@@ -1,12 +1,11 @@
 """
 RootsMagic Historical County Fixer.
 
-This script updates a RootsMagic database by analyzing geocoded timeline markers
-and comparing them against historical shapefiles (like the Newberry Atlas).
-It intelligently forks existing places, updating their display names to reflect
-the correct historical county or territory boundaries active on the date of
-the event, while preserving original FamilySearch and Ancestry.com tracking IDs
-and coordinates.
+Updates a RootsMagic database by checking each event's geocoded location
+against historical shapefiles (like the Newberry Atlas) and forking the
+place record to reflect the correct historical county or territory as of
+that date, while preserving the original FamilySearch/Ancestry tracking
+IDs and coordinates.
 """
 
 import calendar
@@ -16,6 +15,7 @@ import re
 import shutil
 import sqlite3
 import warnings
+from pathlib import Path
 from typing import List, Optional
 
 import geopandas as gpd
@@ -23,9 +23,11 @@ from dotenv import load_dotenv
 from shapely.geometry import Point
 from tqdm import tqdm
 
-# Load environment variables from a .env file if present, overriding any
-# existing environment variables with the values from the file.
-load_dotenv(override=True)
+# Global settings come from the project root's .env; this tool's own settings come from
+# its own subfolder's .env, so CountyFix stays runnable standalone. .env values override
+# anything already in the environment.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
+load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 
 # ==========================================
@@ -36,14 +38,14 @@ PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
 # Resolve database path
 _rm_db = os.getenv(
     "COUNTY_RM_DATABASE",
-    "RootsMagic 11/Trees/Pembina - North Dakota.rmtree"
+    "Roots Magic 11/Your Tree.rmtree"
 )
 RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(PROGRAM_DIR, _rm_db)
 
 # Resolve shapefile path
 _shape = os.getenv(
     "COUNTY_SHAPEFILE",
-    "Python/County FIx/US_AtlasHCB_Counties/US_HistCounties_Shapefile/"
+    "MGS_Toolbox/CountyFix/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/"
     "US_HistCounties.shp"
 )
 SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
@@ -167,7 +169,7 @@ def parse_rm_date(date_str: str) -> Optional[str]:
 
 
 def extract_local_parts(place_name: str) -> str:
-    """Intelligently extract the local city/town from a place name string."""
+    """Extract the local city/town from a place name string."""
     if not place_name:
         return ""
 
@@ -436,8 +438,7 @@ def main() -> None:
             local_city = extract_local_parts(current_name)
             county_val = clean_shapefile_name(matched.iloc[0]['NAME'])
             state_val = clean_shapefile_name(matched.iloc[0]['STATE_TERR'])
-            
-            # Determine final_county assignment based on logic
+
             lower_county = county_val.lower()
             pseudo_keywords = [
                 'territory', 'unorganized', 'nca', 'de facto', 'new pur',
@@ -470,7 +471,7 @@ def main() -> None:
                 new_place_id = clone_historical_place(
                     cursor, place_id, new_place_name, place_table_columns
                 )
-                
+
                 # Fetch or use site ID
                 if site_id and site_id > 0 and detail_name:
                     new_site_id = get_or_create_place_detail(

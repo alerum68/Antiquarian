@@ -1,0 +1,10 @@
+customtkinter==6.0.0
+geopandas==1.1.4
+google-genai==2.10.0
+pandas==3.0.3
+pillow==12.3.0
+python-dotenv==1.2.2
+requests==2.34.2
+shapely==2.1.2
+thefuzz==0.22.1
+tqdm==4.66.5
