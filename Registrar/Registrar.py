@@ -1,5 +1,5 @@
 """
-RootsMagic Duplicate Finder & Task Generator.
+Registrar: RootsMagic Duplicate Finder & Task Generator.
 
 Reads a RootsMagic 11 (.rmtree) SQLite database, uses fuzzy matching to find
 duplicates, and directly creates Task and Folder records in the database.
@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from thefuzz import fuzz
 
 # Global settings come from the project root's .env; this tool's own settings come from
-# its own subfolder's .env, so Dupes stays runnable standalone.
+# its own subfolder's .env, so Registrar stays runnable standalone.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
@@ -27,7 +27,7 @@ MatchValue = Union[str, int, float, bool, None]
 # CONFIGURATION
 # ==========================================
 PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
-_rm_db = os.getenv("DUPE_RM_DATABASE", "Roots Magic 11/Your Tree.rmtree")
+_rm_db = os.getenv("REGISTRAR_RM_DATABASE", "Roots Magic 11/Your Tree.rmtree")
 RM_DATABASE_PATH: str = _rm_db if os.path.isabs(_rm_db) else os.path.join(PROGRAM_DIR, _rm_db)
 
 
@@ -40,19 +40,19 @@ def _get_env_int(key: str, default: int) -> int:
 
 
 # Threshold for people WITH birth years.
-FUZZY_THRESHOLD: int = _get_env_int("DUPE_FUZZY_THRESHOLD", 82)
+FUZZY_THRESHOLD: int = _get_env_int("REGISTRAR_FUZZY_THRESHOLD", 82)
 # Max age gap for Pass 1.
-MAX_AGE_GAP: int = _get_env_int("DUPE_MAX_AGE_GAP", 5)
+MAX_AGE_GAP: int = _get_env_int("REGISTRAR_MAX_AGE_GAP", 5)
 # Strict threshold for people WITHOUT birth years.
-FUZZY_THRESHOLD_STRICT: int = _get_env_int("DUPE_FUZZY_THRESHOLD_STRICT", 95)
+FUZZY_THRESHOLD_STRICT: int = _get_env_int("REGISTRAR_FUZZY_THRESHOLD_STRICT", 95)
 # Threshold for verifying if relatives' names match.
-FAMILY_MATCH_THRESHOLD: int = _get_env_int("DUPE_FAMILY_MATCH_THRESHOLD", 75)
+FAMILY_MATCH_THRESHOLD: int = _get_env_int("REGISTRAR_FAMILY_MATCH_THRESHOLD", 75)
 
-FOLDER_NAME: str = os.getenv("DUPE_FOLDER_NAME", "!Duplicate Review")
+FOLDER_NAME: str = os.getenv("REGISTRAR_FOLDER_NAME", "!Duplicate Review")
 # RootsMagic uses 0-indexed color sets.
-COLOR_SET: int = _get_env_int("DUPE_COLOR_SET", 1)
+COLOR_SET: int = _get_env_int("REGISTRAR_COLOR_SET", 1)
 # 27 = Slate
-COLOR_VALUE: int = _get_env_int("DUPE_COLOR_VALUE", 27)
+COLOR_VALUE: int = _get_env_int("REGISTRAR_COLOR_VALUE", 27)
 
 
 # ==========================================
@@ -194,6 +194,20 @@ def _evaluate_family_context(p1_rels: list, p2_rels: list) -> Tuple[bool, bool]:
     return family_match, family_conflict
 
 
+def _build_match_record(score: int, family_match: bool, p1_id: int, p1: dict, p2: dict,
+                        birth_year_1: MatchValue, birth_year_2: MatchValue,
+                        age_gap: MatchValue) -> Dict[str, MatchValue]:
+    """Assembles one match record dict, shared by both fuzzy-matching passes below (they
+    differ only in what they know about birth year / age gap)."""
+    return {
+        'Score': score, 'Family_Verified': family_match,
+        'ID_1': p1_id, 'Given_1': p1['Given'], 'Surname_1': p1['Surname'], 'Name_1': p1['FullName'],
+        'BirthYear_1': birth_year_1,
+        'ID_2': p2['PersonID'], 'Given_2': p2['Given'], 'Surname_2': p2['Surname'], 'Name_2': p2['FullName'],
+        'BirthYear_2': birth_year_2, 'Age_Gap': age_gap
+    }
+
+
 def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
                           test_limit: Optional[int] = None
                           ) -> pd.DataFrame:
@@ -260,21 +274,8 @@ def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
                 if family_conflict:
                     continue  # Skip this match entirely.
 
-                matches.append({
-                    'Score': score,
-                    'Family_Verified': family_match,
-                    'ID_1': p1_id,
-                    'Given_1': p1['Given'],
-                    'Surname_1': p1['Surname'],
-                    'Name_1': p1_name,
-                    'BirthYear_1': p1_yr,
-                    'ID_2': p2['PersonID'],
-                    'Given_2': p2['Given'],
-                    'Surname_2': p2['Surname'],
-                    'Name_2': p2['FullName'],
-                    'BirthYear_2': p2['BirthYear'],
-                    'Age_Gap': age_diff
-                })
+                matches.append(_build_match_record(score, family_match, p1_id, p1, p2,
+                                                   p1_yr, p2['BirthYear'], age_diff))
     print()
 
     # PASS 2: Unknown Age vs All
@@ -311,23 +312,9 @@ def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
                     if family_conflict:
                         continue  # Skip this match entirely.
 
-                    matches.append({
-                        'Score': score,
-                        'Family_Verified': family_match,
-                        'ID_1': p1_id,
-                        'Given_1': p1['Given'],
-                        'Surname_1': p1['Surname'],
-                        'Name_1': p1_name,
-                        'BirthYear_1': 'Unknown',
-                        'ID_2': p2['PersonID'],
-                        'Given_2': p2['Given'],
-                        'Surname_2': p2['Surname'],
-                        'Name_2': p2['FullName'],
-                        'BirthYear_2': (
-                            p2['BirthYear'] if p2['BirthYear'] > 0 else 'Unknown'
-                        ),
-                        'Age_Gap': 'Unknown'
-                    })
+                    matches.append(_build_match_record(
+                        score, family_match, p1_id, p1, p2, 'Unknown',
+                        p2['BirthYear'] if p2['BirthYear'] > 0 else 'Unknown', 'Unknown'))
         print()
     elif test_limit:
         print(" - Pass 2: Skipped due to Test Mode.")
@@ -531,7 +518,7 @@ def main() -> None:
     """Main execution entry point."""
     # flush=True ensures the UI instantly receives the print statements
     print("==========================================", flush=True)
-    print("RootsMagic Duplicate Finder", flush=True)
+    print("Registrar - RootsMagic Duplicate Finder", flush=True)
     print("==========================================", flush=True)
     print("Select run mode:", flush=True)
     print(" 1. Pass 1 only (Compare records with known birth years - FASTER)",

@@ -1,6 +1,5 @@
 import os
 import sys
-import json
 import re
 from pathlib import Path
 
@@ -8,7 +7,7 @@ import requests
 from dotenv import load_dotenv
 
 # Global settings come from the project root's .env; this tool's own settings come from
-# its own subfolder's .env, so LACDownloader stays runnable standalone.
+# its own subfolder's .env, so Voyageur stays runnable standalone.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
@@ -83,8 +82,6 @@ def download_manifest(manifest_url):
 
 def download_images(manifest_data, out_dir, roll_num):
     """Loops through the manifest canvases and downloads max-resolution files."""
-    #    canvases = []
-
     # Support IIIF Presentation API v2 (Older standard)
     if "sequences" in manifest_data and manifest_data["sequences"]:
         canvases = manifest_data["sequences"][0].get("canvases", [])
@@ -109,7 +106,7 @@ def download_images(manifest_data, out_dir, roll_num):
 
     for i, canvas in enumerate(canvases, 1):
         try:
-            #            img_id = ""
+            img_id = ""
 
             # Navigate IIIF v2 JSON schema
             if "images" in canvas:
@@ -153,16 +150,20 @@ def download_images(manifest_data, out_dir, roll_num):
         except Exception as e:
             print(f"\n[Warning] Failed to download image {i}: {e}")
 
-    print(f"\n\n[System] ✨ LAC Download for {roll_num} completed successfully!")
+    print(f"\n\n[System] LAC Download for {roll_num} completed successfully!")
 
 
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
-if __name__ == "__main__":
+def main() -> None:
     p_dir, m_dir, url = get_env_paths()
     roll, manifest = parse_url(url)
     output_directory = setup_directories(p_dir, m_dir, roll)
 
     manifest_json = download_manifest(manifest)
     download_images(manifest_json, output_directory, roll)
+
+
+if __name__ == "__main__":
+    main()
