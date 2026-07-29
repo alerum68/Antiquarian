@@ -10,6 +10,7 @@ venv/
 # IDE / tooling
 /.idea/
 /.claude/
+/CLAUDE.md
 
 # OS junk
 .DS_Store
