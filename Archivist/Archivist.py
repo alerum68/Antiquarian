@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Hashable, List, Literal, Optional, Tuple, TypedDict, Union, cast
 
 import pandas as pd
+import yaml
 from dotenv import load_dotenv
 
 # A raw scalar value as read from a JSON field or DataFrame cell.
@@ -44,9 +45,15 @@ class FlagRecord(TypedDict):
 # CONFIGURATION
 # ==========================================
 # Global settings come from the project root's .env; this tool's own settings come
-# from its own subfolder's .env, so Archivist stays runnable standalone.
+# from its own subfolder's .env, so Archivist stays runnable standalone. A church
+# document's citation-source settings (call number, repository, etc.) are configured
+# alongside its register/parish info in Paleographer's own settings tab, so Archivist
+# also reads Paleographer's .env directly (never through Scriptorium.py) - see
+# apply_record_type_field_remap, which resolves the actual values from whichever of
+# these three .env files has them.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+load_dotenv(Path(__file__).resolve().parent.parent / "Paleographer" / ".env", override=False)
 
 
 def get_env_int(key: str, default: int) -> int:
@@ -98,7 +105,11 @@ FTM_DIR = safe_path(PROGRAM_DIR, os.getenv("FTM_DIR", ""))
 JSON_DIR = safe_path(PROGRAM_DIR, os.getenv("JSON_DIR", ""))
 GEDCOM_OUTPUT_PATH = safe_path(PROGRAM_DIR, os.getenv("GEDCOM_OUTPUT_PATH", ""))
 GEDCOM_OUTPUT_NAME = os.getenv("GEDCOM_OUTPUT_NAME", "Family_Register.ged")
-IMAGE_DIR = safe_path(PROGRAM_DIR, os.getenv("IMAGE_DIR", ""))
+# Census has no .pmt (no field_remap table to resolve this from - see
+# apply_record_type_field_remap, which handles church/scrip instead), so its own prefixed
+# key is read directly here as a plain fallback, standalone, with no dependency on
+# Scriptorium.py bridging CENSUS_IMAGE_DIR to the generic name.
+IMAGE_DIR = safe_path(PROGRAM_DIR, os.getenv("IMAGE_DIR", "") or os.getenv("CENSUS_IMAGE_DIR", ""))
 IMAGE_EXTENSION = os.getenv("IMAGE_EXTENSION", "").lstrip(".").lower()
 FORM_TYPE = IMAGE_EXTENSION
 
@@ -2567,8 +2578,54 @@ def build_gedcom_from_church(json_data: dict, target_software: str) -> str:
     return "\n".join(ged)
 
 
+def apply_record_type_field_remap(record_type_name: str) -> None:
+    """Resolves this document's own citation-source settings (CALL_NUMBER, COLLECTION_URL,
+    COLLECTION_NAME, REPOSITORY, REPOSITORY_LOC, IMAGE_DIR, GEDCOM_OUTPUT_NAME) via the
+    matching .pmt's field_remap table (see Paleographer/prompts/*.pmt's front matter),
+    reading whichever of that record type's own prefixed .env keys is actually set - the
+    same mechanism Paleographer.py's own resolve_setting uses. record_type_name is read
+    directly off the loaded JSON (set by Paleographer itself - see its load_master_db),
+    never guessed or hardcoded as a family-name string here. A record type with no
+    matching .pmt (or no field_remap entry for a given setting) leaves that setting
+    exactly as already resolved from Archivist's own .env - this only ever adds
+    resolution, never removes a value that was already set."""
+    global CALL_NUMBER, COLLECTION_URL, COLLECTION_NAME, REPOSITORY, REPOSITORY_LOC, IMAGE_DIR, GEDCOM_OUTPUT_NAME
+
+    pmt_path = Path(__file__).resolve().parent.parent / "Paleographer" / "prompts" / f"{record_type_name}.pmt"
+    if not record_type_name or not pmt_path.is_file():
+        return
+
+    raw = pmt_path.read_text(encoding="utf-8")
+    stripped = raw.lstrip()
+    if not stripped.startswith("---"):
+        return
+    parts = stripped.split("---", 2)
+    if len(parts) < 3:
+        return
+    front_matter = yaml.safe_load(parts[1]) or {}
+    field_remap = front_matter.get("field_remap", {}) or {}
+
+    resolved: Dict[str, str] = {}
+    for prefixed_key, target in field_remap.items():
+        val = os.getenv(prefixed_key, "")
+        if val:
+            resolved[target] = val
+
+    CALL_NUMBER = resolved.get("CALL_NUMBER") or CALL_NUMBER
+    COLLECTION_URL = resolved.get("COLLECTION_URL") or COLLECTION_URL
+    COLLECTION_NAME = resolved.get("COLLECTION_NAME") or COLLECTION_NAME
+    REPOSITORY = resolved.get("REPOSITORY") or REPOSITORY
+    REPOSITORY_LOC = resolved.get("REPOSITORY_LOC") or REPOSITORY_LOC
+    if resolved.get("IMAGE_DIR"):
+        IMAGE_DIR = safe_path(PROGRAM_DIR, resolved["IMAGE_DIR"])
+    if resolved.get("GEDCOM_OUTPUT_NAME") and not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
+        GEDCOM_OUTPUT_NAME = resolved["GEDCOM_OUTPUT_NAME"]
+
+
 def run_church_flavor(data: dict) -> None:
     global REPOSITORY, REPOSITORY_LOC
+    apply_record_type_field_remap(data.get("record_type_name", ""))
+
     # REPOSITORY/REPOSITORY_LOC are shared generic names with the census flavor (which
     # relies on them defaulting blank so its own JSON-scraped values via get_json_fallback
     # aren't masked), so the church-specific default is applied here rather than as a

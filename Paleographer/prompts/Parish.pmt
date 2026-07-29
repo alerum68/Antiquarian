@@ -27,6 +27,19 @@ settings_sections:
   - "Parish Information"
   - "Register Information"
   - "Church Citation (Source)"
+# Maps this record type's own prefixed settings-tab keys (grouped under the sections
+# above, saved to Paleographer/.env) to the generic runtime env var name Paleographer.py
+# and Archivist.py each actually read from their own .env - so neither script depends on
+# Scriptorium.py's GUI layer to bridge the two; each resolves this itself, standalone.
+field_remap:
+  CHURCH_IMAGE_DIR: IMAGE_DIR
+  CHURCH_MASTER_DB_NAME: MASTER_DB_NAME
+  CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
+  CHURCH_CALL_NUMBER: CALL_NUMBER
+  CHURCH_COLLECTION_URL: COLLECTION_URL
+  CHURCH_COLLECTION_NAME: COLLECTION_NAME
+  CHURCH_REPOSITORY: REPOSITORY
+  CHURCH_REPOSITORY_LOC: REPOSITORY_LOC
 ---
 
 You are an expert genealogist and translator specializing in 19th-century Catholic parish registers from Métis and French-Canadian communities in the Red River / northern Great Plains region. Extract the historical parish register sheet into JSON.

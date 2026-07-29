@@ -43,13 +43,24 @@ RECORD_TYPE_NAME = os.getenv("PALEOGRAPHER_RECORD_TYPE", "")
 COLLECTION_TITLE = os.getenv("VOLUME_TITLE")
 VOLUME_NUM = os.getenv("VOLUME_NUM", "")
 
-# Matches Scriptorium.py's own _record_type_family() classification exactly, so the
-# master DB is self-describing - Scriptorium's "Generate GEDCOM" auto-dispatch (and
-# Archivist's own FIELD_REMAP selection) can read this directly instead of falling back
-# to guessing "church" for anything that isn't shaped like a census file, which silently
-# misclassified Scrip output as Church (wrong image dir/settings) since Paleographer
-# never wrote this field at all before.
-RECORD_FAMILY = "scrip" if RECORD_TYPE_NAME.strip().lower().removesuffix(".pmt") == "scrip" else "church"
+TYPE_CFG = engine.parse_type_config(engine.resolve_prompt_path(RECORD_TYPE_NAME))
+
+
+def resolve_setting(generic_key: str, default: str = "") -> str:
+    """Resolves a generic runtime setting (IMAGE_DIR, MASTER_DB_NAME, ...) via the active
+    record type's own field_remap table (see Parish.pmt/Scrip.pmt's front matter): finds
+    whichever of this record type's own prefixed .env keys maps to generic_key, and reads
+    that. Falls back to reading generic_key directly so a record type with no field_remap
+    entry for it (or no field_remap at all) still works. This is what lets Paleographer.py
+    resolve its own settings from its own .env with no dependency on Scriptorium.py's GUI
+    layer bridging prefixed settings-tab names to the generic names this script reads."""
+    for prefixed_key, target in TYPE_CFG.field_remap.items():
+        if target == generic_key:
+            val = os.getenv(prefixed_key, "")
+            if val:
+                return val
+    return os.getenv(generic_key, default)
+
 
 API_BUDGET: float = float(os.getenv("API_BUDGET", "5.00"))
 COST_CFG = engine.CostConfig(
@@ -59,8 +70,8 @@ COST_CFG = engine.CostConfig(
 )
 
 PROGRAM_DIR: Path = Path(os.getenv("PROGRAM_DIR", ""))
-MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / os.getenv("MASTER_DB_NAME", ""))
-SOURCE_DIR: str = str(PROGRAM_DIR / os.getenv("IMAGE_DIR", ""))
+MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / resolve_setting("MASTER_DB_NAME"))
+SOURCE_DIR: str = str(PROGRAM_DIR / resolve_setting("IMAGE_DIR"))
 
 MODEL_ID: str = os.getenv("MODEL_NAME") or ""
 if not MODEL_ID:
@@ -72,7 +83,6 @@ SOURCE_SUFFIXES = engine.IMAGE_SUFFIXES + (".pdf",)
 with open(Path(__file__).resolve().parent / "schema.json", "r", encoding="utf-8") as _schema_file:
     CORE_SCHEMA: Dict[str, Any] = json.load(_schema_file)
 
-TYPE_CFG = engine.parse_type_config(engine.resolve_prompt_path(RECORD_TYPE_NAME))
 SCHEMA: Dict[str, Any] = engine.build_merged_schema(CORE_SCHEMA, TYPE_CFG.extra_fields)
 
 
@@ -123,9 +133,11 @@ def tag_document_metadata(page_data: Dict[str, Any], file_name: str, file_ext: s
 def load_master_db() -> Dict[str, Any]:
     if os.path.exists(MASTER_DB):
         with open(MASTER_DB, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"collection_title": COLLECTION_TITLE, "sheets": [], "total_spent": 0.0,
-            "total_pages_processed": 0, "pending_batch_jobs": []}
+            data = json.load(f)
+        data.setdefault("record_type_name", TYPE_CFG.name)
+        return data
+    return {"collection_title": COLLECTION_TITLE, "record_type_name": TYPE_CFG.name, "sheets": [],
+            "total_spent": 0.0, "total_pages_processed": 0, "pending_batch_jobs": []}
 
 
 def save_master_db(master_data: Dict[str, Any]) -> None:
