@@ -1,0 +1,550 @@
+{
+  "person": {
+    "Birth": {
+      "gedcom_tag": "BIRT",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "1"
+    },
+    "Death": {
+      "gedcom_tag": "DEAT",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "2"
+    },
+    "Christen": {
+      "gedcom_tag": "CHR",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "3"
+    },
+    "Burial": {
+      "gedcom_tag": "BURI",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "4"
+    },
+    "Cremation": {
+      "gedcom_tag": "CREM",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "5"
+    },
+    "Adoption": {
+      "gedcom_tag": "ADOP",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "6"
+    },
+    "Baptism": {
+      "gedcom_tag": "BAPM",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "7"
+    },
+    "Bar Mitzvah": {
+      "gedcom_tag": "BARM",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "8"
+    },
+    "Bas Mitzvah": {
+      "gedcom_tag": "BASM",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "9"
+    },
+    "Blessing": {
+      "gedcom_tag": "BLES",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "10"
+    },
+    "Christen (adult)": {
+      "gedcom_tag": "CHRA",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "11"
+    },
+    "Confirmation": {
+      "gedcom_tag": "CONF",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "12"
+    },
+    "First communion": {
+      "gedcom_tag": "FCOM",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "13"
+    },
+    "Ordination": {
+      "gedcom_tag": "ORDN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "14"
+    },
+    "Naturalization": {
+      "gedcom_tag": "NATU",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "15"
+    },
+    "Emigration": {
+      "gedcom_tag": "EMIG",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "16"
+    },
+    "Immigration": {
+      "gedcom_tag": "IMMI",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "17"
+    },
+    "Census": {
+      "gedcom_tag": "CENS",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "18"
+    },
+    "Probate": {
+      "gedcom_tag": "PROB",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "19"
+    },
+    "Will": {
+      "gedcom_tag": "WILL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "20"
+    },
+    "Graduation": {
+      "gedcom_tag": "GRAD",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "21"
+    },
+    "Retirement": {
+      "gedcom_tag": "RETI",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "22"
+    },
+    "Description": {
+      "gedcom_tag": "DSCR",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "23"
+    },
+    "Education": {
+      "gedcom_tag": "EDUC",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "24"
+    },
+    "Nationality": {
+      "gedcom_tag": "NATI",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "25"
+    },
+    "Occupation": {
+      "gedcom_tag": "OCCU",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "26"
+    },
+    "Property": {
+      "gedcom_tag": "PROP",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "27"
+    },
+    "Religion": {
+      "gedcom_tag": "RELI",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "28"
+    },
+    "Residence": {
+      "gedcom_tag": "RESI",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "29"
+    },
+    "Soc Sec No": {
+      "gedcom_tag": "SSN",
+      "use_value": true,
+      "use_date": false,
+      "use_place": false,
+      "custom": false,
+      "code": "30"
+    },
+    "LDS Baptism": {
+      "gedcom_tag": "BAPL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "31"
+    },
+    "LDS Endowment": {
+      "gedcom_tag": "ENDL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "32"
+    },
+    "LDS Seal to parents": {
+      "gedcom_tag": "SLGC",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "33"
+    },
+    "Ancestral File Number": {
+      "gedcom_tag": "AFN",
+      "use_value": true,
+      "use_date": false,
+      "use_place": false,
+      "custom": false,
+      "code": "34"
+    },
+    "Reference No": {
+      "gedcom_tag": "REFN",
+      "use_value": true,
+      "use_date": false,
+      "use_place": false,
+      "custom": false,
+      "code": "35"
+    },
+    "Caste": {
+      "gedcom_tag": "CAST",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "36"
+    },
+    "Title (Nobility)": {
+      "gedcom_tag": "TITL",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "37"
+    },
+    "LDS Confirmation": {
+      "gedcom_tag": "CONL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "38"
+    },
+    "LDS Initiatory": {
+      "gedcom_tag": "WAC",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "39"
+    },
+    "Degree": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "500"
+    },
+    "Military": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "501"
+    },
+    "Mission": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "502"
+    },
+    "Stillborn": {
+      "gedcom_tag": "EVEN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "503"
+    },
+    "Illness": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "504"
+    },
+    "Living": {
+      "gedcom_tag": "EVEN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "505"
+    },
+    "Election": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "507"
+    },
+    "Excommunication": {
+      "gedcom_tag": "EVEN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "508"
+    },
+    "Namesake": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "509"
+    },
+    "Alternate name": {
+      "gedcom_tag": "EVEN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": false,
+      "custom": false,
+      "code": "900"
+    },
+    "DNA test": {
+      "gedcom_tag": "_DNA",
+      "use_value": false,
+      "use_date": true,
+      "use_place": false,
+      "custom": false,
+      "code": "901"
+    },
+    "Association": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "902"
+    },
+    "Miscellaneous": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "999"
+    },
+    "Race": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": false,
+      "custom": true,
+      "code": "10001"
+    },
+    "dit Name": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": true,
+      "code": "10002"
+    },
+    "Scrip": {
+      "gedcom_tag": "EVEN",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": true,
+      "code": "10004"
+    }
+  },
+  "family": {
+    "Marriage": {
+      "gedcom_tag": "MARR",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "300"
+    },
+    "Annulment": {
+      "gedcom_tag": "ANUL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "301"
+    },
+    "Divorce": {
+      "gedcom_tag": "DIV",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "302"
+    },
+    "Divorce filed": {
+      "gedcom_tag": "DIVF",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "303"
+    },
+    "Engagement": {
+      "gedcom_tag": "ENGA",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "304"
+    },
+    "Marriage Bann": {
+      "gedcom_tag": "MARB",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "305"
+    },
+    "Marriage Contract": {
+      "gedcom_tag": "MARC",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "306"
+    },
+    "Marriage License": {
+      "gedcom_tag": "MARL",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "307"
+    },
+    "Marriage Settlement": {
+      "gedcom_tag": "MARS",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "308"
+    },
+    "LDS Seal to spouse": {
+      "gedcom_tag": "SLGS",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "309"
+    },
+    "Residence (family)": {
+      "gedcom_tag": "RESI",
+      "use_value": true,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "310"
+    },
+    "Census (family)": {
+      "gedcom_tag": "CENS",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "311"
+    },
+    "Separation": {
+      "gedcom_tag": "EVEN",
+      "use_value": false,
+      "use_date": true,
+      "use_place": true,
+      "custom": false,
+      "code": "510"
+    }
+  }
+}

@@ -18,7 +18,7 @@ from google import genai
 # CONFIGURATION
 # ==========================================
 # Global settings come from the project root's .env; this tool's own settings come from
-# its own subfolder's .env, so ChurchRegisters stays runnable standalone.
+# its own subfolder's .env, so Paleographer stays runnable standalone.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
