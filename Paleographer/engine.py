@@ -12,6 +12,9 @@ ever requires a new .pmt file in prompts/.
 import copy
 import json
 import re
+import shutil
+import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +29,14 @@ from PIL import Image
 from google import genai
 # noinspection unresolved-references
 from google.genai import types
+
+# PDFix lives in its own sibling tool folder, not an installed package - add the repo
+# root to sys.path so it can be imported the same way every other same-folder import in
+# this codebase already relies on Python's automatic sys.path[0] behavior.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from PDFix.PDFix import optimize_pdf, COMPRESSION_PARAMS  # noqa: E402
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_TYPE = "Parish.pmt"
@@ -327,6 +338,28 @@ def get_pdf_page_count(pdf_path: Union[str, Path]) -> int:
         return len(pdf.pages)
 
 
+def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path:
+    """Runs PDFix's lossless structural optimization (garbage-collection + stream deflate)
+    against a throwaway temp copy before uploading to Gemini, to cut upload size/cost -
+    mirrors optimize_image()'s downscaling for images, but structural rather than pixel-
+    based (embedded image DPI is untouched, so transcription quality is unaffected at any
+    level). NEVER mutates the researcher's original source PDF: optimize_pdf() itself does
+    an in-place move onto whatever path it's given, so that move is aimed at the temp
+    copy, not file_path. Falls back to returning file_path unchanged if anything goes
+    wrong, so a failed optimization never blocks the actual upload."""
+    tmp_fd, tmp_path_str = tempfile.mkstemp(suffix=".pdf", prefix="pdfix_upload_")
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_path_str)
+    try:
+        shutil.copy2(file_path, tmp_path)
+        params = COMPRESSION_PARAMS.get(compression_level, COMPRESSION_PARAMS[2])
+        optimize_pdf(str(tmp_path), params)
+        return tmp_path
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        return file_path
+
+
 def build_content_part_for_file(client: genai.Client, file_path: Path) -> Tuple[str, Any]:
     """Classifies a source file and returns (mode, content_part), where mode is one of
     "image", "pdf_native", or "pdf_text", and content_part is what should be appended to
@@ -341,7 +374,14 @@ def build_content_part_for_file(client: genai.Client, file_path: Path) -> Tuple[
             with pdfplumber.open(str(file_path)) as pdf:
                 text = "\n".join(page.extract_text() or "" for page in pdf.pages)
             return "pdf_text", text
-        uploaded = client.files.upload(file=str(file_path))
+
+        compression_level = int(os.getenv("PALEOGRAPHER_PDF_COMPRESSION_LEVEL", "2"))
+        optimized_path = optimize_pdf_for_upload(file_path, compression_level)
+        try:
+            uploaded = client.files.upload(file=str(optimized_path))
+        finally:
+            if optimized_path != file_path:
+                optimized_path.unlink(missing_ok=True)
         return "pdf_native", uploaded
 
     raise ValueError(f"Unsupported file type: {file_path}")
