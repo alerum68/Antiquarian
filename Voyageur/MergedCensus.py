@@ -43,12 +43,12 @@ def _sheet_locators(sheet: dict) -> Tuple[str, str, str]:
     records = sheet.get('records', [])
     ts = records[0].get('type_specific_fields', {}) if records else {}
     return (normalize_locator(ts.get('enumeration_district')),
-           normalize_locator(sheet.get('page_id')),
-           normalize_locator(ts.get('roll_number')))
+            normalize_locator(sheet.get('page_id')),
+            normalize_locator(ts.get('roll_number')))
 
 
 def match_sheets(ancestry_sheets: List[dict], fs_sheets: List[dict]
-                ) -> List[Tuple[Optional[dict], Optional[dict]]]:
+                 ) -> List[Tuple[Optional[dict], Optional[dict]]]:
     """Pairs sheets sharing an (ED, page_number) locator. Roll number is checked as a
     tie-breaker only when *both* sides actually have it (FamilySearch's census citation
     never exposes film_number, only roll_number - comparing the wrong pair of fields
@@ -128,7 +128,7 @@ def match_participants(a_pairs: List[Tuple[dict, dict]], fs_pairs: List[Tuple[di
 # only Ancestry's - the identity/vital fields, not internal bookkeeping (role_number,
 # type_specific_fields, facts - those are handled separately, not field-by-field here).
 MERGE_FIELDS = ('std_given', 'std_surname', 'sex', 'age', 'birth_place', 'race',
-               'occupation', 'residence', 'role_name')
+                'occupation', 'residence', 'role_name')
 
 
 def merge_participant(a_participant: Optional[dict], fs_participant: Optional[dict]) -> dict:

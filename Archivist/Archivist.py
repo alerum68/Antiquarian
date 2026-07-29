@@ -756,7 +756,7 @@ def resolve_cross_family_links(
                             parent_children.append(sib)
                             flags.append({'person': sib,
                                           'reason': f"Inferred as child of {parent_name} {maiden_surname} via "
-                                                    f"sibling link to head's spouse",
+                                          f"sibling link to head's spouse",
                                           'confidence': 0.85})
 
                 # Clear migrated individuals from the spouse_parents unit
@@ -936,7 +936,7 @@ def parse_household_relational(
             unrelated.append(m)
             flags.append({'person': m,
                           'reason': f"Stated relationship to head: {rel.title()} -- review for correct "
-                                    f"family placement",
+                          f"family placement",
                           'confidence': 0.5})
         else:
             unrelated.append(m)
@@ -2397,10 +2397,10 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
                     main_fam.append(f"2 NOTE Margin note suggests alternate spelling for {who}: {alt_values}")
 
             witnesses = [p for p in rec.get('participants', [])
-                        if p.get('role_semantic') not in ('primary', 'spouse')]
+                         if p.get('role_semantic') not in ('primary', 'spouse')]
             main_fam.extend(build_witness_links(rec, witnesses, vol, target_software))
             main_fam.append(build_church_citation(rec, primary, event_tag, vol, media_uid,
-                                                   get_proof_status(event_date), target_software))
+                                                  get_proof_status(event_date), target_software))
 
         fams.append("\n".join([line for line in main_fam if line]))
 

@@ -31,6 +31,8 @@ FIELD_MAPS_DIR = Path(__file__).resolve().parent / "field_maps"
 # and Archivist are independently standalone-runnable tools (see the design spec) and
 # this is a small, stable piece of US census history, not something either tool "owns"
 # in a way that would make importing across tool boundaries appropriate.
+
+
 def get_census_era(year: int) -> str:
     if year <= 1840:
         return "pre1850"
@@ -68,7 +70,8 @@ def _household_key(columns: Dict[str, str], field_map: Dict[str, Dict[str, str]]
     return None
 
 
-def _group_household(people: List[dict], field_map: Dict[str, Dict[str, str]]) -> List[Tuple[Optional[str], List[dict]]]:
+def _group_household(people: List[dict], field_map: Dict[str, Dict[str, str]]
+                     ) -> List[Tuple[Optional[str], List[dict]]]:
     """Groups people sharing the same family/dwelling number into one household. A person
     with no such number at all (or when no one on the page has one) becomes their own
     single-person group - there's nothing to group them with."""
@@ -135,7 +138,8 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
     if unmapped:
         participant["type_specific_fields"]["unmapped"] = unmapped
         participant["review"] = True
-        participant["review_reason"] = "Unmapped column(s), preserved but not normalized: " + ", ".join(sorted(unmapped))
+        participant["review_reason"] = ("Unmapped column(s), preserved but not normalized: "
+                                        + ", ".join(sorted(unmapped)))
         unmapped_seen.update(unmapped.keys())
 
     if not participant["std_given"]:

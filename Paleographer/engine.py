@@ -250,7 +250,7 @@ def build_vocabulary_summary(type_cfg: TypeConfig) -> str:
         if name and name not in role_context_by_name:
             role_context_by_name[name] = r.get("context")
     role_lines = [f"{name} ({context})" if context else name
-                 for name, context in sorted(role_context_by_name.items())]
+                  for name, context in sorted(role_context_by_name.items())]
     role_names = ", ".join(role_lines)
 
     return dedent(f"""

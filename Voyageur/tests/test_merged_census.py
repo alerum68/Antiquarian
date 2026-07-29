@@ -4,7 +4,7 @@ import MergedCensus
 
 def _doc(sheets, **overrides):
     doc = {"collection_title": "1900 US Census", "record_type_name": "Census_1900",
-          "citation": {}, "sheets": sheets}
+           "citation": {}, "sheets": sheets}
     doc.update(overrides)
     return doc
 
@@ -29,12 +29,12 @@ def _record(participants, **overrides):
 
 def _participant(line, given, surname, **overrides):
     p = {"role_number": None, "role_name": "Head", "std_given": given, "std_surname": surname,
-        "raw_given": None, "raw_surname": None, "dit_name": None, "alternate_names": [],
-        "prefix": None, "suffix": None, "sex": "M", "is_priest": False, "age": None,
-        "age_unit": None, "occupation": None, "race": None, "religion": None, "residence": None,
-        "birth_date": None, "birth_place": None, "death_date": None, "death_place": None,
-        "review": False, "review_reason": None, "facts": [],
-        "type_specific_fields": {"line_number": line}}
+         "raw_given": None, "raw_surname": None, "dit_name": None, "alternate_names": [],
+         "prefix": None, "suffix": None, "sex": "M", "is_priest": False, "age": None,
+         "age_unit": None, "occupation": None, "race": None, "religion": None, "residence": None,
+         "birth_date": None, "birth_place": None, "death_date": None, "death_place": None,
+         "review": False, "review_reason": None, "facts": [],
+         "type_specific_fields": {"line_number": line}}
     p.update(overrides)
     return p
 
