@@ -1608,12 +1608,113 @@ def load_census_dataframe(data: dict) -> pd.DataFrame:
     return df
 
 
+# Reverses Voyageur's field-map fact_type naming (Voyageur/field_maps/*.yaml) back into
+# the column names build_dynamic_events_and_notes/get_occupation_value/get_education_value
+# already key on (by exact name or by DYNAMIC_EVENT_RULES regex) - so a fact normalized at
+# gather time renders exactly the way an old raw-column reading of the same data always
+# did, without any of those functions needing to change.
+FACT_TYPE_TO_COLUMN = {
+    "Occupation": "Occupation", "Education": "Highest Grade Completed",
+    "Immigration": "Immigration Year", "Naturalization": "Naturalization Status",
+    "Military": "Military Service", "Residence": "Residence", "Religion": "Religion",
+    "Property": "Real Estate Value", "Miscellaneous": "Miscellaneous Note",
+}
+
+
+def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, str]:
+    """Adapts the shared sheets[].records[].participants[] schema (as Voyageur's field-map
+    normalization now produces for census gathers - see Voyageur/census_schema.py) into the
+    same flat, old-column-named DataFrame shape load_census_dataframe has always produced,
+    so every household-parsing/citation function below keeps working completely unchanged.
+    This is the one place a census JSON's shared-schema shape is translated back into
+    Archivist's own internal working shape; nothing downstream of this function needs to
+    know the input was ever anything but that shape.
+
+    Returns (dataframe, census_year_str, location_str) - the latter two replace what
+    run_census_flavor used to read directly off the old top-level census_year/location
+    keys, which the shared schema no longer carries at that level."""
+    citation = data.get('citation', {}) or {}
+    census_year_str = ""
+    year_match = re.search(r'(\d{4})', data.get('record_type_name', '') or '')
+    if year_match:
+        census_year_str = year_match.group(1)
+
+    location_str = ""
+    rows = []
+    fallback_family_counter = 0
+    for sheet in data.get('sheets', []):
+        doc_meta = sheet.get('document_metadata', {})
+        for record in sheet.get('records', []):
+            ts = record.get('type_specific_fields', {}) or {}
+            if not location_str:
+                location_str = ts.get('state', '') or doc_meta.get('source_location', '')
+
+            fallback_family_counter += 1
+            family_id = ts.get('family_number') or f"__record_{fallback_family_counter}"
+
+            page_meta = {
+                'Page_Number': sheet.get('page_id', ''), 'Image_ID': doc_meta.get('file_name', ''),
+                'Country': ts.get('country', ''), 'State': ts.get('state', ''),
+                'County': ts.get('county', ''), 'City': ts.get('city', ''),
+                'Enumeration_District': ts.get('enumeration_district', ''),
+                'Film': ts.get('film_number', ''), 'Roll': ts.get('roll_number', ''),
+                'APID_DB': ts.get('apid_db', '') or citation.get('apid_db', ''),
+                'Publisher': citation.get('publisher', ''), 'Publisher Location': citation.get('pub_loc', ''),
+                'Repository': citation.get('repository', ''), 'Repository Location': citation.get('repository_loc', ''),
+                'Family Number': family_id,
+            }
+            for p in record.get('participants', []):
+                pts = p.get('type_specific_fields', {}) or {}
+                row: Dict[str, Any] = dict(page_meta)
+                row['Given Name'] = p.get('std_given', '') or ''
+                row['Surname'] = p.get('std_surname', '') or ''
+                row['Gender'] = p.get('sex', '') or ''
+                if p.get('age'):
+                    row['Age'] = p['age']
+                if p.get('role_name'):
+                    row['Relationship to Head'] = p['role_name']
+                if pts.get('line_number'):
+                    row['Line Number'] = pts['line_number']
+                if p.get('birth_place'):
+                    row['Birth Place'] = p['birth_place']
+                if p.get('race'):
+                    row['Race'] = p['race']
+                for fact in p.get('facts', []) or []:
+                    col = FACT_TYPE_TO_COLUMN.get(fact.get('fact_type', ''), fact.get('fact_type', ''))
+                    row[col] = fact.get('value') or fact.get('date') or fact.get('place') or ''
+                row['PID'] = pts.get('pid', '')
+                row['Extracted_URL'] = pts.get('extracted_url', '')
+                row['FSFTID'] = pts.get('fsftid', '')
+                row['FamilySearch_URL'] = pts.get('familysearch_url', '')
+                row['AlternateNames'] = json.dumps(p.get('alternate_names', []) or [])
+                row['AlternateBirthPlaces'] = json.dumps(pts.get('alternate_birth_places', []) or [])
+                if pts.get('merge_review_reason'):
+                    row['_MergeReviewReason'] = pts['merge_review_reason']
+                rows.append(row)
+
+    df = pd.DataFrame(rows)
+    for numeric_col in ['Age', 'Birth Year']:
+        if numeric_col in df.columns:
+            df[numeric_col] = pd.to_numeric(df[numeric_col], errors='coerce')
+    return df, census_year_str, location_str
+
+
 def run_census_flavor(data: dict) -> None:
     global STATE, COUNTY, TOWNSHIP, ENUMERATION_DISTRICT, ROLL_NUMBER, FILM_NUMBER, CENSUS_YEAR, CENSUS_ERA
     global APID_DB, COLLECTION_NAME, COLLECTION_URL, PUBLISHER, PUB_LOC, CALL_NUMBER, REPOSITORY_LOC, REPOSITORY
     global IMAGE_DIR
 
-    census_df = load_census_dataframe(data)
+    # "pages" (Voyageur's original raw shape) is kept working for any already-gathered
+    # file that predates the shared-schema normalization; "sheets" + a "Census_"-prefixed
+    # record_type_name is what Voyageur now produces (see census_schema.py) - dispatched
+    # on record_type_name, never guessed from shape alone, since the church flavor also
+    # uses "sheets" now.
+    if "pages" in data:
+        census_df = load_census_dataframe(data)
+        payload_year = clean_val(data.get('census_year'))
+        payload_location = clean_val(data.get('location'))
+    else:
+        census_df, payload_year, payload_location = build_census_dataframe_from_unified(data)
 
     # Fallback to JSON columns if environment variables are missing or 0
     STATE = get_json_fallback(census_df, ['State', 'State/Province'], STATE)
@@ -1628,8 +1729,7 @@ def run_census_flavor(data: dict) -> None:
     census_year_str = get_json_fallback(census_df, ['Census Year', 'Year', 'Census_Year'], str(CENSUS_YEAR))
     CENSUS_YEAR = int(census_year_str) if census_year_str and census_year_str.isdigit() else 0
     if not CENSUS_YEAR:
-        year_from_payload = clean_val(data.get('census_year'))
-        CENSUS_YEAR = int(year_from_payload) if year_from_payload.isdigit() else 0
+        CENSUS_YEAR = int(payload_year) if payload_year.isdigit() else 0
     CENSUS_ERA = get_census_era(CENSUS_YEAR)
 
     APID_DB = get_json_fallback(census_df, ['APID_DB', 'APID', 'Database ID', 'dbid'], APID_DB)
@@ -1663,7 +1763,7 @@ def run_census_flavor(data: dict) -> None:
     # so Create works standalone from any complete JSON, without Gather having to hand off an
     # already-resolved path. Only overrides IMAGE_DIR when that nested folder actually exists,
     # so a flat/manually-organized IMAGE_DIR still works exactly as before.
-    location_str = clean_val(data.get('location'))
+    location_str = payload_location
     if IMAGE_DIR and CENSUS_YEAR and location_str:
         location_folder = re.sub(r'^USA\s*-\s*', '', location_str)
         nested_dir = Path(IMAGE_DIR) / f"{CENSUS_YEAR} US Federal Census" / location_folder
@@ -2514,9 +2614,13 @@ if __name__ == "__main__":
     with open(input_path, "r", encoding="utf-8") as json_fh:
         loaded_data = json.load(json_fh)
 
-    if "sheets" in loaded_data:
-        run_church_flavor(loaded_data)
-    elif "pages" in loaded_data:
+    # Census and church-register documents both use the "sheets" shape now (see the
+    # design spec) - which builder applies is read from the document's own
+    # record_type_name, never guessed from JSON shape alone. "pages" (Voyageur's
+    # original raw census shape) is kept working for any already-gathered file that
+    # predates the shared-schema normalization.
+    is_census = loaded_data.get("record_type_name", "").startswith("Census_") or "pages" in loaded_data
+    if is_census:
         # Census runs have no settings field for this (only the church flavor's
         # CHURCH_GEDCOM_NAME sets GEDCOM_OUTPUT_NAME), so left unset this always fell
         # through to the module-level default "Family_Register.ged" - not the name the
@@ -2526,8 +2630,10 @@ if __name__ == "__main__":
         if not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
             GEDCOM_OUTPUT_NAME = input_path.stem + ".ged"
         run_census_flavor(loaded_data)
+    elif "sheets" in loaded_data:
+        run_church_flavor(loaded_data)
     else:
         raise ValueError(
             f"Could not determine JSON flavor for {input_path}: expected a top-level "
-            f"'sheets' key (church register) or 'pages' key (census)."
+            f"'sheets' key with a record_type_name, or a legacy 'pages' key (census)."
         )
