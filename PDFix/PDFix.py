@@ -390,21 +390,31 @@ def attempt_pdf_repair(pdf_path):
     return None
 
 
-def page_by_page_recovery(pdf_path):
+def page_by_page_recovery(pdf_path, output_path=None):
     """
     Attempt to repair a damaged PDF file.
 
     Args:
         pdf_path: Path to the PDF file
+        output_path: If given, the repaired PDF is written here instead of overwriting
+            pdf_path in place, and the return value only needs to be checked for
+            truthiness. Used by optimize_pdf()'s page-by-page fallback, which needs a
+            file to exist at this path afterward rather than a live fitz.Document.
 
     Returns:
-        fitz.Document or None: Repaired document or None if repair failed
+        fitz.Document or None: when output_path is not given (repair succeeded or
+        wasn't needed, or repair failed).
+        bool: when output_path is given (True on success, None on failure).
     """
     try:
         # First try opening normally
         pdf_document = fitz.open(pdf_path)
         if pdf_document.is_pdf and pdf_document.page_count > 0:
-            return pdf_document
+            if output_path is None:
+                return pdf_document
+            pdf_document.close()
+            shutil.copy2(pdf_path, output_path)
+            return True
         pdf_document.close()
     except Exception as e:
         print(f"Initial open failed: {e}")
@@ -449,11 +459,14 @@ def page_by_page_recovery(pdf_path):
         # Try to open the repaired PDF
         repaired_doc = fitz.open(temp_file.name)
         if repaired_doc.page_count > 0:
+            repaired_doc.close()
+            if output_path is not None:
+                shutil.copy2(temp_file.name, output_path)
+                return True
             # Copy the repaired file back to original path
             temp_repaired = pdf_path + '.repaired.pdf'
             shutil.copy2(temp_file.name, temp_repaired)
             os.replace(temp_repaired, pdf_path)
-            repaired_doc.close()
             # Re-open the repaired file
             return fitz.open(pdf_path)
         else:
