@@ -1,0 +1,75 @@
+# Declarative normalization map for Ancestry's census index tables.
+#
+# Raw column header (verbatim, exactly as Ancestry's own table header text reads for a
+# given census year) -> a target in the shared record schema. Seeded from the header
+# variants already validated this project's Archivist build previously had to guess
+# among defensively (its CORE_COLUMNS/RELATIONSHIP_COLUMN_CANDIDATES/DYNAMIC_EVENT_RULES
+# tables) - real observed headers, not invented ones. Extend this file as new header
+# text is seen on a live gather; an unmapped header is flagged for review, never
+# silently dropped or guessed at (see census_schema.normalize_census_pages).
+#
+# Targets:
+#   participant_fields:   a flat field name on the unified schema's participant object
+#   participant_facts:    a fact_type from the shared FactTypes.json vocabulary - goes
+#                         into that participant's facts[] array instead of a flat field
+#   record_fields:        a key under the record's own type_specific_fields (household/
+#                         dwelling identity, not a per-person fact)
+
+participant_fields:
+  "Given Name": std_given
+  "Surname": std_surname
+  "Gender": sex
+  "Sex": sex
+  "Age": age
+  "Birth Place": birth_place
+  "Birthplace": birth_place
+  "Race": race
+  "Color": race
+  "Relationship to Head": role_name
+  "Relationship to Head of House": role_name
+  "Relationship": role_name
+  "Relation to Head": role_name
+  "Relation": role_name
+  "Line Number": type_specific_fields.line_number
+  "Line": type_specific_fields.line_number
+
+participant_facts:
+  "Occupation": Occupation
+  "Occupation Category": Occupation
+  "Trade or Profession": Occupation
+  "Industry": Occupation
+  "Highest Grade of School Completed": Education
+  "Highest Grade Completed": Education
+  "Attended School": Education
+  "Immigration Year": Immigration
+  "Year of Immigration": Immigration
+  "Year of Naturalization": Naturalization
+  "Naturalization Status": Naturalization
+  "Naturalization": Naturalization
+  "Veteran Status": Military
+  "Military Service": Military
+  "Which War": Military
+  "Pension": Military
+  "Survivor of Union or Confederate Army/Navy": Military
+  "Maiden Name": Miscellaneous
+  "Quality": Miscellaneous
+  "Real Estate Value": Property
+  "Personal Estate Value": Property
+  "Cannot Read, Write": Education
+  "Disability Condition": Miscellaneous
+  "Deaf Dumb Blind Insane": Miscellaneous
+  "Idiotic Pauper Convict": Miscellaneous
+  "Father Foreign Born": Miscellaneous
+  "Mother Foreign Born": Miscellaneous
+  "Male Citizen Over 21": Miscellaneous
+  "Voting Rights Denied": Miscellaneous
+
+record_fields:
+  "Family Number": family_number
+  "Household Number": family_number
+  "Family": family_number
+  "Household": family_number
+  "Dwelling Number": dwelling_number
+  "Dwelling": dwelling_number
+  "House Number": dwelling_number
+  "Married within Year": married_within_year

@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import shutil
@@ -8,6 +9,8 @@ import webbrowser
 from pathlib import Path
 
 from dotenv import load_dotenv, set_key
+
+import census_schema
 
 
 def _move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
@@ -132,6 +135,19 @@ def main() -> Path:
     final_json = json_target_dir / json_file.name[len(json_prefix):]
     _move_with_retry(json_file, final_json)
 
+    # Normalize at gather time: translate Ancestry's own raw column header text into the
+    # shared record schema's field names via the declarative field map, so Archivist never
+    # has to guess among several possible header spellings downstream. Overwrites the same
+    # file in place - Archivist still just reads whatever JSON_FILE points to.
+    with open(final_json, "r", encoding="utf-8") as f:
+        raw_gather = json.load(f)
+    census_year_raw = raw_gather.get("census_year", "")
+    collection_title = f"{census_year_raw} US Federal Census - {raw_gather.get('location', '')}".strip(" -")
+    normalized = census_schema.normalize_census_pages(
+        raw_gather, "ancestry_census", collection_title, f"Census_{census_year_raw}")
+    with open(final_json, "w", encoding="utf-8") as f:
+        json.dump(normalized, f, indent=2, ensure_ascii=False)
+
     # Persist this as the JSON_FILE setting immediately, before anything below (the image
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
     # button) still targets the exact file that was just produced, instead of whatever
@@ -168,9 +184,18 @@ def main() -> Path:
     print(f"[System] Gather complete. Run Archivist's \"Generate GEDCOM\" when you're ready to "
           f"build the GEDCOM ({final_json.name}).")
 
-    # Gather's job stops here - it stages the JSON and images and hands off, rather than
-    # launching GEDCOM generation itself. Archivist's build_gedcom_from_census/APID_DB/
-    # CENSUS_YEAR fallbacks already derive everything they need from the JSON's own
+    # Gather's job stops here - it stages the JSON (already normalized into the shared
+    # sheets[].records[].participants[] schema above) and images and hands off, rather
+    # than launching GEDCOM generation itself.
+    #
+    # NOTE: as of the field-map normalization work, this JSON's shape is the unified
+    # schema, not the old {census_year, location, pages: [...]} shape. Archivist's own
+    # census-ingestion path has not been updated to read this shape yet (tracked
+    # separately) - until that lands, this normalized output is not yet consumable by
+    # Archivist. This is expected, sequenced work, not a bug.
+    #
+    # Archivist's build_gedcom_from_census/APID_DB/CENSUS_YEAR fallbacks already derive
+    # everything they need from the JSON's own
     # 'census_year'/'location' fields and each page's own scraped columns, so nothing here
     # needs to be persisted for Archivist to find later - see run_census_flavor's
     # get_json_fallback calls and its own image-folder reconstruction from census_year/location.

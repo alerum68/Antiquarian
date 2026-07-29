@@ -77,9 +77,10 @@ def main() -> None:
     # whichever per-source file A.main()/FS.main() each just set it to individually.
     set_key(str(Path(__file__).resolve().parent / ".env"), "JSON_FILE", merged_json.name)
 
-    total_people = sum(len(p.get('people', [])) for p in merged.get('pages', []))
-    print(f"[System] Merge complete: {len(merged.get('pages', []))} page(s), {total_people} "
-          f"people -> {merged_json.name}")
+    total_participants = sum(len(r.get('participants', [])) for s in merged.get('sheets', [])
+                             for r in s.get('records', []))
+    print(f"[System] Merge complete: {len(merged.get('sheets', []))} sheet(s), {total_participants} "
+          f"participant(s) -> {merged_json.name}")
     print(f"[System] Gather complete. Run Archivist's \"Generate GEDCOM\" when you're ready to "
           f"build the GEDCOM ({merged_json.name}).")
 

@@ -1,0 +1,36 @@
+# Declarative normalization map for FamilySearch's census Image Index tables.
+#
+# DRAFT status: FS.py's existing code already confirms "Given Name"/"Surname" (after its
+# Name-column split fix) and a synthesized "Line Number" align with Ancestry's own naming
+# (see FS.py's build_census_json), but the remaining header text below has NOT been
+# confirmed against a live FamilySearch census gather in this pass - it's seeded from the
+# same real-world vocabulary Ancestry's map uses as a reasonable starting point, not
+# verified FamilySearch-specific text. Confirm and correct against a real gather before
+# relying on it; an unmapped header is flagged for review rather than silently dropped or
+# guessed at (see census_schema.normalize_census_pages), so an incomplete map here fails
+# safe, not silent.
+
+participant_fields:
+  "Given Name": std_given
+  "Surname": std_surname
+  "Gender": sex
+  "Sex": sex
+  "Age": age
+  "Birth Place": birth_place
+  "Birthplace": birth_place
+  "Race": race
+  "Relationship to Head": role_name
+  "Relationship to Head of Household": role_name
+  "Relationship": role_name
+  "Line Number": type_specific_fields.line_number
+
+participant_facts:
+  "Occupation": Occupation
+  "Immigration Year": Immigration
+  "Naturalization": Naturalization
+  "Military Service": Military
+
+record_fields:
+  "Family Number": family_number
+  "Household Number": family_number
+  "Dwelling Number": dwelling_number
