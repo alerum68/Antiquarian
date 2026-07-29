@@ -7,6 +7,33 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
+- **PDFix**: new standalone tool, ported from the separate `PDFix` project, that
+  losslessly shrinks PDF file size in bulk via PyMuPDF's garbage-collection + stream-
+  deflate save flags (structural only - never rescales embedded image resolution/DPI).
+  Recursively scans a target folder, with an optional per-file size threshold, automatic
+  `.pdf.backup` creation before any in-place rewrite, and a repair-mode fallback (direct
+  save -> incremental/conservative save -> full page-by-page reconstruction) for
+  structurally damaged PDFs. Confirmed live: 14% size reduction on a real sample PDF,
+  with the original preserved and a `.backup` copy created.
+  - The ported repair-mode fallback had a latent bug, caught before it ever shipped:
+    `optimize_pdf`'s page-by-page reconstruction path called
+    `page_by_page_recovery(pdf_path, temp_optimized_pdf_path)` with 2 arguments against a
+    signature that only accepted 1, so it raised `TypeError` instead of repairing
+    anything - and even with the arg count fixed, the function always overwrote the
+    original file in place rather than producing the temp file the surrounding code
+    actually looks for. `page_by_page_recovery` now takes an optional `output_path`, used
+    by this specific call site so the reconstructed PDF lands where `optimize_pdf`
+    expects it, without ever touching `pdf_path` directly. Regression test added
+    (`PDFix/tests/test_pdfix.py`) reproducing the exact original crash scenario.
+- **Paleographer**: scanned/handwritten PDFs (the `pdf_native` path in
+  `build_content_part_for_file` - no usable text layer, so the whole file uploads to
+  Gemini as-is) now run through the same PDFix optimization against a throwaway temp
+  copy before upload, cutting upload size/cost. Defaults to the most aggressive
+  compression level (`PALEOGRAPHER_PDF_COMPRESSION_LEVEL`) since the optimization is
+  structural/lossless and never touches embedded image pixel data, so transcription
+  quality is unaffected by the level chosen. The researcher's original source PDF is
+  never mutated - `optimize_pdf_for_upload()` always operates on a copy, deleted once the
+  upload completes.
 - **Paleographer**: records split across a page/image boundary no longer lose continuity.
   Each image was previously processed as its own fully independent API call with zero
   memory of any other image - a record starting near the bottom of one page and
