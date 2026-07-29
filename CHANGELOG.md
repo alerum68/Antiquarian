@@ -1,10 +1,13 @@
 # Changelog
 
 This project is in active testing and has not reached a stable 1.0 release. Version numbers follow
-`MAJOR.MINOR.PATCH`: the `MINOR` number increases for new tools or features, `PATCH` for fixes and
+`MAJOR.MM.PP` - minor and patch are always two digits (e.g. `0.07.00`) so tags keep sorting correctly
+once either number passes 9. The `MM` number increases for new tools or features, `PP` for fixes and
 cleanup with no new functionality.
 
 ## [Unreleased]
+
+## [0.07.00] - 2026-07-29
 
 ### Added
 - **PDFix**: new standalone tool, ported from the separate `PDFix` project, that
@@ -546,7 +549,7 @@ the way:
   **Voyageur/**, and **Registrar/**, matching Archivist and Paleographer with names drawn
   from historical/archival roles instead of generic function names.
 
-## [0.6.0] - 2026-07-25
+## [0.06.00] - 2026-07-25
 
 ### Added
 - **Paleographer**: replaces the Register Transcriber. Transcribes any historical document
@@ -574,7 +577,7 @@ the way:
 - "Step 2: Generate GEDCOM" is disabled unless Parish is the selected record type, since
   GEDCOM generation doesn't understand other record types yet.
 
-## [0.5.0] - 2026-07-25
+## [0.05.00] - 2026-07-25
 
 ### Added
 - **GEDCOM Builder**: A single, unified tool that replaces the separate Census Converter and
@@ -595,7 +598,7 @@ the way:
 ### Removed
 - **CensusConverter.py** and **ChurchCreateGedcom.py**, superseded by the unified GEDCOM Builder.
 
-## [0.4.0] - 2026-07-25
+## [0.04.00] - 2026-07-25
 
 ### Added
 - **LAC Downloader**: New tool that takes a pasted Library and Archives Canada / Heritage Canadiana URL and
@@ -610,7 +613,7 @@ the way:
   settings file, but each tool's own settings now save inside that tool's own folder, so every tool stays
   fully self-contained.
 
-## [0.3.0] - 2026-07-21
+## [0.03.00] - 2026-07-21
 
 ### Added
 - **Census Extractor**: Paste an Ancestry.com census URL and it automatically downloads the record images
@@ -622,13 +625,13 @@ the way:
 - Census Converter's household-grouping logic made more accurate, with column-header fixes for the 1880
   census.
 
-## [0.2.1] - 2026-07-18
+## [0.02.01] - 2026-07-18
 
 ### Changed
 - Project-wide code cleanup: consistent PEP-8 formatting, removed unused imports and variables, and fixed
   several IDE-flagged warnings across all tools.
 
-## [0.2.0] - 2026-07-17
+## [0.02.00] - 2026-07-17
 
 ### Added
 - **Master GUI**: A unified, tabbed application to configure and run every tool from one window, with live
@@ -641,7 +644,7 @@ the way:
 - **Register Transcriber** (historical church register OCR/translation) and **Register to GEDCOM** converter.
 - **Census to GEDCOM Converter**.
 
-## [0.1.0] - 2026-07-12
+## [0.01.00] - 2026-07-12
 
 ### Added
 - Initial upload of the project.
