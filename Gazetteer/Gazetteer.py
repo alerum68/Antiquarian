@@ -24,7 +24,7 @@ from shapely.geometry import Point
 from tqdm import tqdm
 
 # Global settings come from the project root's .env; this tool's own settings come from
-# its own subfolder's .env, so CountyFix stays runnable standalone. .env values override
+# its own subfolder's .env, so Gazetteer stays runnable standalone. .env values override
 # anything already in the environment.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
@@ -37,25 +37,25 @@ PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
 
 # Resolve database path
 _rm_db = os.getenv(
-    "COUNTY_RM_DATABASE",
+    "GAZETTEER_RM_DATABASE",
     "Roots Magic 11/Your Tree.rmtree"
 )
 RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(PROGRAM_DIR, _rm_db)
 
 # Resolve shapefile path
 _shape = os.getenv(
-    "COUNTY_SHAPEFILE",
-    "MGS_Toolbox/CountyFix/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/"
+    "GAZETTEER_SHAPEFILE",
+    "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/"
     "US_HistCounties.shp"
 )
 SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
 
 # Boolean configuration flags
 DEBUG_MODE = str(
-    os.getenv("COUNTY_DEBUG_MODE", "True")
+    os.getenv("GAZETTEER_DEBUG_MODE", "True")
 ).lower() in ('true', '1', 'yes')
 CREATE_BACKUP = str(
-    os.getenv("COUNTY_CREATE_BACKUP", "False")
+    os.getenv("GAZETTEER_CREATE_BACKUP", "False")
 ).lower() in ('true', '1', 'yes')
 
 
@@ -228,6 +228,41 @@ def create_reverse_place(place_name: str) -> str:
 # ==========================================
 # DATABASE OPERATIONS
 # ==========================================
+def _clone_place_row(
+    cursor: sqlite3.Cursor,
+    original_place_id: int,
+    columns: List[str],
+    overrides: dict
+) -> int:
+    """Insert a new PlaceTable row cloned from original_place_id, with the given
+    column values overridden (all other columns, like coordinates and UUIDs,
+    carried over unchanged)."""
+    cursor.execute(
+        "SELECT * FROM PlaceTable WHERE PlaceID = ?",
+        (original_place_id,)
+    )
+    original_data = cursor.fetchone()
+
+    insert_cols = []
+    insert_vals = []
+    placeholders = []
+
+    for col, val in zip(columns, original_data):
+        if col == 'PlaceID':
+            continue
+        insert_cols.append(col)
+        insert_vals.append(overrides.get(col, val))
+        placeholders.append('?')
+
+    insert_sql = (
+        f"INSERT INTO PlaceTable ({', '.join(insert_cols)}) "
+        f"VALUES ({', '.join(placeholders)})"
+    )
+    cursor.execute(insert_sql, insert_vals)
+
+    return cursor.lastrowid
+
+
 def clone_historical_place(
     cursor: sqlite3.Cursor,
     original_place_id: int,
@@ -246,41 +281,11 @@ def clone_historical_place(
         )
         return result[0]
 
-    cursor.execute(
-        "SELECT * FROM PlaceTable WHERE PlaceID = ?",
-        (original_place_id,)
-    )
-    original_data = cursor.fetchone()
-
-    insert_cols = []
-    insert_vals = []
-    placeholders = []
-
     new_reverse_name = create_reverse_place(new_place_name)
-
-    for col, val in zip(columns, original_data):
-        if col == 'PlaceID':
-            continue
-        elif col == 'Name':
-            insert_cols.append(col)
-            insert_vals.append(new_place_name)
-            placeholders.append('?')
-        elif col == 'Reverse':
-            insert_cols.append(col)
-            insert_vals.append(new_reverse_name)
-            placeholders.append('?')
-        else:
-            insert_cols.append(col)
-            insert_vals.append(val)
-            placeholders.append('?')
-
-    insert_sql = (
-        f"INSERT INTO PlaceTable ({', '.join(insert_cols)}) "
-        f"VALUES ({', '.join(placeholders)})"
+    return _clone_place_row(
+        cursor, original_place_id, columns,
+        {'Name': new_place_name, 'Reverse': new_reverse_name}
     )
-    cursor.execute(insert_sql, insert_vals)
-
-    return cursor.lastrowid
 
 
 def get_or_create_place_detail(
@@ -303,35 +308,9 @@ def get_or_create_place_detail(
     if result:
         return result[0]
 
-    cursor.execute(
-        "SELECT * FROM PlaceTable WHERE PlaceID = ?",
-        (original_site_id,)
+    return _clone_place_row(
+        cursor, original_site_id, columns, {'MasterID': new_place_id}
     )
-    original_data = cursor.fetchone()
-
-    insert_cols = []
-    insert_vals = []
-    placeholders = []
-
-    for col, val in zip(columns, original_data):
-        if col == 'PlaceID':
-            continue
-        elif col == 'MasterID':
-            insert_cols.append(col)
-            insert_vals.append(new_place_id)
-            placeholders.append('?')
-        else:
-            insert_cols.append(col)
-            insert_vals.append(val)
-            placeholders.append('?')
-
-    insert_sql = (
-        f"INSERT INTO PlaceTable ({', '.join(insert_cols)}) "
-        f"VALUES ({', '.join(placeholders)})"
-    )
-    cursor.execute(insert_sql, insert_vals)
-
-    return cursor.lastrowid
 
 
 # ==========================================
@@ -491,7 +470,7 @@ def main() -> None:
                 update_ui()
 
                 bar.write(
-                    f"\033[92m[✓ FORKED]\033[0m Event {event_id} "
+                    f"\033[92m[FORKED]\033[0m Event {event_id} "
                     f"[{target_date}] | \033[91m{current_name}\033[0m -> "
                     f"\033[92m{new_place_name}\033[0m"
                 )
