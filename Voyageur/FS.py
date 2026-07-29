@@ -41,6 +41,8 @@ PARISH_PMT_PATH = SCRIPTORIUM_DIR / "Paleographer" / "prompts" / "Parish.pmt"
 # ==========================================
 # SHARED VOCABULARY (read as data, not imported as code - see module docstring)
 # ==========================================
+
+
 def load_event_types() -> Dict[str, Dict[str, str]]:
     """Loads the toolbox-wide fact/event vocabulary from FactTypes.json (RootsMagic's own
     FactTypeTable, defaults plus this project's customs). Person and family buckets are
@@ -234,7 +236,8 @@ def sex_code(raw: str) -> str:
     return ""
 
 
-def build_participant(role_name: str, full_name: str, sex: str, fsftid: str = "", person_ark: str = "") -> Dict[str, Any]:
+def build_participant(role_name: str, full_name: str, sex: str,
+                      fsftid: str = "", person_ark: str = "") -> Dict[str, Any]:
     given, surname, dit_name = split_name_and_dit(full_name)
     type_specific_fields: Dict[str, Any] = {}
     if fsftid:
@@ -314,7 +317,8 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
         if legitimacy:
             primary["type_specific_fields"]["legitimacy"] = legitimacy
 
-    event_type = EVENT_TYPE_ALIASES.get((columns.get("Event Type") or "").strip(), (columns.get("Event Type") or "").strip())
+    raw_event_type = (columns.get("Event Type") or "").strip()
+    event_type = EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type)
     event_date_raw = (columns.get("Event Date") or "").strip()
 
     page = (columns.get("Page Number") or "").strip() or item_id
@@ -434,7 +438,7 @@ def parse_citation(text: str) -> Dict[str, str]:
     publisher/location), just phrased differently: '"<collection>," database with images,
     <repository> (<url> : <date>), <browse path>; <publisher>, <pub_loc>.'"""
     result = {"repository": "", "repository_loc": "", "publisher": "", "pub_loc": "",
-             "collection_name": "", "collection_url": "", "browse_path": ""}
+              "collection_name": "", "collection_url": "", "browse_path": ""}
     if not text:
         return result
 
@@ -623,7 +627,7 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
     nara_info = parse_nara_citing_clause(first_citation_text)
     roll_info = parse_catalog_roll(catalog_items)
     roll_number = (f"{roll_info['series']}_{roll_info['roll']}" if roll_info['series'] and roll_info['roll']
-                  else roll_info['series'] or nara_info['publication'])
+                   else roll_info['series'] or nara_info['publication'])
 
     # The general parse_citation() regex captures garbage into publisher/pub_loc for census
     # citations (see parse_nara_citing_clause) - prefer the NARA-specific parse for those two

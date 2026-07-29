@@ -137,14 +137,14 @@ def test_build_family_baptism_shape_single_famc_no_suffix():
 
 def test_build_family_marriage_shape_three_families_with_suffixes():
     rec = {"event_type": "Marriage", "page": "5", "record_id": "M-1", "event_date": "1850-01-01",
-          "participants": [
+           "participants": [
               make_participant("primary", given="Jean", surname="Gagnon"),
               make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
               make_participant("father", given="Pierre", surname="Gagnon"),
               make_participant("mother", given="Anne", surname="Cyr", sex="F"),
               make_participant("father_in_law", given="Louis", surname="Boucher"),
               make_participant("mother_in_law", given="Rose", surname="Dubois", sex="F"),
-          ]}
+           ]}
     fams = arc.build_family(rec, "5", "M0000000001", "RM")
     assert len(fams) == 3
     main, g_fam, b_fam = fams
@@ -182,11 +182,11 @@ def test_build_family_scrip_shape_claimant_spouse_and_children_share_one_family(
 
 def test_build_individual_famc_and_fams_tags_use_semantic_not_digits():
     rec = {"event_type": "Marriage", "page": "5", "record_id": "M-1", "event_date": "1850-01-01",
-          "participants": [
+           "participants": [
               make_participant("primary", given="Jean", surname="Gagnon"),
               make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
               make_participant("father", given="Pierre", surname="Gagnon"),
-          ]}
+           ]}
     primary = rec["participants"][0]
     lines, _, _, _ = arc.build_individual("I1", rec, primary, "5", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
@@ -228,8 +228,8 @@ def test_build_individual_scrip_event_gets_type_line_and_generic_value_from_extr
     slot of their own, so they render generically as the event's own value text - Archivist
     never hardcodes those field names, just formats whatever type_specific_fields exist."""
     rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "event_place": "Winnipeg",
-          "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
-          "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
+           "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
+           "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
     primary = rec["participants"][0]
     lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)

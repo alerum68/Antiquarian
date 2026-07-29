@@ -21,7 +21,7 @@ def test_relationship_era_groups_household_and_maps_role_name():
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
                         "Relationship to Head": "Head", "Family Number": "5"}, "pid": "p1"},
             {"columns": {"Given Name": "Marie", "Surname": "Gagnon", "Gender": "F", "Age": "38",
-                        "Relationship to Head": "Wife", "Family Number": "5"}, "pid": "p2"},
+                         "Relationship to Head": "Wife", "Family Number": "5"}, "pid": "p2"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
@@ -52,7 +52,7 @@ def test_heuristic_era_groups_by_family_number_with_no_relationship_column():
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
                         "Family Number": "5"}, "pid": "p1"},
             {"columns": {"Given Name": "Marie", "Surname": "Gagnon", "Gender": "F", "Age": "38",
-                        "Family Number": "5"}, "pid": "p2"},
+                         "Family Number": "5"}, "pid": "p2"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1860 US Census", "Census_1860")
@@ -87,7 +87,7 @@ def test_two_unrelated_households_on_one_page_stay_separate():
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M",
                         "Relationship to Head": "Head", "Family Number": "5"}, "pid": "p1"},
             {"columns": {"Given Name": "Louis", "Surname": "Riel", "Gender": "M",
-                        "Relationship to Head": "Head", "Family Number": "6"}, "pid": "p2"},
+                         "Relationship to Head": "Head", "Family Number": "6"}, "pid": "p2"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
@@ -102,7 +102,7 @@ def test_unmapped_column_is_preserved_and_flags_for_review():
         "pages": [_page([
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M",
                         "Relationship to Head": "Head", "Family Number": "5",
-                        "Some Brand New Column Ancestry Just Added": "mystery value"}, "pid": "p1"},
+                         "Some Brand New Column Ancestry Just Added": "mystery value"}, "pid": "p1"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
@@ -110,7 +110,8 @@ def test_unmapped_column_is_preserved_and_flags_for_review():
 
     assert participant["review"] is True
     assert "Some Brand New Column Ancestry Just Added" in participant["type_specific_fields"]["unmapped"]
-    assert participant["type_specific_fields"]["unmapped"]["Some Brand New Column Ancestry Just Added"] == "mystery value"
+    unmapped = participant["type_specific_fields"]["unmapped"]
+    assert unmapped["Some Brand New Column Ancestry Just Added"] == "mystery value"
     assert doc["sheets"][0]["records"][0]["review"] is True
 
 
@@ -120,7 +121,7 @@ def test_recognized_extra_columns_become_typed_facts_not_flagged_for_review():
         "pages": [_page([
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M",
                         "Relationship to Head": "Head", "Family Number": "5",
-                        "Occupation": "Farmer", "Immigration Year": "1889"}, "pid": "p1"},
+                         "Occupation": "Farmer", "Immigration Year": "1889"}, "pid": "p1"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")

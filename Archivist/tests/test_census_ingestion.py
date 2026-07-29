@@ -14,7 +14,7 @@ import Archivist as arc
 
 def _unified_doc(record_type_name, sheets):
     return {"collection_title": "Test Census", "record_type_name": record_type_name,
-           "citation": {"repository": "Ancestry.com"}, "sheets": sheets}
+            "citation": {"repository": "Ancestry.com"}, "sheets": sheets}
 
 
 def _sheet(records, page_id="3"):
@@ -26,25 +26,25 @@ def _record(participants, family_number=None, ed="12", roll="T624_1"):
     if family_number:
         ts["family_number"] = family_number
     return {"record_id": None, "page": "3", "record_number": family_number or "", "event_type": "Census (family)",
-           "year": "1900", "event_date": "", "event_place": "", "english_translation": "",
-           "original_transcription": "", "review": False, "review_reason": None,
-           "continues_on_next_image": False, "continues_from_previous_image": False,
-           "type_specific_fields": ts, "participants": participants}
+            "year": "1900", "event_date": "", "event_place": "", "english_translation": "",
+            "original_transcription": "", "review": False, "review_reason": None,
+            "continues_on_next_image": False, "continues_from_previous_image": False,
+            "type_specific_fields": ts, "participants": participants}
 
 
 def _participant(given, surname, sex, role_name=None, age=None, line=None, facts=None):
     return {"role_number": None, "role_name": role_name, "std_given": given, "std_surname": surname,
-           "raw_given": None, "raw_surname": None, "dit_name": None, "alternate_names": [],
-           "prefix": None, "suffix": None, "sex": sex, "is_priest": False, "age": age, "age_unit": None,
-           "occupation": None, "race": None, "religion": None, "residence": None, "birth_date": None,
-           "birth_place": None, "death_date": None, "death_place": None, "review": False, "review_reason": None,
-           "facts": facts or [], "type_specific_fields": {"line_number": line} if line else {}}
+            "raw_given": None, "raw_surname": None, "dit_name": None, "alternate_names": [],
+            "prefix": None, "suffix": None, "sex": sex, "is_priest": False, "age": age, "age_unit": None,
+            "occupation": None, "race": None, "religion": None, "residence": None, "birth_date": None,
+            "birth_place": None, "death_date": None, "death_place": None, "review": False, "review_reason": None,
+            "facts": facts or [], "type_specific_fields": {"line_number": line} if line else {}}
 
 
 def test_adapter_produces_expected_columns_and_year_location():
     doc = _unified_doc("Census_1900", [_sheet([
         _record([_participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")],
-               family_number="5"),
+                family_number="5"),
     ])])
 
     df, year, location = arc.build_census_dataframe_from_unified(doc)
@@ -67,8 +67,8 @@ def test_adapter_maps_facts_to_expected_old_column_names():
     doc = _unified_doc("Census_1900", [_sheet([
         _record([_participant("Jean", "Gagnon", "M",
                               facts=[{"fact_type": "Occupation", "value": "Farmer"},
-                                    {"fact_type": "Immigration", "date": "1889"}])],
-               family_number="5"),
+                                     {"fact_type": "Immigration", "date": "1889"}])],
+                family_number="5"),
     ])])
     df, _, _ = arc.build_census_dataframe_from_unified(doc)
     row = df.iloc[0]
