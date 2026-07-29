@@ -78,6 +78,7 @@ class TypeConfig:
     defaults: Dict[str, Dict[str, str]]
     extra_fields: Dict[str, List[Dict[str, str]]]
     metadata_fields: Dict[str, str]
+    field_remap: Dict[str, str]
     batch_page_threshold: int
     prose: str
 
@@ -157,11 +158,18 @@ def load_event_types() -> Dict[str, Dict[str, str]]:
 
 def parse_type_config(pmt_path: Path) -> TypeConfig:
     """Parses a .pmt file's YAML front matter and prose body. The front matter carries
-    per-type role vocabulary, defaults, schema extensions, and metadata field templates;
-    event/fact vocabulary comes from the shared FactTypes.json instead (see
-    load_event_types), since it's RootsMagic's own vocabulary rather than something that
-    varies by document type. The prose body is the free-form system-instruction text
-    handed to the LLM."""
+    per-type role vocabulary, defaults, schema extensions, metadata field templates, and
+    a field_remap table (which of this record type's own prefixed settings-tab keys map
+    to which generic runtime env var - e.g. CHURCH_IMAGE_DIR -> IMAGE_DIR); event/fact
+    vocabulary comes from the shared FactTypes.json instead (see load_event_types), since
+    it's RootsMagic's own vocabulary rather than something that varies by document type.
+    The prose body is the free-form system-instruction text handed to the LLM.
+
+    field_remap exists so Paleographer.py (and, independently, Archivist.py) can resolve
+    their own generic runtime settings (IMAGE_DIR, MASTER_DB_NAME, CALL_NUMBER, etc.) from
+    whichever of this record type's own prefixed .env keys is actually set, without
+    Scriptorium.py's GUI layer needing to know what a record type even is - each script
+    reads this table itself, from its own .env, and stays runnable standalone."""
     raw = pmt_path.read_text(encoding="utf-8")
     stripped = raw.lstrip()
 
@@ -183,6 +191,7 @@ def parse_type_config(pmt_path: Path) -> TypeConfig:
         defaults=front_matter.get("defaults", {}),
         extra_fields=front_matter.get("extra_fields", {}),
         metadata_fields=front_matter.get("metadata_fields", {}),
+        field_remap=front_matter.get("field_remap", {}),
         batch_page_threshold=int(front_matter.get("batch_page_threshold", BATCH_PAGE_THRESHOLD)),
         prose=prose.strip(),
     )

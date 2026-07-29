@@ -23,6 +23,14 @@ batch_page_threshold: 5
 # this to only show fields this type actually uses instead of every field for every type.
 settings_sections:
   - "Scrip Information"
+# See Parish.pmt's own field_remap comment - same mechanism. Scrip has no citation-source
+# fields of its own yet (CHURCH_GEDCOM_NAME is reused for its GEDCOM output filename,
+# matching current behavior; a dedicated SCRIP_GEDCOM_NAME can be added later if needed).
+field_remap:
+  SCRIP_IMAGE_DIR: IMAGE_DIR
+  SCRIP_MASTER_DB_NAME: MASTER_DB_NAME
+  SCRIP_COLLECTION_NAME: COLLECTION_NAME
+  CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
 ---
 
 DRAFT: this record type has not yet been reviewed against real scrip file content. The
