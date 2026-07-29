@@ -32,6 +32,8 @@ import yaml
 from dotenv import load_dotenv, set_key
 from thefuzz import fuzz
 
+import census_schema
+
 SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
 FACT_TYPES_PATH = SCRIPTORIUM_DIR / "FactTypes.json"
 PARISH_PMT_PATH = SCRIPTORIUM_DIR / "Paleographer" / "prompts" / "Parish.pmt"
@@ -803,7 +805,15 @@ def main() -> None:
 
     if record_family == "census":
         print("\n[System] Converting raw scrape into census Gather JSON...")
-        final_data = build_census_json(raw_data, items_raw, catalog_items)
+        raw_census = build_census_json(raw_data, items_raw, catalog_items)
+        # Normalize at gather time: translate FamilySearch's own raw column header text
+        # into the shared record schema's field names via the declarative field map, the
+        # same as A.py does for Ancestry - so Archivist reads one shape regardless of
+        # source, and never has to guess among several possible header spellings.
+        collection_title = raw_data.get("collection_title", "")
+        final_data = census_schema.normalize_census_pages(
+            raw_census, "familysearch_census", collection_title,
+            f"Census_{raw_census.get('census_year', '')}")
     else:
         print("\n[System] Converting raw scrape into the universal Gather JSON...")
         final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
@@ -818,17 +828,16 @@ def main() -> None:
 
     set_key(str(Path(__file__).resolve().parent / ".env"), "JSON_FILE", final_json.name)
 
-    # build_census_json and build_universal_json return differently-shaped JSON
-    # (pages/people vs. sheets/records - see their own docstrings), so the summary line
-    # can't share one field path across both.
-    if record_family == "census":
-        total_people = sum(len(p["people"]) for p in final_data["pages"])
-        print(f"[System] Gather complete: {len(final_data['pages'])} image(s), {total_people} "
-              f"person(s), record_family='census'.")
-    else:
-        total_records = sum(len(sheet["records"]) for sheet in final_data["sheets"])
-        print(f"[System] Gather complete: {len(final_data['sheets'])} image(s), {total_records} record(s), "
-              f"record_family='{final_data['record_family']}'.")
+    # Both branches now produce the same sheets[].records[].participants[] shape (the
+    # census path is normalized above via census_schema, same as A.py) - one summary
+    # line path for both on that basis, where before there were two differently-shaped
+    # ones. The two branches still label themselves differently at the top level
+    # (record_type_name vs record_family) - reconciling that is separately tracked
+    # (Archivist's record-type dispatch rework), not done here.
+    total_records = sum(len(sheet["records"]) for sheet in final_data["sheets"])
+    label = final_data.get("record_type_name") or final_data.get("record_family", "")
+    print(f"[System] Gather complete: {len(final_data['sheets'])} image(s), {total_records} record(s), "
+          f"record type '{label}'.")
     print(f"[System] Run Archivist's \"Generate GEDCOM\" when you're ready ({final_json.name}).")
 
     return final_json
