@@ -63,7 +63,7 @@
                 "type_specific_fields": {
                   "type": "object",
                   "properties": {},
-                  "description": "Additional fields specific to this record type, defined by its .pmt file's front matter."
+                  "description": "Additional fields specific to this record type, defined by its .pmt file's front matter. For a pre-1850 US census record with only a named head of household, this is also where an unnamed household_tally (age/sex/race bracket counts) belongs - not fabricated participant entries."
                 },
                 "participants": {
                   "type": "array",
@@ -77,7 +77,8 @@
                       },
                       "role_name": {
                         "type": "string",
-                        "description": "Choose exactly one value from this record type's valid role vocabulary, given in the system instructions."
+                        "nullable": true,
+                        "description": "Choose exactly one value from this record type's valid role vocabulary, given in the system instructions. Null only when the source itself provides no relationship/role data at all for this person (e.g. a pre-1880 US census record) - never leave null merely because a role is unclear; use \"Other\" for that instead."
                       },
                       "std_given": {
                         "type": "string",
@@ -102,9 +103,19 @@
                       },
                       "prefix": { "type": "string", "nullable": true },
                       "suffix": { "type": "string", "nullable": true },
-                      "sex": { "type": "string" },
+                      "sex": {
+                        "type": "string",
+                        "enum": ["M", "F", "U"],
+                        "description": "Infer from role/given name if not explicitly stated. Use \"U\" only when genuinely indeterminate (e.g. an unfamiliar name with no role or contextual clue) - never leave this unset."
+                      },
                       "is_priest": { "type": "boolean" },
                       "age": { "type": "string", "nullable": true },
+                      "age_unit": {
+                        "type": "string",
+                        "enum": ["years", "months", "days"],
+                        "nullable": true,
+                        "description": "Unit for the age field. Infant baptism/burial ages are often given in months or days rather than years - set this explicitly whenever age is present; leave both null if no age is stated."
+                      },
                       "occupation": { "type": "string", "nullable": true },
                       "race": { "type": "string", "nullable": true },
                       "religion": { "type": "string", "nullable": true },
@@ -130,13 +141,28 @@
                         "nullable": true,
                         "description": "Short plain-English note (under 15 words) explaining why this participant needs review. Null if review is false."
                       },
+                      "facts": {
+                        "type": "array",
+                        "nullable": true,
+                        "description": "Any fact about this participant beyond the fields above, named from this record type's valid event vocabulary (the same vocabulary event_type is drawn from) - e.g. an immigration year, a naturalization status. Leave empty/null when nothing beyond the fields above applies; do not duplicate a fact already covered by a named field (occupation, birth_date, etc.) here.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "fact_type": { "type": "string" },
+                            "value": { "type": "string", "nullable": true },
+                            "date": { "type": "string", "nullable": true },
+                            "place": { "type": "string", "nullable": true }
+                          },
+                          "required": ["fact_type"]
+                        }
+                      },
                       "type_specific_fields": {
                         "type": "object",
                         "properties": {},
                         "description": "Additional fields specific to this record type, defined by its .pmt file's front matter."
                       }
                     },
-                    "required": ["role_name", "std_given", "is_priest"]
+                    "required": ["role_name", "std_given", "is_priest", "sex"]
                   }
                 }
               }

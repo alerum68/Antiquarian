@@ -77,6 +77,64 @@ def test_scrip_fixture_validates_against_merged_schema():
     jsonschema.validate(document, merged)
 
 
+def test_facts_and_age_unit_validate_against_merged_schema():
+    core = load_core_schema()
+    merged = engine.build_merged_schema(core, extra_fields={})
+
+    document = {
+        "collection_title": "1900 United States Federal Census",
+        "sheets": [{
+            "page_id": "1",
+            "document_metadata": {"file_name": "", "file_type": "", "volume": "", "pages": "",
+                                  "source_name": "", "source_location": ""},
+            "records": [{
+                "record_id": "CENS-1", "page": "1", "record_number": "1",
+                "event_type": "Census (family)", "year": "1900", "event_date": "1900-06-01",
+                "event_place": "", "english_translation": "", "original_transcription": "",
+                "review": False, "review_reason": "",
+                "type_specific_fields": {"family_number": "12"},
+                "participants": [
+                    {"role_number": "1", "role_name": "Head", "std_given": "Jean", "std_surname": "Gagnon",
+                     "sex": "M", "is_priest": False, "age": "3", "age_unit": "months",
+                     "facts": [{"fact_type": "Immigration", "date": "1889"}],
+                     "type_specific_fields": {}},
+                ]
+            }]
+        }]
+    }
+
+    jsonschema.validate(document, merged)
+
+
+def test_household_tally_convention_validates_against_merged_schema():
+    core = load_core_schema()
+    merged = engine.build_merged_schema(core, extra_fields={})
+
+    document = {
+        "collection_title": "1800 United States Federal Census",
+        "sheets": [{
+            "page_id": "1",
+            "document_metadata": {"file_name": "", "file_type": "", "volume": "", "pages": "",
+                                  "source_name": "", "source_location": ""},
+            "records": [{
+                "record_id": "CENS-1", "page": "1", "record_number": "1",
+                "event_type": "Census (family)", "year": "1800", "event_date": "1800-08-04",
+                "event_place": "", "english_translation": "", "original_transcription": "",
+                "review": False, "review_reason": "",
+                "type_specific_fields": {
+                    "household_tally": [{"category": "free_white_male_under_16", "count": 3}]
+                },
+                "participants": [
+                    {"role_number": "1", "role_name": "Head", "std_given": "Jean", "std_surname": "Gagnon",
+                     "sex": "M", "is_priest": False, "type_specific_fields": {}},
+                ]
+            }]
+        }]
+    }
+
+    jsonschema.validate(document, merged)
+
+
 def test_required_participant_fields_are_enforced():
     core = load_core_schema()
     merged = engine.build_merged_schema(core, extra_fields={})
