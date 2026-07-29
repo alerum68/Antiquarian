@@ -36,6 +36,7 @@ GLOBAL_VARS = {"API & Processing": {"GEMINI_API_KEY": "", "API_BUDGET": "20", "M
                                     "VOYAGEUR_SCRIPT": "Voyageur/Voyageur.py",
                                     "REGISTRAR_SCRIPT": "Registrar/Registrar.py",
                                     "GAZETTEER_SCRIPT": "Gazetteer/Gazetteer.py",
+                                    "PDFIX_SCRIPT": "PDFix/PDFix.py",
                                     "CLEANUP_CACHE_SCRIPT": "Paleographer/CacheCleanup.py"},
                "Global Directories": {"PROGRAM_DIR": "C:/Path/To/Your/Genealogy/Folder", "RM_DIR": "Roots Magic 11",
                                       "FTM_DIR": "Family Tree Maker", "MEDIA_DIR": "Media/Project",
@@ -79,7 +80,8 @@ VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
 
 PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
                                             "CHURCH_GEDCOM_NAME": "Parish.ged",
-                                            "CHURCH_MASTER_DB_NAME": "parish_register.json", },
+                                            "CHURCH_MASTER_DB_NAME": "parish_register.json",
+                                            "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2"},
                      "Parish Information": {"PARISH_NAME": "St. Generic Catholic Church",
                                             "PARISH_NAME_SHORT": "St. Generic Parish, Anytown, ST",
                                             "PARISH_CITY": "Anytown", "PARISH_STATE": "State",
@@ -117,6 +119,10 @@ GAZETTEER_VARS = {"File Paths": {"GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
                                  "US_HistCounties_Shapefile/US_HistCounties.shp"},
                   "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"}}
 
+PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVEL": "2",
+                                "PDFIX_SIZE_THRESHOLD_MB": "0"},
+              "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"}}
+
 # ==========================================
 # GEDCOM SOURCE FIELD REMAP
 # ==========================================
@@ -143,7 +149,8 @@ ENV_TARGETS = [(GLOBAL_VARS, None),
                (PALEOGRAPHER_VARS, "Paleographer"),
                (VOYAGEUR_VARS, "Voyageur"),
                (REGISTRAR_VARS, "Registrar"),
-               (GAZETTEER_VARS, "Gazetteer")]
+               (GAZETTEER_VARS, "Gazetteer"),
+               (PDFIX_VARS, "PDFix")]
 
 # ==========================================
 # TOOLTIP DESCRIPTIONS
@@ -204,6 +211,11 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                          "absolute path.",
     "CHURCH_GEDCOM_NAME": "The filename for the generated GEDCOM file.",
     "CHURCH_MASTER_DB_NAME": "The filename for the JSON database storing the extracted records.",
+    "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "How aggressively PDFix's lossless structural optimization (garbage "
+                                          "collection + stream deflate) runs on a scanned PDF before it's uploaded "
+                                          "to the AI: 0=low, 1=medium, 2=high (recommended). This never touches "
+                                          "embedded image resolution/DPI, so transcription quality is unaffected "
+                                          "at any level.",
     "PARISH_NAME": "The full historical name of the church (e.g., St. Joseph Catholic Church).",
     "PARISH_NAME_SHORT": "A shortened name for the parish, used in file titles.",
     "PARISH_CITY": "The city where the parish is located.",
@@ -253,7 +265,20 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                          "folder.",
     "GAZETTEER_CREATE_BACKUP": "Set to 'True' to automatically create a backup of your RootsMagic file before "
                              "fixing it (Highly Recommended!).",
-    "GAZETTEER_DEBUG_MODE": "Set to 'True' to print extra diagnostic information to the console while processing."}
+    "GAZETTEER_DEBUG_MODE": "Set to 'True' to print extra diagnostic information to the console while processing.",
+
+    # PDFix
+    "PDFIX_TARGET_DIR": "The folder PDFix scans recursively for .pdf files, relative to your Base Media Directory "
+                        "(or an absolute path elsewhere). Leave as '.' to optimize every PDF anywhere inside Media.",
+    "PDFIX_COMPRESSION_LEVEL": "How aggressively to garbage-collect and deflate-compress PDF structure: 0=low, "
+                               "1=medium, 2=high (recommended). This is lossless - it never touches image "
+                               "resolution/DPI.",
+    "PDFIX_SIZE_THRESHOLD_MB": "Only optimize PDFs larger than this size, in MB. Leave as 0 to optimize every PDF "
+                              "regardless of size.",
+    "PDFIX_CREATE_BACKUP": "Set to 'True' to save a '.pdf.backup' copy of each original before optimizing it in "
+                          "place (Highly Recommended!).",
+    "PDFIX_REPAIR_MODE": "Set to 'True' to attempt repairing structurally damaged/corrupted PDFs before "
+                        "optimizing them."}
 
 # ==========================================
 # CUSTOM UI LABELS OVERRIDE
@@ -275,7 +300,8 @@ CUSTOM_LABELS = {
     "FS_URL": "FamilySearch Record URL",
     "VOYAGEUR_SOURCE": "Gather From",
     "CHURCH_REPOSITORY": "Repository Name",
-    "CHURCH_REPOSITORY_LOC": "Repository Location"}
+    "CHURCH_REPOSITORY_LOC": "Repository Location",
+    "PDFIX_TARGET_DIR": "PDF Scan Folder"}
 
 # ==========================================
 # PATH & FILE PICKER FIELDS
@@ -302,6 +328,7 @@ PATH_PICKER_FIELDS = {
     "VOYAGEUR_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
     "REGISTRAR_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
     "GAZETTEER_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
+    "PDFIX_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
     "CLEANUP_CACHE_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
 
     # Global: Directories (folders, relative to PROGRAM_DIR unless absolute)
@@ -335,6 +362,9 @@ PATH_PICKER_FIELDS = {
     # Gazetteer
     "GAZETTEER_RM_DATABASE": {"kind": "open", "base_dir_key": "RM_DIR", "filetypes": RMTREE_FILETYPES},
     "GAZETTEER_SHAPEFILE": {"kind": "open", "base_dir_key": PROGRAM_DIR_SENTINEL, "filetypes": SHP_FILETYPES},
+
+    # PDFix
+    "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
 }
 
 
@@ -601,6 +631,14 @@ class Scriptorium(ctk.CTk):
                                            "2. Make sure you have backed up your tree.\n"
                                            "3. Click 'Run Script'. It will update the display names of your places "
                                            "safely without breaking your maps or tracking IDs.",
+                           "PDFix": "Welcome to PDFix!\n\n"
+                           "This tool losslessly shrinks the file size of every PDF in a folder (and its "
+                           "subfolders), by removing dead internal structure and re-compressing streams. "
+                           "It never rescales embedded image resolution.\n\n"
+                           "1. Set your PDF Scan Folder, relative to your Base Media Directory.\n"
+                           "2. Leave 'Create Backup' on unless you're confident - it rewrites PDFs in "
+                           "place.\n"
+                           "3. Click 'Run Script' and follow along in the console below.",
                            "Global Settings": "Welcome to Global Settings!\n\n"
                                               "How to use:\n"
                                               "These are the master settings shared across all of your tools.\n\n"
@@ -617,6 +655,7 @@ class Scriptorium(ctk.CTk):
                                                                         "Archivist": self._build_tab_archivist,
                                                                         "Registrar": self._build_tab_registrar,
                                                                         "Gazetteer": self._build_tab_gazetteer,
+                                                                        "PDFix": self._build_tab_pdfix,
                                                                         "Global Settings": self._build_tab_global}
 
         self._build_layout()
@@ -1111,6 +1150,20 @@ class Scriptorium(ctk.CTk):
 
         self._build_form_ui(frame, GAZETTEER_VARS)
 
+    def _build_tab_pdfix(self, frame: ctk.CTkFrame):
+        self._build_tab_header(frame, "PDFix", "PDFix")
+
+        ctk.CTkLabel(frame, text="Losslessly shrinks PDF file sizes in bulk (garbage-collection + stream "
+                                 "compression via PyMuPDF) - no image rescaling.",
+                     text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
+
+        # Unified action buttons (Docked to bottom)
+        btn_box = self._create_action_box(frame)
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+                      command=lambda: self.execute_script("PDFIX_SCRIPT", "standalone")).pack(side="left", padx=5)
+
+        self._build_form_ui(frame, PDFIX_VARS)
+
     def _peek_record_family(self, program_dir: str) -> str:
         """Peeks at the JSON file Archivist would build from (mirroring Archivist.py's own
         resolve_json_input: explicit JSON_FILE, else the most recently created *.json in
@@ -1204,7 +1257,8 @@ class Scriptorium(ctk.CTk):
         # Pre-resolve these specific nested directory variables
         nested_dir_keys = [("CHURCH_IMAGE_DIR", full_media_dir), ("SCRIP_IMAGE_DIR", full_media_dir),
                            ("CENSUS_IMAGE_DIR", full_media_dir), ("LAC_IMAGE_DIR", full_media_dir),
-                           ("REGISTRAR_RM_DATABASE", full_rm_dir), ("GAZETTEER_RM_DATABASE", full_rm_dir)]
+                           ("REGISTRAR_RM_DATABASE", full_rm_dir), ("GAZETTEER_RM_DATABASE", full_rm_dir),
+                           ("PDFIX_TARGET_DIR", full_media_dir)]
         for key, base_dir in nested_dir_keys:
             if key in self.string_vars:
                 env_overrides[key] = resolve_path(base_dir, self.string_vars[key].get())

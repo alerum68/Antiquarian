@@ -327,6 +327,54 @@ def test_has_usable_text_layer_false_for_missing_file(tmp_path):
 
 
 # ==========================================
+# optimize_pdf_for_upload
+# ==========================================
+def _make_minimal_pdf(path):
+    import fitz
+    doc = fitz.open()
+    doc.new_page()
+    doc.save(str(path))
+    doc.close()
+
+
+def test_optimize_pdf_for_upload_never_mutates_original(tmp_path):
+    original = tmp_path / "source.pdf"
+    _make_minimal_pdf(original)
+    original_bytes = original.read_bytes()
+
+    result_path = engine.optimize_pdf_for_upload(original)
+
+    assert original.read_bytes() == original_bytes
+    if result_path != original:
+        result_path.unlink()
+
+
+def test_optimize_pdf_for_upload_returns_a_cleaned_up_temp_copy(tmp_path):
+    original = tmp_path / "source.pdf"
+    _make_minimal_pdf(original)
+
+    result_path = engine.optimize_pdf_for_upload(original)
+
+    assert result_path != original
+    assert result_path.exists()
+    result_path.unlink()
+
+
+def test_optimize_pdf_for_upload_falls_back_to_original_on_error(tmp_path, monkeypatch):
+    original = tmp_path / "source.pdf"
+    _make_minimal_pdf(original)
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("optimize failed")
+
+    monkeypatch.setattr(engine, "optimize_pdf", boom)
+
+    result_path = engine.optimize_pdf_for_upload(original)
+
+    assert result_path == original
+
+
+# ==========================================
 # build_continuation_context
 # ==========================================
 def test_build_continuation_context_empty_when_nothing_pending():
