@@ -177,6 +177,9 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
                 type_specific["roll_number"] = page["roll_number"]
             if page.get("film_number"):
                 type_specific["film_number"] = page["film_number"]
+            for loc_key in ("state", "county", "city", "country", "apid_db"):
+                if page.get(loc_key):
+                    type_specific[loc_key] = page[loc_key]
             if era == "pre1850" and len(participants) == 1:
                 # Nothing beyond the head is present in a pre-1850 index row - no tally
                 # data to attach today (Ancestry's own index for these years doesn't
