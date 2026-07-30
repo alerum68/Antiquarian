@@ -1220,8 +1220,8 @@ class Scriptorium(ctk.CTk):
                                command=_on_segment).pack(side="left", padx=5)
 
     def _build_slider_field(self, row, key, widget_spec):
-        """Renders a FIELD_WIDGETS "slider" field: a bounded numeric tuning knob with a live
-        tabular readout, still just reading/writing the same string-valued setting."""
+        """Renders a FIELD_WIDGETS "slider" field: a bounded numeric tuning knob with a live,
+        directly-editable readout, still just reading/writing the same string-valued setting."""
         lo, hi = widget_spec["min"], widget_spec["max"]
         step = widget_spec.get("step", 1)
         suffix = widget_spec.get("suffix", "")
@@ -1230,18 +1230,42 @@ class Scriptorium(ctk.CTk):
         except ValueError:
             current_val = lo
 
-        value_lbl = ctk.CTkLabel(row, text=f"{current_val:g}{suffix}", width=70, anchor="e")
-        value_lbl.pack(side="right", padx=(5, 0))
+        value_var = ctk.StringVar(value=f"{current_val:g}{suffix}")
+        value_entry = ctk.CTkEntry(row, textvariable=value_var, width=70, justify="right")
+        value_entry.pack(side="right", padx=(5, 0))
+
+        def _apply_typed_value(_event=None):
+            raw = value_var.get().strip()
+            if suffix and raw.endswith(suffix.strip()):
+                raw = raw[:-len(suffix.strip())].strip()
+            try:
+                typed = float(raw)
+            except ValueError:
+                value_var.set(f"{slider.get():g}{suffix}")
+                return
+            rounded = round(max(lo, min(hi, typed)) / step) * step
+            slider.set(rounded)
+            value_var.set(f"{rounded:g}{suffix}")
+            self.string_vars[key].set(f"{rounded:g}")
+
+        value_entry.bind("<Return>", _apply_typed_value)
+        value_entry.bind("<FocusOut>", _apply_typed_value)
 
         def _on_slide(new_val):
             rounded = round(new_val / step) * step
-            value_lbl.configure(text=f"{rounded:g}{suffix}")
+            value_var.set(f"{rounded:g}{suffix}")
             self.string_vars[key].set(f"{rounded:g}")
 
         steps = max(1, round((hi - lo) / step))
         slider = ctk.CTkSlider(row, from_=lo, to=hi, number_of_steps=steps, command=_on_slide)
         slider.set(current_val)
         slider.pack(side="left", fill="x", expand=True, padx=5)
+        # CTkSlider binds MouseWheel-over-the-slider (on its internal canvas) to change its
+        # own value by default - this hijacks scrolling the settings page whenever the
+        # cursor merely passes over a slider on the way down. No public API to disable it,
+        # so unbind directly (confirmed via customtkinter/windows/widgets/ctk_slider.py's
+        # own _create_bindings, the only place this binding is set).
+        slider._canvas.unbind("<MouseWheel>")
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
         """Resolves a directory setting (like JSON_DIR) against PROGRAM_DIR the same way
