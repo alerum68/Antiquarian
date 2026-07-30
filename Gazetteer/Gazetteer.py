@@ -50,6 +50,17 @@ _shape = os.getenv(
 )
 SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
 
+# Resolve the Canadian boundary directory (one shapefile per census year - see that
+# folder's own LICENSE_AND_ATTRIBUTION.txt). Optional: if the folder isn't present,
+# Gazetteer simply runs US-only, exactly as it did before this existed.
+_ca_shape_dir = os.getenv(
+    "GAZETTEER_CA_SHAPEFILE_DIR",
+    "Scriptorium/Gazetteer/CA_UNICEN_Counties"
+)
+CA_SHAPEFILE_DIR = (
+    _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
+)
+
 # Boolean configuration flags
 DEBUG_MODE = str(
     os.getenv("GAZETTEER_DEBUG_MODE", "True")
@@ -97,6 +108,28 @@ US_STATES = {
     "canada", "uk", "united kingdom", "england", "france", "germany", "ireland",
     "scotland", "mexico"
 }
+
+# The UNI-CEN Canadian boundaries are discrete per-census-year snapshots (no
+# continuous START_DATE/END_DATE range exists for Canada - see
+# CA_UNICEN_Counties/LICENSE_AND_ATTRIBUTION.txt for why), so an event's own date is
+# matched to whichever of these years is chronologically closest, rather than an
+# exact range lookup.
+CA_CENSUS_YEARS = [1851, 1861, 1871, 1881, 1891, 1901, 1911, 1921]
+
+# geosid's own first two letters are a province/territory code, with no separate
+# name column - confirmed against real data that this is historically accurate as
+# stored (e.g. 1861/1891 code today's Alberta/Saskatchewan under "NT", since neither
+# became a province until 1905), so no extra era-aware remapping is needed here.
+CA_PROVINCE_NAMES = {
+    "AB": "Alberta", "BC": "British Columbia", "MB": "Manitoba", "NB": "New Brunswick",
+    "NL": "Newfoundland", "NS": "Nova Scotia", "NT": "Northwest Territories",
+    "ON": "Ontario", "PE": "Prince Edward Island", "QC": "Quebec", "SK": "Saskatchewan",
+    "YT": "Yukon", "NU": "Nunavut",
+}
+
+# Newfoundland did not join Confederation until 1949 - every year CA_CENSUS_YEARS
+# covers predates that, so an "NL" match's country is its own, never "Canada".
+CA_COUNTRY_OVERRIDES = {"NL": "Newfoundland"}
 
 
 # ==========================================
@@ -225,6 +258,106 @@ def create_reverse_place(place_name: str) -> str:
     return ", ".join(parts)
 
 
+def clean_canadian_name(name: str) -> str:
+    """Cleans a UNI-CEN geoname value. The source dbf uses a literal "?" where a
+    bilingual English/French name should show a "/" separator (e.g. confirmed real
+    data: "Brant, South?Sud") - a data-quality artifact in the source file itself,
+    not something introduced by reading it here."""
+    if not name:
+        return ""
+    return name.replace("?", "/").strip()
+
+
+def load_canadian_shapefiles() -> dict:
+    """Loads each UNI-CEN Census Division snapshot year into its own GeoDataFrame,
+    keyed by census year. Missing entirely (folder not downloaded) is not an error -
+    Gazetteer just runs US-only, as it always has."""
+    shapefiles = {}
+    if not os.path.isdir(CA_SHAPEFILE_DIR):
+        return shapefiles
+    for year in CA_CENSUS_YEARS:
+        path = os.path.join(CA_SHAPEFILE_DIR, f"cd_{year}.shp")
+        if not os.path.exists(path):
+            continue
+        try:
+            shapefiles[year] = gpd.read_file(path, encoding="cp1252").to_crs("EPSG:4326")
+        except Exception as e:
+            print(f"[WARN] Failed to load Canadian {year} boundaries: {e}")
+    return shapefiles
+
+
+def nearest_canadian_census_year(target_date: str) -> Optional[int]:
+    """Finds the loaded UNI-CEN census year closest to an event's own date - the
+    best available precision, since these are decade snapshots with no continuous
+    change log to interpolate from (see CA_UNICEN_Counties/LICENSE_AND_ATTRIBUTION.txt)."""
+    try:
+        target_year = int(str(target_date)[:4])
+    except (TypeError, ValueError):
+        return None
+    return min(CA_CENSUS_YEARS, key=lambda y: abs(y - target_year))
+
+
+def build_us_place_name(current_name: str, matched_row) -> str:
+    """Builds a standardized US place name from a matched Newberry Atlas polygon -
+    the exact naming logic already in use, extracted unchanged so a Canadian match
+    can share the same call site in main()'s event loop."""
+    local_city = extract_local_parts(current_name)
+    county_val = clean_shapefile_name(matched_row['NAME'])
+    state_val = clean_shapefile_name(matched_row['STATE_TERR'])
+
+    lower_county = county_val.lower()
+    pseudo_keywords = [
+        'territory', 'unorganized', 'nca', 'de facto', 'new pur',
+        'boundary', 'ext', 'dist', 'district', 'tract', 'reserve'
+    ]
+
+    if lower_county == state_val.lower():
+        final_county = ""
+    elif any(kw in lower_county for kw in pseudo_keywords):
+        final_county = county_val
+    else:
+        # noinspection SpellCheckingInspection
+        if state_val.lower() == "louisiana":
+            final_county = f"{county_val} Parish"
+        else:
+            final_county = f"{county_val} County"
+
+    components = []
+    if local_city:
+        components.append(local_city)
+    if final_county:
+        components.append(final_county)
+    if state_val:
+        components.append(state_val)
+    components.append("USA")
+
+    return ", ".join(components)
+
+
+def build_ca_place_name(current_name: str, matched_row) -> str:
+    """Builds a standardized Canadian place name from a matched UNI-CEN Census
+    Division polygon. Unlike the US side, geoname is used as-is with no synthetic
+    "County" suffix - Canadian CD names don't follow one uniform convention (some
+    provinces do use "County" in the name itself, most don't), so inventing one
+    would misrepresent real names like "Yale & Cariboo" or "Comox-Atlin"."""
+    local_city = extract_local_parts(current_name)
+    cd_val = clean_canadian_name(matched_row['geoname'])
+    province_code = str(matched_row['geosid'])[:2]
+    province_val = CA_PROVINCE_NAMES.get(province_code, province_code)
+    country_val = CA_COUNTRY_OVERRIDES.get(province_code, "Canada")
+
+    components = []
+    if local_city:
+        components.append(local_city)
+    if cd_val and cd_val.lower() != province_val.lower():
+        components.append(cd_val)
+    if province_val:
+        components.append(province_val)
+    components.append(country_val)
+
+    return ", ".join(components)
+
+
 # ==========================================
 # DATABASE OPERATIONS
 # ==========================================
@@ -326,6 +459,13 @@ def main() -> None:
         print(f"Failed to load shapefiles: {e}")
         return
 
+    ca_shapefiles = load_canadian_shapefiles()
+    if ca_shapefiles:
+        print(f"Loaded Canadian boundaries for {len(ca_shapefiles)} census year(s).\n")
+    else:
+        print("No Canadian boundary data found - running US-only "
+              f"(expected at: {CA_SHAPEFILE_DIR}).\n")
+
     if not os.path.exists(RM_DATABASE):
         print(f"Error: Database file not found at {RM_DATABASE}")
         return
@@ -408,43 +548,29 @@ def main() -> None:
                 matched_mask = active_polygons.geometry.contains(target_point)
                 matched = active_polygons[matched_mask]
 
+            is_canadian_match = False
+            if matched.empty and ca_shapefiles:
+                ca_year = nearest_canadian_census_year(target_date)
+                ca_gdf = ca_shapefiles.get(ca_year)
+                if ca_gdf is not None:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore")
+                        ca_mask = ca_gdf.geometry.contains(target_point)
+                        ca_matched = ca_gdf[ca_mask]
+                    if not ca_matched.empty:
+                        matched = ca_matched
+                        is_canadian_match = True
+
             if matched.empty:
                 debug_print(
                     f"[{current_name}] No historical polygon matched for {target_date}"
                 )
                 continue
 
-            local_city = extract_local_parts(current_name)
-            county_val = clean_shapefile_name(matched.iloc[0]['NAME'])
-            state_val = clean_shapefile_name(matched.iloc[0]['STATE_TERR'])
-
-            lower_county = county_val.lower()
-            pseudo_keywords = [
-                'territory', 'unorganized', 'nca', 'de facto', 'new pur',
-                'boundary', 'ext', 'dist', 'district', 'tract', 'reserve'
-            ]
-
-            if lower_county == state_val.lower():
-                final_county = ""
-            elif any(kw in lower_county for kw in pseudo_keywords):
-                final_county = county_val
+            if is_canadian_match:
+                new_place_name = build_ca_place_name(current_name, matched.iloc[0])
             else:
-                # noinspection SpellCheckingInspection
-                if state_val.lower() == "louisiana":
-                    final_county = f"{county_val} Parish"
-                else:
-                    final_county = f"{county_val} County"
-
-            components = []
-            if local_city:
-                components.append(local_city)
-            if final_county:
-                components.append(final_county)
-            if state_val:
-                components.append(state_val)
-            components.append("USA")
-
-            new_place_name = ", ".join(components)
+                new_place_name = build_us_place_name(current_name, matched.iloc[0])
 
             if new_place_name != current_name:
                 new_place_id = clone_historical_place(

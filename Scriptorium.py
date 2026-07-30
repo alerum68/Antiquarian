@@ -139,7 +139,8 @@ REGISTRAR_VARS = {
 
 GAZETTEER_VARS = {"File Paths": {"GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
                                  "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
-                                 "US_HistCounties_Shapefile/US_HistCounties.shp"},
+                                 "US_HistCounties_Shapefile/US_HistCounties.shp",
+                                 "GAZETTEER_CA_SHAPEFILE_DIR": "Scriptorium/Gazetteer/CA_UNICEN_Counties"},
                   "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"}}
 
 PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVEL": "2",
@@ -270,6 +271,10 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GAZETTEER_SHAPEFILE": "The path to the Newberry Atlas '.shp' file containing historical county boundaries. "
                          "Relative to your Program Dir (it ships alongside the Gazetteer tool), not the RootsMagic "
                          "folder.",
+    "GAZETTEER_CA_SHAPEFILE_DIR": "Folder containing the UNI-CEN Canadian Census Division boundary shapefiles "
+                                "(cd_1851.shp .. cd_1921.shp, one per census year). Optional - leave as-is if you "
+                                "haven't downloaded these; Gazetteer just runs US-only. Relative to your Program "
+                                "Dir, not the RootsMagic folder.",
     "GAZETTEER_CREATE_BACKUP": "Set to 'True' to automatically create a backup of your RootsMagic file before "
                              "fixing it (Highly Recommended!).",
     "GAZETTEER_DEBUG_MODE": "Set to 'True' to print extra diagnostic information to the console while processing.",
@@ -369,6 +374,7 @@ PATH_PICKER_FIELDS = {
     # Gazetteer
     "GAZETTEER_RM_DATABASE": {"kind": "open", "base_dir_key": "RM_DIR", "filetypes": RMTREE_FILETYPES},
     "GAZETTEER_SHAPEFILE": {"kind": "open", "base_dir_key": PROGRAM_DIR_SENTINEL, "filetypes": SHP_FILETYPES},
+    "GAZETTEER_CA_SHAPEFILE_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
 
     # PDFix
     "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},

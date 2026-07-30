@@ -46,6 +46,21 @@ cleanup with no new functionality.
   during a function-by-function audit against the project's design specification.
 - PyCharm Run/Debug configurations for Voyageur (per source), Paleographer, Archivist, and
   the Scriptorium GUI shell, so each can be launched standalone directly from the IDE.
+- **Gazetteer**: Canadian place standardization, using the UNI-CEN Project's Census
+  Division boundary shapefiles (`Gazetteer/CA_UNICEN_Counties/`, one file per census year
+  1851-1921, gitignored like the existing US atlas - see that folder's own
+  `LICENSE_AND_ATTRIBUTION.txt`). An event is matched against the US Newberry atlas first,
+  exactly as before; if nothing matches there, it falls back to the Canadian boundaries for
+  whichever census year is chronologically closest to the event's own date - the best
+  available precision, since (confirmed via research) no Canadian dataset exists with a
+  continuous start/end date range the way the Newberry atlas has for the US: municipal
+  boundaries are provincial jurisdiction, not one uniform national system, and StatCan's own
+  change registry only goes back to 1961. Historical province codes are used as recorded
+  (e.g. 1861/1891 Alberta and Saskatchewan correctly resolve to "Northwest Territories",
+  since neither became a province until 1905; Newfoundland resolves to its own country, not
+  "Canada", since it didn't join Confederation until 1949). New optional setting
+  `GAZETTEER_CA_SHAPEFILE_DIR`; Gazetteer runs US-only if it's not set/found, unchanged from
+  before this existed.
 
 ### Fixed
 - Repo-wide PEP-8 lint failures (`pycodestyle --max-line-length=120`), both newly
