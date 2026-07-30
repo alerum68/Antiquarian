@@ -141,16 +141,17 @@ CENSUS_YEAR = get_env_int("CENSUS_YEAR", 0)
 # later run against that same collection - see resolve_source_id().
 _US_CENSUS_YEARS = [1790, 1800, 1810, 1820, 1830, 1840, 1850, 1860, 1870, 1880,
                     1890, 1900, 1910, 1920, 1930, 1940, 1950]
-# Canadian census years available for genealogical research (matching the 72-year privacy
-# rule genealogists already work within) - LAC.py doesn't set its own record_type_name yet
-# (checked: no "Census_CA_"-style convention exists in this codebase today), so these keys
-# are a forward-looking reservation, not yet reachable from a real gather.
-_CANADIAN_CENSUS_YEARS = [1851, 1861, 1871, 1881, 1891, 1901, 1911]
+# Canadian census years covered by the Canadian Peoples/TCP historical boundary GIS
+# (Cunfer, Billard, McClean, Richard, St-Hilaire - CC BY 4.0, https://hgiscanada.usask.ca) -
+# LAC.py doesn't set its own record_type_name yet (checked: no "Census_CA_"-style convention
+# exists in this codebase today), so these keys are a forward-looking reservation, not yet
+# reachable from a real gather.
+_CANADIAN_CENSUS_YEARS = [1851, 1861, 1871, 1881, 1891, 1901, 1911, 1921]
 
 PRECODED_SOURCE_IDS: Dict[str, int] = {f"Census_{year}": 1001 + i for i, year in enumerate(_US_CENSUS_YEARS)}
 # 1018-1019 reserved (the US census block runs 1001-1019, 17 years assigned + 2 spare).
 PRECODED_SOURCE_IDS["Census_Slave_Schedule"] = 1020
-# 1021-1027 assigned, 1028-1029 reserved (Canadian census block runs 1021-1029).
+# 1021-1028 assigned, 1029 reserved (Canadian census block runs 1021-1029).
 PRECODED_SOURCE_IDS.update({f"Census_CA_{year}": 1021 + i for i, year in enumerate(_CANADIAN_CENSUS_YEARS)})
 
 NEXT_AUTO_SOURCE_ID = 1030
