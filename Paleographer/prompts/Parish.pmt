@@ -117,6 +117,10 @@ Before generating JSON, you must process the record in this exact order:
 6. LOCATIONS & RESIDENCE
 - Use the register's stated location exactly as written. Leave null if completely unstated; a fallback default is applied downstream.
 - RESIDENCE (RESI): Only extract if EXPLICITLY stated.
+- PARISH/CHURCH NAME: if this sheet shows the parish's own name (a printed or handwritten
+  heading, running title, or a phrase like "the parish of ___"), record it exactly as
+  written in this sheet's document_metadata.source_name. Leave it null if the sheet itself
+  never states it - never guess it from context, and never invent one to fill this field.
 
 7. MISSING / ILLEGIBLE / INFERRED TEXT
 - Infer sex from role/given name if not stated.
