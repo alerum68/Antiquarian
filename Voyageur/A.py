@@ -93,12 +93,12 @@ def main() -> Path:
     # Voyageur.js downloads via plain <a download> rather than GM_download (see CHANGELOG -
     # GM_download's permission grant proved unreliable). Chrome replaces "/" in a download
     # attribute with "_" instead of creating subfolders, so these land flat in the Downloads
-    # root with a "MGS_A_"/"MGS_A_Images_" filename prefix instead of a real subfolder -
+    # root with a "TMP_A_"/"TMP_A_Images_" filename prefix instead of a real subfolder -
     # that prefix is also what lets this scan pick its own files out from whatever else
     # happens to be in the Downloads root.
     downloads_dir = Path.home() / "Downloads"
-    json_prefix = "MGS_A_"
-    image_prefix = "MGS_A_Images_"
+    json_prefix = "TMP_A_"
+    image_prefix = "TMP_A_Images_"
     json_file = None
 
     try:

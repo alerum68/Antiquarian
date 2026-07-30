@@ -852,7 +852,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.setAttribute("href", url);
-            link.setAttribute("download", `MGS_${subfolder.replace(/\//g, '_')}_${jsonFileName}`);
+            link.setAttribute("download", `TMP_${subfolder.replace(/\//g, '_')}_${jsonFileName}`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -1432,7 +1432,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.setAttribute('href', url);
-            link.setAttribute('download', `MGS_FS_${jsonFileName}`);
+            link.setAttribute('download', `TMP_FS_${jsonFileName}`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
