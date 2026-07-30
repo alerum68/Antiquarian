@@ -737,6 +737,24 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
+def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[str]:
+    """Builds a "{year} - {state} - {county} - {city}.json" name (matching A.py/Ancestry's
+    own "{year} - {locationStr}" convention) from the first record carrying any of those
+    fields, instead of the raw browser-provided name (document.title, which for a
+    FamilySearch collection page often includes the page's own ark URL). Returns None if no
+    sheet/record has any of these fields at all, so the caller can fall back rather than
+    silently invent a location."""
+    for sheet in normalized_data.get("sheets", []):
+        for record in sheet.get("records", []):
+            fields = record.get("type_specific_fields", {}) or {}
+            parts = [year] + [fields[key] for key in ("state", "county", "city") if fields.get(key)]
+            if len(parts) > 1:
+                safe = " - ".join(parts)
+                safe = re.sub(r'[/\\?%*:|"<>]', "-", safe)
+                return f"{safe}.json"
+    return None
+
+
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
@@ -771,11 +789,11 @@ def main() -> None:
     # original CensusExtractor.js used in production (no special grant to lose), which
     # always honors the exact name given - real filenames are guaranteed. Chrome silently
     # replaces "/" in a download attribute with "_" instead of creating subfolders though,
-    # so these land flat in the Downloads root with a "MGS_FS_" filename prefix (set in
+    # so these land flat in the Downloads root with a "TMP_FS_" filename prefix (set in
     # Voyageur.js) instead of a real subfolder - stripped back off below once found, since
     # it's not part of the actual desired filename.
     downloads_dir = Path.home() / "Downloads"
-    json_prefix = "MGS_FS_"
+    json_prefix = "TMP_FS_"
     raw_json_file = None
 
     try:
@@ -807,6 +825,7 @@ def main() -> None:
     catalog_items = dedup_catalog_items(items_raw)
     record_family = detect_record_family_from_raw(raw_data, catalog_items)
 
+    clean_name = None
     if record_family == "census":
         print("\n[System] Converting raw scrape into census Gather JSON...")
         raw_census = build_census_json(raw_data, items_raw, catalog_items)
@@ -818,6 +837,7 @@ def main() -> None:
         final_data = census_schema.normalize_census_pages(
             raw_census, "familysearch_census", collection_title,
             f"Census_{raw_census.get('census_year', '')}")
+        clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
     else:
         print("\n[System] Converting raw scrape into the universal Gather JSON...")
         final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
@@ -825,7 +845,14 @@ def main() -> None:
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)
 
-    out_name = raw_json_file.name[len(json_prefix):]
+    # The browser side names the raw download after document.title, which for a
+    # FamilySearch collection page is often the full search-result title plus its own ark
+    # URL - unusable as a real filename. Prefer a clean "{year} - {location}" name built
+    # from the same normalized location fields Archivist itself reads, matching Ancestry's
+    # own naming convention (A.py's downloadFinalJson uses this exact "{year} - {location}"
+    # shape); fall back to the raw browser-provided name only if no location was found at
+    # all (e.g. a record with no state/county/city stated anywhere).
+    out_name = clean_name or raw_json_file.name[len(json_prefix):]
     final_json = json_target_dir / out_name
     final_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
     _unlink_with_retry(raw_json_file)
