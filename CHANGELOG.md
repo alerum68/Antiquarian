@@ -7,6 +7,51 @@ cleanup with no new functionality.
 
 ## [Unreleased]
 
+### Added
+- **Shared schema**: `Paleographer/schema.json` gains a constrained `sex` enum (`M`/`F`/`U`,
+  now required - family-position resolution depends on it matching exactly across every
+  source), `age_unit` (`years`/`months`/`days`, since infant baptism/burial ages are often
+  given in months or days), a generic per-participant `facts[]` array (extra facts named
+  from the shared fact/event vocabulary, replacing ad hoc DataFrame-column guessing), a
+  nullable `role_name` (for sources with no relationship data at all, e.g. pre-1880 US
+  census), and the `household_tally` convention for pre-1850 census records' unnamed
+  age/sex/race tallies.
+- **Voyageur**: census gathers (Ancestry and FamilySearch) are now normalized into the
+  shared `sheets[].records[].participants[]` schema at gather time, via a declarative
+  per-source field map (`Voyageur/field_maps/*.yaml`) - translating each source's own raw
+  column header text into the schema's field names, instead of leaving Archivist to guess
+  among several possible header spellings downstream. An unmapped header is flagged for
+  review, never dropped or guessed at. Census households become records
+  (`event_type: "Census (family)"`) grouped by family/dwelling number; a source with no
+  such data (pre-1850) produces one participant per record with no fabricated grouping.
+  `MergedCensus.py` is rewritten to merge on this normalized shape (matching sheets by
+  enumeration district/page/roll, participants by Line Number) instead of raw per-source
+  columns. Verified against real 1860 Ancestry census data (Pembina, Dakota Territory):
+  156 people normalized with zero unmapped headers, correctly resolved into 45 family
+  units through Archivist's existing (unchanged) household-parsing logic.
+- **Archivist**: reads the shared schema directly for census now
+  (`build_census_dataframe_from_unified`), adapting it back into the same column-named
+  shape the existing, independently-verified household-parsing/citation logic has always
+  operated on - that logic itself (era detection, `parse_household`,
+  `parse_household_relational`, citation assembly) is unchanged. Dispatch between census
+  and church documents now reads `record_type_name` directly off the loaded JSON, never a
+  hardcoded family-name string or a shape guess. The legacy `{census_year, location,
+  pages: [...]}` shape is still read unchanged for any already-gathered file that predates
+  this normalization.
+- **Paleographer + Archivist**: both now resolve their own settings (image directory,
+  master DB filename, citation fields) from their own `.env` files via each record type's
+  `field_remap` table (declared in `Parish.pmt`/`Scrip.pmt`'s front matter), with no
+  dependency on Scriptorium.py's GUI layer to bridge prefixed settings-tab names to the
+  generic names each script actually reads - fixes a real standalone-execution gap found
+  during a function-by-function audit against the project's design specification.
+- PyCharm Run/Debug configurations for Voyageur (per source), Paleographer, Archivist, and
+  the Scriptorium GUI shell, so each can be launched standalone directly from the IDE.
+
+### Fixed
+- Repo-wide PEP-8 lint failures (`pycodestyle --max-line-length=120`), both newly
+  introduced by this work and pre-existing debt never caught before CI actually ran on a
+  pull request.
+
 ## [0.07.00] - 2026-07-29
 
 ### Added
