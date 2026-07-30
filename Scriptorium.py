@@ -124,22 +124,6 @@ PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVE
               "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"}}
 
 # ==========================================
-# GEDCOM SOURCE FIELD REMAP
-# ==========================================
-# Archivist.py (the Create step) reads generic, unprefixed field names regardless of which
-# record family it's building. Each tab's own schema still uses its prefixed names
-# (CENSUS_*/CHURCH_*) so its settings stay grouped and self-explanatory in the UI; this
-# table bridges the two. "census"/"scrip" only exist here so `family in FIELD_REMAP` (see
-# execute_script) recognizes them as valid families - their one entry always targets
-# IMAGE_DIR, which every consuming loop below explicitly skips and sets separately, so the
-# loop body is a structural no-op for these two; only "church" has entries it actually uses.
-FIELD_REMAP = {"census": {"CENSUS_IMAGE_DIR": "IMAGE_DIR"},
-               "church": {"CHURCH_CALL_NUMBER": "CALL_NUMBER", "CHURCH_COLLECTION_URL": "COLLECTION_URL",
-                          "CHURCH_COLLECTION_NAME": "COLLECTION_NAME", "CHURCH_REPOSITORY": "REPOSITORY",
-                          "CHURCH_REPOSITORY_LOC": "REPOSITORY_LOC", "CHURCH_IMAGE_DIR": "IMAGE_DIR"},
-               "scrip": {"SCRIP_IMAGE_DIR": "IMAGE_DIR"}}
-
-# ==========================================
 # ENV FILE TARGETS
 # ==========================================
 # Global settings persist to the project root's .env. Each tool's own settings persist to a
@@ -965,21 +949,13 @@ class Scriptorium(ctk.CTk):
         return found or ["Parish.pmt"]
 
     @staticmethod
-    def _record_type_family(record_type_value: str) -> str:
-        """Maps the record-type dropdown's current value to a FIELD_REMAP family key,
-        defaulting to "church" (Parish) for anything unrecognized."""
-        name = record_type_value.strip().lower()
-        if name.endswith(".pmt"):
-            name = name[:-4]
-        return "scrip" if name == "scrip" else "church"
-
-    @staticmethod
-    def _get_pmt_settings_sections(record_type_value: str) -> List[str]:
-        """Reads the settings_sections a .pmt's own YAML front matter declares (if any),
-        telling the Paleographer tab which PALEOGRAPHER_VARS sections are actually
-        relevant for that record type. A .pmt that doesn't declare this (or can't be
-        read/parsed) returns an empty list, meaning "show everything" - so older or
-        hand-edited .pmt files don't lose fields by omission."""
+    def _read_pmt_front_matter(record_type_value: str) -> dict:
+        """Reads a .pmt file's own YAML front matter directly - the same declarative data
+        Paleographer.py/Archivist.py themselves read (via engine.parse_type_config /
+        apply_record_type_field_remap) to resolve their own settings and vocabulary. The
+        GUI shell has no hardcoded knowledge of what a record type means; it only ever
+        reads whatever that record type's own file declares. Returns {} for a .pmt that
+        doesn't exist or can't be parsed."""
         name = record_type_value.strip() or "Parish.pmt"
         if not name.endswith(".pmt"):
             name += ".pmt"
@@ -987,21 +963,34 @@ class Scriptorium(ctk.CTk):
         try:
             raw = pmt_path.read_text(encoding="utf-8")
         except OSError:
-            return []
+            return {}
 
         stripped = raw.lstrip()
         if not stripped.startswith("---"):
-            return []
+            return {}
         parts = stripped.split("---", 2)
         if len(parts) < 3:
-            return []
+            return {}
         try:
-            front_matter = yaml.safe_load(parts[1]) or {}
+            return yaml.safe_load(parts[1]) or {}
         except yaml.YAMLError:
-            return []
+            return {}
 
-        sections = front_matter.get("settings_sections")
+    def _get_pmt_settings_sections(self, record_type_value: str) -> List[str]:
+        """Reads the settings_sections a .pmt's own front matter declares (if any), telling
+        the Paleographer tab which PALEOGRAPHER_VARS sections are actually relevant for
+        that record type. Undeclared (or unparseable) returns an empty list, meaning "show
+        everything" - so older or hand-edited .pmt files don't lose fields by omission."""
+        sections = self._read_pmt_front_matter(record_type_value).get("settings_sections")
         return list(sections) if sections else []
+
+    def _get_pmt_field_remap(self, record_type_value: str) -> Dict[str, str]:
+        """Reads the field_remap a .pmt's own front matter declares (prefixed settings-tab
+        key -> generic runtime name Paleographer.py/Archivist.py each read from their own
+        .env - see Parish.pmt/Scrip.pmt). The GUI only ever needs this for its own display
+        purposes (e.g. picking the right image-dir field to browse from); the scripts
+        resolve it themselves at runtime regardless of whether Scriptorium is involved."""
+        return self._read_pmt_front_matter(record_type_value).get("field_remap") or {}
 
     def _on_record_type_change(self, _value: Optional[str] = None):
         """Rebuilds the settings form to only show the fields the selected .pmt's own
@@ -1056,11 +1045,13 @@ class Scriptorium(ctk.CTk):
 
     def _browse_debug_file(self):
         """Opens a file browser rooted in whichever image folder the current Record Type
-        actually reads from (CHURCH_IMAGE_DIR or SCRIP_IMAGE_DIR, nested under MEDIA_DIR -
-        mirroring execute_script's own resolution), storing just the bare filename since
-        that's what Paleographer.py compares DEBUG_FILE against."""
-        family = self._record_type_family(self.string_vars["PALEOGRAPHER_RECORD_TYPE"].get())
-        image_dir_key = "SCRIP_IMAGE_DIR" if family == "scrip" else "CHURCH_IMAGE_DIR"
+        actually reads from (nested under MEDIA_DIR - mirroring how each script resolves
+        its own IMAGE_DIR), storing just the bare filename since that's what Paleographer.py
+        compares DEBUG_FILE against. Which prefixed key that is comes directly from the
+        active .pmt's own field_remap declaration - never a hardcoded record-type name."""
+        record_type = self.string_vars["PALEOGRAPHER_RECORD_TYPE"].get()
+        field_remap = self._get_pmt_field_remap(record_type)
+        image_dir_key = next((src for src, dst in field_remap.items() if dst == "IMAGE_DIR"), "CHURCH_IMAGE_DIR")
         media_base = self._resolve_base_dir("MEDIA_DIR")
         image_dir_var = self.string_vars.get(image_dir_key)
         image_setting = image_dir_var.get().strip() if image_dir_var is not None else ""
@@ -1187,43 +1178,6 @@ class Scriptorium(ctk.CTk):
 
         self._build_form_ui(frame, PDFIX_VARS)
 
-    def _peek_record_family(self, program_dir: str) -> str:
-        """Peeks at the JSON file Archivist would build from (mirroring Archivist.py's own
-        resolve_json_input: explicit JSON_FILE, else the most recently created *.json in
-        JSON_DIR) just far enough to read its record_family field, so the single "Generate
-        GEDCOM" button can dispatch without the user picking a mode. Falls back to "church"
-        on any error - Archivist.py itself raises the real error when it actually runs."""
-        json_dir_var = self.string_vars.get("JSON_DIR")
-        json_file_var = self.string_vars.get("JSON_FILE")
-        json_dir_setting = json_dir_var.get().strip() if json_dir_var is not None else ""
-        json_file_name = json_file_var.get().strip() if json_file_var is not None else ""
-
-        if json_dir_setting and os.path.isabs(json_dir_setting):
-            json_dir_resolved = json_dir_setting
-        else:
-            json_dir_resolved = os.path.join(program_dir, json_dir_setting) if program_dir else json_dir_setting
-
-        try:
-            if json_file_name:
-                candidate = (Path(json_file_name) if os.path.isabs(json_file_name)
-                             else Path(json_dir_resolved) / json_file_name)
-            else:
-                candidates = sorted(Path(json_dir_resolved).glob("*.json"),
-                                    key=lambda p: p.stat().st_mtime, reverse=True)
-                candidate = candidates[0] if candidates else None
-
-            if candidate and candidate.is_file():
-                with open(candidate, "r", encoding="utf-8") as f:
-                    loaded = json.load(f)
-                family = loaded.get("record_family")
-                if family:
-                    return family
-                return "census" if "pages" in loaded else "church"
-        except (OSError, ValueError, IndexError):
-            pass
-
-        return "church"
-
     def execute_script(self, script_key, mode, on_success=None):
         """Prepares environment variables and launches an external script in a background
         thread. If on_success is given, it's called once the subprocess exits with code 0 -
@@ -1286,48 +1240,14 @@ class Scriptorium(ctk.CTk):
             if key in self.string_vars:
                 env_overrides[key] = resolve_path(base_dir, self.string_vars[key].get())
 
-        if mode == "paleographer_api":
-            family = self._record_type_family(self.string_vars["PALEOGRAPHER_RECORD_TYPE"].get())
-            for src_key, dst_key in FIELD_REMAP.get(family, {}).items():
-                if dst_key == "IMAGE_DIR":
-                    continue
-                var: Union[ctk.StringVar, None] = self.string_vars.get(src_key)
-                env_overrides[dst_key] = var.get() if var is not None else ""
-
-            image_dir_key = "SCRIP_IMAGE_DIR" if family == "scrip" else "CHURCH_IMAGE_DIR"
-            master_db_key = "SCRIP_MASTER_DB_NAME" if family == "scrip" else "CHURCH_MASTER_DB_NAME"
-            env_overrides.update({"IMAGE_DIR": env_overrides.get(image_dir_key, ""),
-                                  "IMAGE_SOURCE_DIR": env_overrides.get(image_dir_key, ""),
-                                  "GEDCOM_OUTPUT_NAME": self.string_vars["CHURCH_GEDCOM_NAME"].get(),
-                                  "MASTER_DB_NAME": self.string_vars[master_db_key].get()})
-        elif mode == "gedcom_auto":
-            family = self._peek_record_family(program_dir)
-            family_key = family if family in FIELD_REMAP else "church"
-
-            for src_key, dst_key in FIELD_REMAP[family_key].items():
-                if dst_key == "IMAGE_DIR":
-                    continue
-                var = self.string_vars.get(src_key)
-                env_overrides[dst_key] = var.get() if var is not None else ""
-
-            if family_key == "census":
-                # GEDCOM_OUTPUT_NAME deliberately left unset here - Archivist's census
-                # flavor derives it from the gathered JSON's own filename when it's blank
-                # (see run_census_flavor), which is the name that actually matters for a
-                # census run; CHURCH_GEDCOM_NAME doesn't apply to this family at all.
-                env_overrides.update({"IMAGE_DIR": env_overrides.get("CENSUS_IMAGE_DIR", ""),
-                                      "IMAGE_SOURCE_DIR": env_overrides.get("CENSUS_IMAGE_DIR", "")})
-            else:
-                # Previously only set in the paleographer_api branch above (the AI
-                # transcription step, which never calls Archivist) and never here in
-                # gedcom_auto (which is the only mode that actually does) - so clicking
-                # "Generate GEDCOM" on a church/scrip register always wrote to Archivist's
-                # module-level default filename instead of this configured one.
-                image_dir_key = "SCRIP_IMAGE_DIR" if family_key == "scrip" else "CHURCH_IMAGE_DIR"
-                env_overrides.update({"IMAGE_DIR": env_overrides.get(image_dir_key, ""),
-                                      "IMAGE_SOURCE_DIR": env_overrides.get(image_dir_key, ""),
-                                      "GEDCOM_OUTPUT_NAME": self.string_vars["CHURCH_GEDCOM_NAME"].get()})
-
+        # Nothing else to compute here: every prefixed setting (CHURCH_*/SCRIP_*/CENSUS_*)
+        # is already in run_env from the blanket string_vars dump above (with the nested
+        # image-dir ones now resolved to full paths, via nested_dir_keys). Paleographer.py
+        # and Archivist.py each resolve their own generic runtime settings (IMAGE_DIR,
+        # MASTER_DB_NAME, CALL_NUMBER, GEDCOM_OUTPUT_NAME, etc.) directly from those env
+        # vars via their own field_remap table (declared in the active .pmt's front
+        # matter) - the same resolution they use when run standalone, with no dependency
+        # on this GUI computing anything family/record-type-specific on their behalf.
         run_env.update(env_overrides)
 
         self._set_ui_state("disabled")
