@@ -752,7 +752,14 @@ class Scriptorium(ctk.CTk):
             saved = dotenv_values(env_path_for(subfolder))
             for fields in category_dict.values():
                 for key, default_val in fields.items():
-                    val = saved.get(key) or default_val
+                    # `key in saved` (not `saved.get(key) or default_val`) - a key the user
+                    # deliberately blanked and saved is present in the file with value "",
+                    # which is falsy in Python; `or default_val` was silently reviving the
+                    # placeholder default every time settings loaded, making it impossible
+                    # to actually test/run with a field left blank on purpose. Only a key
+                    # genuinely absent from the file (never saved at all) falls back to the
+                    # placeholder default now.
+                    val = saved[key] if key in saved else default_val
                     self.string_vars[key] = ctk.StringVar(value=val)
 
     def _save_env(self):
@@ -818,10 +825,26 @@ class Scriptorium(ctk.CTk):
         return btn_box
 
     def _build_form_ui(self, parent, schema_dict, skip_keys: Optional[set] = None):
-        # Lowered default height footprint, scroll frame will expand to fill middle space safely
+        # CTkScrollableFrame doesn't reliably grow past its constructed height from
+        # pack(fill="both", expand=True) alone (a known CustomTkinter limitation) - it just
+        # stays at this small initial height, with the rest of the tab left as dead, unused
+        # space below it. Given a starting size here since the widget needs one to exist at
+        # all; _resize_scroll below recomputes it to actually fill the tab once real
+        # dimensions are known, and again on every resize.
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent", width=800, height=200)
         scroll.pack(side="top", fill="both", expand=True, pady=10)
         skip_keys = skip_keys or set()
+
+        def _resize_scroll(_event=None):
+            parent.update_idletasks()
+            # Rough allowance for the tab header row + docked action-button box that share
+            # this same parent frame above/below the scroll area.
+            available = parent.winfo_height() - 110
+            if available > 100:
+                scroll.configure(height=available)
+
+        parent.bind("<Configure>", _resize_scroll)
+        parent.after(50, _resize_scroll)
 
         for section, fields in schema_dict.items():
             ctk.CTkLabel(scroll, text=section, font=ctk.CTkFont(size=16, weight="bold"), text_color="#3B8ED0").pack(
