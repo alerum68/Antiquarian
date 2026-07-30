@@ -460,10 +460,11 @@ class ToolTip:
 class ConsoleRedirector:
     """Manages UI updates for streamed console text, routing progress bars appropriately."""
 
-    def __init__(self, text_widget, status_widget, on_progress=None):
+    def __init__(self, text_widget, status_widget, on_progress=None, on_line=None):
         self.text_widget = text_widget
         self.status_widget = status_widget
         self.on_progress = on_progress
+        self.on_line = on_line
         self.queue = queue.Queue()
         self.ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
         # Paleographer prints "[3/45] Processing file.jpg..." with end="" (no newline),
@@ -499,6 +500,14 @@ class ConsoleRedirector:
                 if matches:
                     current, total = matches[-1].groups()
                     self.on_progress(int(current), int(total))
+
+            if self.on_line is not None:
+                # Approximate preview only (a chunk boundary can split a line mid-tick) -
+                # fine for a collapsed-drawer preview, not meant to be exact.
+                tail = clean_chunk.rstrip('\n')
+                last_line = tail.rsplit('\n', 1)[-1] if tail else ''
+                if last_line.strip():
+                    self.on_line(last_line.strip())
 
             if '\r' in clean_chunk:
                 parts = clean_chunk.split('\r')
@@ -666,8 +675,7 @@ class Scriptorium(ctk.CTk):
         # This fixes a known CustomTkinter bug where CTkScrollableFrame
         # crashes with a math error if drawn before the window has a height.
         self.update_idletasks()
-        self.tabview.set("Voyageur")
-        self._on_tab_change()
+        self._switch_tab("Voyageur")
 
     def _on_closing(self):
         """Forcefully terminates the window and kills any zombie threads running in background."""
@@ -687,25 +695,20 @@ class Scriptorium(ctk.CTk):
         self.main_container = ctk.CTkFrame(self, corner_radius=10)
         self.main_container.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
 
-        self.main_container.grid_rowconfigure(0, weight=2)  # Prioritize top half for tabs
-        self.main_container.grid_rowconfigure(1, weight=1)  # Bottom half for console
-        self.main_container.grid_columnconfigure(0, weight=1)
+        self.main_container.grid_rowconfigure(0, weight=1)
+        self.main_container.grid_columnconfigure(0, weight=0)  # sidebar: fixed width
+        self.main_container.grid_columnconfigure(1, weight=1)  # main panel: expands
 
-        # Using the native CTkTabview for top-oriented tabs
-        self.tabview = ctk.CTkTabview(self.main_container, command=self._on_tab_change)
-        self.tabview.grid(row=0, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self._build_sidebar(self.main_container)
 
-        for tab_name in self.tab_builders.keys():
-            self.tabview.add(tab_name)
+        self.main_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
+        self.main_panel.grid(row=0, column=1, sticky="nsew")
+        self.main_panel.grid_rowconfigure(2, weight=1)  # content_area is the only row that expands
+        self.main_panel.grid_columnconfigure(0, weight=1)
 
-        self.console_frame = ctk.CTkFrame(self.main_container)
-        self.console_frame.grid(row=1, column=0, sticky="nsew", pady=(10, 0), padx=10)
-        self.console_frame.grid_rowconfigure(2, weight=1)
-        self.console_frame.grid_columnconfigure(0, weight=1)
-
-        # Sits above the tabview's own content, so it stays visible - and reflects the
-        # truth - no matter which tab is active when a background job is running.
-        self.status_row = ctk.CTkFrame(self.console_frame, fg_color="transparent")
+        # Sits above content_area, so it stays visible - and reflects the truth - no matter
+        # which tab is active when a background job is running.
+        self.status_row = ctk.CTkFrame(self.main_panel, fg_color="transparent")
         self.status_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
         self.status_row.grid_columnconfigure(1, weight=1)
 
@@ -720,19 +723,53 @@ class Scriptorium(ctk.CTk):
         self.status_bar.insert(0, "System Ready")
         self.status_bar.configure(state="readonly")
 
-        self.progress_bar = ctk.CTkProgressBar(self.console_frame, mode="determinate")
+        self.progress_bar = ctk.CTkProgressBar(self.main_panel, mode="determinate")
         self.progress_bar.set(0)
         self.progress_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 0))
         self.progress_bar.grid_remove()  # hidden until a run reports real [i/total] progress
 
+        # --- content area: one pre-built frame per tab, tkraise()'d by _switch_tab instead
+        # of a CTkTabview tab strip. Every _build_tab_* method is unchanged - it still just
+        # builds into whatever frame it's handed. ---
+        self.content_area = ctk.CTkFrame(self.main_panel, fg_color="transparent")
+        self.content_area.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 5))
+        self.content_area.grid_rowconfigure(0, weight=1)
+        self.content_area.grid_columnconfigure(0, weight=1)
+
+        self.tab_frames: Dict[str, ctk.CTkFrame] = {}
+        for tab_name in self.tab_builders.keys():
+            frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+            frame.grid(row=0, column=0, sticky="nsew")
+            self.tab_frames[tab_name] = frame
+
+        # --- collapsible console drawer: collapsed by default, auto-expanded by
+        # execute_script the moment a job actually starts. ---
+        self.console_toggle_row = ctk.CTkFrame(self.main_panel, fg_color="transparent", cursor="hand2")
+        self.console_toggle_row.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 2))
+        self._console_arrow = ctk.CTkLabel(self.console_toggle_row, text="▶", width=16,
+                                           font=ctk.CTkFont(size=12, weight="bold"), text_color="gray60")
+        self._console_arrow.pack(side="left")
+        self._console_preview = ctk.CTkLabel(self.console_toggle_row, text="Console", anchor="w",
+                                             font=ctk.CTkFont(family="Consolas", size=11), text_color="gray60")
+        self._console_preview.pack(side="left", fill="x", expand=True, padx=5)
+        self._console_expanded = False
+        for widget in (self.console_toggle_row, self._console_arrow, self._console_preview):
+            widget.bind("<Button-1>", self._toggle_console)
+
+        self.console_body = ctk.CTkFrame(self.main_panel, fg_color="transparent")
+        self.console_body.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        self.console_body.grid_rowconfigure(0, weight=1)
+        self.console_body.grid_columnconfigure(0, weight=1)
+        self.console_body.grid_remove()  # collapsed until _toggle_console/_expand_console
+
         # Set fixed fallback dimensions to prevent 0-height rendering geometry crash
-        self.console_text = ctk.CTkTextbox(self.console_frame, font=ctk.CTkFont(family="Consolas", size=12),
-                                           text_color="#00FF00", width=800, height=250)
-        self.console_text.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 10))
+        self.console_text = ctk.CTkTextbox(self.console_body, font=ctk.CTkFont(family="Consolas", size=12),
+                                           text_color="#00FF00", width=800, height=220)
+        self.console_text.grid(row=0, column=0, sticky="nsew")
         self.console_text.configure(state="disabled")
 
-        self.input_frame = ctk.CTkFrame(self.console_frame, fg_color="transparent")
-        self.input_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.input_frame = ctk.CTkFrame(self.console_body, fg_color="transparent")
+        self.input_frame.grid(row=1, column=0, sticky="ew", pady=(5, 0))
         self.input_frame.grid_columnconfigure(0, weight=1)
 
         self.console_input = ctk.CTkEntry(self.input_frame,
@@ -745,7 +782,115 @@ class Scriptorium(ctk.CTk):
                                         width=80, state="disabled", command=self.cancel_script)
         self.cancel_btn.grid(row=0, column=1)
 
-        self.console = ConsoleRedirector(self.console_text, self.status_bar, on_progress=self._on_progress_update)
+        self.console = ConsoleRedirector(self.console_text, self.status_bar,
+                                         on_progress=self._on_progress_update, on_line=self._on_console_line)
+
+    def _build_sidebar(self, parent):
+        """Left nav rail replacing the old top CTkTabview: a scrollable list of tool groups
+        (Pipeline: Voyageur -> Paleographer -> Archivist; Utilities: Registrar/Gazetteer/
+        PDFix) plus a footer pinned outside that scroll region (Help, Global Settings) so
+        neither can ever be scrolled out of view or clipped by a short window."""
+        self.sidebar = ctk.CTkFrame(parent, fg_color="#212121", corner_radius=8)
+        self.sidebar.grid(row=0, column=0, sticky="ns", padx=(0, 10))
+        self.sidebar.grid_rowconfigure(0, weight=1)
+        self.sidebar.grid_columnconfigure(0, weight=1)
+
+        self.nav_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", width=190, height=300)
+        self.nav_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=(14, 4))
+
+        ctk.CTkLabel(self.nav_scroll, text="Scriptorium", font=ctk.CTkFont(size=17, weight="bold")
+                     ).pack(anchor="w", padx=6, pady=(0, 0))
+        ctk.CTkLabel(self.nav_scroll, text="Record shell", font=ctk.CTkFont(size=11),
+                     text_color="gray60").pack(anchor="w", padx=6, pady=(0, 14))
+
+        self._nav_buttons: Dict[str, ctk.CTkButton] = {}
+
+        def add_group_label(text):
+            ctk.CTkLabel(self.nav_scroll, text=text.upper(), font=ctk.CTkFont(size=10, weight="bold"),
+                         text_color="gray50").pack(anchor="w", padx=6, pady=(10, 4))
+
+        def add_nav_button(container, tab_name, command=None):
+            btn = ctk.CTkButton(container, text=tab_name, anchor="w", fg_color="transparent",
+                                hover_color="#2b2b2b", text_color="gray85",
+                                command=command or partial(self._switch_tab, tab_name))
+            btn.pack(fill="x", pady=1)
+            self._nav_buttons[tab_name] = btn
+            return btn
+
+        def add_connector():
+            ctk.CTkFrame(self.nav_scroll, width=2, height=8, fg_color="gray35").pack(padx=18)
+
+        add_group_label("Pipeline")
+        add_nav_button(self.nav_scroll, "Voyageur")
+        add_connector()
+        add_nav_button(self.nav_scroll, "Paleographer")
+        add_connector()
+        add_nav_button(self.nav_scroll, "Archivist")
+
+        add_group_label("Utilities")
+        add_nav_button(self.nav_scroll, "Registrar")
+        add_nav_button(self.nav_scroll, "Gazetteer")
+        add_nav_button(self.nav_scroll, "PDFix")
+
+        self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.sidebar_footer.grid(row=1, column=0, sticky="ew", padx=8, pady=(4, 14))
+        ctk.CTkFrame(self.sidebar_footer, height=1, fg_color="gray30").pack(fill="x", pady=(0, 6))
+        add_nav_button(self.sidebar_footer, "Help", command=self._show_current_help)
+        # "Global Settings" doubles as both a real tab_name (drives _switch_tab / active-
+        # highlight bookkeeping the same as any other nav button) and its own settings form.
+        add_nav_button(self.sidebar_footer, "Global Settings")
+
+        # Same known CTkScrollableFrame sizing limitation _build_form_ui already works
+        # around: it doesn't reliably grow to fill its grid cell on its own, so this
+        # recomputes an explicit height from the sidebar's actual size on every resize.
+        def _resize_nav_scroll(_event=None):
+            self.sidebar.update_idletasks()
+            available = self.sidebar.winfo_height() - self.sidebar_footer.winfo_height() - 40
+            if available > 80:
+                self.nav_scroll.configure(height=available)
+
+        self.sidebar.bind("<Configure>", _resize_nav_scroll)
+        self.sidebar.after(50, _resize_nav_scroll)
+
+    def _switch_tab(self, tab_name):
+        """Replaces CTkTabview's own tab switching: lazily builds a tab's content into its
+        pre-created frame on first visit (same self.tabs_built guard as before), raises it,
+        and updates which sidebar nav button reads as active."""
+        self.current_tab_name = tab_name
+        frame = self.tab_frames[tab_name]
+        if tab_name not in self.tabs_built:
+            self.tab_builders[tab_name](frame)
+            self.tabs_built.add(tab_name)
+        frame.tkraise()
+        for name, btn in self._nav_buttons.items():
+            if name == tab_name:
+                btn.configure(fg_color="#3B8ED0", text_color="white")
+            elif name != "Help":
+                btn.configure(fg_color="transparent", text_color="gray85")
+
+    def _show_current_help(self):
+        """The sidebar's single Help entry point, replacing the old per-tab Help button -
+        always shows whichever tab is actually on screen right now."""
+        self.show_help(getattr(self, "current_tab_name", "Voyageur"))
+
+    def _toggle_console(self, _event=None):
+        self._console_expanded = not self._console_expanded
+        if self._console_expanded:
+            self.console_body.grid()
+            self._console_arrow.configure(text="▼")
+        else:
+            self.console_body.grid_remove()
+            self._console_arrow.configure(text="▶")
+
+    def _expand_console(self):
+        """Called by execute_script the moment a job actually starts, so first-run output
+        is never silently missed behind a collapsed drawer - collapsing back is left to the
+        user."""
+        if not self._console_expanded:
+            self._toggle_console()
+
+    def _on_console_line(self, line):
+        self._console_preview.configure(text=line[:100])
 
     def _on_progress_update(self, current, total):
         """Fed by ConsoleRedirector whenever it spots Paleographer's own
@@ -804,13 +949,6 @@ class Scriptorium(ctk.CTk):
         self.console.put("\n[System] Environment variables saved (global settings to the root .env, "
                          "each tool's settings to its own subfolder).\n")
 
-    def _on_tab_change(self):
-        current_tab = self.tabview.get()
-        if current_tab not in self.tabs_built:
-            tab_frame = self.tabview.tab(current_tab)
-            self.tab_builders[current_tab](tab_frame)
-            self.tabs_built.add(current_tab)
-
     def show_help(self, tab_name):
         """Displays a clean pop-up window with help instructions."""
         help_window = ctk.CTkToplevel(self)
@@ -839,13 +977,11 @@ class Scriptorium(ctk.CTk):
         cleaned = cleaned.replace("_", " ").title()
         return cleaned
 
-    def _build_tab_header(self, frame: ctk.CTkFrame, title: str, help_key: str):
+    def _build_tab_header(self, frame: ctk.CTkFrame, title: str):
         """A helper method to standardize tab headers and eliminate duplicate code."""
         header_frame = ctk.CTkFrame(frame, fg_color="transparent")
         header_frame.pack(fill="x", pady=(0, 10))
         ctk.CTkLabel(header_frame, text=title, font=ctk.CTkFont(size=24, weight="bold")).pack(side="left")
-        ctk.CTkButton(header_frame, text="Help", width=60, fg_color="#3B8ED0", hover_color="#2b7a4b",
-                      command=lambda: self.show_help(help_key)).pack(side="right", padx=5)
         ctk.CTkButton(header_frame, text="Save Config", fg_color="#D4AC0D", hover_color="#B7950B",
                       text_color="black", command=self._save_env).pack(side="right", padx=5)
 
@@ -1025,7 +1161,7 @@ class Scriptorium(ctk.CTk):
             self.string_vars[key].set(str(selected_path).replace("\\", "/"))
 
     def _build_tab_global(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Global Environment Settings", "Global Settings")
+        self._build_tab_header(frame, "Global Environment Settings")
 
         # Build buttons first so they dock safely to the bottom
         self._create_action_box(frame)
@@ -1033,7 +1169,7 @@ class Scriptorium(ctk.CTk):
         self._build_form_ui(frame, GLOBAL_VARS)
 
     def _build_tab_archivist(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Archivist", "Archivist")
+        self._build_tab_header(frame, "Archivist")
 
         ctk.CTkLabel(frame, text="Builds a GEDCOM from whatever JSON Voyageur or Paleographer already produced.",
                      text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
@@ -1117,7 +1253,7 @@ class Scriptorium(ctk.CTk):
                                 skip_keys={"PALEOGRAPHER_RECORD_TYPE"})
 
     def _build_tab_paleographer(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Paleographer", "Paleographer")
+        self._build_tab_header(frame, "Paleographer")
 
         type_frame = ctk.CTkFrame(frame, fg_color="transparent")
         type_frame.pack(side="top", fill="x", pady=(10, 5))
@@ -1216,7 +1352,7 @@ class Scriptorium(ctk.CTk):
             self._build_form_ui(self.voyageur_form_container, filtered, skip_keys={"VOYAGEUR_SOURCE"})
 
     def _build_tab_voyageur(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Voyageur", "Voyageur")
+        self._build_tab_header(frame, "Voyageur")
 
         source_frame = ctk.CTkFrame(frame, fg_color="transparent")
         source_frame.pack(side="top", fill="x", pady=(10, 5))
@@ -1247,7 +1383,7 @@ class Scriptorium(ctk.CTk):
         self._on_voyageur_source_change()
 
     def _build_tab_registrar(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Registrar", "Registrar")
+        self._build_tab_header(frame, "Registrar")
 
         ctk.CTkLabel(frame, text="Finds logical duplicate people in RootsMagic.", text_color="gray").pack(side="top",
                                                                                                           anchor="w",
@@ -1261,7 +1397,7 @@ class Scriptorium(ctk.CTk):
         self._build_form_ui(frame, REGISTRAR_VARS)
 
     def _build_tab_gazetteer(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Gazetteer", "Gazetteer")
+        self._build_tab_header(frame, "Gazetteer")
 
         ctk.CTkLabel(frame, text="Fixes historical US county jurisdictions utilizing geopandas.",
                      text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
@@ -1274,7 +1410,7 @@ class Scriptorium(ctk.CTk):
         self._build_form_ui(frame, GAZETTEER_VARS)
 
     def _build_tab_pdfix(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "PDFix", "PDFix")
+        self._build_tab_header(frame, "PDFix")
 
         ctk.CTkLabel(frame, text="Losslessly shrinks PDF file sizes in bulk (garbage-collection + stream "
                                  "compression via PyMuPDF) - no image rescaling.",
@@ -1321,6 +1457,7 @@ class Scriptorium(ctk.CTk):
         self.status_bar.configure(state="readonly")
         self.run_indicator.configure(text_color="#2ECC71")
         self.run_tooltip.text = f"Running: {script_display_name}"
+        self._expand_console()
 
         run_env = os.environ.copy()
         run_env.update({k: str(v.get()) for k, v in self.string_vars.items()})
@@ -1438,7 +1575,10 @@ class Scriptorium(ctk.CTk):
             self.after(150, on_success)
 
     def _set_ui_state(self, state):
-        self._recursive_state(self.tabview, state)
+        # Deliberately only content_area, not self.sidebar - tab switching should stay
+        # possible while a script runs in the background, matching the old CTkTabview
+        # layout's own (if accidental) behavior of never disabling its own tab strip either.
+        self._recursive_state(self.content_area, state)
 
         if hasattr(self, 'console_input'):
             if state == "disabled":
