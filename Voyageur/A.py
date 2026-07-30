@@ -168,8 +168,13 @@ def main() -> Path:
     # Persist this as the JSON_FILE setting immediately, before anything below (the image
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
     # button) still targets the exact file that was just produced, instead of whatever
-    # JSON_FILE happened to be set to before this run started.
-    set_key(str(Path(__file__).resolve().parent / ".env"), "JSON_FILE", final_json.name)
+    # JSON_FILE happened to be set to before this run started. JSON_FILE is read by
+    # Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py), so it's written to
+    # Archivist's own .env, not this script's own subfolder one - confirmed live this was
+    # the actual bug behind Archivist immediately failing with FileNotFoundError right
+    # after a real gather succeeded: this used to write to Voyageur/.env, a file Archivist
+    # never reads at all.
+    set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json.name)
 
     stem_parts = final_json.stem.split(' - ', 1)
     census_year = stem_parts[0].strip() if len(stem_parts) > 0 else "Unknown_Year"
