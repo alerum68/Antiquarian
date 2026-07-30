@@ -80,6 +80,7 @@ GLOBAL_VARS = {"API & Processing": {"GEMINI_API_KEY": "", "API_BUDGET": "20", "M
 
 ARCHIVIST_VARS = {"Which JSON to Build From": {"JSON_FILE": ""},
                   "Location Overrides": {"STATE": "", "COUNTY": "", "TOWNSHIP": ""},
+                  "GEDCOM Output": {"GEDCOM_OUTPUT_MODE": "Both"},
                   "Family Inference Tuning": {"MIN_MARRIAGE_AGE": "12", "MAX_SPOUSE_AGE_GAP": "25",
                                               "HUSBAND_CHILD_AGE_GAP_MIN": "14", "HUSBAND_CHILD_AGE_GAP_MAX": "60",
                                               "WIFE_CHILD_AGE_GAP_MIN": "12", "WIFE_CHILD_AGE_GAP_MAX": "50"}}
@@ -99,7 +100,8 @@ VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC"),
 VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
                  "Ancestry": {"CENSUS_URL": ""},
                  "FamilySearch": {"FS_URL": ""},
-                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC"}}
+                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC"},
+                 "Merged (Ancestry + FamilySearch)": {"MERGE_PRIMARY_PROVIDER": "Ancestry"}}
 
 PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
                                             "CHURCH_GEDCOM_NAME": "Parish.ged",
@@ -194,6 +196,9 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
               "this in to force the same County on every record.",
     "TOWNSHIP": "Leave blank to use the Township/City Voyageur already gathered per-page from the JSON file. "
                 "Only fill this in to force the same Township on every record.",
+    "GEDCOM_OUTPUT_MODE": "Which GEDCOM file(s) to generate: RootsMagic only, Family Tree Maker only, or Both. "
+                         "When only one is selected, its output filename has no ' - RM'/' - FTM' suffix, since "
+                         "there's nothing to disambiguate from.",
     "MIN_MARRIAGE_AGE": "The youngest plausible age someone could be married (used to group families correctly).",
     "MAX_SPOUSE_AGE_GAP": "The largest age gap allowed between a husband and wife before the AI assumes they are not "
                           "married.",
@@ -211,6 +216,9 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                 "https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/).",
     "LAC_IMAGE_DIR": "The subfolder name (e.g., 'LAC') inside your Base Media Directory. A subfolder per roll number "
                       "is created automatically inside it. Can also be an absolute path.",
+    "MERGE_PRIMARY_PROVIDER": "Which source's own reading wins when a Merged gather's two indexes disagree on a "
+                              "field. The other source's differing reading is never dropped either way - it's "
+                              "always recorded as a review reason.",
 
     # Paleographer
     "PALEOGRAPHER_RECORD_TYPE": "Which record type (from Paleographer/prompts) to transcribe. Leave blank to use the "
@@ -399,6 +407,10 @@ FIELD_WIDGETS = {
                                            "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
     "PDFIX_COMPRESSION_LEVEL": {"type": "segmented",
                                 "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
+    "GEDCOM_OUTPUT_MODE": {"type": "segmented",
+                           "options": [("RM", "RootsMagic"), ("FTM", "Family Tree Maker"), ("Both", "Both")]},
+    "MERGE_PRIMARY_PROVIDER": {"type": "segmented",
+                               "options": [("Ancestry", "Ancestry"), ("FamilySearch", "FamilySearch")]},
 
     "MIN_MARRIAGE_AGE": {"type": "slider", "min": 8, "max": 20},
     "MAX_SPOUSE_AGE_GAP": {"type": "slider", "min": 5, "max": 40},

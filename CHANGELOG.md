@@ -61,11 +61,28 @@ cleanup with no new functionality.
   "Canada", since it didn't join Confederation until 1949). New optional setting
   `GAZETTEER_CA_SHAPEFILE_DIR`; Gazetteer runs US-only if it's not set/found, unchanged from
   before this existed.
+- **Voyageur (Merged)**: which source is treated as primary on a field conflict is now
+  configurable (`MERGE_PRIMARY_PROVIDER`, Ancestry/FamilySearch, default Ancestry -
+  unchanged from before this setting existed). `MergedCensus.py`'s merge functions are
+  genericized from hardcoded Ancestry/FamilySearch naming to primary/secondary throughout;
+  both sources' own identifiers/links are still always carried through regardless of which
+  is primary.
+- **Archivist**: which GEDCOM flavor(s) to generate is now configurable
+  (`GEDCOM_OUTPUT_MODE`: RM, FTM, or Both - default Both, unchanged from before). A
+  single-flavor run drops the " - RM"/" - FTM" disambiguating filename suffix entirely,
+  since there's nothing to disambiguate from with only one output.
 
 ### Fixed
 - Repo-wide PEP-8 lint failures (`pycodestyle --max-line-length=120`), both newly
   introduced by this work and pre-existing debt never caught before CI actually ran on a
   pull request.
+- **Voyageur (Ancestry/FamilySearch)**: periodic checkpoint downloads (crash-recovery
+  saves taken every 20 pages/items) were never cleaned up from the Downloads folder - only
+  the final combined JSON was ever moved out, so a long gather left several superseded,
+  marker-prefixed checkpoint files behind permanently. `A.py`/`FS.py` now delete this run's
+  own checkpoint files once the final JSON is safely written. (The marker prefix itself on
+  the final JSON was already stripped before reaching the project folder - that part
+  was never actually broken, despite being renamed several times looking for the bug.)
 
 ## [0.07.00] - 2026-07-29
 
