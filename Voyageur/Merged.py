@@ -67,7 +67,12 @@ def main() -> None:
     print("\n[System] Step 3 of 3: Merging the two sources...\n")
     ancestry_data = json.loads(Path(ancestry_json).read_text(encoding="utf-8"))
     fs_data = json.loads(Path(fs_json).read_text(encoding="utf-8"))
-    merged = MergedCensus.merge_census(ancestry_data, fs_data)
+
+    primary_provider = os.getenv("MERGE_PRIMARY_PROVIDER", "Ancestry").strip()
+    if primary_provider == "FamilySearch":
+        merged = MergedCensus.merge_census(fs_data, ancestry_data, "FamilySearch", "Ancestry")
+    else:
+        merged = MergedCensus.merge_census(ancestry_data, fs_data, "Ancestry", "FamilySearch")
 
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)

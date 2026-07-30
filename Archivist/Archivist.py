@@ -105,6 +105,7 @@ FTM_DIR = safe_path(PROGRAM_DIR, os.getenv("FTM_DIR", ""))
 JSON_DIR = safe_path(PROGRAM_DIR, os.getenv("JSON_DIR", ""))
 GEDCOM_OUTPUT_PATH = safe_path(PROGRAM_DIR, os.getenv("GEDCOM_OUTPUT_PATH", ""))
 GEDCOM_OUTPUT_NAME = os.getenv("GEDCOM_OUTPUT_NAME", "Family_Register.ged")
+GEDCOM_OUTPUT_MODE = os.getenv("GEDCOM_OUTPUT_MODE", "Both").strip()
 # Census has no .pmt (no field_remap table to resolve this from - see
 # apply_record_type_field_remap, which handles church/scrip instead), so its own prefixed
 # key is read directly here as a plain fallback, standalone, with no dependency on
@@ -426,14 +427,28 @@ def wrap_text(text: str, tag: str = "5 CONT") -> str:
     return "\n".join(wrapped)
 
 
+def resolve_gedcom_output_targets() -> List[str]:
+    """Which GEDCOM flavor(s) to actually generate this run, from GEDCOM_OUTPUT_MODE
+    ("RM", "FTM", or "Both" - default "Both", preserving this tool's original
+    always-generate-both behavior when the setting is left unset)."""
+    if GEDCOM_OUTPUT_MODE == "RM":
+        return ["RM"]
+    if GEDCOM_OUTPUT_MODE == "FTM":
+        return ["FTM"]
+    return ["RM", "FTM"]
+
+
 def resolve_gedcom_output_path(target_software: str) -> Path:
     """Resolves the output .ged path for a given software flavor (RM/FTM), rooted in
-    GEDCOM_OUTPUT_PATH if set, otherwise that flavor's own RM_DIR/FTM_DIR."""
+    GEDCOM_OUTPUT_PATH if set, otherwise that flavor's own RM_DIR/FTM_DIR. The " - RM"/
+    " - FTM" disambiguating suffix is only added when both flavors are actually being
+    generated this run - a single-flavor run has nothing to disambiguate from."""
     base_name, ext = Path(GEDCOM_OUTPUT_NAME).stem, Path(GEDCOM_OUTPUT_NAME).suffix
     out_dir = Path(str(GEDCOM_OUTPUT_PATH)) if GEDCOM_OUTPUT_PATH else (
         Path(str(RM_DIR)) if target_software == "RM" else Path(str(FTM_DIR)))
     out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / f"{base_name} - {target_software}{ext}"
+    suffix = f" - {target_software}" if len(resolve_gedcom_output_targets()) > 1 else ""
+    return out_dir / f"{base_name}{suffix}{ext}"
 
 
 def dedent_citation_lines(lines: List[str], skip_at_level: Optional[Tuple[int, str]] = None) -> List[str]:
@@ -1860,7 +1875,7 @@ def run_census_flavor(data: dict) -> None:
         if nested_dir.is_dir():
             IMAGE_DIR = str(nested_dir)
 
-    for software in ["RM", "FTM"]:
+    for software in resolve_gedcom_output_targets():
         build_gedcom_from_census(census_df, software)
 
 
@@ -2742,7 +2757,7 @@ def run_church_flavor(data: dict) -> None:
     REPOSITORY = REPOSITORY or "FamilySearch.org"
     REPOSITORY_LOC = REPOSITORY_LOC or "Granite Mountain, UT"
 
-    for software in ["RM", "FTM"]:
+    for software in resolve_gedcom_output_targets():
         gedcom_text = build_gedcom_from_church(data, software)
 
         final_path = resolve_gedcom_output_path(software)
