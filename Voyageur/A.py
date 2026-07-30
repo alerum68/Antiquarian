@@ -178,7 +178,19 @@ def main() -> Path:
     location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
     census_folder = f"{census_year} US Federal Census"
 
-    base_img_dir = Path(program_dir) / base_img_setting if program_dir else Path(base_img_setting)
+    # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
+    # PROGRAM_DIR directly. Resolved here independently (rather than relying on
+    # Scriptorium.py's GUI to pre-resolve it into an absolute path before launching this
+    # as a subprocess) so this script produces correct output standalone, with nothing
+    # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
+    # directly by the user) is used as-is, never re-nested.
+    if os.path.isabs(base_img_setting):
+        base_img_dir = Path(base_img_setting)
+    else:
+        media_setting = os.getenv("MEDIA_DIR", "Media")
+        base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
+            Path(program_dir) / media_setting if program_dir else Path(media_setting))
+        base_img_dir = base_media_dir / base_img_setting
     img_target_dir = base_img_dir / census_folder / location_folder
     img_target_dir.mkdir(parents=True, exist_ok=True)
 

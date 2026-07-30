@@ -1,11 +1,12 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.0
+// @version      0.3.5
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
 // @match        *://*.familysearch.org/ark:/*
+// @match        *://sg30p0.familysearch.org/*
 // @connect      *
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
@@ -58,8 +59,52 @@
 
     if (host.includes('ancestry.com')) {
         runAncestryGather();
+    } else if (host === 'sg30p0.familysearch.org') {
+        runFsImageIframeHelper();
     } else if (host.includes('familysearch.org')) {
         runFamilySearchGather();
+    }
+
+    // ==========================================
+    // FAMILYSEARCH IMAGE HELPER - runs inside the hidden iframe downloadFsImage (below)
+    // creates, same-origin relative to the deepzoomcloud image itself. Direct access to
+    // this endpoint from the FamilySearch record page's own origin is blocked - confirmed
+    // live across three separate mechanisms: GM_xmlhttpRequest hangs to timeout, a plain
+    // cross-origin fetch() gets 429 even on a brand-new item_id never requested before,
+    // and a plain cross-origin <a download> triggers nothing at all - while a genuine
+    // top-level navigation to this exact URL (what the site's own "Print" button does)
+    // always works cleanly. Loading it in a hidden iframe gets a real navigation (no
+    // popup-blocker issue, unlike window.open(), and the parent page's own state/loop
+    // isn't disturbed the way navigating the parent tab itself would be), and this
+    // function then runs same-origin inside that iframe, where fetch() is no longer
+    // cross-origin and none of the above restrictions apply.
+    // ==========================================
+    function runFsImageIframeHelper() {
+        // Only fetches here and hands the raw bytes back to the parent via postMessage -
+        // confirmed live that triggering the actual <a download> click from *inside* this
+        // iframe runs the whole fetch+blob chain successfully (postMessage 'done' arrives,
+        // the image visibly renders) but never actually saves a file, while the identical
+        // click mechanism triggered from the top-level record page (the JSON downloads)
+        // always works - browsers commonly restrict download-triggering from a nested
+        // iframe even when same-origin. The parent does the actual click instead, in the
+        // same top-level context that already reliably downloads the JSON.
+        const match = window.location.pathname.match(/\/dz\/v1\/([^/]+)\/\$dist/);
+        const itemId = match ? decodeURIComponent(match[1]) : "unknown_item";
+        const fileName = `${itemId.replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`;
+
+        fetch(window.location.href)
+            .then(response => {
+                if (!response.ok) {
+                    window.parent.postMessage({voyageurFsImage: 'error', status: response.status}, '*');
+                    return;
+                }
+                return response.arrayBuffer().then(buffer => {
+                    window.parent.postMessage({voyageurFsImage: 'data', buffer, fileName}, '*', [buffer]);
+                });
+            })
+            .catch(e => {
+                window.parent.postMessage({voyageurFsImage: 'error', message: String(e)}, '*');
+            });
     }
 
     // ==========================================
@@ -1371,6 +1416,9 @@
 
             const rows = await scrapeIndexRows();
             const {citationText, catalogItems} = await scrapeCitationAndCatalog();
+            // Awaited before moving on to the next image, same convention as Ancestry's
+            // own per-page image download.
+            await downloadFsImage(itemId);
 
             seenItemIds.add(itemId);
             accumulatedItems.push({item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows});
@@ -1438,6 +1486,76 @@
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+        }
+
+        function downloadFsImage(itemId) {
+            // FamilySearch's own image viewer exposes a "Download" button that fetches the
+            // full scanned page (not a tile, not a thumbnail - confirmed against a real
+            // record: 3346x4527, full resolution) from its deepzoomcloud storage service,
+            // keyed by the same item_id already scraped for citations above.
+            //
+            // Direct access from this page's own origin is blocked - confirmed live across
+            // three separate mechanisms (GM_xmlhttpRequest hangs to timeout; a plain
+            // cross-origin fetch() gets 429 even on a brand-new item_id never requested
+            // before; a plain cross-origin <a download> triggers nothing). A genuine
+            // top-level navigation to the same URL always works (what the site's own
+            // "Print" button does) - loading it into a hidden iframe gets that same real
+            // navigation without popup-blocker issues (window.open() gets blocked, since
+            // this isn't a trusted user gesture) and without disturbing this page's own
+            // gather loop state. runFsImageIframeHelper (this script's own top-level
+            // dispatch, matched via the sg30p0.familysearch.org @match rule) then runs
+            // same-origin inside that iframe and does the actual fetch+download, signaling
+            // back via postMessage when done.
+            const imageUrl = `https://sg30p0.familysearch.org/service/records/storage/`
+                + `deepzoomcloud/dz/v1/${encodeURIComponent(itemId)}/$dist`;
+            debugLog(`downloadFsImage loading via hidden iframe: ${imageUrl}`);
+
+            return new Promise((resolve) => {
+                let settled = false;
+                const finish = () => {
+                    if (settled) return;
+                    settled = true;
+                    window.removeEventListener('message', onMessage);
+                    clearTimeout(safetyTimer);
+                    if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+                    resolve();
+                };
+
+                const onMessage = (event) => {
+                    if (!event.data || typeof event.data !== 'object' || !('voyageurFsImage' in event.data)) return;
+                    if (event.data.voyageurFsImage === 'data') {
+                        // The actual download click happens here, in this top-level
+                        // frame's own context - not inside the iframe (see
+                        // runFsImageIframeHelper's own comment for why).
+                        const blob = new Blob([event.data.buffer], {type: 'image/jpeg'});
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.setAttribute('href', url);
+                        link.setAttribute('download', `TMP_FS_Images_${event.data.fileName}`);
+                        link.style.visibility = 'hidden';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                        if (window.fsShowToast) window.fsShowToast(`Image captured: ${event.data.fileName}`, 'success', 1000);
+                    } else {
+                        debugLog(`downloadFsImage iframe reported error: ${JSON.stringify(event.data)}`);
+                        if (window.fsShowToast) window.fsShowToast('Failed to fetch image.', 'error');
+                    }
+                    finish();
+                };
+                window.addEventListener('message', onMessage);
+
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = imageUrl;
+                document.body.appendChild(iframe);
+
+                // Safety net in case the iframe never loads or never gets a chance to run
+                // (blocked, slow network, etc.) - one image's failure shouldn't hang the
+                // whole batch forever.
+                const safetyTimer = setTimeout(finish, 15000);
+            });
         }
 
         function downloadFinalJson() {
