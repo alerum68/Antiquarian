@@ -738,12 +738,13 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
 
 
 def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[str]:
-    """Builds a "{year} - {state} - {county} - {city}.json" name (matching A.py/Ancestry's
-    own "{year} - {locationStr}" convention) from the first record carrying any of those
-    fields, instead of the raw browser-provided name (document.title, which for a
-    FamilySearch collection page often includes the page's own ark URL). Returns None if no
-    sheet/record has any of these fields at all, so the caller can fall back rather than
-    silently invent a location."""
+    """Builds a "{year} - {state} - {county} - {city} - FS.json" name (matching A.py/
+    Ancestry's own "{year} - {locationStr} - ANC" convention, so both sources' output files
+    are named the same way and the provider is obvious at a glance) from the first record
+    carrying any of those fields, instead of the raw browser-provided name (document.title,
+    which for a FamilySearch collection page often includes the page's own ark URL).
+    Returns None if no sheet/record has any of these fields at all, so the caller can fall
+    back rather than silently invent a location."""
     for sheet in normalized_data.get("sheets", []):
         for record in sheet.get("records", []):
             fields = record.get("type_specific_fields", {}) or {}
@@ -751,7 +752,7 @@ def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[st
             if len(parts) > 1:
                 safe = " - ".join(parts)
                 safe = re.sub(r'[/\\?%*:|"<>]', "-", safe)
-                return f"{safe}.json"
+                return f"{safe} - FS.json"
     return None
 
 

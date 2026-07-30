@@ -871,7 +871,7 @@
             }
             const {year, locationStr} = getYearAndLocation();
             const payload = {census_year: year, location: locationStr, pages: accumulatedPages};
-            triggerJsonDownload(JSON.stringify(payload, null, 2), `${year} - ${locationStr}.json`);
+            triggerJsonDownload(JSON.stringify(payload, null, 2), `${year} - ${locationStr} - ANC.json`);
             if (window.showToast) window.showToast("Success! Master JSON Downloaded.", "success", 5000);
         }
 

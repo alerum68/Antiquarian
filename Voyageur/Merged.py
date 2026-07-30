@@ -12,6 +12,7 @@ browser automation and download watching) rather than re-implementing that logic
 """
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -70,7 +71,10 @@ def main() -> None:
 
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)
-    merged_json = json_target_dir / f"{Path(ancestry_json).stem} - Merged.json"
+    # Strip the Ancestry file's own "- ANC" suffix first, so this doesn't read
+    # "... - ANC - Merged.json" - "- Merged" already says both sources went into it.
+    base_stem = re.sub(r" - ANC$", "", Path(ancestry_json).stem)
+    merged_json = json_target_dir / f"{base_stem} - Merged.json"
     merged_json.write_text(json.dumps(merged, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # Point "Generate GEDCOM"'s default JSON_FILE at the merged result, superseding
