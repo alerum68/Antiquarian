@@ -460,11 +460,17 @@ class ToolTip:
 class ConsoleRedirector:
     """Manages UI updates for streamed console text, routing progress bars appropriately."""
 
-    def __init__(self, text_widget, status_widget):
+    def __init__(self, text_widget, status_widget, on_progress=None):
         self.text_widget = text_widget
         self.status_widget = status_widget
+        self.on_progress = on_progress
         self.queue = queue.Queue()
         self.ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        # Paleographer prints "[3/45] Processing file.jpg..." with end="" (no newline),
+        # so a single 50ms tick may only see a few characters of it - this buffer
+        # accumulates raw text across ticks so the regex still matches once it's complete.
+        self._progress_buffer = ""
+        self._progress_re = re.compile(r'\[(\d+)/(\d+)\] Processing')
         self.update_gui()
 
     def put(self, text):
@@ -486,6 +492,13 @@ class ConsoleRedirector:
             text_chunk = "".join(chars)
             clean_chunk = self.ansi_escape.sub('', text_chunk)
             clean_chunk = clean_chunk.replace('\r\n', '\n')
+
+            if self.on_progress is not None:
+                self._progress_buffer = (self._progress_buffer + clean_chunk)[-500:]
+                matches = list(self._progress_re.finditer(self._progress_buffer))
+                if matches:
+                    current, total = matches[-1].groups()
+                    self.on_progress(int(current), int(total))
 
             if '\r' in clean_chunk:
                 parts = clean_chunk.split('\r')
@@ -687,23 +700,39 @@ class Scriptorium(ctk.CTk):
 
         self.console_frame = ctk.CTkFrame(self.main_container)
         self.console_frame.grid(row=1, column=0, sticky="nsew", pady=(10, 0), padx=10)
-        self.console_frame.grid_rowconfigure(1, weight=1)
+        self.console_frame.grid_rowconfigure(2, weight=1)
         self.console_frame.grid_columnconfigure(0, weight=1)
 
-        self.status_bar = ctk.CTkEntry(self.console_frame, font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
+        # Sits above the tabview's own content, so it stays visible - and reflects the
+        # truth - no matter which tab is active when a background job is running.
+        self.status_row = ctk.CTkFrame(self.console_frame, fg_color="transparent")
+        self.status_row.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        self.status_row.grid_columnconfigure(1, weight=1)
+
+        self.run_indicator = ctk.CTkLabel(self.status_row, text="●", width=20,
+                                          font=ctk.CTkFont(size=16, weight="bold"), text_color="gray50")
+        self.run_indicator.grid(row=0, column=0, padx=(0, 5))
+        self.run_tooltip = ToolTip(self.run_indicator, "Idle - no script running")
+
+        self.status_bar = ctk.CTkEntry(self.status_row, font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
                                        text_color="#00FFFF", fg_color="#1a1a1a", border_width=1)
-        self.status_bar.grid(row=0, column=0, sticky="ew", padx=10, pady=(10, 0))
+        self.status_bar.grid(row=0, column=1, sticky="ew")
         self.status_bar.insert(0, "System Ready")
         self.status_bar.configure(state="readonly")
+
+        self.progress_bar = ctk.CTkProgressBar(self.console_frame, mode="determinate")
+        self.progress_bar.set(0)
+        self.progress_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 0))
+        self.progress_bar.grid_remove()  # hidden until a run reports real [i/total] progress
 
         # Set fixed fallback dimensions to prevent 0-height rendering geometry crash
         self.console_text = ctk.CTkTextbox(self.console_frame, font=ctk.CTkFont(family="Consolas", size=12),
                                            text_color="#00FF00", width=800, height=250)
-        self.console_text.grid(row=1, column=0, sticky="nsew", padx=10, pady=(5, 10))
+        self.console_text.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 10))
         self.console_text.configure(state="disabled")
 
         self.input_frame = ctk.CTkFrame(self.console_frame, fg_color="transparent")
-        self.input_frame.grid(row=2, column=0, sticky="ew", padx=10, pady=(0, 10))
+        self.input_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 10))
         self.input_frame.grid_columnconfigure(0, weight=1)
 
         self.console_input = ctk.CTkEntry(self.input_frame,
@@ -716,7 +745,15 @@ class Scriptorium(ctk.CTk):
                                         width=80, state="disabled", command=self.cancel_script)
         self.cancel_btn.grid(row=0, column=1)
 
-        self.console = ConsoleRedirector(self.console_text, self.status_bar)
+        self.console = ConsoleRedirector(self.console_text, self.status_bar, on_progress=self._on_progress_update)
+
+    def _on_progress_update(self, current, total):
+        """Fed by ConsoleRedirector whenever it spots Paleographer's own
+        "[i/total] Processing ..." line in the streamed output."""
+        if total <= 0:
+            return
+        self.progress_bar.grid()
+        self.progress_bar.set(min(1.0, current / total))
 
     def send_input(self, _event=None):
         if self.active_process and self.active_process.poll() is None:
@@ -1277,10 +1314,13 @@ class Scriptorium(ctk.CTk):
             self.console.put(f"\n[System] Could not find the script at: {target_script_path}\n")
             return
 
+        script_display_name = os.path.basename(target_script_path)
         self.status_bar.configure(state="normal")
         self.status_bar.delete(0, "end")
-        self.status_bar.insert(0, f"Launching {os.path.basename(target_script_path)}...")
+        self.status_bar.insert(0, f"Launching {script_display_name}...")
         self.status_bar.configure(state="readonly")
+        self.run_indicator.configure(text_color="#2ECC71")
+        self.run_tooltip.text = f"Running: {script_display_name}"
 
         run_env = os.environ.copy()
         run_env.update({k: str(v.get()) for k, v in self.string_vars.items()})
@@ -1330,6 +1370,10 @@ class Scriptorium(ctk.CTk):
             self.status_bar.delete(0, "end")
             self.status_bar.insert(0, "System Ready")
             self.status_bar.configure(state="readonly")
+            self.run_indicator.configure(text_color="gray50")
+            self.run_tooltip.text = "Idle - no script running"
+            self.progress_bar.set(0)
+            self.progress_bar.grid_remove()
 
         args = [target_script_path]
         if mode == "paleographer_api" and self.debug_file_var.get().strip():
