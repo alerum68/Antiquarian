@@ -21,6 +21,7 @@ Thumbs.db
 /identifier.sqlite
 /Gazetteer/US_AtlasHCB_Counties/
 /JSON/
+/Archivist/source_id_registry.json
 
 # Local dev scratch space (sample data, test files, etc.)
 /DEV/
