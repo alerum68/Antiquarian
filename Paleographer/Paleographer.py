@@ -70,7 +70,13 @@ COST_CFG = engine.CostConfig(
 )
 
 PROGRAM_DIR: Path = Path(os.getenv("PROGRAM_DIR", ""))
-MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / resolve_setting("MASTER_DB_NAME"))
+_MASTER_DB_NAME = resolve_setting("MASTER_DB_NAME")
+if not _MASTER_DB_NAME:
+    raise RuntimeError(
+        "MASTER_DB_NAME resolved to an empty value (check the active record type's own "
+        "MASTER_DB_NAME setting, e.g. CHURCH_MASTER_DB_NAME for Parish.pmt) - without it "
+        "MASTER_DB would just be the JSON folder itself, not a file inside it.")
+MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / _MASTER_DB_NAME)
 SOURCE_DIR: str = str(PROGRAM_DIR / resolve_setting("IMAGE_DIR"))
 
 MODEL_ID: str = os.getenv("MODEL_NAME") or ""

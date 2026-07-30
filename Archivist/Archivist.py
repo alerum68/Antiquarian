@@ -2622,9 +2622,24 @@ def apply_record_type_field_remap(record_type_name: str) -> None:
         GEDCOM_OUTPUT_NAME = resolved["GEDCOM_OUTPUT_NAME"]
 
 
+def apply_extracted_parish_name(data: dict) -> None:
+    """Paleographer's AI reads the parish's own name off the page itself (Parish.pmt's
+    "PARISH/CHURCH NAME" rule) into each sheet's document_metadata.source_name - prefer
+    that over the settings-tab PARISH_NAME so the user isn't asked to type in by hand what
+    the transcription already extracted. Falls back to the settings value (already in
+    CHURCH_CONFIG) when no sheet states it, e.g. an older file gathered before this rule
+    existed."""
+    for sheet in data.get("sheets", []):
+        source_name = (sheet.get("document_metadata") or {}).get("source_name")
+        if source_name and source_name.strip():
+            CHURCH_CONFIG["parish_name"] = source_name.strip()
+            return
+
+
 def run_church_flavor(data: dict) -> None:
     global REPOSITORY, REPOSITORY_LOC
     apply_record_type_field_remap(data.get("record_type_name", ""))
+    apply_extracted_parish_name(data)
 
     # REPOSITORY/REPOSITORY_LOC are shared generic names with the census flavor (which
     # relies on them defaulting blank so its own JSON-scraped values via get_json_fallback
