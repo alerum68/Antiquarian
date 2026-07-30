@@ -123,6 +123,66 @@ CURRENT_DATE = datetime.datetime.now().strftime('%d %b %Y').upper()
 # safe default (e.g. ANCESTRY_START_RECORD_ID's fallback offset is added to a DataFrame row
 # index that's already unique within that one GEDCOM build on its own).
 CENSUS_YEAR = get_env_int("CENSUS_YEAR", 0)
+
+# ==========================================
+# SOURCE ID REGISTRY
+# ==========================================
+# Every source (a census year, a parish register, a scrip district, a will collection, ...)
+# gets one stable 4-digit numeric Source ID, embedded consistently as both the GEDCOM
+# source record's own XREF (@S{id}@) and its REFN tag - not an arbitrary "1" placeholder,
+# and not a string XREF with no real number in it at all (the census flavor's own
+# @S_{year}_CENSUS@ was exactly that, fixed below).
+#
+# US and Canadian census years, plus the combined slave schedule, are precoded - the same
+# real historical source regardless of which website it was gathered from, so Ancestry,
+# FamilySearch, and LAC all gathering the same 1860 census share the same Source ID.
+# Everything else (church/parish, scrip, wills, ...) starts at 1030 and is auto-assigned
+# the first time a given (record type, collection name) pair is seen, then reused on every
+# later run against that same collection - see resolve_source_id().
+_US_CENSUS_YEARS = [1790, 1800, 1810, 1820, 1830, 1840, 1850, 1860, 1870, 1880,
+                    1890, 1900, 1910, 1920, 1930, 1940, 1950]
+# Canadian census years available for genealogical research (matching the 72-year privacy
+# rule genealogists already work within) - LAC.py doesn't set its own record_type_name yet
+# (checked: no "Census_CA_"-style convention exists in this codebase today), so these keys
+# are a forward-looking reservation, not yet reachable from a real gather.
+_CANADIAN_CENSUS_YEARS = [1851, 1861, 1871, 1881, 1891, 1901, 1911]
+
+PRECODED_SOURCE_IDS: Dict[str, int] = {f"Census_{year}": 1001 + i for i, year in enumerate(_US_CENSUS_YEARS)}
+# 1018-1019 reserved (the US census block runs 1001-1019, 17 years assigned + 2 spare).
+PRECODED_SOURCE_IDS["Census_Slave_Schedule"] = 1020
+# 1021-1027 assigned, 1028-1029 reserved (Canadian census block runs 1021-1029).
+PRECODED_SOURCE_IDS.update({f"Census_CA_{year}": 1021 + i for i, year in enumerate(_CANADIAN_CENSUS_YEARS)})
+
+NEXT_AUTO_SOURCE_ID = 1030
+SOURCE_ID_REGISTRY_PATH = Path(__file__).resolve().parent / "source_id_registry.json"
+
+
+def resolve_source_id(record_type_name: str, collection_name: str = "") -> int:
+    """Returns this document's stable 4-digit Source ID. A precoded census year or the
+    slave schedule returns its fixed id immediately, regardless of collection_name.
+    Anything else is looked up in (and, the first time, assigned into) a small persistent
+    registry keyed on (record_type_name, collection_name), so re-scanning the same
+    collection (e.g. Assumption Parish scanned three times) reuses its existing id instead
+    of drifting to a new one each time."""
+    if record_type_name in PRECODED_SOURCE_IDS:
+        return PRECODED_SOURCE_IDS[record_type_name]
+
+    try:
+        registry = json.loads(SOURCE_ID_REGISTRY_PATH.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        registry = {"next": NEXT_AUTO_SOURCE_ID, "entries": {}}
+
+    key = f"{record_type_name}|{collection_name}"
+    if key in registry["entries"]:
+        return registry["entries"][key]
+
+    new_id = registry.get("next", NEXT_AUTO_SOURCE_ID)
+    registry["entries"][key] = new_id
+    registry["next"] = new_id + 1
+    SOURCE_ID_REGISTRY_PATH.write_text(json.dumps(registry, indent=2), encoding="utf-8")
+    return new_id
+
+
 ANCESTRY_START_RECORD_ID = get_env_int("ANCESTRY_START_RECORD_ID", 0)
 APID_DB = os.getenv("APID_DB", "")
 ANCESTRY_IMAGE_BASE_ID = os.getenv("ANCESTRY_IMAGE_BASE_ID", "")
@@ -167,6 +227,7 @@ def get_census_template_id(year: int) -> int:
 
 
 CENSUS_ERA = get_census_era(CENSUS_YEAR)
+CENSUS_SOURCE_ID = resolve_source_id(f"Census_{CENSUS_YEAR}") if CENSUS_YEAR else NEXT_AUTO_SOURCE_ID
 
 # Church-specific settings.
 CHURCH_CONFIG = {
@@ -994,7 +1055,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
     ancestry_url = get_row_val(row, ['Extracted_URL'], '') or \
         f"https://www.ancestry.com/search/collections/{APID_DB}/records/{rec_id}"
 
-    cit = [f"2 SOUR @S_{CENSUS_YEAR}_CENSUS@"]
+    cit = [f"2 SOUR @S{CENSUS_SOURCE_ID}@"]
 
     caps = CENSUS_TEMPLATES[get_census_template_id(CENSUS_YEAR)]
     ed_suffix = f", ED {row_ed}" if (caps["ed"] and row_ed) else ""
@@ -1213,7 +1274,8 @@ def get_census_sources(target_software: str) -> List[str]:
                          "2 FIELD", "3 NAME PubType", "3 VALUE on-line image",
                          "2 FIELD", "3 NAME FilmID", f"3 VALUE {FILM_NUMBER}"]
 
-        return [f"0 @S_{CENSUS_YEAR}_CENSUS@ SOUR", f"1 ABBR {CENSUS_YEAR} U.S. Federal Census",
+        return [f"0 @S{CENSUS_SOURCE_ID}@ SOUR", f"1 REFN {CENSUS_SOURCE_ID}",
+                f"1 ABBR {CENSUS_YEAR} U.S. Federal Census",
                 f"1 TITL , {CENSUS_YEAR} U.S. Federal Census, {COUNTY}, {STATE}{schedule_frag}{ed_frag}, ; "
                 f"on-line image {FILM_NUMBER}, .",
                 f"1 _SUBQ , {CENSUS_YEAR} U.S. Federal Census, {COUNTY}, {STATE}{schedule_frag}{ed_frag}, .",
@@ -1224,7 +1286,8 @@ def get_census_sources(target_software: str) -> List[str]:
                 f"1 PUBL Researcher: {RESEARCHER}."] + weblink_lines(
             MGS_GROUP_URL, "Facebook Group", "RM") + weblink_lines(ANCESTRY_GROUP_URL, "Ancestry Group", "RM")
     else:
-        return [f"0 @S_{CENSUS_YEAR}_CENSUS@ SOUR", f"1 TITL {CENSUS_YEAR} U.S. Federal Census",
+        return [f"0 @S{CENSUS_SOURCE_ID}@ SOUR", f"1 REFN {CENSUS_SOURCE_ID}",
+                f"1 TITL {CENSUS_YEAR} U.S. Federal Census",
                 f"1 PUBL {PUB_LOC}: {PUBLISHER}", "1 REPO @R1@", f"1 _APID 1,{APID_DB}::0",
                 f"0 {ROOT_SOURCE_ID} SOUR", f"1 TITL {ORG_NAME}", f"1 AUTH Research conducted by {RESEARCHER}.",
                 f"1 _LINK {MGS_GROUP_URL}", "2 NAME Facebook Group", f"1 _LINK {ANCESTRY_GROUP_URL}",
@@ -1713,7 +1776,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
 def run_census_flavor(data: dict) -> None:
     global STATE, COUNTY, TOWNSHIP, ENUMERATION_DISTRICT, ROLL_NUMBER, FILM_NUMBER, CENSUS_YEAR, CENSUS_ERA
     global APID_DB, COLLECTION_NAME, COLLECTION_URL, PUBLISHER, PUB_LOC, CALL_NUMBER, REPOSITORY_LOC, REPOSITORY
-    global IMAGE_DIR
+    global IMAGE_DIR, CENSUS_SOURCE_ID
 
     # "pages" (Voyageur's original raw shape) is kept working for any already-gathered
     # file that predates the shared-schema normalization; "sheets" + a "Census_"-prefixed
@@ -1742,6 +1805,12 @@ def run_census_flavor(data: dict) -> None:
     if not CENSUS_YEAR:
         CENSUS_YEAR = int(payload_year) if payload_year.isdigit() else 0
     CENSUS_ERA = get_census_era(CENSUS_YEAR)
+    # The document's own record_type_name (e.g. "Census_1860", or a future "Census_CA_1901"
+    # once LAC.py sets one) is the authoritative key into PRECODED_SOURCE_IDS - falls back to
+    # reconstructing it from CENSUS_YEAR for the legacy "pages" shape, which never carried
+    # record_type_name at all.
+    record_type_name = data.get("record_type_name") or f"Census_{CENSUS_YEAR}"
+    CENSUS_SOURCE_ID = resolve_source_id(record_type_name, COLLECTION_NAME)
 
     APID_DB = get_json_fallback(census_df, ['APID_DB', 'APID', 'Database ID', 'dbid'], APID_DB)
     COLLECTION_NAME = get_json_fallback(census_df, ['Collection Name', 'Collection_Name', 'Collection'],
@@ -2636,10 +2705,25 @@ def apply_extracted_parish_name(data: dict) -> None:
             return
 
 
+def apply_resolved_source_id(data: dict) -> None:
+    """Auto-resolves this document's stable Source ID via the same registry every other
+    non-precoded source uses (see resolve_source_id), keyed on this record type and its own
+    extracted parish name - so re-scanning the same parish register reuses its existing id
+    instead of drifting to a new one each run. An explicit REGISTER_SOURCE_ID the user
+    actually typed in (not just the untouched "1" default) always wins."""
+    explicit = os.getenv("REGISTER_SOURCE_ID", "").strip()
+    if explicit and explicit != "1":
+        return
+    record_type_name = data.get("record_type_name") or "Church"
+    collection_name = CHURCH_CONFIG.get("parish_name", "")
+    CHURCH_CONFIG["register_source_id"] = str(resolve_source_id(record_type_name, collection_name))
+
+
 def run_church_flavor(data: dict) -> None:
     global REPOSITORY, REPOSITORY_LOC
     apply_record_type_field_remap(data.get("record_type_name", ""))
     apply_extracted_parish_name(data)
+    apply_resolved_source_id(data)
 
     # REPOSITORY/REPOSITORY_LOC are shared generic names with the census flavor (which
     # relies on them defaulting blank so its own JSON-scraped values via get_json_fallback
