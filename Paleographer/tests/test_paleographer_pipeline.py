@@ -63,6 +63,20 @@ class FakeClient:
         FakeClient.last_instance = self
 
 
+# Record types' own prefixed .env keys (Parish.pmt/Scrip.pmt's field_remap tables). Other
+# test modules (e.g. Archivist's) import Archivist.py with real, unmocked load_dotenv calls,
+# which set these for real in the process environment (override=False still sets a key
+# that's otherwise unset) and never clean up after themselves - so a real dev machine's own
+# Paleographer/.env values (CHURCH_IMAGE_DIR='Parish', etc.) can leak into this test's
+# os.environ when the full suite runs in one process. Clearing them here keeps this test
+# isolated regardless of what ran earlier in the same pytest session.
+_PREFIXED_KEYS_TO_CLEAR = (
+    "CHURCH_IMAGE_DIR", "CHURCH_MASTER_DB_NAME", "CHURCH_GEDCOM_NAME", "CHURCH_CALL_NUMBER",
+    "CHURCH_COLLECTION_URL", "CHURCH_COLLECTION_NAME", "CHURCH_REPOSITORY", "CHURCH_REPOSITORY_LOC",
+    "SCRIP_IMAGE_DIR", "SCRIP_MASTER_DB_NAME", "SCRIP_COLLECTION_NAME",
+)
+
+
 def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_data, argv=None,
                                image_filenames=("TestFile_00001.jpg",)):
     program_dir = tmp_path / "program"
@@ -73,6 +87,9 @@ def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_d
 
     for name in image_filenames:
         Image.new("RGB", (10, 10), color="white").save(program_dir / image_dir_name / name)
+
+    for key in _PREFIXED_KEYS_TO_CLEAR:
+        monkeypatch.delenv(key, raising=False)
 
     env = {
         "PROGRAM_DIR": str(program_dir),
