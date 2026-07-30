@@ -1618,6 +1618,18 @@ class Scriptorium(ctk.CTk):
         letting a caller chain a follow-up run (e.g. "Gather and Send to Archivist" auto-running
         Generate GEDCOM once a gather finishes cleanly), without chaining onto a cancelled
         or failed run."""
+        # JSON_FILE can be updated directly on disk by a just-finished Voyageur gather
+        # (A.py/FS.py's own set_key call, once a gather completes) - resync it here before
+        # _save_env() below, so a chained "Gather and Send to Archivist" run doesn't
+        # clobber that fresh value with whatever was already showing in this field before
+        # the gather started. Confirmed live: without this, Archivist immediately failed
+        # with FileNotFoundError right after a real gather succeeded, since this field's
+        # own in-memory StringVar never picks up a sibling script's own disk write.
+        if "JSON_FILE" in self.string_vars:
+            fresh_json_file = dotenv_values(env_path_for("Archivist")).get("JSON_FILE")
+            if fresh_json_file is not None:
+                self.string_vars["JSON_FILE"].set(fresh_json_file)
+
         self._save_env()
 
         script_path_var: Union[ctk.StringVar, None] = self.string_vars.get(script_key)

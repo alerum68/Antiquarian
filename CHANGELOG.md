@@ -25,6 +25,14 @@ cleanup with no new functionality.
   already uses.
 
 ### Fixed
+- **Voyageur -> Archivist handoff**: `A.py`/`FS.py` wrote the freshly-gathered `JSON_FILE`
+  setting to their own subfolder's `.env` - a file Archivist never reads at all (`JSON_FILE`
+  belongs to Archivist's own settings, per its `ARCHIVIST_VARS` entry). Both now write it to
+  `Archivist/.env`. Also fixed the GUI's "Gather and Send to Archivist" chain: it never
+  re-read this value from disk before its own `_save_env()` call overwrote it with whatever
+  was already showing in that field before the gather started - `execute_script` now
+  resyncs it first. Confirmed live: this was the exact cause of Archivist immediately
+  failing with `FileNotFoundError` right after a real gather succeeded.
 - **Voyageur (Ancestry/FamilySearch)**: `CENSUS_IMAGE_DIR` is a subfolder of the Base Media
   Directory (`MEDIA_DIR`), not of `PROGRAM_DIR` directly - both `A.py` and `FS.py` now
   resolve this themselves, matching how Scriptorium.py's GUI already resolves it before

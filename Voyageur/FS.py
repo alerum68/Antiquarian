@@ -939,7 +939,12 @@ def main() -> None:
 
     print(f"[System] Moved {img_count} image(s) to Project folder.")
 
-    set_key(str(Path(__file__).resolve().parent / ".env"), "JSON_FILE", final_json.name)
+    # JSON_FILE is read by Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py),
+    # so it's written to Archivist's own .env, not this script's own subfolder one -
+    # confirmed live this was the actual bug behind Archivist immediately failing with
+    # FileNotFoundError right after a real gather succeeded: this used to write to
+    # Voyageur/.env, a file Archivist never reads at all.
+    set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json.name)
 
     # Both branches now produce the same sheets[].records[].participants[] shape (the
     # census path is normalized above via census_schema, same as A.py) - one summary
