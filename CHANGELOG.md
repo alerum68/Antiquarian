@@ -8,6 +8,31 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
+- **Voyageur (FamilySearch)**: full-resolution image download for census gathers, matching
+  Ancestry's own per-page image capture. FamilySearch's deepzoomcloud storage endpoint
+  blocks direct access from the record page's own origin across every mechanism tried
+  (`GM_xmlhttpRequest` hangs to timeout; a plain cross-origin `fetch()` returns 429 even on
+  a brand-new item never requested before; a plain cross-origin `<a download>` triggers
+  nothing) - but a genuine top-level navigation to the same URL always works (confirmed:
+  it's what the site's own "Print" button does). Voyageur.js now loads the image into a
+  hidden iframe (a real navigation, not blocked by any of the above, and without the
+  popup-blocker issue `window.open()` hits since it's not a trusted user gesture); a second
+  `@match` rule runs a small helper inside that iframe, fetching same-origin and handing
+  the raw bytes back to the parent page via `postMessage` - the actual download click
+  happens in the parent's own context, since triggering it from inside the iframe silently
+  produces nothing despite the fetch succeeding. `FS.py` collects and moves these images
+  into the same nested `{year} US Federal Census / {location}` folder structure `A.py`
+  already uses.
+
+### Fixed
+- **Voyageur (Ancestry/FamilySearch)**: `CENSUS_IMAGE_DIR` is a subfolder of the Base Media
+  Directory (`MEDIA_DIR`), not of `PROGRAM_DIR` directly - both `A.py` and `FS.py` now
+  resolve this themselves, matching how Scriptorium.py's GUI already resolves it before
+  launching either script as a subprocess. Confirmed live: running either script standalone
+  (bypassing the GUI, which normally injects the fully-resolved path) previously put images
+  in a stray folder at the program root instead of nested under the user's actual
+  RootsMagic media folder - a real gap, not just a testing artifact, since every other tool
+  in this project is expected to produce correct output standalone.
 - **Shared schema**: `Paleographer/schema.json` gains a constrained `sex` enum (`M`/`F`/`U`,
   now required - family-position resolution depends on it matching exactly across every
   source), `age_unit` (`years`/`months`/`days`, since infant baptism/burial ages are often

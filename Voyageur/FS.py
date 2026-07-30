@@ -14,13 +14,16 @@ Also handles same-person matching across duplicate index entries (stamping a sha
 rather than merging records - see Archivist's generate_uid, which already knows to prefer
 link_id over its own hash).
 
-Does not fetch the source image itself; that's later, separate work (deep-zoom tile
-stitching), deliberately out of scope for this pass.
+Also fetches the source image itself (see downloadFsImage in Voyageur.js) - FamilySearch's
+own image viewer's "Download" button turned out to fetch the complete page directly from its
+deepzoomcloud storage service, keyed by the same item_id already scraped for citations, with
+no tile-stitching needed at all.
 """
 
 import json
 import os
 import re
+import shutil
 import sys
 import time
 import webbrowser
@@ -737,6 +740,21 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
+def _move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+    """Same reasoning as A.py's own _move_with_retry: Chrome (or antivirus scanning it) can
+    still hold a freshly-downloaded file open for a brief moment after it appears in the
+    folder listing."""
+    for attempt in range(1, attempts + 1):
+        try:
+            shutil.move(str(src), str(dst))
+            return
+        except OSError as e:
+            if attempt == attempts:
+                print(f"[ERROR] Could not move {src.name} to {dst} after {attempts} attempts: {e}")
+                raise
+            time.sleep(delay)
+
+
 def _cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float) -> None:
     """Deletes this run's own leftover periodic checkpoint downloads (see
     downloadCheckpointJson in Voyageur.js) now that the final combined JSON has already
@@ -811,6 +829,7 @@ def main() -> None:
     # it's not part of the actual desired filename.
     downloads_dir = Path.home() / "Downloads"
     json_prefix = "TMP_FS_"
+    image_prefix = "TMP_FS_Images_"
     raw_json_file = None
 
     try:
@@ -874,6 +893,51 @@ def main() -> None:
     final_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
     _unlink_with_retry(raw_json_file)
     _cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
+
+    # Mirrors A.py's own nested {year} US Federal Census / {location} image folder
+    # convention, derived from this same run's own clean filename (when one was built) so
+    # both sources' images land under a comparable structure.
+    stem = re.sub(r' - FS$', '', final_json.stem)
+    stem_parts = stem.split(' - ', 1)
+    census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
+    location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
+    census_folder = f"{census_year} US Federal Census"
+
+    # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
+    # PROGRAM_DIR directly - confirmed live: running this standalone (bypassing
+    # Scriptorium.py's GUI, which normally pre-resolves this into an absolute path before
+    # launching the subprocess) put a stray "Census" folder at the program root instead of
+    # nested under the user's actual RootsMagic media folder. Resolved here independently
+    # so this script produces correct output standalone, with nothing else open - matching
+    # every other tool in this project. An already-absolute CENSUS_IMAGE_DIR (whether
+    # GUI-resolved or set directly by the user) is used as-is, never re-nested.
+    base_img_setting = os.getenv("CENSUS_IMAGE_DIR", "Census")
+    if os.path.isabs(base_img_setting):
+        base_img_dir = Path(base_img_setting)
+    else:
+        media_setting = os.getenv("MEDIA_DIR", "Media")
+        base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
+            Path(program_dir) / media_setting if program_dir else Path(media_setting))
+        base_img_dir = base_media_dir / base_img_setting
+    img_target_dir = base_img_dir / census_folder / location_folder
+    img_target_dir.mkdir(parents=True, exist_ok=True)
+
+    img_count = 0
+    image_candidates = [
+        p for p in downloads_dir.iterdir()
+        if p.is_file() and p.suffix.lower() == '.jpg'
+        and p.name.startswith(image_prefix) and p.stat().st_mtime >= start_time
+    ]
+    for file_path in image_candidates:
+        # noinspection broad-exception
+        try:
+            final_img = img_target_dir / file_path.name[len(image_prefix):]
+            _move_with_retry(file_path, final_img)
+            img_count += 1
+        except Exception:
+            pass
+
+    print(f"[System] Moved {img_count} image(s) to Project folder.")
 
     set_key(str(Path(__file__).resolve().parent / ".env"), "JSON_FILE", final_json.name)
 
