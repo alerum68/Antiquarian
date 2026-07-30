@@ -15,6 +15,7 @@ from typing import Union, Dict, Callable, List, Optional
 import customtkinter as ctk
 import yaml
 from dotenv import set_key, dotenv_values
+from PIL import Image
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -24,6 +25,28 @@ def env_path_for(subfolder: Optional[str]) -> Path:
     otherwise that tool's own subfolder, so each tool's config stays self-contained."""
     return BASE_DIR / subfolder / ".env" if subfolder else BASE_DIR / ".env"
 
+
+# ==========================================
+# COLOR PALETTE
+# ==========================================
+# Dark-mode values from assets/theme.json's own token set (the app forces
+# ctk.set_appearance_mode("Dark"), so only these matter visually) - for the handful of
+# widgets below that pass their own explicit color kwargs instead of riding the CTk theme
+# (which covers every CTkEntry/CTkSwitch/CTkSlider/CTkSegmentedButton/CTkComboBox already).
+C_SURFACE = "#202329"
+C_SURFACE_RAISED = "#262A31"
+C_TEXT = "#E7E6DE"
+C_TEXT_MUTED = "#8A8D83"
+C_ACCENT = "#8FA0CE"
+C_ACCENT_STRONG = "#6C7EAE"
+C_ON_ACCENT = "#141A28"
+C_BRASS = "#CBA35F"
+C_BRASS_SOFT = "#3A2F1C"
+C_SUCCESS = "#74C285"
+C_SUCCESS_HOVER = "#5CAA6E"
+C_DANGER = "#E58585"
+C_DANGER_HOVER = "#C96A6A"
+C_BORDER = "#33363D"
 
 # ==========================================
 # UNIFIED ENV SCHEMA & CONTEXT OVERRIDES
@@ -471,7 +494,7 @@ class ToolTip:
             tw.wm_attributes('-transparent', True)
 
         # Build the tooltip label
-        label = ctk.CTkLabel(tw, text=self.text, justify="left", fg_color="#1a1a1a", text_color="#E0E0E0",
+        label = ctk.CTkLabel(tw, text=self.text, justify="left", fg_color=C_SURFACE_RAISED, text_color=C_TEXT,
                              corner_radius=8, padx=12, pady=8, font=ctk.CTkFont(size=12))
         label.pack()
 
@@ -599,7 +622,7 @@ class Scriptorium(ctk.CTk):
         self.minsize(1000, 600)  # Prevents scrollbars from squishing to 0 height and crashing
 
         ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme("blue")
+        ctk.set_default_color_theme(str(BASE_DIR / "assets" / "theme.json"))
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
@@ -748,12 +771,13 @@ class Scriptorium(ctk.CTk):
         self.status_row.grid_columnconfigure(1, weight=1)
 
         self.run_indicator = ctk.CTkLabel(self.status_row, text="●", width=20,
-                                          font=ctk.CTkFont(size=16, weight="bold"), text_color="gray50")
+                                          font=ctk.CTkFont(size=16, weight="bold"), text_color=C_TEXT_MUTED)
         self.run_indicator.grid(row=0, column=0, padx=(0, 5))
         self.run_tooltip = ToolTip(self.run_indicator, "Idle - no script running")
 
         self.status_bar = ctk.CTkEntry(self.status_row, font=ctk.CTkFont(family="Consolas", size=13, weight="bold"),
-                                       text_color="#00FFFF", fg_color="#1a1a1a", border_width=1)
+                                       text_color=C_ACCENT, fg_color=C_SURFACE_RAISED, border_width=1,
+                                       border_color=C_BORDER)
         self.status_bar.grid(row=0, column=1, sticky="ew")
         self.status_bar.insert(0, "System Ready")
         self.status_bar.configure(state="readonly")
@@ -782,10 +806,10 @@ class Scriptorium(ctk.CTk):
         self.console_toggle_row = ctk.CTkFrame(self.main_panel, fg_color="transparent", cursor="hand2")
         self.console_toggle_row.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 2))
         self._console_arrow = ctk.CTkLabel(self.console_toggle_row, text="▶", width=16,
-                                           font=ctk.CTkFont(size=12, weight="bold"), text_color="gray60")
+                                           font=ctk.CTkFont(size=12, weight="bold"), text_color=C_TEXT_MUTED)
         self._console_arrow.pack(side="left")
         self._console_preview = ctk.CTkLabel(self.console_toggle_row, text="Console", anchor="w",
-                                             font=ctk.CTkFont(family="Consolas", size=11), text_color="gray60")
+                                             font=ctk.CTkFont(family="Consolas", size=11), text_color=C_TEXT_MUTED)
         self._console_preview.pack(side="left", fill="x", expand=True, padx=5)
         self._console_expanded = False
         for widget in (self.console_toggle_row, self._console_arrow, self._console_preview):
@@ -799,7 +823,7 @@ class Scriptorium(ctk.CTk):
 
         # Set fixed fallback dimensions to prevent 0-height rendering geometry crash
         self.console_text = ctk.CTkTextbox(self.console_body, font=ctk.CTkFont(family="Consolas", size=12),
-                                           text_color="#00FF00", width=800, height=220)
+                                           text_color=C_SUCCESS, width=800, height=220)
         self.console_text.grid(row=0, column=0, sticky="nsew")
         self.console_text.configure(state="disabled")
 
@@ -813,8 +837,8 @@ class Scriptorium(ctk.CTk):
         self.console_input.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.console_input.bind("<Return>", self.send_input)
 
-        self.cancel_btn = ctk.CTkButton(self.input_frame, text="Cancel", fg_color="darkred", hover_color="red",
-                                        width=80, state="disabled", command=self.cancel_script)
+        self.cancel_btn = ctk.CTkButton(self.input_frame, text="Cancel", fg_color=C_DANGER, hover_color=C_DANGER_HOVER,
+                                        text_color=C_ON_ACCENT, width=80, state="disabled", command=self.cancel_script)
         self.cancel_btn.grid(row=0, column=1)
 
         self.console = ConsoleRedirector(self.console_text, self.status_bar,
@@ -825,55 +849,70 @@ class Scriptorium(ctk.CTk):
         (Pipeline: Voyageur -> Paleographer -> Archivist; Utilities: Registrar/Gazetteer/
         PDFix) plus a footer pinned outside that scroll region (Help, Global Settings) so
         neither can ever be scrolled out of view or clipped by a short window."""
-        self.sidebar = ctk.CTkFrame(parent, fg_color="#212121", corner_radius=8)
-        self.sidebar.grid(row=0, column=0, sticky="ns", padx=(0, 10))
+        # width= + grid_propagate(False): without this, CTkFrame shrinks itself to fit its
+        # children's natural size regardless of sticky="nsew", so the dark background
+        # stopped at nav_scroll's own height instead of filling the sidebar's full column -
+        # leaving the pinned footer (Help/Global Settings) rendering past that edge with no
+        # background behind it at all, looking like it had fallen out of the panel entirely.
+        self.sidebar = ctk.CTkFrame(parent, fg_color=C_SURFACE, corner_radius=8, width=210)
+        self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        self.sidebar.grid_propagate(False)
         self.sidebar.grid_rowconfigure(0, weight=1)
         self.sidebar.grid_columnconfigure(0, weight=1)
 
         self.nav_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", width=190, height=300)
         self.nav_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=(14, 4))
 
-        ctk.CTkLabel(self.nav_scroll, text="Scriptorium", font=ctk.CTkFont(size=17, weight="bold")
+        ctk.CTkLabel(self.nav_scroll, text="Scriptorium", font=ctk.CTkFont(family="Georgia", size=17, weight="bold")
                      ).pack(anchor="w", padx=6, pady=(0, 0))
         ctk.CTkLabel(self.nav_scroll, text="Record shell", font=ctk.CTkFont(size=11),
-                     text_color="gray60").pack(anchor="w", padx=6, pady=(0, 14))
+                     text_color=C_TEXT_MUTED).pack(anchor="w", padx=6, pady=(0, 14))
 
         self._nav_buttons: Dict[str, ctk.CTkButton] = {}
+        icons_dir = BASE_DIR / "assets" / "icons"
+        self._nav_icon_images: Dict[str, ctk.CTkImage] = {}
+        for key in ("voyageur", "paleographer", "archivist", "registrar", "gazetteer",
+                    "pdfix", "help", "global"):
+            path = icons_dir / f"{key}.png"
+            if path.exists():
+                img = Image.open(path)
+                self._nav_icon_images[key] = ctk.CTkImage(light_image=img, dark_image=img, size=(20, 20))
 
         def add_group_label(text):
             ctk.CTkLabel(self.nav_scroll, text=text.upper(), font=ctk.CTkFont(size=10, weight="bold"),
-                         text_color="gray50").pack(anchor="w", padx=6, pady=(10, 4))
+                         text_color=C_TEXT_MUTED).pack(anchor="w", padx=6, pady=(10, 4))
 
-        def add_nav_button(container, tab_name, command=None):
+        def add_nav_button(container, tab_name, icon_key, command=None):
             btn = ctk.CTkButton(container, text=tab_name, anchor="w", fg_color="transparent",
-                                hover_color="#2b2b2b", text_color="gray85",
+                                hover_color=C_SURFACE_RAISED, text_color=C_TEXT,
+                                image=self._nav_icon_images.get(icon_key), compound="left",
                                 command=command or partial(self._switch_tab, tab_name))
             btn.pack(fill="x", pady=1)
             self._nav_buttons[tab_name] = btn
             return btn
 
         def add_connector():
-            ctk.CTkFrame(self.nav_scroll, width=2, height=8, fg_color="gray35").pack(padx=18)
+            ctk.CTkFrame(self.nav_scroll, width=3, height=10, fg_color=C_BRASS).pack(padx=18)
 
         add_group_label("Pipeline")
-        add_nav_button(self.nav_scroll, "Voyageur")
+        add_nav_button(self.nav_scroll, "Voyageur", "voyageur")
         add_connector()
-        add_nav_button(self.nav_scroll, "Paleographer")
+        add_nav_button(self.nav_scroll, "Paleographer", "paleographer")
         add_connector()
-        add_nav_button(self.nav_scroll, "Archivist")
+        add_nav_button(self.nav_scroll, "Archivist", "archivist")
 
         add_group_label("Utilities")
-        add_nav_button(self.nav_scroll, "Registrar")
-        add_nav_button(self.nav_scroll, "Gazetteer")
-        add_nav_button(self.nav_scroll, "PDFix")
+        add_nav_button(self.nav_scroll, "Registrar", "registrar")
+        add_nav_button(self.nav_scroll, "Gazetteer", "gazetteer")
+        add_nav_button(self.nav_scroll, "PDFix", "pdfix")
 
         self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.sidebar_footer.grid(row=1, column=0, sticky="ew", padx=8, pady=(4, 14))
-        ctk.CTkFrame(self.sidebar_footer, height=1, fg_color="gray30").pack(fill="x", pady=(0, 6))
-        add_nav_button(self.sidebar_footer, "Help", command=self._show_current_help)
+        ctk.CTkFrame(self.sidebar_footer, height=1, fg_color=C_BORDER).pack(fill="x", pady=(0, 6))
+        add_nav_button(self.sidebar_footer, "Help", "help", command=self._show_current_help)
         # "Global Settings" doubles as both a real tab_name (drives _switch_tab / active-
         # highlight bookkeeping the same as any other nav button) and its own settings form.
-        add_nav_button(self.sidebar_footer, "Global Settings")
+        add_nav_button(self.sidebar_footer, "Global Settings", "global")
 
         # Same known CTkScrollableFrame sizing limitation _build_form_ui already works
         # around: it doesn't reliably grow to fill its grid cell on its own, so this
@@ -899,9 +938,9 @@ class Scriptorium(ctk.CTk):
         frame.tkraise()
         for name, btn in self._nav_buttons.items():
             if name == tab_name:
-                btn.configure(fg_color="#3B8ED0", text_color="white")
+                btn.configure(fg_color=C_ACCENT, text_color=C_ON_ACCENT)
             elif name != "Help":
-                btn.configure(fg_color="transparent", text_color="gray85")
+                btn.configure(fg_color="transparent", text_color=C_TEXT)
 
     def _show_current_help(self):
         """The sidebar's single Help entry point, replacing the old per-tab Help button -
@@ -1012,13 +1051,27 @@ class Scriptorium(ctk.CTk):
         cleaned = cleaned.replace("_", " ").title()
         return cleaned
 
-    def _build_tab_header(self, frame: ctk.CTkFrame, title: str):
+    def _build_tab_header(self, frame: ctk.CTkFrame, title: str, role_tag: str, description: str):
         """A helper method to standardize tab headers and eliminate duplicate code."""
         header_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        header_frame.pack(fill="x", pady=(0, 10))
-        ctk.CTkLabel(header_frame, text=title, font=ctk.CTkFont(size=24, weight="bold")).pack(side="left")
-        ctk.CTkButton(header_frame, text="Save Config", fg_color="#D4AC0D", hover_color="#B7950B",
-                      text_color="black", command=self._save_env).pack(side="right", padx=5)
+        header_frame.pack(fill="x", pady=(0, 4))
+
+        title_row = ctk.CTkFrame(header_frame, fg_color="transparent")
+        title_row.pack(fill="x")
+        ctk.CTkLabel(title_row, text=title, font=ctk.CTkFont(family="Georgia", size=24, weight="bold")
+                     ).pack(side="left")
+        ctk.CTkLabel(title_row, text=role_tag, font=ctk.CTkFont(family="Consolas", size=11, weight="bold"),
+                     fg_color=C_BRASS_SOFT, text_color=C_BRASS, corner_radius=4, padx=8, pady=2
+                     ).pack(side="left", padx=(10, 0))
+        # Outline/secondary style, not filled - this is a secondary action on every tab
+        # (the tab's own primary action already saves everything too, via execute_script's
+        # own _save_env() call), not the one thing this screen is for.
+        ctk.CTkButton(title_row, text="Save Config", fg_color="transparent", hover_color=C_SURFACE_RAISED,
+                      border_width=1, border_color=C_BRASS, text_color=C_BRASS,
+                      command=self._save_env).pack(side="right", padx=5)
+
+        ctk.CTkLabel(header_frame, text=description, font=ctk.CTkFont(size=13), text_color=C_TEXT_MUTED,
+                     anchor="w", justify="left", wraplength=760).pack(fill="x", pady=(6, 0))
 
     def _create_action_box(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         """A helper method to standardize the action button frames and reduce code duplication."""
@@ -1056,10 +1109,10 @@ class Scriptorium(ctk.CTk):
             header = ctk.CTkFrame(scroll, fg_color="transparent", cursor="hand2")
             header.pack(fill="x", pady=(15, 5))
             arrow_lbl = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"),
-                                     text_color="#3B8ED0", width=16)
+                                     text_color=C_ACCENT, width=16)
             arrow_lbl.pack(side="left")
             ctk.CTkLabel(header, text=section, font=ctk.CTkFont(size=16, weight="bold"),
-                         text_color="#3B8ED0").pack(side="left")
+                         text_color=C_ACCENT).pack(side="left")
 
             content = ctk.CTkFrame(scroll, fg_color="transparent")
 
@@ -1098,7 +1151,7 @@ class Scriptorium(ctk.CTk):
                         # equivalent of a grayed-out placeholder.
                         state = self.field_state.get(key, "user")
                         entry = ctk.CTkEntry(row, textvariable=self.string_vars[key],
-                                             text_color="gray60" if state == "default" else None,
+                                             text_color=C_TEXT_MUTED if state == "default" else None,
                                              placeholder_text="(intentionally blank)" if state == "blank" else "")
                         entry.pack(side="left", fill="x", expand=True, padx=5)
 
@@ -1248,7 +1301,9 @@ class Scriptorium(ctk.CTk):
             self.string_vars[key].set(str(selected_path).replace("\\", "/"))
 
     def _build_tab_global(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Global Environment Settings")
+        self._build_tab_header(frame, "Global Settings", "SHARED",
+                               "The API key, folders, and researcher credit every tool above shares, "
+                               "so you only enter them once.")
 
         # Build buttons first so they dock safely to the bottom
         self._create_action_box(frame)
@@ -1256,14 +1311,14 @@ class Scriptorium(ctk.CTk):
         self._build_form_ui(frame, GLOBAL_VARS)
 
     def _build_tab_archivist(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Archivist")
-
-        ctk.CTkLabel(frame, text="Builds a GEDCOM from whatever JSON Voyageur or Paleographer already produced.",
-                     text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
+        self._build_tab_header(frame, "Archivist", "BUILD",
+                               "Turns gathered or transcribed records into a sourced GEDCOM file, working out "
+                               "who belongs to which family from ages, roles, and household position.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Generate GEDCOM", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Generate GEDCOM", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
+                      text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")).pack(side="left",
                                                                                                    padx=5)
 
@@ -1340,7 +1395,9 @@ class Scriptorium(ctk.CTk):
                                 skip_keys={"PALEOGRAPHER_RECORD_TYPE"})
 
     def _build_tab_paleographer(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Paleographer")
+        self._build_tab_header(frame, "Paleographer", "TRANSCRIBE",
+                               "Reads scanned parish registers and scrip records with AI, transcribing and "
+                               "translating the handwriting into structured entries.")
 
         type_frame = ctk.CTkFrame(frame, fg_color="transparent")
         type_frame.pack(side="top", fill="x", pady=(10, 5))
@@ -1361,10 +1418,11 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Analysis (API)", fg_color="#3B8ED0", hover_color="#2b7a4b",
-                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
+        ctk.CTkButton(btn_box, text="Run Analysis (API)", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
+                      text_color=C_ON_ACCENT, command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
                       ).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Clear Cache", fg_color="#991b1b", hover_color="#7f1d1d",
+        ctk.CTkButton(btn_box, text="Clear Cache", fg_color="transparent", hover_color=C_SURFACE_RAISED,
+                      border_width=1, border_color=C_DANGER, text_color=C_DANGER,
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
                                                                                                       padx=5)
 
@@ -1439,7 +1497,9 @@ class Scriptorium(ctk.CTk):
             self._build_form_ui(self.voyageur_form_container, filtered, skip_keys={"VOYAGEUR_SOURCE"})
 
     def _build_tab_voyageur(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Voyageur")
+        self._build_tab_header(frame, "Voyageur", "GATHER",
+                               "Pulls census, vital, and land records straight from Ancestry, FamilySearch, or "
+                               "Library and Archives Canada into a file ready for the next step.")
 
         source_frame = ctk.CTkFrame(frame, fg_color="transparent")
         source_frame.pack(side="top", fill="x", pady=(10, 5))
@@ -1455,11 +1515,13 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color="#3B8ED0", hover_color="#2b7a4b")
+        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color=C_ACCENT,
+                                                 hover_color=C_ACCENT_STRONG, text_color=C_ON_ACCENT)
         self.voyageur_gather_btn.pack(side="left", padx=5)
 
         self.voyageur_send_to_archivist_btn = ctk.CTkButton(
-            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935")
+            btn_box, text="Gather and Send to Archivist", fg_color=C_SUCCESS, hover_color=C_SUCCESS_HOVER,
+            text_color=C_ON_ACCENT)
         self.voyageur_send_to_archivist_btn.pack(side="left", padx=5)
 
         # Persistent container the filtered settings form gets rebuilt into whenever the
@@ -1470,42 +1532,40 @@ class Scriptorium(ctk.CTk):
         self._on_voyageur_source_change()
 
     def _build_tab_registrar(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Registrar")
-
-        ctk.CTkLabel(frame, text="Finds logical duplicate people in RootsMagic.", text_color="gray").pack(side="top",
-                                                                                                          anchor="w",
-                                                                                                          pady=(0, 20))
+        self._build_tab_header(frame, "Registrar", "DEDUPE",
+                               "Scans your RootsMagic tree for people who are probably the same person entered "
+                               "twice, and flags them for review.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
+                      text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("REGISTRAR_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, REGISTRAR_VARS)
 
     def _build_tab_gazetteer(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Gazetteer")
-
-        ctk.CTkLabel(frame, text="Fixes historical US county jurisdictions utilizing geopandas.",
-                     text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
+        self._build_tab_header(frame, "Gazetteer", "UTILITY",
+                               "Corrects county names in your RootsMagic tree to match the historical county "
+                               "boundaries in effect on each event's date.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
+                      text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("GAZETTEER_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, GAZETTEER_VARS)
 
     def _build_tab_pdfix(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "PDFix")
-
-        ctk.CTkLabel(frame, text="Losslessly shrinks PDF file sizes in bulk (garbage-collection + stream "
-                                 "compression via PyMuPDF) - no image rescaling.",
-                     text_color="gray").pack(side="top", anchor="w", pady=(0, 20))
+        self._build_tab_header(frame, "PDFix", "UTILITY",
+                               "Shrinks a folder of scanned PDFs down in file size, without touching image "
+                               "quality.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
+                      text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("PDFIX_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, PDFIX_VARS)
@@ -1542,7 +1602,7 @@ class Scriptorium(ctk.CTk):
         self.status_bar.delete(0, "end")
         self.status_bar.insert(0, f"Launching {script_display_name}...")
         self.status_bar.configure(state="readonly")
-        self.run_indicator.configure(text_color="#2ECC71")
+        self.run_indicator.configure(text_color=C_SUCCESS)
         self.run_tooltip.text = f"Running: {script_display_name}"
         self._expand_console()
 
@@ -1594,7 +1654,7 @@ class Scriptorium(ctk.CTk):
             self.status_bar.delete(0, "end")
             self.status_bar.insert(0, "System Ready")
             self.status_bar.configure(state="readonly")
-            self.run_indicator.configure(text_color="gray50")
+            self.run_indicator.configure(text_color=C_TEXT_MUTED)
             self.run_tooltip.text = "Idle - no script running"
             self.progress_bar.set(0)
             self.progress_bar.grid_remove()
