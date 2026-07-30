@@ -21,6 +21,7 @@ participant_fields:
   "Gender": sex
   "Sex": sex
   "Age": age
+  "Birth Year": birth_date
   "Birth Place": birth_place
   "Birthplace": birth_place
   "Race": race
@@ -73,3 +74,4 @@ record_fields:
   "Dwelling": dwelling_number
   "House Number": dwelling_number
   "Married within Year": married_within_year
+  "Married Within Year": married_within_year
