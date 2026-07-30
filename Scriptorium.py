@@ -351,6 +351,41 @@ PATH_PICKER_FIELDS = {
     "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
 }
 
+# ==========================================
+# FIELD WIDGET TYPE OVERRIDES
+# ==========================================
+# Keys here get a richer control than the default plain text entry - a switch for a real
+# boolean, a segmented control for a small fixed choice, a slider for a bounded number.
+# Every one still only ever reads/writes the same self.string_vars[key] StringVar that
+# already round-trips through the .env files, so _save_env/_load_env_to_vars need no
+# changes. A key with no entry here keeps the default CTkEntry behavior - this is additive,
+# never a replacement for the field-state dimming _build_form_ui already does.
+FIELD_WIDGETS = {
+    "GAZETTEER_DEBUG_MODE": {"type": "toggle"},
+    "GAZETTEER_CREATE_BACKUP": {"type": "toggle"},
+    "PDFIX_CREATE_BACKUP": {"type": "toggle"},
+    "PDFIX_REPAIR_MODE": {"type": "toggle"},
+
+    "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": {"type": "segmented",
+                                           "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
+    "PDFIX_COMPRESSION_LEVEL": {"type": "segmented",
+                                "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
+
+    "MIN_MARRIAGE_AGE": {"type": "slider", "min": 8, "max": 20},
+    "MAX_SPOUSE_AGE_GAP": {"type": "slider", "min": 5, "max": 40},
+    "HUSBAND_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 10, "max": 30},
+    "HUSBAND_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 40, "max": 80},
+    "WIFE_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 8, "max": 25},
+    "WIFE_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 35, "max": 70},
+    "REGISTRAR_FUZZY_THRESHOLD": {"type": "slider", "min": 50, "max": 100, "suffix": "%"},
+    "REGISTRAR_MAX_AGE_GAP": {"type": "slider", "min": 0, "max": 20, "suffix": " yrs"},
+    "REGISTRAR_FUZZY_THRESHOLD_STRICT": {"type": "slider", "min": 80, "max": 100, "suffix": "%"},
+    "REGISTRAR_FAMILY_MATCH_THRESHOLD": {"type": "slider", "min": 50, "max": 100, "suffix": "%"},
+    "API_BUDGET": {"type": "slider", "min": 1, "max": 100, "suffix": " USD"},
+    "CACHE_DISCOUNT_MULTIPLIER": {"type": "slider", "min": 0.0, "max": 1.0, "step": 0.01},
+    "PDFIX_SIZE_THRESHOLD_MB": {"type": "slider", "min": 0, "max": 50, "suffix": " MB"},
+}
+
 
 # ==========================================
 # CUSTOM WIDGET CLASSES
@@ -1050,32 +1085,46 @@ class Scriptorium(ctk.CTk):
                     if desc:
                         ToolTip(lbl, desc)
 
-                    # Field-state styling: a value never explicitly saved (still just the
-                    # placeholder default) renders dimmed, so it reads as a suggestion
-                    # rather than real configuration; a deliberately-blanked, saved value
-                    # gets an explicit hint instead of just looking like an empty box that
-                    # was never filled in; a real saved value renders normally.
-                    state = self.field_state.get(key, "user")
-                    entry = ctk.CTkEntry(row, textvariable=self.string_vars[key],
-                                         text_color="gray60" if state == "default" else None,
-                                         placeholder_text="(intentionally blank)" if state == "blank" else "")
-                    entry.pack(side="left", fill="x", expand=True, padx=5)
+                    widget_spec = FIELD_WIDGETS.get(key)
 
-                    def _on_edit(_name, _index, _mode, key=key, entry=entry):
-                        # Once the user actually types something, this is no longer just a
-                        # placeholder default sitting there unedited - promote it visually
-                        # to a real, normal-colored value immediately, not just on next load.
-                        if self.field_state.get(key) == "default":
-                            self.field_state[key] = "user"
-                            entry.configure(text_color=None)
+                    if widget_spec is None:
+                        # Field-state styling: a value never explicitly saved (still just
+                        # the placeholder default) renders dimmed, so it reads as a
+                        # suggestion rather than real configuration; a deliberately-blanked,
+                        # saved value gets an explicit hint instead of just looking like an
+                        # empty box that was never filled in; a real saved value renders
+                        # normally. Only meaningful for a plain text entry - a switch/
+                        # slider/segment always shows a concrete position, with no real
+                        # equivalent of a grayed-out placeholder.
+                        state = self.field_state.get(key, "user")
+                        entry = ctk.CTkEntry(row, textvariable=self.string_vars[key],
+                                             text_color="gray60" if state == "default" else None,
+                                             placeholder_text="(intentionally blank)" if state == "blank" else "")
+                        entry.pack(side="left", fill="x", expand=True, padx=5)
 
-                    self.string_vars[key].trace_add("write", _on_edit)
+                        def _on_edit(_name, _index, _mode, key=key, entry=entry):
+                            # Once the user actually types something, this is no longer
+                            # just a placeholder default sitting there unedited - promote
+                            # it visually to a real, normal-colored value immediately, not
+                            # just on next load.
+                            if self.field_state.get(key) == "default":
+                                self.field_state[key] = "user"
+                                entry.configure(text_color=None)
 
-                    picker = PATH_PICKER_FIELDS.get(key)
-                    if picker:
-                        ctk.CTkButton(row, text="Browse...", width=90,
-                                      command=partial(self._browse_for_path, key, picker)
-                                      ).pack(side="left", padx=5)
+                        self.string_vars[key].trace_add("write", _on_edit)
+
+                        picker = PATH_PICKER_FIELDS.get(key)
+                        if picker:
+                            ctk.CTkButton(row, text="Browse...", width=90,
+                                          command=partial(self._browse_for_path, key, picker)
+                                          ).pack(side="left", padx=5)
+                    elif widget_spec["type"] == "toggle":
+                        ctk.CTkSwitch(row, text="", variable=self.string_vars[key],
+                                      onvalue="True", offvalue="False").pack(side="left", padx=5)
+                    elif widget_spec["type"] == "segmented":
+                        self._build_segmented_field(row, key, widget_spec)
+                    elif widget_spec["type"] == "slider":
+                        self._build_slider_field(row, key, widget_spec)
 
             render_content()
 
@@ -1102,6 +1151,44 @@ class Scriptorium(ctk.CTk):
                 child.bind("<Button-1>", toggle)
 
             apply_expanded_state()
+
+    def _build_segmented_field(self, row, key, widget_spec):
+        """Renders a FIELD_WIDGETS "segmented" field: a small fixed set of (stored_value,
+        display_label) pairs, e.g. compression level "0"/"1"/"2" shown as Low/Medium/High."""
+        options = widget_spec["options"]
+        value_to_label = dict(options)
+        label_to_value = {label: value for value, label in options}
+        seg_var = ctk.StringVar(value=value_to_label.get(self.string_vars[key].get(), options[0][1]))
+
+        def _on_segment(selected_label):
+            self.string_vars[key].set(label_to_value.get(selected_label, self.string_vars[key].get()))
+
+        ctk.CTkSegmentedButton(row, values=[label for _, label in options], variable=seg_var,
+                               command=_on_segment).pack(side="left", padx=5)
+
+    def _build_slider_field(self, row, key, widget_spec):
+        """Renders a FIELD_WIDGETS "slider" field: a bounded numeric tuning knob with a live
+        tabular readout, still just reading/writing the same string-valued setting."""
+        lo, hi = widget_spec["min"], widget_spec["max"]
+        step = widget_spec.get("step", 1)
+        suffix = widget_spec.get("suffix", "")
+        try:
+            current_val = float(self.string_vars[key].get())
+        except ValueError:
+            current_val = lo
+
+        value_lbl = ctk.CTkLabel(row, text=f"{current_val:g}{suffix}", width=70, anchor="e")
+        value_lbl.pack(side="right", padx=(5, 0))
+
+        def _on_slide(new_val):
+            rounded = round(new_val / step) * step
+            value_lbl.configure(text=f"{rounded:g}{suffix}")
+            self.string_vars[key].set(f"{rounded:g}")
+
+        steps = max(1, round((hi - lo) / step))
+        slider = ctk.CTkSlider(row, from_=lo, to=hi, number_of_steps=steps, command=_on_slide)
+        slider.set(current_val)
+        slider.pack(side="left", fill="x", expand=True, padx=5)
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
         """Resolves a directory setting (like JSON_DIR) against PROGRAM_DIR the same way
