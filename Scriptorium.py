@@ -547,6 +547,10 @@ class Scriptorium(ctk.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 
         self.string_vars: Dict[str, ctk.StringVar] = {}
+        # Per-key state ("default"/"blank"/"user") so the settings form can visually tell
+        # apart an untouched placeholder, a field deliberately left empty and saved that
+        # way, and a real user-entered value - see _build_form_ui's field-state styling.
+        self.field_state: Dict[str, str] = {}
         self.active_process = None
         self._cancel_requested = False
         self.debug_file_var = ctk.StringVar(value="")
@@ -745,6 +749,12 @@ class Scriptorium(ctk.CTk):
                     # placeholder default now.
                     val = saved[key] if key in saved else default_val
                     self.string_vars[key] = ctk.StringVar(value=val)
+                    if key not in saved:
+                        self.field_state[key] = "default"
+                    elif saved[key] == "":
+                        self.field_state[key] = "blank"
+                    else:
+                        self.field_state[key] = "user"
 
     def _save_env(self):
         for category_dict, subfolder in ENV_TARGETS:
@@ -830,33 +840,95 @@ class Scriptorium(ctk.CTk):
         parent.bind("<Configure>", _resize_scroll)
         parent.after(50, _resize_scroll)
 
-        for section, fields in schema_dict.items():
-            ctk.CTkLabel(scroll, text=section, font=ctk.CTkFont(size=16, weight="bold"), text_color="#3B8ED0").pack(
-                anchor="w", pady=(15, 5))
-            for key in fields.keys():
-                if key in skip_keys:
-                    continue
-                row = ctk.CTkFrame(scroll, fg_color="transparent")
-                row.pack(fill="x", pady=2)
+        for section_index, (section, fields) in enumerate(schema_dict.items()):
+            visible_keys = [k for k in fields.keys() if k not in skip_keys]
+            if not visible_keys:
+                continue
 
-                # Generate hoverable, friendly labels
-                desc = TOOLTIP_DESCRIPTIONS.get(key)
-                friendly_name = self._clean_label(key)
-                display_text = f"{friendly_name} ⓘ" if desc else friendly_name
+            header = ctk.CTkFrame(scroll, fg_color="transparent", cursor="hand2")
+            header.pack(fill="x", pady=(15, 5))
+            arrow_lbl = ctk.CTkLabel(header, text="", font=ctk.CTkFont(size=16, weight="bold"),
+                                     text_color="#3B8ED0", width=16)
+            arrow_lbl.pack(side="left")
+            ctk.CTkLabel(header, text=section, font=ctk.CTkFont(size=16, weight="bold"),
+                         text_color="#3B8ED0").pack(side="left")
 
-                lbl = ctk.CTkLabel(row, text=display_text, width=250, anchor="w", cursor="hand2" if desc else "arrow")
-                lbl.pack(side="left", padx=5)
+            content = ctk.CTkFrame(scroll, fg_color="transparent")
 
-                if desc:
-                    ToolTip(lbl, desc)
+            # First section open by default (most forms are short enough that this alone
+            # is already usable); the rest start collapsed so a field-heavy tab isn't one
+            # long wall of every setting scrolled past to find the one that matters.
+            expanded = {"state": section_index == 0}
 
-                ctk.CTkEntry(row, textvariable=self.string_vars[key]).pack(side="left", fill="x", expand=True, padx=5)
+            def render_content():
+                for key in visible_keys:
+                    row = ctk.CTkFrame(content, fg_color="transparent")
+                    row.pack(fill="x", pady=2)
 
-                picker = PATH_PICKER_FIELDS.get(key)
-                if picker:
-                    ctk.CTkButton(row, text="Browse...", width=90,
-                                  command=partial(self._browse_for_path, key, picker)
-                                  ).pack(side="left", padx=5)
+                    # Generate hoverable, friendly labels
+                    desc = TOOLTIP_DESCRIPTIONS.get(key)
+                    friendly_name = self._clean_label(key)
+                    display_text = f"{friendly_name} ⓘ" if desc else friendly_name
+
+                    lbl = ctk.CTkLabel(row, text=display_text, width=250, anchor="w",
+                                       cursor="hand2" if desc else "arrow")
+                    lbl.pack(side="left", padx=5)
+
+                    if desc:
+                        ToolTip(lbl, desc)
+
+                    # Field-state styling: a value never explicitly saved (still just the
+                    # placeholder default) renders dimmed, so it reads as a suggestion
+                    # rather than real configuration; a deliberately-blanked, saved value
+                    # gets an explicit hint instead of just looking like an empty box that
+                    # was never filled in; a real saved value renders normally.
+                    state = self.field_state.get(key, "user")
+                    entry = ctk.CTkEntry(row, textvariable=self.string_vars[key],
+                                         text_color="gray60" if state == "default" else None,
+                                         placeholder_text="(intentionally blank)" if state == "blank" else "")
+                    entry.pack(side="left", fill="x", expand=True, padx=5)
+
+                    def _on_edit(_name, _index, _mode, key=key, entry=entry):
+                        # Once the user actually types something, this is no longer just a
+                        # placeholder default sitting there unedited - promote it visually
+                        # to a real, normal-colored value immediately, not just on next load.
+                        if self.field_state.get(key) == "default":
+                            self.field_state[key] = "user"
+                            entry.configure(text_color=None)
+
+                    self.string_vars[key].trace_add("write", _on_edit)
+
+                    picker = PATH_PICKER_FIELDS.get(key)
+                    if picker:
+                        ctk.CTkButton(row, text="Browse...", width=90,
+                                      command=partial(self._browse_for_path, key, picker)
+                                      ).pack(side="left", padx=5)
+
+            render_content()
+
+            # Every one of these must capture this iteration's own header/content/arrow_lbl/
+            # expanded as default-argument values, not as ordinary closure-over-loop-variable
+            # references - a plain `for` loop reuses the same local variable slots on every
+            # pass, so a closure that only *reads* them (rather than binding them as defaults
+            # at definition time) would have every section's click handler end up acting on
+            # whichever section happened to be built last.
+            def apply_expanded_state(expanded=expanded, arrow_lbl=arrow_lbl, content=content, header=header):
+                arrow_lbl.configure(text="▼" if expanded["state"] else "▶")
+                if expanded["state"]:
+                    content.pack(fill="x", after=header)
+                else:
+                    content.pack_forget()
+
+            def toggle(_event=None, expanded=expanded, apply_expanded_state=apply_expanded_state):
+                expanded["state"] = not expanded["state"]
+                apply_expanded_state()
+
+            header.bind("<Button-1>", toggle)
+            arrow_lbl.bind("<Button-1>", toggle)
+            for child in header.winfo_children():
+                child.bind("<Button-1>", toggle)
+
+            apply_expanded_state()
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
         """Resolves a directory setting (like JSON_DIR) against PROGRAM_DIR the same way
