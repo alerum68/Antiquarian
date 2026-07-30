@@ -1538,8 +1538,17 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
                                     row_roll, row_film, row_ed)
 
         alt_names = parse_alternate_entries(row, 'AlternateNames')
+        # FSFTID (the attached FamilySearch Family Tree person, when Voyageur.js found one -
+        # see scrapeIndexRows) is the person's OWN identifier, distinct from rec_id (a
+        # synthetic per-run record number) and distinct from the record's own citation-level
+        # _FSFTID (build_census_citation already emits that inside the source citation
+        # block) - this is the top-level INDI tag other genealogy software reads to link
+        # this person to their actual FamilySearch Family Tree profile.
+        row_fsftid = get_row_val(row, ['FSFTID'], '')
         ged.extend(
-            [f"0 @I{rec_id}@ INDI", f"1 REFN {rec_id}", f"1 NAME {giv} /{sur}/"] + cit +
+            [f"0 @I{rec_id}@ INDI", f"1 REFN {rec_id}"]
+            + ([f"1 _FSFTID {row_fsftid}"] if row_fsftid else [])
+            + [f"1 NAME {giv} /{sur}/"] + cit +
             build_alternate_name_lines(alt_names, cit) +
             [f"1 SEX {gen}", f"1 SOUR {ROOT_SOURCE_ID}", f"2 NAME Researcher: {RESEARCHER}",
              f"2 _TITL Researcher: {RESEARCHER}"]

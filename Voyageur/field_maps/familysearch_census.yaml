@@ -34,3 +34,11 @@ record_fields:
   "Family Number": family_number
   "Household Number": family_number
   "Dwelling Number": dwelling_number
+  # FamilySearch's own Image Index table (the only per-person view Voyageur.js currently
+  # scrapes for FS) carries no family/dwelling number at all - confirmed against a real
+  # 1860 census gather, where every person came back as their own solitary household.
+  # Grouping by page number instead (see _household_key's page_number_fallback handling in
+  # census_schema.py) is a real limitation, not a full fix - more than one real household
+  # can share a physical page - but it's a meaningfully better starting point for
+  # Archivist's own age/sex/surname household heuristics than no grouping at all.
+  "Page Number": page_number_fallback
