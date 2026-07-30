@@ -60,21 +60,36 @@ def _parse_year(value: Any) -> int:
 
 
 def _household_key(columns: Dict[str, str], field_map: Dict[str, Dict[str, str]]) -> Optional[str]:
-    """Finds this person's normalized family/dwelling number, if their source row has
-    one at all - the grouping key for which record (household) they belong to."""
+    """Finds this person's normalized family/dwelling number, if their source row has one
+    at all - the grouping key for which record (household) they belong to. Falls back to
+    a page-number-based grouping (everyone indexed on the same scanned page) when a source
+    has no family/dwelling number field at all - confirmed true of FamilySearch's own Image
+    Index table (the only per-person view Voyageur.js currently scrapes for FS - it lists
+    everyone on one scanned image with no household grouping of its own). A real household
+    usually spans less than a full physical page, so this can over-group more than one
+    family sharing a page - a real limitation, not a full fix - but it gives Archivist's own
+    age/sex/surname household-parsing heuristics (already used for the 1850-1870 "heuristic
+    era") something to actually work with, instead of every person arriving as their own
+    solitary one-person "household" with nothing to group at all."""
     for raw_key, target in field_map["record_fields"].items():
         if target in ("family_number", "dwelling_number") and raw_key in columns:
             val = str(columns[raw_key]).strip()
             if val:
                 return val
+    for raw_key, target in field_map["record_fields"].items():
+        if target == "page_number_fallback" and raw_key in columns:
+            val = str(columns[raw_key]).strip()
+            if val:
+                return f"page_{val}"
     return None
 
 
 def _group_household(people: List[dict], field_map: Dict[str, Dict[str, str]]
                      ) -> List[Tuple[Optional[str], List[dict]]]:
-    """Groups people sharing the same family/dwelling number into one household. A person
-    with no such number at all (or when no one on the page has one) becomes their own
-    single-person group - there's nothing to group them with."""
+    """Groups people sharing the same family/dwelling number (or, failing that, the same
+    page-number fallback - see _household_key) into one household. A person with neither
+    at all becomes their own single-person group - there's genuinely nothing to group them
+    with."""
     groups: Dict[Optional[str], List[dict]] = {}
     order: List[Optional[str]] = []
     fallback_counter = 0
