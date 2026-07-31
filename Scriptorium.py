@@ -6,6 +6,7 @@ import re
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
 from functools import partial
 from pathlib import Path
@@ -599,15 +600,26 @@ class Scriptorium(ctk.CTk):
 
         self.title("The Scriptorium")
 
-        # Wider aspect ratio for the main window
-        window_width = 1440
-        window_height = 720
-
-        # Calculate exact center of the user's monitor
+        # Sized as a fraction of the actual monitor instead of a fixed pixel size, so it
+        # scales sensibly on anything from a small laptop panel to a large desktop display.
+        # Deliberately NOT full-screen-height: winfo_screenwidth/height() report the raw
+        # display resolution, which includes whatever the taskbar covers, so a window sized
+        # too close to that full height renders with its bottom edge underneath the taskbar
+        # when not maximized (confirmed live earlier this session with an unrelated preview
+        # window). A Win32 SPI_GETWORKAREA call could get the exact taskbar-free region, but
+        # tried and reverted: CustomTkinter's own __init__ (just above) changes the
+        # process's DPI-awareness state, which then makes that raw ctypes call report
+        # physical pixels while Tk's own winfo_screenwidth/height keeps reporting in its own
+        # logical space - the two disagreed enough to produce a garbage tiny window. Staying
+        # entirely within Tk's own self-consistent measurements and leaving a generous
+        # margin is more robust than chasing the exact taskbar height.
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        center_x = int((screen_width / 2) - (window_width / 2))
-        center_y = int((screen_height / 2) - (window_height / 2))
+
+        window_width = max(1000, min(1600, int(screen_width * 0.82)))
+        window_height = max(650, min(900, int(screen_height * 0.82)))
+        center_x = (screen_width - window_width) // 2
+        center_y = (screen_height - window_height) // 2
 
         self.geometry(f"{window_width}x{window_height}+{center_x}+{center_y}")
         self.minsize(1000, 600)  # Prevents scrollbars from squishing to 0 height and crashing
@@ -814,6 +826,11 @@ class Scriptorium(ctk.CTk):
         # rendered (it varies - description length differs per tab) and cover only the body
         # beneath it, never the header itself.
         self.tab_header_frames: Dict[ctk.CTkFrame, ctk.CTkFrame] = {}
+        # Keyed the same way, but -> that tab's bottom-docked action-button row (see
+        # _create_action_box), so the console overlay can also stop short of covering it -
+        # otherwise the overlay spans the whole body and hides the very buttons a user would
+        # need to re-run a script without first closing the console.
+        self.tab_btn_boxes: Dict[ctk.CTkFrame, ctk.CTkFrame] = {}
 
         # --- pop-up console: hidden by default, raised over the active tab's body (leaving
         # that tab's own header visible) the moment execute_script starts a job. A sibling of
@@ -953,16 +970,25 @@ class Scriptorium(ctk.CTk):
 
     def _show_console_overlay(self):
         """Positions the pop-up console to cover the active tab's body while leaving that
-        tab's own title/description header visible above it - header height is measured
-        live (not hardcoded) since description text length, and therefore wrapped height,
-        differs per tab. CTk's place() rejects literal width/height (they can only be set
-        at widget construction), so the vertical offset is expressed as a relheight
-        fraction of content_area's own current height instead of a pixel height."""
+        tab's own title/description header visible above it, and that tab's bottom-docked
+        action-button row visible below it - so a script can be re-run without first
+        closing the console. Both are measured live (not hardcoded), since header height
+        (description text length) and button-row height (button count/wrapping) both vary
+        per tab. CTk's place() rejects literal width/height (they can only be set at widget
+        construction), so both offsets are expressed as relheight/relative fractions of
+        content_area's own current height instead of pixel heights."""
         self.update_idletasks()
-        header = self.tab_header_frames.get(self.tab_frames.get(self.current_tab_name))
+        tab_frame = self.tab_frames.get(self.current_tab_name)
+        header = self.tab_header_frames.get(tab_frame)
         header_h = header.winfo_height() + 4 if header else 0
+        btn_box = self.tab_btn_boxes.get(tab_frame)
+        # btn_box is packed with pady=10 (see _create_action_box) - 10px reserved on both
+        # its top AND bottom, not just the one side winfo_height() reports - plus a little
+        # extra margin so a button's clickable area is never right up against the overlay's
+        # edge even with the sub-pixel drift real widget geometry settles to.
+        btn_box_h = btn_box.winfo_height() + 40 if btn_box and btn_box.winfo_ismapped() else 0
         content_h = self.content_area.winfo_height()
-        frac = max(0.05, (content_h - header_h) / content_h) if content_h > 0 else 1.0
+        frac = max(0.05, (content_h - header_h - btn_box_h) / content_h) if content_h > 0 else 1.0
         self.console_overlay.place(relx=0, rely=0, relwidth=1, relheight=frac, x=0, y=header_h)
         self.console_overlay.lift()
 
@@ -1101,38 +1127,53 @@ class Scriptorium(ctk.CTk):
         """A helper method to standardize the action button frames and reduce code duplication."""
         btn_box = ctk.CTkFrame(parent, fg_color="transparent")
         btn_box.pack(side="bottom", fill="x", pady=10)  # Docked to bottom to prevent clipping
+        # Recorded so the pop-up console overlay can measure this tab's actual rendered
+        # button-row height and stop short of it - see tab_btn_boxes.
+        self.tab_btn_boxes[parent] = btn_box
         return btn_box
 
     def _build_form_ui(self, parent, schema_dict, skip_keys: Optional[set] = None):
-        # CTkScrollableFrame doesn't reliably grow past its constructed height from
-        # pack(fill="both", expand=True) alone (a known CustomTkinter limitation) - it just
-        # stays at this small initial height, with the rest of the tab left as dead, unused
-        # space below it. Given a starting size here since the widget needs one to exist at
-        # all; _resize_scroll below recomputes it to actually fill the tab once real
-        # dimensions are known, and again on every resize.
+        # CTkScrollableFrame is a composite: what pack(fill="both", expand=True) actually
+        # stretches is its outer wrapper frame (._parent_frame, via its overridden pack()),
+        # which DOES correctly fill available space - confirmed live. But the visible
+        # canvas *inside* that wrapper only shows however many pixels its own configured
+        # height says to, and that never adapts to the *content* actually packed into it -
+        # so a short form (a couple of collapsed sections) ends up as a mostly-empty
+        # transparent canvas with a scrollbar nobody needs, rather than sizing to fit.
+        # _resize_scroll below sizes the canvas to the CONTENT's own natural height instead
+        # (capped so a fully-expanded, field-heavy tab still scrolls rather than growing
+        # without limit) - the opposite of stretching to fill the parent.
         scroll = ctk.CTkScrollableFrame(parent, fg_color="transparent", width=800, height=200)
         scroll.pack(side="top", fill="both", expand=True, pady=10)
         skip_keys = skip_keys or set()
 
         def _resize_scroll(_event=None):
             parent.update_idletasks()
-            # Actual height of every other direct child sharing this same parent frame (the
-            # tab header, the docked action-button box) - measured directly rather than
-            # guessed as a fixed constant, since that varies per tab.
-            siblings_height = sum(
-                child.winfo_height() for child in parent.winfo_children() if child is not scroll
-            )
-            available = parent.winfo_height() - siblings_height - 20
-            if available > 100:
-                scroll.configure(height=available)
+            natural_h = scroll.winfo_reqheight()
+            scroll.configure(height=max(60, min(natural_h + 10, 600)))
 
         parent.bind("<Configure>", _resize_scroll)
-        parent.after(50, _resize_scroll)
+        # A single early call can fire before the tab frame (built while still hidden
+        # behind whichever tab was previously on top, then raised after) has settled -
+        # confirmed live elsewhere in this file for a related sizing bug. Retried at
+        # increasing delays (each call is idempotent) reliably catches whichever point
+        # layout has actually settled.
+        for delay in (50, 150, 350, 700):
+            parent.after(delay, _resize_scroll)
 
         for section_index, (section, fields) in enumerate(schema_dict.items()):
             visible_keys = [k for k in fields.keys() if k not in skip_keys]
             if not visible_keys:
                 continue
+
+            # Divider line above every section after the first - the "dividers + subheaders"
+            # pattern instead of a bordered box per section (see CHANGELOG: wrapping each
+            # section in its own bordered CTkFrame is what caused Global Settings' sections
+            # to render dead). A single 1px, unstyled CTkFrame - already used safely
+            # elsewhere (the sidebar footer's own divider) - not the heavier
+            # corner_radius+border_width construction that broke.
+            if section_index > 0:
+                ctk.CTkFrame(scroll, height=1, fg_color=C_BORDER).pack(fill="x", pady=(4, 0))
 
             header = ctk.CTkFrame(scroll, fg_color="transparent", cursor="hand2")
             header.pack(fill="x", pady=(15, 5))
@@ -1221,8 +1262,24 @@ class Scriptorium(ctk.CTk):
                     content.pack(fill="x", after=header)
                 else:
                     content.pack_forget()
+                # The canvas is sized to whatever's actually showing (see _resize_scroll
+                # above) - every collapse/expand changes that, so it has to be recomputed
+                # every time, not just once at initial build.
+                _resize_scroll()
 
             def toggle(_event=None, expanded=expanded, apply_expanded_state=apply_expanded_state):
+                # header/arrow_lbl/every header child are all bound to this same handler
+                # independently (see below) - confirmed live that the very first click of a
+                # fresh session (before the window has ever had real OS focus) gets
+                # delivered twice, flipping the section open then immediately shut again
+                # (Windows can dispatch a window-activating click to more than one widget in
+                # the hit-test chain). Never reproduces once the window already has focus.
+                # A short debounce swallows that duplicate without needing to touch
+                # window-activation/focus handling directly.
+                now = time.monotonic()
+                if now - expanded.get("_last_toggle", 0.0) < 0.2:
+                    return
+                expanded["_last_toggle"] = now
                 expanded["state"] = not expanded["state"]
                 apply_expanded_state()
 
@@ -1369,6 +1426,7 @@ class Scriptorium(ctk.CTk):
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
         ctk.CTkButton(btn_box, text="Generate GEDCOM", fg_color="#2b7a4b", hover_color="#1e5935",
+                      text_color=C_TEXT,
                       command=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")).pack(side="left",
                                                                                                    padx=5)
 
@@ -1469,9 +1527,11 @@ class Scriptorium(ctk.CTk):
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
         ctk.CTkButton(btn_box, text="Run Analysis (API)", fg_color="#3B8ED0", hover_color="#2b7a4b",
+                      text_color=C_TEXT,
                       command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
                       ).pack(side="left", padx=5)
         ctk.CTkButton(btn_box, text="Clear Cache", fg_color="#991b1b", hover_color="#7f1d1d",
+                      text_color=C_TEXT,
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
                                                                                                       padx=5)
 
@@ -1564,11 +1624,13 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color="#3B8ED0", hover_color="#2b7a4b")
+        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color="#3B8ED0", hover_color="#2b7a4b",
+                                                 text_color=C_TEXT)
         self.voyageur_gather_btn.pack(side="left", padx=5)
 
         self.voyageur_send_to_archivist_btn = ctk.CTkButton(
-            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935")
+            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935",
+            text_color=C_TEXT)
         self.voyageur_send_to_archivist_btn.pack(side="left", padx=5)
 
         # Persistent container the filtered settings form gets rebuilt into whenever the
@@ -1585,7 +1647,7 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935", text_color=C_TEXT,
                       command=lambda: self.execute_script("REGISTRAR_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, REGISTRAR_VARS)
@@ -1597,7 +1659,7 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935", text_color=C_TEXT,
                       command=lambda: self.execute_script("GAZETTEER_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, GAZETTEER_VARS)
@@ -1609,7 +1671,7 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935", text_color=C_TEXT,
                       command=lambda: self.execute_script("PDFIX_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, PDFIX_VARS)
