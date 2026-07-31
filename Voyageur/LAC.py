@@ -1,6 +1,6 @@
 import os
-import sys
 import re
+import sys
 from pathlib import Path
 
 import requests
@@ -32,7 +32,6 @@ def parse_url(raw_url):
     """Sanitizes the user's pasted URL into a proper IIIF manifest API call."""
     print(f"[Info] Target URL: {raw_url}")
 
-    # Extract the base identifier (e.g., oocihm.lac_reel_c2170)
     base_id_match = re.search(r'(oocihm\.lac_reel_[a-zA-Z0-9]+)', raw_url, re.IGNORECASE)
     if not base_id_match:
         print("[Error] Could not find a valid Canadiana identifier (oocihm.lac_reel...) in the URL.")
@@ -40,7 +39,6 @@ def parse_url(raw_url):
 
     base_id = base_id_match.group(1)
 
-    # Extract just the roll number for our folder naming
     roll_match = re.search(r'lac_reel_([a-zA-Z0-9]+)', base_id, re.IGNORECASE)
     roll_num = roll_match.group(1) if roll_match else "Unknown_Roll"
     print(f"[Info] Extracted Roll Number: {roll_num}")
@@ -53,7 +51,6 @@ def parse_url(raw_url):
 
 def setup_directories(program_dir, media_dir, roll_num):
     """Constructs the final output path relative to the user's media directory."""
-    # Resolve absolute path for media if needed
     if os.path.isabs(media_dir):
         base_media = media_dir
     else:
@@ -108,14 +105,12 @@ def download_images(manifest_data, out_dir, roll_num):
         try:
             img_id = ""
 
-            # Navigate IIIF v2 JSON schema
             if "images" in canvas:
                 images = canvas.get("images", [])
                 if images:
                     resource = images[0].get("resource", {})
                     img_id = resource.get("@id", "")
 
-            # Navigate IIIF v3 JSON schema
             elif "items" in canvas:
                 items = canvas.get("items", [])
                 if items:
