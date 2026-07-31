@@ -11,6 +11,7 @@ ever requires a new .pmt file in prompts/.
 
 import copy
 import json
+import os
 import re
 import shutil
 import sys
@@ -22,7 +23,6 @@ from string import Template
 from textwrap import dedent
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
-import os
 import pdfplumber
 import yaml
 from PIL import Image
