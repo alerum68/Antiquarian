@@ -137,3 +137,70 @@ def test_dispatch_by_record_type_name_not_shape():
     doc = _unified_doc("Census_1900", [_sheet([_record([_participant("Jean", "Gagnon", "M")])])])
     assert doc.get("record_type_name", "").startswith("Census_")
     assert "sheets" in doc
+
+
+def test_build_census_task_folder_name_uses_fixed_vocabulary_not_raw_flag_text():
+    """Regression: RootsMagic rejects an arbitrary sentence as a "0 _FOLDER" value -
+    build_census_task used to write one directly (a lightly regex-cleaned copy of the raw
+    review-flag text, e.g. "Head-surname match: no age fit"). The folder name must instead
+    come from evaluate_task_priority's fixed, safe vocabulary - already proven correct for
+    the church flavor - reusing the exact flag text real 1860 census data produced."""
+    _, folder = arc.build_census_task("1", "Jean", "Gagnon", "1900, Fam 5, p.3",
+                                      [("Head-surname match; no age fit", 0.3)],
+                                      [], "img.jpg", "Title", "RM")
+    assert folder == "Name & Identity Issues"
+
+    _, folder2 = arc.build_census_task("2", "Jean", "Gagnon", "1900, Fam 5, p.3",
+                                       [("Unrelated household member", 0.5)],
+                                       [], "img.jpg", "Title", "RM")
+    assert folder2 == "General Review"
+
+
+def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extension(tmp_path, monkeypatch):
+    """Regression for the FTM import-error root cause (confirmed against a real FTM import
+    error log: ~85 "Unsupported or invalid tag: NAME" errors on one real test census page):
+    a "NAME Researcher: ..." line was being written as a child of a SOUR citation, which
+    isn't legal under GEDCOM 5.5.1 (see build_census_citation). Also regresses an OBJE media
+    filename doubling its extension (".jpg.jpg") when Image_ID already carries one, as it
+    does coming from the unified schema's document_metadata.file_name - and confirms the
+    FamilySearch Family Tree profile webtag now accompanies _FSFTID."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"] = {"line_number": "1", "fsftid": "LZXY-ABC"}
+    wife = _participant("Marie", "Gagnon", "F", role_name="Wife", age="38", line="2")
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head, wife], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(arc, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    out_files = list(tmp_path.glob("*.ged"))
+    assert len(out_files) == 1
+    lines = out_files[0].read_text(encoding="utf-8").splitlines()
+
+    # The illegal line was specifically "3 NAME Researcher: ..." (or "2 NAME ...") nested
+    # directly under a "SOUR" citation - "NAME" lines under other custom constructs (e.g.
+    # "4 NAME ..." under "_WEBTAG", already used for the Ancestry/FS weblink names) are a
+    # separate, legitimate, pre-existing pattern this isn't regressing.
+    assert not any("NAME Researcher" in ln for ln in lines)
+    sour_line_idxs = [i for i, ln in enumerate(lines) if ln.startswith("2 SOUR ")]
+    for i in sour_line_idxs:
+        for ln in lines[i + 1:]:
+            if not (ln.startswith("3 ") or ln.startswith("4 ") or ln.startswith("5 ")):
+                break
+            if ln.startswith("3 NAME") or ln.startswith("2 NAME"):
+                assert False, f"illegal NAME directly under SOUR citation: {ln!r}"
+
+    file_lines = [ln for ln in lines if ln.startswith("1 FILE ")]
+    assert file_lines
+    assert all(ln.endswith(".jpg") and not ln.endswith(".jpg.jpg") for ln in file_lines)
+
+    assert any(ln == "1 _FSFTID LZXY-ABC" for ln in lines)
+    assert any("https://www.familysearch.org/tree/person/details/LZXY-ABC" in ln for ln in lines)

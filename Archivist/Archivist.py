@@ -1051,13 +1051,6 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
     fam_num = get_row_val(row, ['Family Number', 'Family', 'Household Number', 'Household'], '')
     dwell_num = get_row_val(row, ['Dwelling Number', 'Dwelling', 'House Number'], '')
-    # get_row_val treats a truthy `default` as an already-resolved override and never even
-    # looks at the row (correct for global settings like TOWNSHIP that should win when set)
-    # - but 'X' here is a last-resort filler, not an override, and being truthy meant it was
-    # *always* returned without ever reading the row's real Line Number. Fixed by passing an
-    # empty default (so the row is actually checked) and applying 'X' only if that comes
-    # back empty too.
-    line_num = get_row_val(row, ['Line Number', 'Line'], '') or 'X'
 
     # Present only on a merged Ancestry+FamilySearch record (see MergedCensus.py) - a
     # single-source run leaves these blank, so the extra tag/link below never appear.
@@ -1077,22 +1070,22 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
     ed_suffix = f", ED {row_ed}" if (caps["ed"] and row_ed) else ""
 
     if target_software == "RM":
+        # No per-citation _TMPLT block here: the template (era-matched TID 47/48/49) lives
+        # once on the SOURCE record itself (get_census_sources) - a citation just points at
+        # that source (SOUR @S...@ above) and supplies its own detail via PAGE, the way RM's
+        # real Population Schedule templates actually work. A second, TID-less _TMPLT was
+        # previously duplicated here per citation, followed by a "3 NAME ..." line that's
+        # illegal as a SOURCE_CITATION child under GEDCOM 5.5.1 - confirmed as the root cause
+        # of RootsMagic/FTM import silently dropping NAME (and cascading to NOTE) lines and,
+        # in RM specifically, dropping individuals outright. Both removed; PAGE below already
+        # carries the same roll/town/ED/page/household/person detail.
         page_parts = [row_roll, f"{row_town}{ed_suffix}", real_page]
-        tmplt_fields = ["4 FIELD", "5 NAME RollNo", f"5 VALUE {row_roll}",
-                        "4 FIELD", "5 NAME CivilDivision", f"5 VALUE {row_town}"]
-        if caps["ed"]:
-            tmplt_fields += ["4 FIELD", "5 NAME ED", f"5 VALUE {row_ed}"]
-        tmplt_fields += ["4 FIELD", "5 NAME PageID", f"5 VALUE {real_page}"]
         if caps["household"]:
             page_parts.append(fam_num)
-            tmplt_fields += ["4 FIELD", "5 NAME HouseholdID", f"5 VALUE {fam_num}"]
         page_parts.append(person_str)
-        tmplt_fields += ["4 FIELD", "5 NAME PersonOfInterest", f"5 VALUE {person_str}"]
 
         collection_title = COLLECTION_NAME or f'{CENSUS_YEAR} United States Federal Census'
-        cit.extend([f"3 PAGE {'; '.join(page_parts)}", "3 _TMPLT"] + tmplt_fields + [
-                    f"3 NAME {sur}, {giv}: Page: {real_page}, Line: {line_num}, "
-                    f"Dwelling: {dwell_num}, Family: {fam_num}",
+        cit.extend([f"3 PAGE {'; '.join(page_parts)}",
                     "3 DATA", f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
                     f"4 NAME Anc- {collection_title}",
                     f"4 URL {ancestry_url}"])
@@ -1248,10 +1241,13 @@ def build_census_task(rec_id: str, giv: str, sur: str, record_label: str, reason
                       target_software: str) -> Tuple[List[str], str]:
     task_id = f"@T{rec_id}@"
     summary = "; ".join(r for r, _ in reasons)
-    folder_raw = reasons[0][0]
-    folder_name = re.sub(r"\(age \d+\)", "", folder_raw)
-    folder_name = re.sub(r"of \w+", "", folder_name).replace("--", ":")
-    folder_name = re.sub(r"\s+", " ", folder_name).strip(" :")
+    # A raw (lightly regex-cleaned) review-flag sentence used to be written directly as the
+    # 0 _FOLDER value - RootsMagic's importer rejects an arbitrary sentence there
+    # ("Invalid record type"). evaluate_task_priority() already solves exactly this for the
+    # church flavor: it keyword-matches the note text against a fixed set of safe folder
+    # names (falling back to "General Review" for anything that doesn't match a keyword,
+    # e.g. "Unrelated household member") - reused here instead of a separate mapper.
+    _, _, folder_name = evaluate_task_priority(summary)
     min_c = min((c for _, c in reasons), default=1.0)
     priority = 1 if min_c < 0.3 else (2 if min_c < REVIEW_THRESHOLD else 3)
 
@@ -1542,12 +1538,26 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
         if not image_id_val:
             image_id_val = f"{BASE_ID}_{page.zfill(5)}"
 
-        m_id = f"@M{image_id_val}@"
-        image_name = image_id_val
+        # Image_ID already carries a real extension when it comes from the unified schema's
+        # document_metadata.file_name (e.g. "4211353_00003.jpg" - see
+        # build_census_dataframe_from_unified); the legacy schema's plain image_id never
+        # does. Strip it for the @M...@ pointer/dict-key either way, and only fall back to
+        # the global IMAGE_EXTENSION when the raw value didn't already supply one - blindly
+        # re-appending IMAGE_EXTENSION regardless used to double it (...jpg.jpg). Mirrors
+        # build_gedcom_from_church's direct os.path.join (Archivist.py:2632), which never
+        # re-appends an extension either.
+        image_stem = Path(image_id_val).stem
+        image_suffix = Path(image_id_val).suffix.lstrip('.').lower()
+        if image_suffix == 'jpeg':
+            image_suffix = 'jpg'
+
+        m_id = f"@M{image_stem}@"
+        image_name = image_stem
 
         if image_name not in media_dict:
-            img_path = Path(str(IMAGE_DIR)) / f"{image_name}.{IMAGE_EXTENSION}"
-            media_dict[image_name] = {'id': m_id, 'img': img_path,
+            img_filename = f"{image_stem}.{image_suffix}" if image_suffix else f"{image_stem}.{IMAGE_EXTENSION}"
+            img_path = Path(str(IMAGE_DIR)) / img_filename
+            media_dict[image_name] = {'id': m_id, 'img': img_path, 'form': image_suffix or FORM_TYPE,
                                       'title': f"{CENSUS_YEAR} Census, {row_county}, Image {image_name}"}
 
         cit = build_census_citation(row, rec_id, m_id, real_page, target_software, row_town, row_county, row_state,
@@ -1561,16 +1571,28 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
         # block) - this is the top-level INDI tag other genealogy software reads to link
         # this person to their actual FamilySearch Family Tree profile.
         row_fsftid = get_row_val(row, ['FSFTID'], '')
+        # _FSFTID alone gives software the raw ID but no clickable link; only the
+        # citation-level FamilySearch ark URL (inside cit, above) was ever emitted, so the
+        # actual FS Tree profile page never had a link of its own to compete with Ancestry's.
+        fs_tree_link = (weblink_lines(f"https://www.familysearch.org/tree/person/details/{row_fsftid}",
+                                      "FamilySearch Family Tree", target_software)
+                        if row_fsftid else [])
         ged.extend(
             [f"0 @I{rec_id}@ INDI", f"1 REFN {rec_id}"]
             + ([f"1 _FSFTID {row_fsftid}"] if row_fsftid else [])
+            + fs_tree_link
             + [f"1 NAME {giv} /{sur}/"] + cit +
             build_alternate_name_lines(alt_names, cit) +
-            [f"1 SEX {gen}", f"1 SOUR {ROOT_SOURCE_ID}", f"2 NAME Researcher: {RESEARCHER}",
-             f"2 _TITL Researcher: {RESEARCHER}"]
+            # No "2 NAME Researcher: ..." here - NAME isn't a legal SOURCE_CITATION child
+            # (see build_census_citation); _TITL is the safe equivalent, already present.
+            [f"1 SEX {gen}", f"1 SOUR {ROOT_SOURCE_ID}", f"2 _TITL Researcher: {RESEARCHER}"]
         )
 
-        if person_flags := review_flags.get(idx, []):
+        # _TASK/_FOLDER are RootsMagic's own Task List feature (see Registrar's help text) -
+        # a custom, non-standard GEDCOM record type with no FTM equivalent. FTM's importer
+        # rejects "0 _TASK"/"0 _FOLDER" outright ("Invalid record type"), so these are only
+        # built for RM output; FTM output gets none of this review-flagging at all.
+        if (person_flags := review_flags.get(idx, [])) and target_software == "RM":
             fam_lbl_num = get_row_val(row, ['Family Number', 'Family', 'Household Number', 'Household'], '')
             lbl = f"{CENSUS_YEAR}, Fam {fam_lbl_num}, p.{real_page}"
             task_records, folder = build_census_task(rec_id, giv, sur, lbl, person_flags, cit,
@@ -1638,7 +1660,8 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
     ged.extend(get_census_sources(target_software))
     for m in media_dict.values():
-        ged.extend([f"0 {m['id']} OBJE", f"1 FILE {m['img']}", f"2 FORM {FORM_TYPE}", f"1 TITL {m['title']}"])
+        ged.extend([f"0 {m['id']} OBJE", f"1 FILE {m['img']}", f"2 FORM {m.get('form') or FORM_TYPE}",
+                    f"1 TITL {m['title']}"])
 
     if target_software == "RM":
         ged.extend(
@@ -2087,10 +2110,13 @@ def build_church_citation(rec: dict, part: dict, tag_name: str, vol: str, media_
 
     vol_clause = f"Vol. {vol}, " if vol else ""
 
+    # No plain "3 NAME ..." line here (it used to duplicate the _TITL/PAGE lines below) -
+    # NAME is not a legal SOURCE_CITATION child under GEDCOM 5.5.1, and both RootsMagic and
+    # FTM reject it on import (see census flavor's build_census_citation for the same fix
+    # and full explanation). _TITL is the safe custom-tag equivalent, already present.
     block = [
         f"2 _PROOF {proof_status}",
         f"2 SOUR {get_dynamic_source_id(vol)}",
-        f"3 NAME {std_s}, {std_g}, {vol_clause}Page {page}, {rec_id}, {year}",
         f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}",
         f"3 PAGE Page {page}, Record {rec_id}",
         "3 DATA",
@@ -2109,12 +2135,12 @@ def build_church_citation(rec: dict, part: dict, tag_name: str, vol: str, media_
 
     refn = clean_val(rec.get('record_number')) or rec_id
     if target_software == "RM":
+        # No per-citation _TMPLT here either - the real template (hardcoded TID 355) lives
+        # once on the source record itself; this duplicate carried no TID at all, so it was
+        # never a valid RM template reference to begin with. PAGE/_TITL above already carry
+        # the same person/page/record detail this used to repeat.
         block.extend([
             f"3 REFN {refn}",
-            "3 _TMPLT", "4 FIELD", "5 NAME ItemOfInterest",
-            f"5 VALUE {f'{std_g} {std_s}'.strip()}", "4 FIELD", "5 NAME Page",
-            f"5 VALUE Page {page}", "4 FIELD", "5 NAME DetailRef",
-            f"5 VALUE {rec_id}",
             "3 QUAY 3", "3 _QUAL", "4 _SOUR O", "4 _INFO P",
             "4 _EVID D"
         ])
@@ -2250,12 +2276,20 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     fsftid = clean_val((part.get('type_specific_fields') or {}).get('fsftid'))
     if fsftid:
         indi.append(f"1 _FSFTID {fsftid}")
+        # _FSFTID alone gives software the raw ID but no clickable link; only the
+        # record/citation-level FamilySearch ark URL (see get_source_root/weblink_lines
+        # call for the citation) was ever emitted, so the actual FS Tree profile page
+        # never had a link of its own to compete with Ancestry's.
+        indi.extend(weblink_lines(f"https://www.familysearch.org/tree/person/details/{fsftid}",
+                                  "FamilySearch Family Tree", target_software))
 
     task_block, needs_review, folder_name = None, False, None
 
-    # Handle Tasks / Review Flags -- always built the same way for both RM and FTM,
-    # since real Family Tree Maker exports have no dedicated research/to-do tag of
-    # their own to target instead.
+    # Handle Tasks / Review Flags -- _TASK/_FOLDER are RootsMagic's own Task List feature
+    # (a custom, non-standard GEDCOM record type); FTM's importer rejects "0 _TASK" outright
+    # ("Invalid record type"). needs_review/flagged still gets computed either way (still
+    # meaningful for the run's own review_count summary), but the actual _TASK/_COLOR GEDCOM
+    # output is RM-only.
     needs_primary_review = rec.get('review', False) and not any_part_review and is_primary
     if part.get('review', False) or needs_primary_review:
         needs_review = True
@@ -2264,29 +2298,32 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
 
         priority, color_code, folder_name = evaluate_task_priority(task_note)
 
-        indi.extend([f"1 _COLOR {color_code}", f"1 _TASK @T{uid}@"])
+        if target_software == "RM":
+            indi.extend([f"1 _COLOR {color_code}", f"1 _TASK @T{uid}@"])
 
-        raw_cit = build_church_citation(rec, part, f"Review {event_tag}", vol, media_uid,
-                                        target_software=target_software).split('\n')
+            raw_cit = build_church_citation(rec, part, f"Review {event_tag}", vol, media_uid,
+                                            target_software=target_software).split('\n')
 
-        task_citation = dedent_citation_lines(raw_cit, skip_at_level=(2, "_PROOF"))
+            task_citation = dedent_citation_lines(raw_cit, skip_at_level=(2, "_PROOF"))
 
-        weblink = weblink_lines(clean_val(CHURCH_CONFIG.get('collection_url')),
-                                CHURCH_CONFIG.get('collection_name', 'Collection Link'), target_software)
+            weblink = weblink_lines(clean_val(CHURCH_CONFIG.get('collection_url')),
+                                    CHURCH_CONFIG.get('collection_name', 'Collection Link'), target_software)
 
-        task_lines = [
-            f"0 @T{uid}@ _TASK", f"1 DESC {std_s or '[No Surname]'}, {std_g or '[No Given Name]'} "
-            f"({clean_val(rec.get('record_id')) or 'Unknown'}): {task_note}", f"1 REFN {uid}",
-            f"1 _LINK @I{uid}@", "1 TYPE 2", f"1 DATE {gedcom_date}",
-            f"1 _LDATE {gedcom_date}", f"1 NOTE {task_note}", "1 STAT NEW", f"1 PRTY {priority}",
-            f"1 _COLOR {color_code}"
-        ]
+            task_lines = [
+                f"0 @T{uid}@ _TASK", f"1 DESC {std_s or '[No Surname]'}, {std_g or '[No Given Name]'} "
+                f"({clean_val(rec.get('record_id')) or 'Unknown'}): {task_note}", f"1 REFN {uid}",
+                f"1 _LINK @I{uid}@", "1 TYPE 2", f"1 DATE {gedcom_date}",
+                f"1 _LDATE {gedcom_date}", f"1 NOTE {task_note}", "1 STAT NEW", f"1 PRTY {priority}",
+                f"1 _COLOR {color_code}"
+            ]
 
-        task_lines.extend(weblink)
-        task_lines.extend(task_citation)
-        if media_uid:
-            task_lines.extend([f"1 OBJE @{media_uid}@"])
-        task_block = "\n".join(task_lines)
+            task_lines.extend(weblink)
+            task_lines.extend(task_citation)
+            if media_uid:
+                task_lines.extend([f"1 OBJE @{media_uid}@"])
+            task_block = "\n".join(task_lines)
+        else:
+            folder_name = None
 
     # Process Dit Names
     std_s_base = std_s
@@ -2306,8 +2343,8 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     if clean_val(part.get('suffix')):
         indi.append(f"2 NSFX {clean_val(part.get('suffix'))}")
 
-    indi.extend([f"1 SOUR {ROOT_SOURCE_ID}", f"2 NAME Researcher: {RESEARCHER}",
-                 f"2 _TITL Researcher: {RESEARCHER}"])
+    # No "2 NAME Researcher: ..." here - see build_census_citation for why.
+    indi.extend([f"1 SOUR {ROOT_SOURCE_ID}", f"2 _TITL Researcher: {RESEARCHER}"])
 
     if dit_name:
         indi.extend([f"1 NAME {std_g} /{std_s_base} dit {dit_name}/", f"1 NAME {std_g} /{dit_name}/"])

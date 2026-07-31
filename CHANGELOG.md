@@ -40,6 +40,41 @@ cleanup with no new functionality.
   "Researcher & Organization" card.
 
 ### Fixed
+- **Archivist (census GEDCOM)**: a `NAME` line was being written as a direct child of a
+  `SOUR` citation (both inside each person's own citation block and, duplicated one level
+  shallower, inside `_TASK` records) - `NAME` isn't a legal `SOURCE_CITATION` child under
+  GEDCOM 5.5.1, and confirmed live against a real RootsMagic-authored GEDCOM import into
+  Family Tree Maker, this caused FTM to reject that line and cascade to rejecting the
+  `NOTE` line right after it too (~85 "Unsupported or invalid tag" errors on one real
+  test census page). A second, separate, TID-less `_TMPLT` block was also being duplicated
+  at the per-citation level - the real, working Evidence-Explained-style template (using
+  RootsMagic's own built-in era-matched TIDs) already lives once on the `SOURCE` record
+  itself (`get_census_sources`); a citation only needs to reference it via `SOUR`/`PAGE`.
+  Both removed. `_TASK`/`_FOLDER` records (RootsMagic's own Task List feature, with no FTM
+  equivalent) are now only emitted for RM output - FTM rejected them outright ("Invalid
+  record type"). The census flavor's `_FOLDER` value now maps through the same
+  fixed-vocabulary keyword mapper (`evaluate_task_priority`) the church flavor already used
+  for this, instead of writing a lightly-cleaned raw review-flag sentence RM's importer
+  would reject. Fixed an `OBJE` media filename getting a doubled extension
+  (`4211353_00003.jpg.jpg`) in the unified-schema census path, baked into the `@M...@`
+  pointer ID itself - the extension is no longer re-appended when the source data already
+  supplies one. Added a `FamilySearch Family Tree` `_WEBTAG`/`_LINK` profile link
+  (`https://www.familysearch.org/tree/person/details/{fsftid}`) alongside the existing
+  `_FSFTID` tag, for both the census and church flavors - previously only the
+  record/citation-level FamilySearch ark URL was ever emitted, so there was no actual link
+  to the person's own FS Tree profile to begin with.
+- **Scriptorium (UI polish)**: primary action buttons (Generate GEDCOM, Run Script, Gather,
+  Clear Cache, ...) passed a custom `fg_color` but no `text_color`, silently inheriting the
+  theme's dark default text meant for its light default `fg_color` - near-black-on-green/
+  red/blue read as "grayed out and disabled." All now set an explicit light `text_color`.
+  A collapsible settings-section header (`▼`/`▶`) could flip open then immediately snap
+  shut again on the very first click of a fresh session (every header worked normally after
+  that, and only that first click was ever affected) - confirmed live as Windows
+  double-dispatching that window-activating click to the header's bound handler; a short
+  debounce on the toggle handler absorbs the duplicate without touching window-focus
+  handling directly. The pop-up console overlay now also measures the active tab's own
+  bottom-docked action-button row (not just its header) and stops short of it, so a script
+  can be re-run without first closing the console.
 - **Scriptorium (Global Settings)**: sections after the first (auto-expanded) one could
   render effectively dead - collapsed headers not responding to clicks, or responding only
   along a thin sliver near the arrow rather than across the whole row. Root-caused, not

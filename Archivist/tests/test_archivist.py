@@ -123,6 +123,29 @@ def test_build_individual_primary_with_no_parents_still_gets_famc():
     assert famc_id in fams[0]
 
 
+def test_build_individual_fsftid_gets_companion_fs_tree_weblink():
+    """Regression: only the record/citation-level FamilySearch ark URL was ever emitted -
+    the person's own FS Tree profile page never had a link of its own, so it couldn't
+    compete with the Ancestry link already present. _FSFTID must now be accompanied by a
+    weblink to https://www.familysearch.org/tree/person/details/{fsftid}, RM/FTM-flavored
+    the same way every other weblink already is (weblink_lines)."""
+    rec = {"event_type": "Burial", "page": "12", "record_id": "S-2", "participants": [
+        make_participant("primary", given="Baptiste", surname="Ledoux"),
+    ]}
+    primary = dict(rec["participants"][0], type_specific_fields={"fsftid": "LZXY-ABC"})
+    rec["participants"][0] = primary
+
+    rm_lines, _, _, _ = arc.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
+    joined_rm = "\n".join(rm_lines)
+    assert "1 _FSFTID LZXY-ABC" in joined_rm
+    assert "1 _WEBTAG" in joined_rm
+    assert "2 URL https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_rm
+
+    ftm_lines, _, _, _ = arc.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "FTM")
+    joined_ftm = "\n".join(ftm_lines)
+    assert "1 _LINK https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_ftm
+
+
 def test_build_family_baptism_shape_single_famc_no_suffix():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1", "participants": [
         make_participant("primary", given="Baptiste", surname="Ledoux"),
