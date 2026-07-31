@@ -23,8 +23,34 @@ cleanup with no new functionality.
   produces nothing despite the fetch succeeding. `FS.py` collects and moves these images
   into the same nested `{year} US Federal Census / {location}` folder structure `A.py`
   already uses.
+- **Scriptorium (settings shell)**: left sidebar navigation replacing the old top-tab
+  strip (Voyageur/Paleographer/Archivist ungrouped, a labeled Utilities group for
+  Registrar/Gazetteer/PDFix, Help and Global Settings pinned to the bottom), a custom
+  dark theme with Georgia headings and role-tag pills per tool, and richer field widgets
+  (toggles, sliders, segmented controls) in place of plain text entries for the settings
+  that are really booleans or bounded numbers. The console is now a pop-up that raises
+  over the active tab's body the moment a script starts (leaving that tab's own title
+  visible above it) instead of a permanently-docked drawer, with a bigger progress bar
+  and a live percentage readout. The status bar shows the outcome of the run that just
+  finished (`FS.py: finished successfully` / `cancelled` / `failed (exit code ...)`)
+  instead of reverting to a generic "System Ready" the instant it ends. Each tool's own
+  script path is now hardcoded (`SCRIPT_PATHS`) instead of a Global Settings field - the
+  codebase's own folder layout doesn't vary per user or need configuring. Global
+  Settings' "Metadata & Organization" and "Standard Links" sections are merged into one
+  "Researcher & Organization" card.
 
 ### Fixed
+- **Scriptorium (Global Settings)**: sections after the first (auto-expanded) one could
+  render effectively dead - collapsed headers not responding to clicks, or responding only
+  along a thin sliver near the arrow rather than across the whole row. Root-caused, not
+  guessed at: wrapping each settings section in its own bordered `CTkFrame` ("card") left
+  every card after the first genuinely unmapped by Tk (`winfo_ismapped() == False`, not
+  just visually off) until some unrelated later event forced a full relayout - confirmed
+  live via direct Tk introspection, and confirmed absent by rebuilding the same settings
+  shell fresh from the pre-card version and testing after every phase. The bordered-card
+  layout is reverted for now (back to one scrollable region holding collapsible sections,
+  the same mechanism already used before) until a version of the "boxed" design that
+  doesn't trigger this gets designed.
 - **Voyageur -> Archivist handoff**: `A.py`/`FS.py` wrote the freshly-gathered `JSON_FILE`
   setting to their own subfolder's `.env` - a file Archivist never reads at all (`JSON_FILE`
   belongs to Archivist's own settings, per its `ARCHIVIST_VARS` entry). Both now write it to

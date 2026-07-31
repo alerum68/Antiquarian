@@ -15,9 +15,21 @@ from typing import Union, Dict, Callable, List, Optional
 import customtkinter as ctk
 import yaml
 from dotenv import set_key, dotenv_values
-from PIL import Image
 
 BASE_DIR = Path(__file__).resolve().parent
+
+# Each tool's own script lives in a fixed subfolder of this codebase - hardcoded rather than
+# a configurable Global Settings field, since the folder layout is the codebase's own, not
+# something that varies per user or per project the way PROGRAM_DIR does.
+SCRIPT_PATHS = {
+    "ANALYSIS_SCRIPT": "Paleographer/Paleographer.py",
+    "ARCHIVIST_SCRIPT": "Archivist/Archivist.py",
+    "VOYAGEUR_SCRIPT": "Voyageur/Voyageur.py",
+    "REGISTRAR_SCRIPT": "Registrar/Registrar.py",
+    "GAZETTEER_SCRIPT": "Gazetteer/Gazetteer.py",
+    "PDFIX_SCRIPT": "PDFix/PDFix.py",
+    "CLEANUP_CACHE_SCRIPT": "Paleographer/CacheCleanup.py",
+}
 
 
 def env_path_for(subfolder: Optional[str]) -> Path:
@@ -31,8 +43,7 @@ def env_path_for(subfolder: Optional[str]) -> Path:
 # ==========================================
 # Dark-mode values from assets/theme.json's own token set (the app forces
 # ctk.set_appearance_mode("Dark"), so only these matter visually) - for the handful of
-# widgets below that pass their own explicit color kwargs instead of riding the CTk theme
-# (which covers every CTkEntry/CTkSwitch/CTkSlider/CTkSegmentedButton/CTkComboBox already).
+# widgets below that pass their own explicit color kwargs instead of riding the CTk theme.
 C_SURFACE = "#202329"
 C_SURFACE_RAISED = "#262A31"
 C_TEXT = "#E7E6DE"
@@ -54,33 +65,28 @@ C_BORDER = "#33363D"
 GLOBAL_VARS = {"API & Processing": {"GEMINI_API_KEY": "", "API_BUDGET": "20", "MODEL_NAME": "gemini-3.1-pro-preview",
                                     "COST_PER_1M_INPUT": "2.00", "COST_PER_1M_OUTPUT": "12.00",
                                     "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
-               "Script Locations": {"ANALYSIS_SCRIPT": "Paleographer/Paleographer.py",
-                                    "ARCHIVIST_SCRIPT": "Archivist/Archivist.py",
-                                    "VOYAGEUR_SCRIPT": "Voyageur/Voyageur.py",
-                                    "REGISTRAR_SCRIPT": "Registrar/Registrar.py",
-                                    "GAZETTEER_SCRIPT": "Gazetteer/Gazetteer.py",
-                                    "PDFIX_SCRIPT": "PDFix/PDFix.py",
-                                    "CLEANUP_CACHE_SCRIPT": "Paleographer/CacheCleanup.py"},
                "Global Directories": {"PROGRAM_DIR": "C:/Path/To/Your/Genealogy/Folder", "RM_DIR": "Roots Magic 11",
                                       "FTM_DIR": "Family Tree Maker", "MEDIA_DIR": "Media/Project",
                                       "CENSUS_IMAGE_DIR": "Census",
                                       "JSON_DIR": "Scriptorium/Working/Project/JSON", "IMAGE_EXTENSION": "jpg",
                                       "GEDCOM_OUTPUT_PATH": "GEDCOM/Project"},
-               "Metadata & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
-                                           "SOFTWARE_NAME": "RootsMagic", "SOFTWARE_VERS": "11.0",
-                                           "COPYRIGHT_START": "2024",
-                                           "GEDCOM_NOTE": "This file contains original historical translations and "
-                                                          "research.",
-                                           "GEDCOM_CONC": "Please do not upload this raw GEDCOM to public, "
-                                                          "collaborative trees without permission and attribution.",
-                                           "REVIEW_COLOR": "1", "ROOT_SOURCE_ID": "@S1@"},
-               "Standard Links": {"SUBM_ADDRESS": "https://www.example.com/contact",
-                                  "MGS_GROUP_URL": "https://www.example.com/groups/main",
-                                  "ANCESTRY_GROUP_URL": "https://www.ancestry.com/groups/example"}}
+               # Everything identifying who's doing the research and how it's attributed,
+               # in one card - was two ("Metadata & Organization", "Standard Links").
+               "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
+                                             "SOFTWARE_NAME": "RootsMagic", "SOFTWARE_VERS": "11.0",
+                                             "COPYRIGHT_START": "2024",
+                                             "GEDCOM_NOTE": "This file contains original historical translations "
+                                                            "and research.",
+                                             "GEDCOM_CONC": "Please do not upload this raw GEDCOM to public, "
+                                                            "collaborative trees without permission and "
+                                                            "attribution.",
+                                             "REVIEW_COLOR": "1", "ROOT_SOURCE_ID": "@S1@",
+                                             "SUBM_ADDRESS": "https://www.example.com/contact",
+                                             "MGS_GROUP_URL": "https://www.example.com/groups/main",
+                                             "ANCESTRY_GROUP_URL": "https://www.ancestry.com/groups/example"}}
 
 ARCHIVIST_VARS = {"Which JSON to Build From": {"JSON_FILE": ""},
                   "Location Overrides": {"STATE": "", "COUNTY": "", "TOWNSHIP": ""},
-                  "GEDCOM Output": {"GEDCOM_OUTPUT_MODE": "Both"},
                   "Family Inference Tuning": {"MIN_MARRIAGE_AGE": "12", "MAX_SPOUSE_AGE_GAP": "25",
                                               "HUSBAND_CHILD_AGE_GAP_MIN": "14", "HUSBAND_CHILD_AGE_GAP_MAX": "60",
                                               "WIFE_CHILD_AGE_GAP_MIN": "12", "WIFE_CHILD_AGE_GAP_MAX": "50"}}
@@ -100,8 +106,7 @@ VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC"),
 VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
                  "Ancestry": {"CENSUS_URL": ""},
                  "FamilySearch": {"FS_URL": ""},
-                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC"},
-                 "Merged (Ancestry + FamilySearch)": {"MERGE_PRIMARY_PROVIDER": "Ancestry"}}
+                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC"}}
 
 PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
                                             "CHURCH_GEDCOM_NAME": "Parish.ged",
@@ -141,8 +146,7 @@ REGISTRAR_VARS = {
 
 GAZETTEER_VARS = {"File Paths": {"GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
                                  "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
-                                 "US_HistCounties_Shapefile/US_HistCounties.shp",
-                                 "GAZETTEER_CA_SHAPEFILE_DIR": "Scriptorium/Gazetteer/CA_UNICEN_Counties"},
+                                 "US_HistCounties_Shapefile/US_HistCounties.shp"},
                   "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"}}
 
 PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVEL": "2",
@@ -196,9 +200,6 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
               "this in to force the same County on every record.",
     "TOWNSHIP": "Leave blank to use the Township/City Voyageur already gathered per-page from the JSON file. "
                 "Only fill this in to force the same Township on every record.",
-    "GEDCOM_OUTPUT_MODE": "Which GEDCOM file(s) to generate: RootsMagic only, Family Tree Maker only, or Both. "
-                         "When only one is selected, its output filename has no ' - RM'/' - FTM' suffix, since "
-                         "there's nothing to disambiguate from.",
     "MIN_MARRIAGE_AGE": "The youngest plausible age someone could be married (used to group families correctly).",
     "MAX_SPOUSE_AGE_GAP": "The largest age gap allowed between a husband and wife before the AI assumes they are not "
                           "married.",
@@ -216,9 +217,6 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                 "https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/).",
     "LAC_IMAGE_DIR": "The subfolder name (e.g., 'LAC') inside your Base Media Directory. A subfolder per roll number "
                       "is created automatically inside it. Can also be an absolute path.",
-    "MERGE_PRIMARY_PROVIDER": "Which source's own reading wins when a Merged gather's two indexes disagree on a "
-                              "field. The other source's differing reading is never dropped either way - it's "
-                              "always recorded as a review reason.",
 
     # Paleographer
     "PALEOGRAPHER_RECORD_TYPE": "Which record type (from Paleographer/prompts) to transcribe. Leave blank to use the "
@@ -279,10 +277,6 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GAZETTEER_SHAPEFILE": "The path to the Newberry Atlas '.shp' file containing historical county boundaries. "
                          "Relative to your Program Dir (it ships alongside the Gazetteer tool), not the RootsMagic "
                          "folder.",
-    "GAZETTEER_CA_SHAPEFILE_DIR": "Folder containing the UNI-CEN Canadian Census Division boundary shapefiles "
-                                "(cd_1851.shp .. cd_1921.shp, one per census year). Optional - leave as-is if you "
-                                "haven't downloaded these; Gazetteer just runs US-only. Relative to your Program "
-                                "Dir, not the RootsMagic folder.",
     "GAZETTEER_CREATE_BACKUP": "Set to 'True' to automatically create a backup of your RootsMagic file before "
                              "fixing it (Highly Recommended!).",
     "GAZETTEER_DEBUG_MODE": "Set to 'True' to print extra diagnostic information to the console while processing.",
@@ -338,19 +332,9 @@ TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (
 RMTREE_FILETYPES = [("RootsMagic files", "*.rmtree"), ("All files", "*.*")]
 JSON_FILETYPES = [("JSON files", "*.json"), ("All files", "*.*")]
 GED_FILETYPES = [("GEDCOM files", "*.ged"), ("All files", "*.*")]
-PY_FILETYPES = [("Python files", "*.py"), ("All files", "*.*")]
 SHP_FILETYPES = [("Shapefiles", "*.shp"), ("All files", "*.*")]
 
 PATH_PICKER_FIELDS = {
-    # Global: Script Locations (.py files, rooted at the toolbox's own code folder)
-    "ANALYSIS_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "ARCHIVIST_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "VOYAGEUR_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "REGISTRAR_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "GAZETTEER_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "PDFIX_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-    "CLEANUP_CACHE_SCRIPT": {"kind": "open", "base_dir_key": TOOLBOX_DIR_SENTINEL, "filetypes": PY_FILETYPES},
-
     # Global: Directories (folders, relative to PROGRAM_DIR unless absolute)
     "PROGRAM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL, "always_absolute": True},
     "RM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
@@ -382,49 +366,41 @@ PATH_PICKER_FIELDS = {
     # Gazetteer
     "GAZETTEER_RM_DATABASE": {"kind": "open", "base_dir_key": "RM_DIR", "filetypes": RMTREE_FILETYPES},
     "GAZETTEER_SHAPEFILE": {"kind": "open", "base_dir_key": PROGRAM_DIR_SENTINEL, "filetypes": SHP_FILETYPES},
-    "GAZETTEER_CA_SHAPEFILE_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
 
     # PDFix
     "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
 }
 
 # ==========================================
-# FIELD WIDGET TYPE OVERRIDES
+# RICHER FIELD WIDGETS (toggles/segments/sliders instead of plain text entries)
 # ==========================================
-# Keys here get a richer control than the default plain text entry - a switch for a real
-# boolean, a segmented control for a small fixed choice, a slider for a bounded number.
-# Every one still only ever reads/writes the same self.string_vars[key] StringVar that
-# already round-trips through the .env files, so _save_env/_load_env_to_vars need no
-# changes. A key with no entry here keeps the default CTkEntry behavior - this is additive,
-# never a replacement for the field-state dimming _build_form_ui already does.
+# Keyed by settings key; any key not listed here keeps the default plain CTkEntry behavior.
 FIELD_WIDGETS = {
+    # Real booleans in the schema - a switch, not a "True"/"False" text box.
     "GAZETTEER_DEBUG_MODE": {"type": "toggle"},
     "GAZETTEER_CREATE_BACKUP": {"type": "toggle"},
     "PDFIX_CREATE_BACKUP": {"type": "toggle"},
     "PDFIX_REPAIR_MODE": {"type": "toggle"},
 
+    # Small fixed set of labeled options, stored as a numeric string.
     "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": {"type": "segmented",
                                            "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
-    "PDFIX_COMPRESSION_LEVEL": {"type": "segmented",
-                                "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
-    "GEDCOM_OUTPUT_MODE": {"type": "segmented",
-                           "options": [("RM", "RootsMagic"), ("FTM", "Family Tree Maker"), ("Both", "Both")]},
-    "MERGE_PRIMARY_PROVIDER": {"type": "segmented",
-                               "options": [("Ancestry", "Ancestry"), ("FamilySearch", "FamilySearch")]},
+    "PDFIX_COMPRESSION_LEVEL": {"type": "segmented", "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
 
-    "MIN_MARRIAGE_AGE": {"type": "slider", "min": 8, "max": 20},
-    "MAX_SPOUSE_AGE_GAP": {"type": "slider", "min": 5, "max": 40},
-    "HUSBAND_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 10, "max": 30},
-    "HUSBAND_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 40, "max": 80},
-    "WIFE_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 8, "max": 25},
-    "WIFE_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 35, "max": 70},
-    "REGISTRAR_FUZZY_THRESHOLD": {"type": "slider", "min": 50, "max": 100, "suffix": "%"},
-    "REGISTRAR_MAX_AGE_GAP": {"type": "slider", "min": 0, "max": 20, "suffix": " yrs"},
-    "REGISTRAR_FUZZY_THRESHOLD_STRICT": {"type": "slider", "min": 80, "max": 100, "suffix": "%"},
-    "REGISTRAR_FAMILY_MATCH_THRESHOLD": {"type": "slider", "min": 50, "max": 100, "suffix": "%"},
-    "API_BUDGET": {"type": "slider", "min": 1, "max": 100, "suffix": " USD"},
-    "CACHE_DISCOUNT_MULTIPLIER": {"type": "slider", "min": 0.0, "max": 1.0, "step": 0.01},
-    "PDFIX_SIZE_THRESHOLD_MB": {"type": "slider", "min": 0, "max": 50, "suffix": " MB"},
+    # Bounded numeric tuning knobs.
+    "MIN_MARRIAGE_AGE": {"type": "slider", "min": 0, "max": 30, "step": 1},
+    "MAX_SPOUSE_AGE_GAP": {"type": "slider", "min": 0, "max": 50, "step": 1},
+    "HUSBAND_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 0, "max": 30, "step": 1},
+    "HUSBAND_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 30, "max": 90, "step": 1},
+    "WIFE_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 0, "max": 30, "step": 1},
+    "WIFE_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 20, "max": 70, "step": 1},
+    "REGISTRAR_FUZZY_THRESHOLD": {"type": "slider", "min": 0, "max": 100, "step": 1},
+    "REGISTRAR_MAX_AGE_GAP": {"type": "slider", "min": 0, "max": 20, "step": 1},
+    "REGISTRAR_FUZZY_THRESHOLD_STRICT": {"type": "slider", "min": 0, "max": 100, "step": 1},
+    "REGISTRAR_FAMILY_MATCH_THRESHOLD": {"type": "slider", "min": 0, "max": 100, "step": 1},
+    "API_BUDGET": {"type": "slider", "min": 0, "max": 200, "step": 5, "suffix": "$"},
+    "CACHE_DISCOUNT_MULTIPLIER": {"type": "slider", "min": 0, "max": 1, "step": 0.05},
+    "PDFIX_SIZE_THRESHOLD_MB": {"type": "slider", "min": 0, "max": 100, "step": 1, "suffix": "MB"},
 }
 
 
@@ -512,7 +488,7 @@ class ToolTip:
             tw.wm_attributes('-transparent', True)
 
         # Build the tooltip label
-        label = ctk.CTkLabel(tw, text=self.text, justify="left", fg_color=C_SURFACE_RAISED, text_color=C_TEXT,
+        label = ctk.CTkLabel(tw, text=self.text, justify="left", fg_color="#1a1a1a", text_color="#E0E0E0",
                              corner_radius=8, padx=12, pady=8, font=ctk.CTkFont(size=12))
         label.pack()
 
@@ -577,14 +553,6 @@ class ConsoleRedirector:
                     current, total = matches[-1].groups()
                     self.on_progress(int(current), int(total))
 
-            if self.on_line is not None:
-                # Approximate preview only (a chunk boundary can split a line mid-tick) -
-                # fine for a collapsed-drawer preview, not meant to be exact.
-                tail = clean_chunk.rstrip('\n')
-                last_line = tail.rsplit('\n', 1)[-1] if tail else ''
-                if last_line.strip():
-                    self.on_line(last_line.strip())
-
             if '\r' in clean_chunk:
                 parts = clean_chunk.split('\r')
                 for i, part in enumerate(parts):
@@ -607,6 +575,11 @@ class ConsoleRedirector:
                             self.status_widget.configure(state="readonly")
             else:
                 self.text_widget.insert("end", clean_chunk)
+
+            if self.on_line is not None:
+                lines = [ln for ln in clean_chunk.replace('\r', '\n').split('\n') if ln.strip()]
+                if lines:
+                    self.on_line(lines[-1])
 
         try:
             current_lines = int(self.text_widget.index('end-1c').split('.')[0])
@@ -779,8 +752,8 @@ class Scriptorium(ctk.CTk):
 
         self.main_panel = ctk.CTkFrame(self.main_container, fg_color="transparent")
         self.main_panel.grid(row=0, column=1, sticky="nsew")
-        self.main_panel.grid_rowconfigure(2, weight=1)  # content_area is the only row that expands
         self.main_panel.grid_columnconfigure(0, weight=1)
+        self.main_panel.grid_rowconfigure(2, weight=1)  # content_area is the only row that expands
 
         # Sits above content_area, so it stays visible - and reflects the truth - no matter
         # which tab is active when a background job is running.
@@ -800,160 +773,166 @@ class Scriptorium(ctk.CTk):
         self.status_bar.insert(0, "System Ready")
         self.status_bar.configure(state="readonly")
 
-        self.progress_bar = ctk.CTkProgressBar(self.main_panel, mode="determinate")
-        self.progress_bar.set(0)
-        self.progress_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 0))
-        self.progress_bar.grid_remove()  # hidden until a run reports real [i/total] progress
+        # Reopens/dismisses the pop-up console at any time, not just while a script is
+        # running - lives in status_row (outside content_area) so _recursive_state's
+        # disable-while-running pass never touches it.
+        self.console_toggle_btn = ctk.CTkButton(self.status_row, text="Console", width=90, height=28,
+                                                fg_color="transparent", border_width=1, border_color=C_BORDER,
+                                                text_color=C_TEXT, hover_color=C_SURFACE_RAISED,
+                                                command=self._toggle_console)
+        self.console_toggle_btn.grid(row=0, column=2, padx=(8, 0))
 
-        # --- content area: one pre-built frame per tab, tkraise()'d by _switch_tab instead
-        # of a CTkTabview tab strip. Every _build_tab_* method is unchanged - it still just
-        # builds into whatever frame it's handed. ---
+        # A dedicated row (not just a bare progress bar) so it can carry an explicit height
+        # and a live percentage readout - a plain default-height CTkProgressBar reads as
+        # nearly invisible against the surface color.
+        self.progress_row = ctk.CTkFrame(self.main_panel, fg_color="transparent")
+        self.progress_row.grid(row=1, column=0, sticky="ew", padx=10, pady=(8, 0))
+        self.progress_row.grid_columnconfigure(0, weight=1)
+
+        self.progress_bar = ctk.CTkProgressBar(self.progress_row, mode="determinate", height=16,
+                                               progress_color=C_ACCENT, fg_color=C_SURFACE)
+        self.progress_bar.set(0)
+        self.progress_bar.grid(row=0, column=0, sticky="ew")
+
+        self.progress_pct_label = ctk.CTkLabel(self.progress_row, text="0%", width=36,
+                                               font=ctk.CTkFont(size=12, weight="bold"), text_color=C_TEXT_MUTED)
+        self.progress_pct_label.grid(row=0, column=1, padx=(10, 0))
+
+        self.progress_row.grid_remove()  # hidden until a run reports real [i/total] progress
+
+        # --- content area: one frame per tab, created lazily on first visit and tkraise()'d
+        # by _switch_tab instead of a CTkTabview tab strip. ---
         self.content_area = ctk.CTkFrame(self.main_panel, fg_color="transparent")
         self.content_area.grid(row=2, column=0, sticky="nsew", padx=10, pady=(5, 5))
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
+        self.content_area.bind("<Configure>", self._on_content_area_resize)
 
         self.tab_frames: Dict[str, ctk.CTkFrame] = {}
-        for tab_name in self.tab_builders.keys():
-            frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
-            frame.grid(row=0, column=0, sticky="nsew")
-            self.tab_frames[tab_name] = frame
+        # Keyed by each tab's own content frame -> that tab's _build_tab_header() frame, so
+        # the console overlay below can measure exactly how tall THIS tab's title+description
+        # rendered (it varies - description length differs per tab) and cover only the body
+        # beneath it, never the header itself.
+        self.tab_header_frames: Dict[ctk.CTkFrame, ctk.CTkFrame] = {}
 
-        # --- collapsible console drawer: collapsed by default, auto-expanded by
-        # execute_script the moment a job actually starts. ---
-        self.console_toggle_row = ctk.CTkFrame(self.main_panel, fg_color="transparent", cursor="hand2")
-        self.console_toggle_row.grid(row=3, column=0, sticky="ew", padx=10, pady=(0, 2))
-        self._console_arrow = ctk.CTkLabel(self.console_toggle_row, text="▶", width=16,
-                                           font=ctk.CTkFont(size=12, weight="bold"), text_color=C_TEXT_MUTED)
-        self._console_arrow.pack(side="left")
-        self._console_preview = ctk.CTkLabel(self.console_toggle_row, text="Console", anchor="w",
-                                             font=ctk.CTkFont(family="Consolas", size=11), text_color=C_TEXT_MUTED)
-        self._console_preview.pack(side="left", fill="x", expand=True, padx=5)
+        # --- pop-up console: hidden by default, raised over the active tab's body (leaving
+        # that tab's own header visible) the moment execute_script starts a job. A sibling of
+        # the tab frames inside content_area, shown/hidden via place()/place_forget() instead
+        # of grid, so it never claims a grid slot of its own. ---
+        self.console_overlay = ctk.CTkFrame(self.content_area, fg_color=C_SURFACE, corner_radius=8,
+                                            border_width=1, border_color=C_ACCENT)
+        self.console_overlay.grid_rowconfigure(1, weight=1)
+        self.console_overlay.grid_columnconfigure(0, weight=1)
         self._console_expanded = False
-        for widget in (self.console_toggle_row, self._console_arrow, self._console_preview):
-            widget.bind("<Button-1>", self._toggle_console)
 
-        self.console_body = ctk.CTkFrame(self.main_panel, fg_color="transparent")
-        self.console_body.grid(row=4, column=0, sticky="nsew", padx=10, pady=(0, 10))
-        self.console_body.grid_rowconfigure(0, weight=1)
-        self.console_body.grid_columnconfigure(0, weight=1)
-        self.console_body.grid_remove()  # collapsed until _toggle_console/_expand_console
+        overlay_hdr = ctk.CTkFrame(self.console_overlay, fg_color="transparent")
+        overlay_hdr.grid(row=0, column=0, sticky="ew", padx=14, pady=(12, 6))
+        ctk.CTkLabel(overlay_hdr, text="Console", font=ctk.CTkFont(size=14, weight="bold"),
+                     text_color=C_TEXT).pack(side="left")
+        self._console_status_label = ctk.CTkLabel(
+            overlay_hdr, text="", font=ctk.CTkFont(size=12), text_color=C_TEXT_MUTED)
+        self._console_status_label.pack(side="left", padx=(8, 0))
+        # A click-bound label, not a CTkButton - _recursive_state only disables CTkButtons
+        # while a script runs, so this stays clickable to dismiss the overlay mid-run.
+        back_label = ctk.CTkLabel(overlay_hdr, text="Back to Settings  ▲", font=ctk.CTkFont(size=12, weight="bold"),
+                                  text_color=C_ACCENT, cursor="hand2")
+        back_label.pack(side="right")
+        back_label.bind("<Button-1>", self._toggle_console)
 
         # Set fixed fallback dimensions to prevent 0-height rendering geometry crash
-        self.console_text = ctk.CTkTextbox(self.console_body, font=ctk.CTkFont(family="Consolas", size=12),
+        self.console_text = ctk.CTkTextbox(self.console_overlay, font=ctk.CTkFont(family="Consolas", size=12),
                                            text_color=C_SUCCESS, width=800, height=220)
-        self.console_text.grid(row=0, column=0, sticky="nsew")
+        self.console_text.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 10))
         self.console_text.configure(state="disabled")
 
-        self.input_frame = ctk.CTkFrame(self.console_body, fg_color="transparent")
-        self.input_frame.grid(row=1, column=0, sticky="ew", pady=(5, 0))
+        self.input_frame = ctk.CTkFrame(self.console_overlay, fg_color="transparent")
+        self.input_frame.grid(row=2, column=0, sticky="ew", padx=14, pady=(0, 18))
         self.input_frame.grid_columnconfigure(0, weight=1)
 
-        self.console_input = ctk.CTkEntry(self.input_frame,
+        self.console_input = ctk.CTkEntry(self.input_frame, height=32,
                                           placeholder_text="Type script input here and press Enter...",
                                           state="disabled")
         self.console_input.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.console_input.bind("<Return>", self.send_input)
 
         self.cancel_btn = ctk.CTkButton(self.input_frame, text="Cancel", fg_color=C_DANGER, hover_color=C_DANGER_HOVER,
-                                        text_color=C_ON_ACCENT, width=80, state="disabled", command=self.cancel_script)
+                                        text_color=C_ON_ACCENT, width=80, height=32,
+                                        state="disabled", command=self.cancel_script)
         self.cancel_btn.grid(row=0, column=1)
 
         self.console = ConsoleRedirector(self.console_text, self.status_bar,
                                          on_progress=self._on_progress_update, on_line=self._on_console_line)
 
     def _build_sidebar(self, parent):
-        """Left nav rail replacing the old top CTkTabview: a scrollable list of tool groups
-        (Pipeline: Voyageur -> Paleographer -> Archivist; Utilities: Registrar/Gazetteer/
-        PDFix) plus a footer pinned outside that scroll region (Help, Global Settings) so
-        neither can ever be scrolled out of view or clipped by a short window."""
+        """Left nav rail replacing the old top CTkTabview: a plain (non-scrolling) list of
+        the pipeline tools (Voyageur/Paleographer/Archivist, ungrouped) plus a labeled
+        Utilities group (Registrar/Gazetteer/PDFix) and a footer pinned to the bottom (Help,
+        Global Settings). Text-only nav items - no icons, no pipeline connector marks.
+        A plain frame (not CTkScrollableFrame) for the nav list - six items plus one group
+        label comfortably fit the sidebar's height without ever needing to scroll."""
         # width= + grid_propagate(False): without this, CTkFrame shrinks itself to fit its
         # children's natural size regardless of sticky="nsew", so the dark background
-        # stopped at nav_scroll's own height instead of filling the sidebar's full column -
-        # leaving the pinned footer (Help/Global Settings) rendering past that edge with no
-        # background behind it at all, looking like it had fallen out of the panel entirely.
+        # wouldn't fill the sidebar's full column.
         self.sidebar = ctk.CTkFrame(parent, fg_color=C_SURFACE, corner_radius=8, width=210)
         self.sidebar.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
         self.sidebar.grid_propagate(False)
-        self.sidebar.grid_rowconfigure(0, weight=1)
-        self.sidebar.grid_columnconfigure(0, weight=1)
 
-        self.nav_scroll = ctk.CTkScrollableFrame(self.sidebar, fg_color="transparent", width=190, height=300)
-        self.nav_scroll.grid(row=0, column=0, sticky="nsew", padx=8, pady=(14, 4))
+        self.nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
+        self.nav_frame.pack(side="top", fill="x", padx=8, pady=(14, 4))
 
-        ctk.CTkLabel(self.nav_scroll, text="Scriptorium", font=ctk.CTkFont(family="Georgia", size=17, weight="bold")
-                     ).pack(anchor="w", padx=6, pady=(0, 0))
-        ctk.CTkLabel(self.nav_scroll, text="Record shell", font=ctk.CTkFont(size=11),
-                     text_color=C_TEXT_MUTED).pack(anchor="w", padx=6, pady=(0, 14))
+        ctk.CTkLabel(self.nav_frame, text="Scriptorium", font=ctk.CTkFont(family="Georgia", size=17, weight="bold")
+                     ).pack(anchor="w", padx=6, pady=(0, 14))
 
         self._nav_buttons: Dict[str, ctk.CTkButton] = {}
-        icons_dir = BASE_DIR / "assets" / "icons"
-        self._nav_icon_images: Dict[str, ctk.CTkImage] = {}
-        for key in ("voyageur", "paleographer", "archivist", "registrar", "gazetteer",
-                    "pdfix", "help", "global"):
-            path = icons_dir / f"{key}.png"
-            if path.exists():
-                img = Image.open(path)
-                self._nav_icon_images[key] = ctk.CTkImage(light_image=img, dark_image=img, size=(20, 20))
 
         def add_group_label(text):
-            ctk.CTkLabel(self.nav_scroll, text=text.upper(), font=ctk.CTkFont(size=10, weight="bold"),
+            ctk.CTkLabel(self.nav_frame, text=text.upper(), font=ctk.CTkFont(size=10, weight="bold"),
                          text_color=C_TEXT_MUTED).pack(anchor="w", padx=6, pady=(10, 4))
 
-        def add_nav_button(container, tab_name, icon_key, command=None):
+        def add_nav_button(container, tab_name, command=None):
             btn = ctk.CTkButton(container, text=tab_name, anchor="w", fg_color="transparent",
                                 hover_color=C_SURFACE_RAISED, text_color=C_TEXT,
-                                image=self._nav_icon_images.get(icon_key), compound="left",
                                 command=command or partial(self._switch_tab, tab_name))
             btn.pack(fill="x", pady=1)
             self._nav_buttons[tab_name] = btn
             return btn
 
-        def add_connector():
-            ctk.CTkFrame(self.nav_scroll, width=3, height=10, fg_color=C_BRASS).pack(padx=18)
-
-        add_group_label("Pipeline")
-        add_nav_button(self.nav_scroll, "Voyageur", "voyageur")
-        add_connector()
-        add_nav_button(self.nav_scroll, "Paleographer", "paleographer")
-        add_connector()
-        add_nav_button(self.nav_scroll, "Archivist", "archivist")
+        add_nav_button(self.nav_frame, "Voyageur")
+        add_nav_button(self.nav_frame, "Paleographer")
+        add_nav_button(self.nav_frame, "Archivist")
 
         add_group_label("Utilities")
-        add_nav_button(self.nav_scroll, "Registrar", "registrar")
-        add_nav_button(self.nav_scroll, "Gazetteer", "gazetteer")
-        add_nav_button(self.nav_scroll, "PDFix", "pdfix")
+        add_nav_button(self.nav_frame, "Registrar")
+        add_nav_button(self.nav_frame, "Gazetteer")
+        add_nav_button(self.nav_frame, "PDFix")
 
         self.sidebar_footer = ctk.CTkFrame(self.sidebar, fg_color="transparent")
-        self.sidebar_footer.grid(row=1, column=0, sticky="ew", padx=8, pady=(4, 14))
+        self.sidebar_footer.pack(side="bottom", fill="x", padx=8, pady=(4, 14))
         ctk.CTkFrame(self.sidebar_footer, height=1, fg_color=C_BORDER).pack(fill="x", pady=(0, 6))
-        add_nav_button(self.sidebar_footer, "Help", "help", command=self._show_current_help)
+        add_nav_button(self.sidebar_footer, "Help", command=self._show_current_help)
         # "Global Settings" doubles as both a real tab_name (drives _switch_tab / active-
         # highlight bookkeeping the same as any other nav button) and its own settings form.
-        add_nav_button(self.sidebar_footer, "Global Settings", "global")
-
-        # Same known CTkScrollableFrame sizing limitation _build_form_ui already works
-        # around: it doesn't reliably grow to fill its grid cell on its own, so this
-        # recomputes an explicit height from the sidebar's actual size on every resize.
-        def _resize_nav_scroll(_event=None):
-            self.sidebar.update_idletasks()
-            available = self.sidebar.winfo_height() - self.sidebar_footer.winfo_height() - 40
-            if available > 80:
-                self.nav_scroll.configure(height=available)
-
-        self.sidebar.bind("<Configure>", _resize_nav_scroll)
-        self.sidebar.after(50, _resize_nav_scroll)
+        add_nav_button(self.sidebar_footer, "Global Settings")
 
     def _switch_tab(self, tab_name):
-        """Replaces CTkTabview's own tab switching: lazily builds a tab's content into its
-        pre-created frame on first visit (same self.tabs_built guard as before), raises it,
-        and updates which sidebar nav button reads as active."""
+        """Replaces CTkTabview's own tab switching: lazily creates a tab's own frame and
+        builds its content into it on first visit, raises it, and updates which sidebar
+        nav button reads as active."""
         self.current_tab_name = tab_name
+        if tab_name not in self.tab_frames:
+            frame = ctk.CTkFrame(self.content_area, fg_color="transparent")
+            frame.grid(row=0, column=0, sticky="nsew")
+            self.tab_frames[tab_name] = frame
         frame = self.tab_frames[tab_name]
         if tab_name not in self.tabs_built:
             self.tab_builders[tab_name](frame)
             self.tabs_built.add(tab_name)
         frame.tkraise()
+        if self._console_expanded:
+            # frame.tkraise() just restacked this tab above the overlay too (they're
+            # siblings in content_area) - if the console was left open while switching
+            # tabs, re-show it on top, repositioned for the new tab's own header height.
+            self._show_console_overlay()
         for name, btn in self._nav_buttons.items():
             if name == tab_name:
                 btn.configure(fg_color=C_ACCENT, text_color=C_ON_ACCENT)
@@ -961,36 +940,58 @@ class Scriptorium(ctk.CTk):
                 btn.configure(fg_color="transparent", text_color=C_TEXT)
 
     def _show_current_help(self):
-        """The sidebar's single Help entry point, replacing the old per-tab Help button -
-        always shows whichever tab is actually on screen right now."""
+        """The sidebar's single Help entry point - always shows whichever tab is actually
+        on screen right now."""
         self.show_help(getattr(self, "current_tab_name", "Voyageur"))
 
     def _toggle_console(self, _event=None):
         self._console_expanded = not self._console_expanded
         if self._console_expanded:
-            self.console_body.grid()
-            self._console_arrow.configure(text="▼")
+            self._show_console_overlay()
         else:
-            self.console_body.grid_remove()
-            self._console_arrow.configure(text="▶")
+            self.console_overlay.place_forget()
+
+    def _show_console_overlay(self):
+        """Positions the pop-up console to cover the active tab's body while leaving that
+        tab's own title/description header visible above it - header height is measured
+        live (not hardcoded) since description text length, and therefore wrapped height,
+        differs per tab. CTk's place() rejects literal width/height (they can only be set
+        at widget construction), so the vertical offset is expressed as a relheight
+        fraction of content_area's own current height instead of a pixel height."""
+        self.update_idletasks()
+        header = self.tab_header_frames.get(self.tab_frames.get(self.current_tab_name))
+        header_h = header.winfo_height() + 4 if header else 0
+        content_h = self.content_area.winfo_height()
+        frac = max(0.05, (content_h - header_h) / content_h) if content_h > 0 else 1.0
+        self.console_overlay.place(relx=0, rely=0, relwidth=1, relheight=frac, x=0, y=header_h)
+        self.console_overlay.lift()
+
+    def _on_content_area_resize(self, _event=None):
+        """content_area's own <Configure> fires on window resize - reposition the overlay
+        (its relheight fraction was computed from a specific content_area height, so it
+        drifts as the window is resized) only while it's actually showing."""
+        if self._console_expanded:
+            self._show_console_overlay()
 
     def _expand_console(self):
         """Called by execute_script the moment a job actually starts, so first-run output
-        is never silently missed behind a collapsed drawer - collapsing back is left to the
-        user."""
-        if not self._console_expanded:
-            self._toggle_console()
+        is never silently missed behind a dismissed console - collapsing back is left to
+        the user via the status row's Console toggle."""
+        self._console_expanded = True
+        self._show_console_overlay()
 
     def _on_console_line(self, line):
-        self._console_preview.configure(text=line[:100])
+        self._console_status_label.configure(text=line[:100])
 
     def _on_progress_update(self, current, total):
         """Fed by ConsoleRedirector whenever it spots Paleographer's own
         "[i/total] Processing ..." line in the streamed output."""
         if total <= 0:
             return
-        self.progress_bar.grid()
-        self.progress_bar.set(min(1.0, current / total))
+        self.progress_row.grid()
+        pct = min(1.0, current / total)
+        self.progress_bar.set(pct)
+        self.progress_pct_label.configure(text=f"{int(pct * 100)}%")
 
     def send_input(self, _event=None):
         if self.active_process and self.active_process.poll() is None:
@@ -1091,6 +1092,11 @@ class Scriptorium(ctk.CTk):
         ctk.CTkLabel(header_frame, text=description, font=ctk.CTkFont(size=13), text_color=C_TEXT_MUTED,
                      anchor="w", justify="left", wraplength=760).pack(fill="x", pady=(6, 0))
 
+        # Recorded so the pop-up console overlay can measure this tab's actual rendered
+        # header height (it varies - description length differs per tab) and cover only the
+        # body beneath it, never the header itself.
+        self.tab_header_frames[frame] = header_frame
+
     def _create_action_box(self, parent: ctk.CTkFrame) -> ctk.CTkFrame:
         """A helper method to standardize the action button frames and reduce code duplication."""
         btn_box = ctk.CTkFrame(parent, fg_color="transparent")
@@ -1110,9 +1116,13 @@ class Scriptorium(ctk.CTk):
 
         def _resize_scroll(_event=None):
             parent.update_idletasks()
-            # Rough allowance for the tab header row + docked action-button box that share
-            # this same parent frame above/below the scroll area.
-            available = parent.winfo_height() - 110
+            # Actual height of every other direct child sharing this same parent frame (the
+            # tab header, the docked action-button box) - measured directly rather than
+            # guessed as a fixed constant, since that varies per tab.
+            siblings_height = sum(
+                child.winfo_height() for child in parent.winfo_children() if child is not scroll
+            )
+            available = parent.winfo_height() - siblings_height - 20
             if available > 100:
                 scroll.configure(height=available)
 
@@ -1281,8 +1291,7 @@ class Scriptorium(ctk.CTk):
         # CTkSlider binds MouseWheel-over-the-slider (on its internal canvas) to change its
         # own value by default - this hijacks scrolling the settings page whenever the
         # cursor merely passes over a slider on the way down. No public API to disable it,
-        # so unbind directly (confirmed via customtkinter/windows/widgets/ctk_slider.py's
-        # own _create_bindings, the only place this binding is set).
+        # so unbind directly.
         slider._canvas.unbind("<MouseWheel>")
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
@@ -1359,8 +1368,7 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Generate GEDCOM", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
-                      text_color=C_ON_ACCENT,
+        ctk.CTkButton(btn_box, text="Generate GEDCOM", fg_color="#2b7a4b", hover_color="#1e5935",
                       command=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")).pack(side="left",
                                                                                                    padx=5)
 
@@ -1460,11 +1468,10 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Analysis (API)", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
-                      text_color=C_ON_ACCENT, command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
+        ctk.CTkButton(btn_box, text="Run Analysis (API)", fg_color="#3B8ED0", hover_color="#2b7a4b",
+                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
                       ).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Clear Cache", fg_color="transparent", hover_color=C_SURFACE_RAISED,
-                      border_width=1, border_color=C_DANGER, text_color=C_DANGER,
+        ctk.CTkButton(btn_box, text="Clear Cache", fg_color="#991b1b", hover_color="#7f1d1d",
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
                                                                                                       padx=5)
 
@@ -1557,13 +1564,11 @@ class Scriptorium(ctk.CTk):
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color=C_ACCENT,
-                                                 hover_color=C_ACCENT_STRONG, text_color=C_ON_ACCENT)
+        self.voyageur_gather_btn = ctk.CTkButton(btn_box, text="Gather", fg_color="#3B8ED0", hover_color="#2b7a4b")
         self.voyageur_gather_btn.pack(side="left", padx=5)
 
         self.voyageur_send_to_archivist_btn = ctk.CTkButton(
-            btn_box, text="Gather and Send to Archivist", fg_color=C_SUCCESS, hover_color=C_SUCCESS_HOVER,
-            text_color=C_ON_ACCENT)
+            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935")
         self.voyageur_send_to_archivist_btn.pack(side="left", padx=5)
 
         # Persistent container the filtered settings form gets rebuilt into whenever the
@@ -1575,39 +1580,36 @@ class Scriptorium(ctk.CTk):
 
     def _build_tab_registrar(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Registrar", "DEDUPE",
-                               "Scans your RootsMagic tree for people who are probably the same person entered "
-                               "twice, and flags them for review.")
+                               "Finds logical duplicate people in RootsMagic using smart name and age matching, "
+                               "and flags them for manual review.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
-                      text_color=C_ON_ACCENT,
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
                       command=lambda: self.execute_script("REGISTRAR_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, REGISTRAR_VARS)
 
     def _build_tab_gazetteer(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Gazetteer", "UTILITY",
-                               "Corrects county names in your RootsMagic tree to match the historical county "
-                               "boundaries in effect on each event's date.")
+                               "Corrects County or Territory place names in RootsMagic to match historical "
+                               "boundaries for the exact year of each event.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
-                      text_color=C_ON_ACCENT,
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
                       command=lambda: self.execute_script("GAZETTEER_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, GAZETTEER_VARS)
 
     def _build_tab_pdfix(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "PDFix", "UTILITY",
-                               "Shrinks a folder of scanned PDFs down in file size, without touching image "
-                               "quality.")
+                               "Losslessly shrinks PDF file sizes in bulk (garbage-collection + stream "
+                               "compression) - no image rescaling.")
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Run Script", fg_color=C_ACCENT, hover_color=C_ACCENT_STRONG,
-                      text_color=C_ON_ACCENT,
+        ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935",
                       command=lambda: self.execute_script("PDFIX_SCRIPT", "standalone")).pack(side="left", padx=5)
 
         self._build_form_ui(frame, PDFIX_VARS)
@@ -1618,34 +1620,14 @@ class Scriptorium(ctk.CTk):
         letting a caller chain a follow-up run (e.g. "Gather and Send to Archivist" auto-running
         Generate GEDCOM once a gather finishes cleanly), without chaining onto a cancelled
         or failed run."""
-        # JSON_FILE can be updated directly on disk by a just-finished Voyageur gather
-        # (A.py/FS.py's own set_key call, once a gather completes) - resync it here before
-        # _save_env() below, so a chained "Gather and Send to Archivist" run doesn't
-        # clobber that fresh value with whatever was already showing in this field before
-        # the gather started. Confirmed live: without this, Archivist immediately failed
-        # with FileNotFoundError right after a real gather succeeded, since this field's
-        # own in-memory StringVar never picks up a sibling script's own disk write.
-        if "JSON_FILE" in self.string_vars:
-            fresh_json_file = dotenv_values(env_path_for("Archivist")).get("JSON_FILE")
-            if fresh_json_file is not None:
-                self.string_vars["JSON_FILE"].set(fresh_json_file)
-
         self._save_env()
 
-        script_path_var: Union[ctk.StringVar, None] = self.string_vars.get(script_key)
-        if script_path_var is None or not script_path_var.get().strip():
-            self.console.put(
-                f"\n[System] The script path for '{script_key}' is empty or missing in Global Settings.\n")
+        script_path_str = SCRIPT_PATHS.get(script_key)
+        if not script_path_str:
+            self.console.put(f"\n[System] Unknown script key: '{script_key}'.\n")
             return
 
-        script_path_str = script_path_var.get().strip()
-        prog_dir_var: Union[ctk.StringVar, None] = self.string_vars.get("PROGRAM_DIR")
-        program_dir = prog_dir_var.get().strip() if prog_dir_var is not None else ""
-
-        if os.path.isabs(script_path_str):
-            target_script_path = os.path.abspath(script_path_str)
-        else:
-            target_script_path = os.path.abspath(os.path.join(str(BASE_DIR), script_path_str))
+        target_script_path = os.path.abspath(os.path.join(str(BASE_DIR), script_path_str))
 
         if not os.path.exists(target_script_path):
             self.console.put(f"\n[System] Could not find the script at: {target_script_path}\n")
@@ -1656,7 +1638,7 @@ class Scriptorium(ctk.CTk):
         self.status_bar.delete(0, "end")
         self.status_bar.insert(0, f"Launching {script_display_name}...")
         self.status_bar.configure(state="readonly")
-        self.run_indicator.configure(text_color=C_SUCCESS)
+        self.run_indicator.configure(text_color=C_ACCENT)
         self.run_tooltip.text = f"Running: {script_display_name}"
         self._expand_console()
 
@@ -1671,6 +1653,8 @@ class Scriptorium(ctk.CTk):
                 return sub
             return os.path.join(base, sub).replace("\\", "/")
 
+        prog_dir_var: Union[ctk.StringVar, None] = self.string_vars.get("PROGRAM_DIR")
+        program_dir = prog_dir_var.get().strip() if prog_dir_var is not None else ""
         media_dir_var = self.string_vars.get("MEDIA_DIR")
         media_base = media_dir_var.get().strip() if media_dir_var is not None else "Media"
         rm_dir_var = self.string_vars.get("RM_DIR")
@@ -1702,16 +1686,20 @@ class Scriptorium(ctk.CTk):
 
         self._set_ui_state("disabled")
 
-        def on_complete():
+        def on_complete(status_msg="System Ready"):
+            # Shows the outcome of the run that just finished (success/failed/cancelled and
+            # which script), not a generic "System Ready" that erases that information the
+            # moment the run ends - stays until the next run overwrites it.
             self._set_ui_state("normal")
             self.status_bar.configure(state="normal")
             self.status_bar.delete(0, "end")
-            self.status_bar.insert(0, "System Ready")
+            self.status_bar.insert(0, status_msg)
             self.status_bar.configure(state="readonly")
             self.run_indicator.configure(text_color=C_TEXT_MUTED)
             self.run_tooltip.text = "Idle - no script running"
             self.progress_bar.set(0)
-            self.progress_bar.grid_remove()
+            self.progress_pct_label.configure(text="0%")
+            self.progress_row.grid_remove()
 
         args = [target_script_path]
         if mode == "paleographer_api" and self.debug_file_var.get().strip():
@@ -1735,6 +1723,7 @@ class Scriptorium(ctk.CTk):
 
         self._cancel_requested = False
         succeeded = False
+        status_msg = f"{script_name}: did not start"
         try:
             self.active_process = subprocess.Popen([sys.executable] + safe_cmd, stdin=subprocess.PIPE,
                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
@@ -1753,32 +1742,35 @@ class Scriptorium(ctk.CTk):
             if self.active_process.returncode == 0:
                 self.console.put(f"\n[System] {script_name} finished successfully!\n")
                 succeeded = True
+                status_msg = f"{script_name}: finished successfully"
             elif self._cancel_requested:
                 # terminate() reports the same exit code (1 on Windows) as a genuine
                 # unhandled exception, so cancellation can only be told apart from a real
                 # crash via this flag, not the returncode itself.
                 self.console.put(f"\n[System] Task was cancelled by you.\n")
+                status_msg = f"{script_name}: cancelled"
             else:
                 self.console.put(
                     f"\n[System] {script_name} encountered an error (exit code "
                     f"{self.active_process.returncode}). Please check the text above for clues.\n")
+                status_msg = f"{script_name}: failed (exit code {self.active_process.returncode})"
 
         except (OSError, subprocess.SubprocessError, ValueError) as e:
             self.console.put(f"\n[System] Failed to execute {script_name}:\n{str(e)}\n")
+            status_msg = f"{script_name}: failed to start"
 
         self.active_process = None
         # on_complete's own delay (100ms) fires first, re-enabling the UI, before
         # on_success (150ms) potentially launches a follow-up script through
         # execute_script - which disables the UI again itself - so the two calls'
         # UI-state changes can't race each other out of order.
-        self.after(100, on_complete)
+        self.after(100, partial(on_complete, status_msg))
         if succeeded and on_success:
             self.after(150, on_success)
 
     def _set_ui_state(self, state):
         # Deliberately only content_area, not self.sidebar - tab switching should stay
-        # possible while a script runs in the background, matching the old CTkTabview
-        # layout's own (if accidental) behavior of never disabling its own tab strip either.
+        # possible while a script runs in the background.
         self._recursive_state(self.content_area, state)
 
         if hasattr(self, 'console_input'):
