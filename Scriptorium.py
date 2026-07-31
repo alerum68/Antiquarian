@@ -1567,10 +1567,6 @@ class Scriptorium(ctk.CTk):
         self.debug_file_var.set(os.path.basename(selected))
 
     @staticmethod
-    def _voyageur_label_for_code(code: str) -> str:
-        return next((label for c, label in VOYAGEUR_SOURCES if c == code), VOYAGEUR_SOURCES[0][1])
-
-    @staticmethod
     def _voyageur_code_for_label(label: str) -> str:
         return next((c for c, lbl in VOYAGEUR_SOURCES if lbl == label), VOYAGEUR_SOURCES[0][0])
 
