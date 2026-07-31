@@ -142,10 +142,7 @@ def extract_people_from_rm(db_path: str) -> pd.DataFrame:
                 relatives_map.setdefault(c, set()).add(m)
 
     except Exception as e:
-        print(
-            f"Warning: Could not fully extract family tables. "
-            f"Proceeding with basic matching. Error: {e}"
-        )
+        print(f"Warning: Could not fully extract family tables. Proceeding with basic matching. Error: {e}")
     finally:
         conn.close()
 
@@ -159,10 +156,7 @@ def extract_people_from_rm(db_path: str) -> pd.DataFrame:
                      ]
     )
 
-    print(
-        f"Extracted {len(df)} individuals and their family contexts "
-        f"from the database."
-    )
+    print(f"Extracted {len(df)} individuals and their family contexts from the database.")
     return df
 
 
@@ -239,10 +233,7 @@ def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
                     else total_known
                     )
 
-    print(
-        f" - Pass 1: Comparing {pass_1_limit} records with known "
-        f"birth years..."
-    )
+    print(f" - Pass 1: Comparing {pass_1_limit} records with known birth years...")
 
     for i in range(pass_1_limit):
         p1 = known_records[i]
@@ -252,9 +243,7 @@ def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
         p1_rels = p1['RelativesList']
 
         # In-place progress update (carriage return prevents console spam)
-        print(f"\r   Processing {i + 1}/{pass_1_limit}: {p1_name[:30]:<30}", end="",
-              flush=True
-              )
+        print(f"\r   Processing {i + 1}/{pass_1_limit}: {p1_name[:30]:<30}", end="", flush=True)
 
         for j in range(i + 1, total_known):
             p2 = known_records[j]
@@ -281,19 +270,14 @@ def find_fuzzy_duplicates(df: pd.DataFrame, run_pass_two: bool = False,
     # PASS 2: Unknown Age vs All
     if run_pass_two and not test_limit:
         total_unknown = len(unknown_records)
-        print(
-            f" - Pass 2: Comparing {total_unknown} records missing "
-            f"birth years (strict name matching)..."
-        )
+        print(f" - Pass 2: Comparing {total_unknown} records missing birth years (strict name matching)...")
         for i in range(total_unknown):
             p1 = unknown_records[i]
             p1_name = p1['FullName']
             p1_id = p1['PersonID']
             p1_rels = p1['RelativesList']
 
-            print(f"\r   Processing {i + 1}/{total_unknown}: {p1_name[:30]:<30}", end="",
-                  flush=True
-                  )
+            print(f"\r   Processing {i + 1}/{total_unknown}: {p1_name[:30]:<30}", end="", flush=True)
 
             for j in range(len(all_records)):
                 p2 = all_records[j]
@@ -357,10 +341,7 @@ def write_tasks_to_db(matches_df: pd.DataFrame, db_path: str) -> None:
     duplicate_folder_names = cursor.fetchall()
 
     if duplicate_folder_names:
-        print(
-            f"Found {len(duplicate_folder_names)} folder name(s) "
-            f"with duplicates. Merging..."
-        )
+        print(f"Found {len(duplicate_folder_names)} folder name(s) with duplicates. Merging...")
 
         for (f_name,) in duplicate_folder_names:
             # Get all TagIDs for this exact folder name, sorted to keep oldest
@@ -416,18 +397,14 @@ def write_tasks_to_db(matches_df: pd.DataFrame, db_path: str) -> None:
 
     # Clean up ghost folder mistakenly created in TaskTable from older runs
     try:
-        cursor.execute("DELETE FROM TaskTable WHERE TaskType = 1 AND Name = ?",
-                       (FOLDER_NAME,)
-                       )
+        cursor.execute("DELETE FROM TaskTable WHERE TaskType = 1 AND Name = ?", (FOLDER_NAME,))
     except sqlite3.OperationalError:
         pass
 
     utc_mod_date = 0.0
 
     # Ensure the folder exists in TagTable (TagType = 1 = Task Folder)
-    cursor.execute("SELECT TagID FROM TagTable WHERE TagType = 1 AND TagName = ?",
-                   (FOLDER_NAME,)
-                   )
+    cursor.execute("SELECT TagID FROM TagTable WHERE TagType = 1 AND TagName = ?", (FOLDER_NAME,))
     folder = cursor.fetchone()
 
     if folder:
@@ -521,19 +498,9 @@ def main() -> None:
     print("Registrar - RootsMagic Duplicate Finder", flush=True)
     print("==========================================", flush=True)
     print("Select run mode:", flush=True)
-    print(" 1. Pass 1 only (Compare records with known birth years - FASTER)",
-          flush=True
-          )
-    print(
-        " 2. Pass 1 & 2 (Include strict comparisons for missing birth years "
-        "- SLOWER)",
-        flush=True
-    )
-    print(
-        " 3. TEST MODE (Only process the first 100 individuals to quickly "
-        "test database writing)",
-        flush=True
-    )
+    print(" 1. Pass 1 only (Compare records with known birth years - FASTER)", flush=True)
+    print(" 2. Pass 1 & 2 (Include strict comparisons for missing birth years - SLOWER)", flush=True)
+    print(" 3. TEST MODE (Only process the first 100 individuals to quickly test database writing)", flush=True)
     choice = input("Enter 1, 2, or 3 (default 1): ").strip()
     print("==========================================\n", flush=True)
 
@@ -541,9 +508,7 @@ def main() -> None:
     test_limit = 100 if choice == "3" else None
 
     people_df = extract_people_from_rm(RM_DATABASE_PATH)
-    suggestions_df = find_fuzzy_duplicates(people_df, run_pass_two=run_pass_two,
-                                           test_limit=test_limit
-                                           )
+    suggestions_df = find_fuzzy_duplicates(people_df, run_pass_two=run_pass_two, test_limit=test_limit)
 
     if not suggestions_df.empty:
         suggestions_df = suggestions_df.sort_values('Score', ascending=False)
@@ -557,20 +522,12 @@ def main() -> None:
         print("!" * 60)
 
         while True:
-            confirm = input(
-                "Type 'yes' to write tasks to the database, or 'no' to abort: "
-            ).strip().lower()
+            confirm = input("Type 'yes' to write tasks to the database, or 'no' to abort: ").strip().lower()
 
             if confirm == 'yes':
                 write_tasks_to_db(suggestions_df, RM_DATABASE_PATH)
-                print(
-                    f"\nSUCCESS! Found and linked {len(suggestions_df)} "
-                    f"potential duplicates."
-                )
-                print(
-                    "Tasks have been attached directly to the individuals "
-                    "in RootsMagic."
-                )
+                print(f"\nSUCCESS! Found and linked {len(suggestions_df)} potential duplicates.")
+                print("Tasks have been attached directly to the individuals in RootsMagic.")
                 print("You can now open RootsMagic and check the Task List!")
                 break
             elif confirm == 'no':
@@ -579,9 +536,7 @@ def main() -> None:
             else:
                 print("Invalid input. Please type 'yes' or 'no'.")
     else:
-        print("\nNo fuzzy duplicates found based on the current threshold.",
-              flush=True
-              )
+        print("\nNo fuzzy duplicates found based on the current threshold.", flush=True)
 
 
 if __name__ == "__main__":
