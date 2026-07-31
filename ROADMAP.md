@@ -164,6 +164,18 @@ FamilySearch)" source showing both URL fields at once; picking it and clicking G
 verification against a real Ancestry + FamilySearch dual gather of the same physical page
 (synthetic-fixture verification only so far).
 
+## Reunion (Mac) GEDCOM output support
+
+Low priority. A third `target_software` output flavor in Archivist.py (alongside RootsMagic
+and Family Tree Maker) for Reunion, the long-standing Mac-only genealogy app from Leister
+Productions. Feasible to build the same way the FTM branch was - research Reunion's known
+GEDCOM import behavior/quirks, then write a `target_software == "Reunion"` branch in the
+citation/task builders - but with a real gap the RM/FTM work didn't have: neither this
+project nor its maintainer currently has a Mac or a copy of Reunion to test against, so
+anything built would ship unverified against a real import (unlike FTM, where at least the
+maintainer can test empirically) until that access exists. Worth doing once that testing
+gap closes, not before.
+
 ## Paleographer: second-pass redesign
 
 Deferred deliberately (see the implementation plan from this session): now that Voyageur
