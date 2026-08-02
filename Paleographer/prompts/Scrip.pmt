@@ -21,9 +21,11 @@ extra_fields:
     - {name: claim_number, type: string}
     - {name: affidavit_number, type: string}
     - {name: commission_reference, type: string}
+    - {name: package_summary, type: string}
   participant:
     - {name: marital_status, type: string}
     - {name: relationship_to_claimant, type: string}
+    - {name: address, type: string}
 metadata_fields:
   Collection: "${SCRIP_COLLECTION_NAME}"
   District: "${SCRIP_DISTRICT}"
@@ -70,6 +72,21 @@ extracting, since it changes what "one record" means:
 
 Extract every distinct application OR list-entry present in the file into JSON - each
 gets its own record either way, using the same schema.
+
+SUPPORTING BAPTISMAL/BURIAL DOCUMENTS: a scrip application packet sometimes includes a
+supporting document from a parish register - most often a baptismal extract proving the
+claimant's birth/age, occasionally a burial extract proving a deceased parent or original
+claimant (needed for an heirship claim). When you find one of these pages, give it its
+OWN separate record with event_type "Baptism" or "Burial" (NOT "Scrip") - use role "1"
+(Claimant) for whoever the baptism/burial record is actually about (the same semantic as
+a Parish register's own primary), and Father/Mother/Witness as they best fit; the
+Commissioner role has no meaning on a church document and should not be used there.
+is_priest is a real possibility on THIS kind of embedded record specifically (unlike a
+Scrip affidavit's own participants, who are never clergy) - if the document names an
+officiating priest, set is_priest true for that participant same as Parish.pmt would.
+This is a narrower reuse of Scrip's own role table for a differently-shaped embedded
+document, not a full redesign of it - flag the record for review if anything about the
+church-document shape doesn't fit cleanly into these roles.
 
 RULES:
 INSTRUCTION PRECEDENCE: If instructions conflict, apply them in this order: 1. Preserve
@@ -174,6 +191,20 @@ Before generating JSON, process the file in this exact order:
   record it here exactly as stated. This is a citation-relevant fact for Scrip (feeds
   the Parish/Location field on the claim's source citation), not just biographical
   detail - don't skip it because it seems redundant with birth_place.
+- address: a specific STREET/CIVIC address (house number, street name, lot/block/section
+  number), when one is stated in addition to (not instead of) residence's own
+  parish/place-name reading - e.g. residence = "St. Laurent, Saskatchewan", address =
+  "Lot 14, River Lot Settlement". Most scrip affidavits state only a place name, not a
+  civic address - leave this null rather than duplicating residence's value into it.
+- package_summary (record-level): a concise one-paragraph plain-English summary of what
+  this specific document establishes - who is claiming, on what basis, and the outcome
+  if stated (e.g. "Affidavit of Roger Letendre, born 1849 at St. François Xavier,
+  claiming half-breed scrip as an original settler under the Manitoba Act; witnessed by
+  his neighbour Baptiste Gladu; claim allowed for $160 money scrip."). Written by you
+  (not copied verbatim from the document) - this is a summary, not a second
+  transcription. Keep it to 2-4 sentences; don't restate every field already captured
+  elsewhere (dates/numbers/names are already structured data - focus the summary on the
+  narrative: who, why, and what happened).
 
 5. TRANSCRIPTION & TRANSLATION
 - original_transcription = exact original text (French or English, as written).
@@ -224,6 +255,13 @@ application packet - not a register):
   than incidental, or whether these should merge into one record instead.
 
 TODO (still open):
+- package_summary, address, and the SUPPORTING BAPTISMAL/BURIAL DOCUMENTS rule are all
+  new, added directly from the user's own review of real GEDCOM output - NONE of the
+  three has been re-run against a real sample yet. In particular, the baptismal/burial
+  rule reuses Scrip's own Claimant/Father/Mother/Witness roles for a document shape they
+  weren't designed for (a church register extract, not an affidavit) - needs a real
+  packet containing one of these to confirm the role mapping actually reads sensibly
+  before treating it as settled.
 - Confirm whether children's ages are commonly stated on application packets, and whether
   a "review" flag is warranted whenever a whole family's applications span many pages
   with inconsistent handwriting (multiple clerks/witnesses) - neither reviewed sample

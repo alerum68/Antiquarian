@@ -159,8 +159,12 @@ def test_build_census_task_folder_name_uses_fixed_vocabulary_not_raw_flag_text()
 def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extension(tmp_path, monkeypatch):
     """Regression for the FTM import-error root cause (confirmed against a real FTM import
     error log: ~85 "Unsupported or invalid tag: NAME" errors on one real test census page):
-    a "NAME Researcher: ..." line was being written as a child of a SOUR citation, which
-    isn't legal under GEDCOM 5.5.1 (see build_census_citation). Also regresses an OBJE media
+    a "NAME Researcher: ..." line was being written as a child of a per-fact "2 SOUR ..."
+    citation, which isn't legal under GEDCOM 5.5.1 (see build_census_citation). This is
+    distinct from "2 NAME Researcher: ..." under the shared "1 SOUR @S1@" researcher
+    reference on every individual - confirmed live by the user that RootsMagic needs BOTH
+    "2 NAME" and "2 _TITL" there to merge that citation across every person who cites it;
+    that pattern is intentional, not a regression of this fix. Also regresses an OBJE media
     filename doubling its extension (".jpg.jpg") when Image_ID already carries one, as it
     does coming from the unified schema's document_metadata.file_name - and confirms the
     FamilySearch Family Tree profile webtag now accompanies _FSFTID."""
@@ -185,18 +189,25 @@ def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extensio
     assert len(out_files) == 1
     lines = out_files[0].read_text(encoding="utf-8").splitlines()
 
-    # The illegal line was specifically "3 NAME Researcher: ..." (or "2 NAME ...") nested
-    # directly under a "SOUR" citation - "NAME" lines under other custom constructs (e.g.
-    # "4 NAME ..." under "_WEBTAG", already used for the Ancestry/FS weblink names) are a
-    # separate, legitimate, pre-existing pattern this isn't regressing.
-    assert not any("NAME Researcher" in ln for ln in lines)
+    # The illegal line was specifically "3 NAME Researcher: ..." nested directly under a
+    # per-fact "2 SOUR ..." citation - "2 NAME Researcher: ..." under the shared top-level
+    # "1 SOUR @S1@" reference (checked below) is the separate, intentional pattern.
     sour_line_idxs = [i for i, ln in enumerate(lines) if ln.startswith("2 SOUR ")]
     for i in sour_line_idxs:
         for ln in lines[i + 1:]:
             if not (ln.startswith("3 ") or ln.startswith("4 ") or ln.startswith("5 ")):
                 break
-            if ln.startswith("3 NAME") or ln.startswith("2 NAME"):
-                assert False, f"illegal NAME directly under SOUR citation: {ln!r}"
+            if ln.startswith("3 NAME"):
+                assert False, f"illegal NAME directly under a per-fact SOUR citation: {ln!r}"
+
+    # The shared "1 SOUR @S1@" researcher reference on each individual needs BOTH "2 NAME"
+    # and "2 _TITL" - confirmed live by the user - to merge across every person's citation
+    # of it in RootsMagic's own UI.
+    root_sour_idxs = [i for i, ln in enumerate(lines) if ln == f"1 SOUR {arc.ROOT_SOURCE_ID}"]
+    assert root_sour_idxs
+    for i in root_sour_idxs:
+        assert lines[i + 1].startswith("2 NAME Researcher:")
+        assert lines[i + 2].startswith("2 _TITL Researcher:")
 
     file_lines = [ln for ln in lines if ln.startswith("1 FILE ")]
     assert file_lines

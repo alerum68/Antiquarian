@@ -322,31 +322,41 @@ def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
 
 
 def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together():
-    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
-           "type_specific_fields": {
-               "claim_number": "3126", "affidavit_number": "5473",
-               "scrip_number": "12761", "scrip_amount": "$160", "claim_basis": "Half-breed Head",
-           },
-           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
-    primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
-    joined = "\n".join(lines)
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
+               "type_specific_fields": {
+                   "claim_number": "3126", "affidavit_number": "5473",
+                   "scrip_number": "12761", "scrip_amount": "$160", "claim_basis": "Half-breed Head",
+               },
+               "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
 
-    assert "1 EVEN Claim: 3126; Affidavit #: 5473; Scrip #: 12761 ($160); Claim Basis: Half-breed Head" in joined
+        assert "1 EVEN Claim: 3126; Affidavit #: 5473; Scrip #: 12761 ($160); Claim Basis: Half-breed Head" in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
-def test_build_individual_scrip_desc_line_falls_back_to_generic_without_claim_or_affidavit():
-    """No claim_number/affidavit_number present (e.g. an older extraction, or a non-Scrip
-    custom fact entirely) - must fall through to exactly the original generic formatter."""
-    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
-           "type_specific_fields": {"scrip_number": "12761", "scrip_amount": "$160"},
-           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
-    primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
-    joined = "\n".join(lines)
+def test_build_individual_scrip_desc_line_without_claim_or_affidavit_still_shows_scrip_number():
+    """No claim_number/affidavit_number present (e.g. an older extraction) - the fact's own
+    value line still shows whatever Scrip-specific fields it does have."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
+               "type_specific_fields": {"scrip_number": "12761", "scrip_amount": "$160"},
+               "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
 
-    assert "1 EVEN Scrip Number: 12761; Scrip Amount: $160" in joined
-    assert "Claim:" not in joined and "Affidavit #:" not in joined
+        assert "1 EVEN Scrip #: 12761 ($160)" in joined
+        assert "Claim:" not in joined and "Affidavit #:" not in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
 def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
@@ -354,32 +364,42 @@ def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
     whole merged claim - showing it in the fact's own value line was misleading (per the
     user, the note appeared to cite only the witness affidavit). Still available per
     citation via _TITL's own "-- {document_type}" suffix, just not here."""
-    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
-           "type_specific_fields": {
-               "claim_number": "3126", "affidavit_number": "5473",
-               "scrip_number": "12761", "document_type": "Witness Affidavit",
-           },
-           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
-    primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
-    joined = "\n".join(lines)
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
+               "type_specific_fields": {
+                   "claim_number": "3126", "affidavit_number": "5473",
+                   "scrip_number": "12761", "document_type": "Witness Affidavit",
+               },
+               "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
 
-    assert "Document Type" not in joined
-    even_line = next(line for line in lines if line.startswith("1 EVEN"))
-    assert "Witness Affidavit" not in even_line
+        assert "Document Type" not in joined
+        even_line = next(line for line in lines if line.startswith("1 EVEN"))
+        assert "Witness Affidavit" not in even_line
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
 def test_build_individual_scrip_desc_line_excludes_document_type_without_claim():
-    """Same exclusion in the generic (no claim/affidavit) fallback path."""
-    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
-           "type_specific_fields": {"scrip_number": "12761", "document_type": "Register Entry"},
-           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
-    primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
-    joined = "\n".join(lines)
+    """Same exclusion in the no-claim/affidavit path."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
+               "type_specific_fields": {"scrip_number": "12761", "document_type": "Register Entry"},
+               "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
 
-    assert "Document Type" not in joined
-    assert "Register Entry" not in joined
+        assert "Document Type" not in joined
+        assert "Register Entry" not in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
 def test_parse_household_forms_second_family_unit_for_unrelated_boarder_household():
@@ -615,21 +635,86 @@ def test_build_individual_race_uses_generic_custom_fact_not_bare_race_tag():
     assert "1 EVEN Metis" in joined and "2 TYPE Race" in joined
 
 
-def test_build_individual_scrip_event_gets_type_line_and_generic_value_from_extra_fields():
-    """Scrip's own event_type resolves to gedcom_tag 'EVEN' (a custom fact, not a standard
-    GEDCOM tag) - it needs a '2 TYPE Scrip' line for RootsMagic to recognize which custom
-    fact this is, and its extra_fields (scrip_number, scrip_amount, ...) have no standard
-    slot of their own, so they render generically as the event's own value text - Archivist
-    never hardcodes those field names, just formats whatever type_specific_fields exist."""
-    rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "event_place": "Winnipeg",
-           "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
-           "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
-    primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
-    joined = "\n".join(lines)
-    assert "2 TYPE Scrip" in joined
-    assert "Scrip Number: 1234" in joined and "Scrip Amount: $160" in joined
-    assert "2 PLAC Winnipeg" in joined
+def test_build_individual_scrip_event_gets_type_line_and_value_from_extra_fields():
+    """Scrip's own event_type resolves to gedcom_tag 'EVEN' - it's built as a dedicated
+    "Scrip" custom fact (FactTypes.json code 10004), needing a '2 TYPE Scrip' line for
+    RootsMagic to recognize it, with its own Date/Place/Desc all filled in."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "event_place": "Winnipeg",
+               "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
+               "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
+        assert "2 TYPE Scrip" in joined
+        assert "1 EVEN Scrip #: 1234 ($160)" in joined
+        assert "2 PLAC Winnipeg" in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_individual_scrip_fact_gets_document_year_as_date_and_media_attached():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
+               "type_specific_fields": {"scrip_number": "1234"},
+               "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
+        assert "2 DATE 1901" in joined
+        assert "3 OBJE @M0000000001@" in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_individual_scrip_race_fact_gets_no_document_year_date():
+    """Per the user: everything but Race should carry the document year as its DATE -
+    Race describes an ongoing characteristic, not something dated to one document."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
+               "type_specific_fields": {}, "participants": [make_participant("primary")]}
+        primary = rec["participants"][0]
+        primary["race"] = "Metis"
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        joined = "\n".join(lines)
+        race_block = joined.split("2 TYPE Race")[1].split("2 SOUR")[0]
+        assert "2 DATE" not in race_block
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
+    """Only true witnesses (no family-position role_semantic) become witness
+    Associations - spouse/parent/child participants must not appear here even though the
+    old filter (just excluding 'primary') used to sweep them in too. Uses FTM output,
+    where witnesses render as plain names in a NOTE line - RM's own _SHAR form only ever
+    carries a UID + role text, not a name, so it can't distinguish this directly."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1",
+               "type_specific_fields": {"scrip_number": "1"},
+               "participants": [
+                   make_participant("primary", given="Baptiste", surname="Ledoux"),
+                   make_participant("spouse", given="Marie", surname="Ledoux"),
+                   make_participant("child", given="Jean", surname="Ledoux"),
+                   make_participant(None, role_name="Witness", given="Louis", surname="Riel"),
+               ]}
+        primary = rec["participants"][0]
+        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "FTM")
+        joined = "\n".join(lines)
+        witness_note = next(line for line in lines if line.startswith("2 NOTE Witnesses:"))
+        assert "Louis" in witness_note and "Riel" in witness_note
+        assert "Marie" not in witness_note
+        assert "Jean" not in witness_note
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
 def test_build_individual_baptism_event_gets_no_type_line():
