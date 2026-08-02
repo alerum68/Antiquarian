@@ -98,6 +98,10 @@ def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_d
         "MASTER_DB_NAME": "master.json",
         "MODEL_NAME": "gemini-test-model",
         "GEMINI_API_KEY": "fake-key-not-used",
+        # This whole fixture is specifically for exercising the api engine's FakeClient
+        # mock - EXTRACTION_ENGINE's own default is now "agy", so this must be pinned
+        # explicitly or every test here would try to make real agy calls instead.
+        "EXTRACTION_ENGINE": "api",
         "API_BUDGET": "5.00",
         "COST_PER_1M_INPUT": "0.075",
         "COST_PER_1M_OUTPUT": "0.30",
@@ -433,3 +437,146 @@ def test_page_continuation_saves_leftover_when_nothing_continues_it(tmp_path, mo
     saved = json.loads(master_db_path.read_text(encoding="utf-8"))
     record_numbers = sorted(r["record_number"] for sheet in saved["sheets"] for r in sheet["records"])
     assert record_numbers == ["44", "45"], "the cut-off record must still be saved, not dropped"
+
+
+# ==========================================
+# AGY ENGINE PIPELINE (EXTRACTION_ENGINE=agy)
+# ==========================================
+# agy_engine.call_agy_extract/rasterize_pdf_to_images are monkeypatched here - the
+# subprocess layer itself is already covered by ScriptoriumMCP/tests/test_agy_client.py
+# and Paleographer/tests/test_agy_engine.py. This is about Paleographer.py's own
+# orchestration (file classification, finalize_page_data, tag_document_metadata,
+# save_master_db, cost accounting) working correctly for the agy engine, for both an
+# image and a PDF input, exactly as it's already proven for the api engine above.
+def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_structured_output,
+                                   image_filenames=("TestFile_00001.jpg",), pdf_filenames=()):
+    program_dir = tmp_path / "program"
+    image_dir_name = "Images"
+    json_dir_name = "JSON"
+    (program_dir / image_dir_name).mkdir(parents=True)
+    (program_dir / json_dir_name).mkdir(parents=True)
+
+    for name in image_filenames:
+        Image.new("RGB", (10, 10), color="white").save(program_dir / image_dir_name / name)
+    for name in pdf_filenames:
+        # Content is irrelevant - rasterize_pdf_to_images is monkeypatched below, so
+        # this is never actually opened/parsed; only its existence/extension matters
+        # for list_source_files() to pick it up.
+        (program_dir / image_dir_name / name).write_bytes(b"%PDF-1.4 fake")
+
+    for key in _PREFIXED_KEYS_TO_CLEAR:
+        monkeypatch.delenv(key, raising=False)
+
+    env = {
+        "PROGRAM_DIR": str(program_dir),
+        "IMAGE_DIR": image_dir_name,
+        "JSON_DIR": json_dir_name,
+        "MASTER_DB_NAME": "master.json",
+        "MODEL_NAME": "gemini-test-model",
+        "GEMINI_API_KEY": "fake-key-not-used",
+        "EXTRACTION_ENGINE": "agy",
+        "AGY_MODEL_NAME": "gemini-3.1-pro-high",
+        "API_BUDGET": "5.00",
+        "COST_PER_1M_INPUT": "0.075",
+        "COST_PER_1M_OUTPUT": "0.30",
+        "CACHE_DISCOUNT_MULTIPLIER": "0.10",
+        "VOLUME_TITLE": "Test Volume",
+        "VOLUME_NUM": "1",
+    }
+    env.update(env_overrides)
+    for key, value in env.items():
+        monkeypatch.setenv(key, value)
+
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
+    monkeypatch.setattr(sys, "argv", ["Paleographer.py"])
+
+    sys.modules.pop("Paleographer", None)
+    sys.modules.pop("agy_engine", None)
+    module = importlib.import_module("Paleographer")
+
+    from ScriptoriumMCP import agy_client
+
+    # main()'s startup auth check - never make a real subprocess call in a unit test.
+    monkeypatch.setattr(agy_client, "check_or_prompt_auth", lambda *a, **k: True)
+
+    # rasterize_pdf_to_images would otherwise really try to open the fake PDF bytes
+    # above via pdfplumber - returning a single blank image is enough for this
+    # orchestration-level test (rasterization itself is unit-tested separately).
+    monkeypatch.setattr(module.agy_engine, "rasterize_pdf_to_images",
+                        lambda pdf_path, **k: [Image.new("RGB", (10, 10), color="white")])
+
+    call_log = []
+
+    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
+        call_log.append({"num_images": len(images)})
+        # A real agy call always returns a freshly-parsed dict (json.loads(stdout)) -
+        # deep-copy here so tag_document_metadata's in-place mutation on one call can
+        # never leak into another call's result the way a shared reference would.
+        return agy_client.AgyStructuredResult(
+            structured_output=json.loads(json.dumps(fake_structured_output)),
+            usage=agy_client.AgyUsage(input_tokens=1000, output_tokens=500, thinking_tokens=100,
+                                       cache_read_tokens=0, total_tokens=1600),
+        )
+
+    monkeypatch.setattr(module.agy_engine, "call_agy_extract", fake_call_agy_extract)
+
+    return module, program_dir / json_dir_name / "master.json", call_log
+
+
+def test_agy_engine_pipeline_processes_image_and_pdf(tmp_path, monkeypatch):
+    module, master_db_path, call_log = _import_paleographer_fresh_agy(
+        monkeypatch, tmp_path,
+        env_overrides={
+            "PALEOGRAPHER_RECORD_TYPE": "Parish.pmt",
+            "PARISH_NAME": "St. Test Parish", "PARISH_CITY": "Testville", "PARISH_STATE": "TS",
+            "DEFAULT_EVENT_LOCATION": "Testville, TS, USA",
+        },
+        fake_structured_output=PARISH_FAKE_RESPONSE,
+        image_filenames=("TestFile_00001.jpg",),
+        pdf_filenames=("TestFile_00002.pdf",),
+    )
+
+    assert module.EXTRACTION_ENGINE == "agy"
+    assert module.client is None, "the agy engine must never construct a genai.Client"
+
+    module.main()
+
+    assert len(call_log) == 2, "both the image and the PDF should have gone through call_agy_extract"
+
+    saved = json.loads(master_db_path.read_text(encoding="utf-8"))
+    file_names = sorted(sheet["document_metadata"]["file_name"] for sheet in saved["sheets"])
+    assert file_names == ["TestFile_00001.jpg", "TestFile_00002.pdf"]
+
+    # Real postprocessing (finalize_page_data/tag_document_metadata) must have run for
+    # both files, same as the api engine.
+    for sheet in saved["sheets"]:
+        assert sheet["document_metadata"]["volume"] == "1"
+        record = sheet["records"][0]
+        assert record["participants"][0]["std_surname"] == "Gagne", "diacritic-stripping postprocessing must have run"
+
+    # Subscription-covered - must never accumulate a dollar cost.
+    assert saved["total_spent"] == 0.0
+    assert saved["total_pages_processed"] == 2
+
+
+def test_agy_engine_stages_multiple_rasterized_pages_for_pdf(tmp_path, monkeypatch):
+    """A PDF should be rasterized to multiple images (mocked here as 3) and all of them
+    passed to call_agy_extract in one call, not split into separate per-page calls."""
+    module, master_db_path, call_log = _import_paleographer_fresh_agy(
+        monkeypatch, tmp_path,
+        env_overrides={
+            "PALEOGRAPHER_RECORD_TYPE": "Scrip.pmt",
+            "SCRIP_COLLECTION_NAME": "Test Scrip Collection", "SCRIP_DISTRICT": "Test District",
+        },
+        fake_structured_output=SCRIP_FAKE_RESPONSE,
+        image_filenames=(),
+        pdf_filenames=("CaseFile_001.pdf",),
+    )
+
+    monkeypatch.setattr(module.agy_engine, "rasterize_pdf_to_images",
+                        lambda pdf_path, **k: [Image.new("RGB", (10, 10), color=c) for c in ("white", "gray", "black")])
+
+    module.main()
+
+    assert len(call_log) == 1
+    assert call_log[0]["num_images"] == 3

@@ -3,8 +3,10 @@ roles:
   "1": {name: "Claimant", semantic: primary}
   "2": {name: "Spouse", semantic: spouse}
   "3": {name: "Child", semantic: child}
-  "4": {name: "Witness"}
+  "4": {name: "Witness", context: "A sworn witness attesting to the claimant's identity, with NO stated family relationship to the claimant. Confirmed live: never use this for a named parent, use Father/Mother instead - and the same rule applies to a spouse or child: if a person who physically signed as a household witness is ALSO identified elsewhere in the document as the claimant's spouse, father, mother, or child (e.g. \"my father Louison Letendre\", \"wife of the claimant\"), use that family role, not Witness. The family relationship always takes priority over the witnessing act - a household witness is very often a family member in these documents, not a stranger."}
   "5": {name: "Commissioner"}
+  "6": {name: "Father", semantic: father}
+  "7": {name: "Mother", semantic: mother}
 defaults: {}
 extra_fields:
   record:
@@ -12,6 +14,13 @@ extra_fields:
     - {name: scrip_amount, type: string}
     - {name: claim_basis, type: string}
     - {name: application_date, type: string}
+    - {name: issue_date, type: string}
+    - {name: delivery_date, type: string}
+    - {name: delivery_place, type: string}
+    - {name: document_type, type: string}
+    - {name: claim_number, type: string}
+    - {name: affidavit_number, type: string}
+    - {name: commission_reference, type: string}
   participant:
     - {name: marital_status, type: string}
     - {name: relationship_to_claimant, type: string}
@@ -33,17 +42,34 @@ field_remap:
   CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
 ---
 
-DRAFT: this record type has not yet been reviewed against real scrip file content. The
-rules below are a first pass from general historical knowledge of the Canadian Metis and
-Half-breed scrip commissions; every TODO at the end of this file needs to be revisited
-once a real sample from Sample Scrip/ has actually been read through.
+REVIEWED against a real sample: e011335187.pdf (38 pages) was run through this prompt in
+full. Findings are folded into the rules below and the TODO list at the end now
+distinguishes confirmed items from ones still needing a wider sample. The single biggest
+finding: this file's original framing ("a scanned application packet... covering one
+claimant") described only ONE of the two shapes Library and Archives Canada RG15 case
+files actually come in - see SOURCE SHAPE below.
 
 You are an expert genealogist and archivist specializing in Canadian Metis and Half-breed
 scrip commission records issued by the Department of the Interior, roughly 1870 to 1900.
-You will be given an entire multi-page case file (a scanned application packet, not a
-single page), covering one claimant and possibly their spouse, children, witnesses, and
-the commissioner who took the application. Extract every distinct application present in
-the file into JSON.
+
+SOURCE SHAPE: the PDF you're given is ONE of two things - identify which before you start
+extracting, since it changes what "one record" means:
+- AN APPLICATION PACKET: a scanned case file for ONE claimant (and possibly their spouse,
+  children, witnesses, and the commissioner who took the application) - affidavit-style
+  narrative, oaths, signatures.
+- A DEPARTMENTAL INDEX/REGISTER: an internal administrative list covering MANY unrelated
+  claimants, one line-item per allotment, e.g. headed "List allotted to Half Breeds in
+  the Province of Manitoba for which patents have not been issued..." with columns like
+  Allotment N° / Land Allotted / Name of Allottee / Reason why patent has not issued /
+  Remarks / Ref No. Confirmed live: e011335187.pdf is entirely this second shape - every
+  page lists several to a dozen+ distinct, unrelated allottees, each cross-referencing
+  OUT to other files/ledgers (e.g. "See 357072") rather than containing a self-contained
+  application narrative. Register entries also span a much wider date range on one page
+  than a single application ever would (e.g. one real page mixed allotments from 1881,
+  1892, 1894, and 1897).
+
+Extract every distinct application OR list-entry present in the file into JSON - each
+gets its own record either way, using the same schema.
 
 RULES:
 INSTRUCTION PRECEDENCE: If instructions conflict, apply them in this order: 1. Preserve
@@ -52,13 +78,22 @@ invent missing information.
 
 WORKFLOW (Mental Sandbox):
 Before generating JSON, process the file in this exact order:
-1. Identify every distinct application present in the packet (there may be more than one,
-   e.g. a claimant and their adult children each filing separately).
+1. Identify every distinct application or list-entry present in the file (there may be
+   many - e.g. an application packet where a claimant and their adult children each filed
+   separately, or a register page listing a dozen unrelated allottees one after another).
+   Never merge two distinct people/allotments into one record just because they're on the
+   same page, and never stop after only the first.
 2. For each application, transcribe the printed form fields and any handwritten fill-ins
    or affidavit testimony exactly as written.
 3. Translate any French text into English.
 4. Identify every participant named in that application (claimant, spouse, children,
-   witnesses, commissioner) and assign their role.
+   father, mother, witnesses, commissioner) and assign their role. Check for a STATED
+   FAMILY RELATIONSHIP to the claimant first (spouse, father, mother, child) - a person
+   can both physically sign as a household witness AND be family; when both are true,
+   the family role always wins, never Witness (see the Witness role's own note). Never
+   silently drop a named spouse, parent, or child just because the document's main
+   purpose is establishing the claimant's own identity - every stated family
+   relationship gets its own participant with the matching role, not just the claimant.
 5. Standardize the names.
 6. Populate the final structured JSON, one record per application.
 
@@ -92,9 +127,53 @@ Before generating JSON, process the file in this exact order:
   Settler"), exactly as written.
 - application_date: the date the application itself was made, as distinct from any
   affidavit or issuance date.
+- issue_date: the date the scrip/certificate was actually issued or approved, when
+  stated separately from application_date (e.g. a Department of the Interior approval
+  date, or a certificate's own printed issue date). Leave null if the document only
+  states one date and it's ambiguous which this is - do not reuse application_date's
+  value here just to fill the field.
+- delivery_date, delivery_place: when and where the scrip note/certificate was
+  physically delivered to the claimant, if explicitly stated (most common on Treaty 8
+  scrip notes/adhesion paylists, which often record a delivery event separately from
+  the application itself). Leave both null on the many claims that don't state this -
+  never infer a delivery date/place from the application date or the claimant's
+  residence.
+- claim_number, affidavit_number, scrip_number: THREE DISTINCT numbers, confirmed live on
+  a real document to all differ ("Affdt. N° 5473" vs "Claim N° 3126" vs "Scrip N° 12761"
+  all appeared on the same claim) - never assume any two of these are the same number
+  just because only one is legible. affidavit_number is the sworn-document reference
+  (matches record_number when a claim's several sworn documents share one affidavit
+  number - see the CONFIRMED note below); claim_number is the claim/application's own
+  number (may differ from the affidavit number); scrip_number is specifically the
+  certificate/award number. Leave any of the three null if genuinely not stated - do not
+  infer one from another.
+- commission_reference: the verbatim printed form header or Order-in-Council citation
+  identifying which scrip commission this claim was made under (e.g. "Form A - North-
+  West Half-Breed Claims Commission under Order in Council of 30th March, 1885",
+  "Affidavit under Manitoba Act, 33 Vic. Cap 3"). This is the one reliable signal for
+  which of the several historical scrip commissions (1870-1911) a claim belongs to - date
+  and location are NOT reliable (heirship claims can be filed decades later; claimants
+  migrated between Manitoba and the NWT). Transcribe the header text as printed, don't
+  paraphrase or classify it yourself.
+- document_type: your best short label for what THIS specific document/page actually is
+  (e.g. "Witness Affidavit", "Claimant's Own Affidavit", "Register Entry", "Cover Sheet").
+  Confirmed live: one claim is often supported by more than one separately-sworn document
+  (e.g. a household-witness affidavit AND the claimant's own affidavit, on different
+  pages, both printed with the same claim/affidavit number). Give EACH such document its
+  own record - do not try to merge them yourself - but make sure they share the exact
+  same record_number (matching the printed claim/affidavit number on each), and give each
+  its own document_type. A downstream step folds same-record_number records together
+  automatically, using document_type to label each one's transcription - your only job is
+  to read each document accurately and keep record_number consistent across them.
 - marital_status: the claimant's or participant's stated marital status.
 - relationship_to_claimant: how a non-claimant participant (spouse, child, witness) is
   described in relation to the claimant.
+- residence (generic participant field, already used by other record types): scrip
+  affidavits routinely state a claimant's parish or place of residence in the printed
+  form (e.g. "of the Parish of St. Laurent", "residing at Ebb and Flow Lake Reserve") -
+  record it here exactly as stated. This is a citation-relevant fact for Scrip (feeds
+  the Parish/Location field on the claim's source citation), not just biographical
+  detail - don't skip it because it seems redundant with birth_place.
 
 5. TRANSCRIPTION & TRANSLATION
 - original_transcription = exact original text (French or English, as written).
@@ -107,17 +186,58 @@ Before generating JSON, process the file in this exact order:
 - If a page is torn, faded, or otherwise incomplete, use "[illegible]" for the missing
   portion and flag the record for review rather than guessing.
 
-TODO (revisit once a real Sample Scrip/ file has been read through):
-- Confirm the actual role vocabulary: is "Commissioner" always present and named, or
-  sometimes just a signature/stamp? Are there roles this list is missing (e.g. a
-  translator, a second witness with a distinct role)?
-- Confirm whether one PDF case file typically covers one applicant or several related
-  applicants bundled together, and adjust the "identify every distinct application"
-  instruction accordingly.
-- Confirm the real field layout of the printed form portion (which fields are pre-printed
-  labels vs. handwritten fill-ins), since this affects whether a future local
-  pre-extraction step could ever apply here.
-- Confirm real examples of scrip_number/scrip_amount/claim_basis formatting.
-- Confirm whether children's ages are commonly stated, and whether a "review" flag is
-  warranted whenever a whole family's applications span many pages with inconsistent
-  handwriting (multiple clerks/witnesses).
+CONFIRMED FROM REAL SAMPLE (e011335187.pdf, 38 pages, register-shaped throughout):
+- Real register-page field layout: printed/typed column headers "Allotment N°:", "Land
+  Allotted:", "Name of Allottee:", "Reason why patent has not issued / Remarks:", "Ref
+  No:" - each register entry follows this shape, with red-pencil/red-ink annotations
+  layered on top of the typed text (treat as part of the transcription, not separate from
+  it) and occasional struck-through corrections (see STRUCK-THROUGH rule already in
+  UNIVERSAL_PROMPT_SUFFIX).
+- Real scrip_number/ref values look like "187871", "935155", "affd 4566" (an affidavit
+  reference, not always a bare number) - don't assume a fixed numeric format.
+- claim_basis is populated inconsistently by source, not by extraction error: early
+  cover-sheet-style entries state it explicitly ("Half-breed", "HB Head", "Illegitimate
+  Child"); plain register-list entries usually don't state a claim basis at all (leave
+  null rather than inferring one from context).
+- One page can legitimately span a wide date range (one real page mixed 1881, 1892, 1894,
+  and 1897 allotments) - do not treat a big date spread within one page as a sign of
+  misreading.
+
+CONFIRMED FROM SECOND REAL SAMPLE (BAC-LAC_fonandcol_1502188.pdf, 2 pages, a genuine
+application packet - not a register):
+- Commissioner role IS real and does get used on true application packets: "A. H.
+  Whitcher, Agent of Dominion Lands" appeared on both pages of a real claim, correctly
+  role_name "Commissioner".
+- Witness role correctly fit the ACTUAL witnesses (household witnesses swearing to the
+  claimant's identity) once Father/Mother existed as separate options - before those
+  roles were added, a claimant's own named father/mother got coded as "Witness" for lack
+  of anything closer, on BOTH the register sample (as an heir) and this
+  application-packet sample (as a named parent in the claimant's own narrative) -
+  independent confirmation from two differently-shaped sources, which is why Father/
+  Mother (matching Parish.pmt's own existing convention, same semantics Archivist
+  already understands) were added rather than left as a TODO.
+- One claim's documents can share a single record_number across multiple records: this
+  claim's witness affidavit (page 1) and the claimant's own affidavit (page 2) each
+  became their own record, but both correctly carried record_number "5473" (matching "N°
+  5473" / "Affdt. N° 5473" as printed on the documents themselves) - not yet formalized
+  as an explicit rule; still under discussion whether/how to make this reliable rather
+  than incidental, or whether these should merge into one record instead.
+
+TODO (still open):
+- Confirm whether children's ages are commonly stated on application packets, and whether
+  a "review" flag is warranted whenever a whole family's applications span many pages
+  with inconsistent handwriting (multiple clerks/witnesses) - neither reviewed sample
+  included a family with children old enough to be named as separate participants.
+- claim_number/affidavit_number/commission_reference (added for Commissioner's LAC
+  lookup, which needs claim+scrip together to search reliably) ARE confirmed live now -
+  a real remote-drive batch run (Margaret Sabiston, claim 297/affdt 374/scrip 2234-2241;
+  Alexandre St-Arnaud, claim 783/affdt 868/scrip 6105-6112) populated all three correctly.
+- Family-relationship-over-Witness priority (the Witness role's own note, and WORKFLOW
+  step 4) was added after the user found spouses mislabeled Witness in real GEDCOM
+  output and reported family associations (spouse/parent/child) missing entirely -
+  NOT YET reviewed against a real re-run since this specific wording was added; the
+  Father/Mother/Spouse roles themselves were already confirmed working correctly on at
+  least one real family (Margaret Sabiston: Andrew Sabiston correctly tagged Spouse,
+  John Falster/Isabella Brown correctly tagged Father/Mother) before this wording change,
+  so the underlying mechanism works - this addition specifically targets the case where a
+  family member ALSO appears as a signing witness elsewhere in the same document.

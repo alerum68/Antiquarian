@@ -161,3 +161,144 @@ def test_apply_defaults_ignores_fields_not_in_table():
     target = {"given": "Jean"}
     postprocess.apply_defaults(target, {"religion": "Roman Catholic"})
     assert target == {"given": "Jean", "religion": "Roman Catholic"}
+
+
+# ==========================================
+# MERGE (source_documents shape)
+# ==========================================
+def test_label_for_prefers_document_type_over_page():
+    record = {"page": "page_002", "type_specific_fields": {"document_type": "Witness Affidavit"}}
+    assert postprocess._label_for(record) == "Witness Affidavit"
+
+
+def test_label_for_falls_back_to_page():
+    record = {"page": "page_002", "type_specific_fields": {}}
+    assert postprocess._label_for(record) == "Page page_002"
+
+
+def test_label_for_falls_back_to_untitled():
+    record = {}
+    assert postprocess._label_for(record) == "Untitled section"
+
+
+def test_merge_record_into_builds_source_documents_from_scratch():
+    base = {
+        "page": "page_001",
+        "original_transcription": "base original text",
+        "english_translation": "base english text",
+        "type_specific_fields": {"document_type": "Witness Affidavit", "scrip_number": "12751"},
+        "participants": [],
+    }
+    incoming = {
+        "page": "page_002",
+        "original_transcription": "incoming original text",
+        "english_translation": "incoming english text",
+        "type_specific_fields": {"document_type": "Claimant's Own Affidavit", "claim_number": "3126"},
+        "participants": [],
+    }
+
+    postprocess._merge_record_into(base, incoming)
+
+    # base's own top-level transcription fields are untouched, not flattened/labeled
+    assert base["original_transcription"] == "base original text"
+    assert base["english_translation"] == "base english text"
+
+    assert base["source_documents"] == [
+        {"document_type": "Witness Affidavit", "page": "page_001",
+         "original_transcription": "base original text", "english_translation": "base english text"},
+        {"document_type": "Claimant's Own Affidavit", "page": "page_002",
+         "original_transcription": "incoming original text", "english_translation": "incoming english text"},
+    ]
+
+    # incoming's own type_specific_fields fold into base without overwriting existing keys
+    assert base["type_specific_fields"]["scrip_number"] == "12751"
+    assert base["type_specific_fields"]["claim_number"] == "3126"
+    assert "document_type" not in base["type_specific_fields"] or base["type_specific_fields"]["document_type"] == "Witness Affidavit"
+
+
+def test_merge_record_into_appends_third_document_without_duplicating_base_entry():
+    base = {"page": "page_001", "original_transcription": "base text", "english_translation": "",
+            "type_specific_fields": {"document_type": "Witness Affidavit"}, "participants": []}
+    second = {"page": "page_002", "original_transcription": "second text", "english_translation": "",
+              "type_specific_fields": {"document_type": "Claimant's Own Affidavit"}, "participants": []}
+    third = {"page": "page_003", "original_transcription": "third text", "english_translation": "",
+             "type_specific_fields": {"document_type": "Commissioner's Certificate"}, "participants": []}
+
+    postprocess._merge_record_into(base, second)
+    postprocess._merge_record_into(base, third)
+
+    assert len(base["source_documents"]) == 3
+    assert [d["document_type"] for d in base["source_documents"]] == [
+        "Witness Affidavit", "Claimant's Own Affidavit", "Commissioner's Certificate"]
+
+
+def test_merge_record_into_merges_review_reasons():
+    base = {"page": "page_001", "original_transcription": "", "english_translation": "",
+            "type_specific_fields": {}, "participants": []}
+    incoming = {"page": "page_002", "original_transcription": "", "english_translation": "",
+                "type_specific_fields": {}, "participants": [], "review": True,
+                "review_reason": "illegible witness name"}
+
+    postprocess._merge_record_into(base, incoming)
+    assert base["review"] is True
+    assert base["review_reason"] == "illegible witness name"
+
+
+def test_merge_record_into_merges_participants_by_name_filling_blank_fields_only():
+    base = {"page": "page_001", "original_transcription": "", "english_translation": "",
+            "type_specific_fields": {}, "participants": [
+                {"std_given": "Roger", "std_surname": "Letendre", "role_name": "Claimant"},
+            ]}
+    incoming = {"page": "page_002", "original_transcription": "", "english_translation": "",
+                "type_specific_fields": {}, "participants": [
+                    {"std_given": "Roger", "std_surname": "Letendre", "marital_status": "Married"},
+                    {"std_given": "Olivier", "std_surname": "Larocque", "role_name": "Witness"},
+                ]}
+
+    postprocess._merge_record_into(base, incoming)
+
+    assert len(base["participants"]) == 2
+    roger = next(p for p in base["participants"] if p["std_surname"] == "Letendre")
+    assert roger["role_name"] == "Claimant"  # not overwritten
+    assert roger["marital_status"] == "Married"  # filled in from incoming
+    assert any(p["std_surname"] == "Larocque" for p in base["participants"])
+
+
+def test_merge_same_claim_records_merges_matching_record_ids_across_one_sheet():
+    witness_affidavit = {
+        "record_id": "SCRIP-5473", "page": "page_001",
+        "original_transcription": "witness text", "english_translation": "",
+        "type_specific_fields": {"document_type": "Witness Affidavit"}, "participants": [],
+    }
+    claimant_affidavit = {
+        "record_id": "SCRIP-5473", "page": "page_002",
+        "original_transcription": "claimant text", "english_translation": "",
+        "type_specific_fields": {"document_type": "Claimant's Own Affidavit"}, "participants": [],
+    }
+    unrelated = {
+        "record_id": "SCRIP-9999", "page": "page_003",
+        "original_transcription": "unrelated text", "english_translation": "",
+        "type_specific_fields": {}, "participants": [],
+    }
+    sheets = [{"records": [witness_affidavit, claimant_affidavit, unrelated]}]
+
+    postprocess.merge_same_claim_records(sheets)
+
+    assert len(sheets[0]["records"]) == 2
+    survivor = next(r for r in sheets[0]["records"] if r["record_id"] == "SCRIP-5473")
+    assert len(survivor["source_documents"]) == 2
+    assert survivor["original_transcription"] == "witness text"  # base's own text, untouched
+
+
+def test_merge_same_claim_records_leaves_records_without_record_id_alone():
+    no_id_a = {"page": "page_001", "original_transcription": "", "english_translation": "",
+               "type_specific_fields": {}, "participants": []}
+    no_id_b = {"page": "page_002", "original_transcription": "", "english_translation": "",
+               "type_specific_fields": {}, "participants": []}
+    sheets = [{"records": [no_id_a, no_id_b]}]
+
+    postprocess.merge_same_claim_records(sheets)
+
+    assert len(sheets[0]["records"]) == 2
+    assert "source_documents" not in no_id_a
+    assert "source_documents" not in no_id_b

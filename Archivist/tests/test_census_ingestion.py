@@ -144,7 +144,7 @@ def test_build_census_task_folder_name_uses_fixed_vocabulary_not_raw_flag_text()
     build_census_task used to write one directly (a lightly regex-cleaned copy of the raw
     review-flag text, e.g. "Head-surname match: no age fit"). The folder name must instead
     come from evaluate_task_priority's fixed, safe vocabulary - already proven correct for
-    the church flavor - reusing the exact flag text real 1860 census data produced."""
+    the general flavor - reusing the exact flag text real 1860 census data produced."""
     _, folder = arc.build_census_task("1", "Jean", "Gagnon", "1900, Fam 5, p.3",
                                       [("Head-surname match; no age fit", 0.3)],
                                       [], "img.jpg", "Title", "RM")

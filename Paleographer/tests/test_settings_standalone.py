@@ -29,6 +29,11 @@ def minimal_paleographer_env(monkeypatch, tmp_path):
         "CACHE_DISCOUNT_MULTIPLIER": "0.10",
         "VOLUME_TITLE": "Test Volume",
         "VOLUME_NUM": "1",
+        # This fixture mocks google.genai.Client (below) to test the api engine's
+        # settings resolution - EXTRACTION_ENGINE's own default is now "agy", so pin
+        # it explicitly even though none of this file's tests call main() (the only
+        # place that would actually trigger a real agy call).
+        "EXTRACTION_ENGINE": "api",
         # Only the record type's own PREFIXED keys - no IMAGE_DIR/MASTER_DB_NAME at all,
         # matching how these are actually saved to Paleographer/.env by the settings
         # shell (see Parish.pmt's field_remap front matter).

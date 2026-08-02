@@ -11,6 +11,377 @@ import pandas as pd
 import Archivist as arc
 
 
+def test_generate_uid_same_person_same_page_matches():
+    """Baseline: identical record_id/role/page must always collide onto one UID."""
+    rec = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [{"role_number": "1"}]}
+    part = rec["participants"][0]
+    assert arc.generate_uid(rec, part, "1") == arc.generate_uid(dict(rec), part, "1")
+
+
+def test_generate_uid_same_record_id_different_page_still_matches():
+    """Regression: confirmed live, two JSON records for the same real person on different
+    pages used to hash to different UIDs (page was part of the hash input) - two separate
+    INDI blocks for one person. page must no longer affect the UID at all when record_id
+    (or lac_pid) is the same."""
+    part = {"role_number": "1"}
+    rec_page_1 = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [part]}
+    rec_page_2 = {"page": "page_002", "record_id": "SCRIP-5473", "participants": [part]}
+
+    assert arc.generate_uid(rec_page_1, part, "1") == arc.generate_uid(rec_page_2, part, "1")
+
+
+def test_generate_uid_prefers_lac_pid_over_record_id():
+    """Once Commissioner attaches lac_pid, it must take priority over record_id (LAC's own
+    authoritative identifier vs. an OCR'd record_number) - proven here by two records with
+    DIFFERENT record_ids but the SAME lac_pid still colliding onto one UID."""
+    part = {"role_number": "1"}
+    rec_a = {"page": "page_001", "record_id": "SCRIP-5473", "lac_pid": "1502188", "participants": [part]}
+    rec_b = {"page": "page_002", "record_id": "SCRIP-9999", "lac_pid": "1502188", "participants": [part]}
+
+    assert arc.generate_uid(rec_a, part, "1") == arc.generate_uid(rec_b, part, "1")
+
+
+def test_get_dynamic_source_id_omits_prefix_for_scrip():
+    """Per the user: LAC volume numbers are already globally unique on their own, unlike
+    Parish which needs register_source_id to disambiguate two parishes sharing a volume
+    number - "with Scrip it shouldn't have the @S1 just @S"."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        assert arc.get_dynamic_source_id("1324") == "@S1324@"
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_get_dynamic_source_id_keeps_prefix_by_default_for_parish():
+    """Unchanged existing behavior for every record type other than Scrip - the flag
+    defaults to falsy/unset, so Parish's own register_source_id-based disambiguation
+    keeps working exactly as before."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = False
+        assert arc.get_dynamic_source_id("1324") == "@S11324@"
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_run_general_flavor_sets_omit_prefix_flag_from_record_type(monkeypatch, tmp_path):
+    """run_general_flavor is the one place that decides the flag, from record_type_name -
+    confirms it actually gets set (True for Scrip, False otherwise) before any GEDCOM is
+    built, without needing to exercise the full file-writing path."""
+    monkeypatch.setattr(arc, "resolve_gedcom_output_targets", lambda: [])
+    arc.run_general_flavor({"record_type_name": "Scrip", "sheets": []})
+    assert arc.GENERAL_CONFIG['omit_source_id_prefix'] is True
+
+    arc.run_general_flavor({"record_type_name": "Parish", "sheets": []})
+    assert arc.GENERAL_CONFIG['omit_source_id_prefix'] is False
+
+
+def test_generate_uid_different_record_id_still_differs_without_lac_pid():
+    """Sanity check the fix didn't accidentally collapse everything - genuinely different
+    claims (no lac_pid on either) must still get different UIDs."""
+    part = {"role_number": "1"}
+    rec_a = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [part]}
+    rec_b = {"page": "page_001", "record_id": "SCRIP-9999", "participants": [part]}
+
+    assert arc.generate_uid(rec_a, part, "1") != arc.generate_uid(rec_b, part, "1")
+
+
+def test_generate_media_uid_for_path_deterministic_and_path_keyed():
+    a = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
+    b = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
+    c = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355549.pdf")
+    assert a == b
+    assert a != c
+    assert a.startswith("M")
+
+
+def test_build_general_citation_page_line_uses_claim_affdt_when_present():
+    """RootsMagic/FTM auto-name citations from this PAGE line - "Record EVEN-1964" (an
+    internal id_prefix+number) made the Citations list unbrowsable in real testing. Use
+    the claim's own real reference numbers instead when known."""
+    rec = {"page": "3", "record_id": "EVEN-1964", "year": "1901",
+           "type_specific_fields": {"claim_number": "1964", "affidavit_number": "850"},
+           "original_transcription": "text", "english_translation": "text"}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    assert "3 PAGE Claim 1964; Affdt 850, Page 3" in blocks[0]
+    assert "Record EVEN-1964" not in blocks[0]
+
+
+def test_build_general_citation_page_line_falls_back_without_claim_affdt():
+    rec = {"page": "3", "record_id": "B-1", "year": "1876",
+           "original_transcription": "text", "english_translation": "text"}
+    part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
+    assert "3 PAGE Page 3, Record B-1" in blocks[0]
+
+
+def test_build_general_citation_single_block_without_source_documents():
+    """Backward compatibility: every record type that never populates source_documents
+    (everything except Parish/Scrip claims that went through the merge step) must get
+    exactly the same single-block behavior as before."""
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "orig text", "english_translation": "eng text"}
+    part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
+    assert isinstance(blocks, list)
+    assert len(blocks) == 1
+    assert "orig text" in blocks[0]
+    assert "eng text" in blocks[0]
+
+
+def test_build_general_citation_collapses_identical_original_and_translation():
+    """Per the user: most Scrip affidavits are already in English, so
+    original_transcription and english_translation end up identical - showing both the
+    "English Translation:"/"Original Transcription:" headers in that case just duplicates
+    the same text twice. Only one plain text block, no header labels, when they match."""
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "I, Roger Letendre, do solemnly swear...",
+           "english_translation": "I, Roger Letendre, do solemnly swear..."}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 1
+    assert blocks[0].count("I, Roger Letendre, do solemnly swear") == 1
+    assert "English Translation:" not in blocks[0]
+    assert "Original Transcription:" not in blocks[0]
+    assert "4 TEXT I, Roger Letendre" in blocks[0]
+
+
+def test_build_general_citation_normalization_is_whitespace_only_not_fuzzy():
+    """Word order actually differing (the "1964" moved) is a genuine content difference,
+    not just reflow - must NOT collapse, proving the normalization added for whitespace
+    reflow doesn't also hide a real mismatch via fuzzy/reordering matching."""
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "1964\nForm A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.",
+           "english_translation": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. 1964"}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 1
+    assert "English Translation:" in blocks[0]
+    assert "Original Transcription:" in blocks[0]
+
+
+def test_build_general_citation_collapses_whitespace_only_reflow():
+    """The actual confirmed-live case: same words, same order, only newlines vs. spaces
+    differ - this one must collapse."""
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "Form A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.\nBefore me.",
+           "english_translation": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. Before me."}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 1
+    assert "English Translation:" not in blocks[0]
+    assert "Original Transcription:" not in blocks[0]
+    assert "NORTH-WEST HALFBREED CLAIMS COMMISSION" in blocks[0]
+
+
+def test_build_general_citation_collapses_when_only_one_side_populated():
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "", "english_translation": "Only a translation exists here."}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 1
+    assert "Only a translation exists here." in blocks[0]
+    assert "English Translation:" not in blocks[0]
+    assert "Original Transcription:" not in blocks[0]
+
+
+def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
+    """The other direction: a real French-original document with a distinct English
+    translation must keep both labeled sections - nothing to collapse there."""
+    rec = {"page": "1", "record_id": "B-1", "year": "1876",
+           "original_transcription": "Je soussigné jure solennellement...",
+           "english_translation": "I, the undersigned, do solemnly swear..."}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 1
+    assert "English Translation:" in blocks[0]
+    assert "Original Transcription:" in blocks[0]
+    assert "Je soussigné" in blocks[0]
+    assert "I, the undersigned" in blocks[0]
+    assert "-- " not in blocks[0]  # no document_type suffix when there's nothing to distinguish
+
+
+def test_build_general_citation_one_block_per_source_document():
+    rec = {"page": "1", "record_id": "SCRIP-5473", "year": "1880", "source_documents": [
+        {"document_type": "Witness Affidavit", "page": "page_001",
+         "original_transcription": "witness orig", "english_translation": "witness eng"},
+        {"document_type": "Claimant's Own Affidavit", "page": "page_002",
+         "original_transcription": "claimant orig", "english_translation": "claimant eng"},
+    ]}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+    assert len(blocks) == 2
+    assert "-- Witness Affidavit" in blocks[0]
+    assert "Page page_001" in blocks[0]
+    assert "witness orig" in blocks[0] and "witness eng" in blocks[0]
+    assert "claimant orig" not in blocks[0]
+
+    assert "-- Claimant's Own Affidavit" in blocks[1]
+    assert "Page page_002" in blocks[1]
+    assert "claimant orig" in blocks[1] and "claimant eng" in blocks[1]
+    assert "witness orig" not in blocks[1]
+
+    # record_id (shared across all merged documents) stays constant across both blocks
+    assert "Record SCRIP-5473" in blocks[0]
+    assert "Record SCRIP-5473" in blocks[1]
+
+
+def test_build_general_citation_media_only_entry_uses_its_own_path_derived_uid():
+    """A Commissioner-downloaded certificate has no transcription, only a media_path -
+    its citation block must reference an OBJE built from generate_media_uid_for_path on
+    THAT path, not the shared media_uid passed in for the sheet's own scanned image."""
+    media_path = "C:/Media/Commissioner/1502999/e099999999.pdf"
+    rec = {"page": "1", "record_id": "SCRIP-5473", "year": "1880", "source_documents": [
+        {"document_type": "Scrip Certificate", "media_path": media_path},
+    ]}
+    part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
+
+    expected_uid = arc.generate_media_uid_for_path(media_path)
+    assert f"3 OBJE @{expected_uid}@" in blocks[0]
+    assert "M_SHEET_UID" not in blocks[0]
+    assert "-- Scrip Certificate" in blocks[0]
+
+
+def test_build_gedcom_from_general_creates_separate_objE_for_commissioner_media():
+    media_path = "C:/Media/Commissioner/1502999/e099999999.pdf"
+    data = {
+        "collection_title": "Test Scrip Collection", "record_type_name": "Scrip",
+        "sheets": [{
+            "document_metadata": {"file_name": "BAC-LAC_fonandcol_1502188.pdf", "pages": "1", "file_type": "pdf"},
+            "records": [{
+                "event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "year": "1880",
+                "type_specific_fields": {}, "source_documents": [
+                    {"document_type": "Scrip Certificate", "media_path": media_path},
+                ],
+                "participants": [make_participant("primary", given="Roger", surname="Letendre")],
+            }],
+        }],
+    }
+    ged = arc.build_gedcom_from_general(data, "RM")
+
+    expected_uid = arc.generate_media_uid_for_path(media_path)
+    assert f"0 @{expected_uid}@ OBJE" in ged
+    assert f"1 FILE {media_path}" in ged
+    assert "2 TITL Scrip Certificate" in ged
+    assert f"3 OBJE @{expected_uid}@" in ged  # the citation references the same UID
+
+
+def test_generate_media_uid_for_lac_asset_uses_the_e_number_directly():
+    """Confirmed live in review: an opaque hashed media UID makes a real GEDCOM harder to
+    cross-reference by hand against LAC - the e-number's digits are already a stable,
+    unique identifier, so they should be used directly rather than hashed. The leading
+    "e" is stripped (not kept) - per the user, FTM import breaks on a non-numeric media
+    object ID, so everything after the fixed "M" prefix must stay digits-only."""
+    assert arc.generate_media_uid_for_lac_asset("e011359206") == "M011359206"
+
+
+def test_build_general_citation_prefers_lac_asset_id_over_hashed_path():
+    """The realistic Commissioner shape: a source_documents entry always carries both
+    media_path AND lac_asset_id - the e-number must win over hashing the path."""
+    media_path = "C:/Media/Commissioner/1503710/e011359206.pdf"
+    rec = {"page": "1", "record_id": "SCRIP-5473", "year": "1880", "source_documents": [
+        {"document_type": "Scrip Certificate", "media_path": media_path, "lac_asset_id": "e011359206"},
+    ]}
+    part = {"std_given": "Margaret", "std_surname": "Sabiston", "role_number": "1"}
+    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
+
+    assert "3 OBJE @M011359206@" in blocks[0]
+    hashed_uid = arc.generate_media_uid_for_path(media_path)
+    assert f"@{hashed_uid}@" not in blocks[0]
+
+
+def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
+    media_path = "C:/Media/Commissioner/1503710/e011359206.pdf"
+    data = {
+        "collection_title": "Test Scrip Collection", "record_type_name": "Scrip",
+        "sheets": [{
+            "document_metadata": {"file_name": "e011359206.pdf", "pages": "1", "file_type": "pdf"},
+            "records": [{
+                "event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "year": "1880",
+                "type_specific_fields": {}, "source_documents": [
+                    {"document_type": "Scrip Certificate", "media_path": media_path, "lac_asset_id": "e011359206"},
+                ],
+                "participants": [make_participant("primary", given="Margaret", surname="Sabiston")],
+            }],
+        }],
+    }
+    ged = arc.build_gedcom_from_general(data, "RM")
+
+    assert "0 @M011359206@ OBJE" in ged
+    assert f"1 FILE {media_path}" in ged
+    assert "3 OBJE @M011359206@" in ged
+
+
+def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together():
+    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
+           "type_specific_fields": {
+               "claim_number": "3126", "affidavit_number": "5473",
+               "scrip_number": "12761", "scrip_amount": "$160", "claim_basis": "Half-breed Head",
+           },
+           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+    primary = rec["participants"][0]
+    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "1 EVEN Claim: 3126; Affidavit #: 5473; Scrip #: 12761 ($160); Claim Basis: Half-breed Head" in joined
+
+
+def test_build_individual_scrip_desc_line_falls_back_to_generic_without_claim_or_affidavit():
+    """No claim_number/affidavit_number present (e.g. an older extraction, or a non-Scrip
+    custom fact entirely) - must fall through to exactly the original generic formatter."""
+    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
+           "type_specific_fields": {"scrip_number": "12761", "scrip_amount": "$160"},
+           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+    primary = rec["participants"][0]
+    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "1 EVEN Scrip Number: 12761; Scrip Amount: $160" in joined
+    assert "Claim:" not in joined and "Affidavit #:" not in joined
+
+
+def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
+    """document_type labels ONE physical document (e.g. "Witness Affidavit"), not the
+    whole merged claim - showing it in the fact's own value line was misleading (per the
+    user, the note appeared to cite only the witness affidavit). Still available per
+    citation via _TITL's own "-- {document_type}" suffix, just not here."""
+    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
+           "type_specific_fields": {
+               "claim_number": "3126", "affidavit_number": "5473",
+               "scrip_number": "12761", "document_type": "Witness Affidavit",
+           },
+           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+    primary = rec["participants"][0]
+    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "Document Type" not in joined
+    even_line = next(line for line in lines if line.startswith("1 EVEN"))
+    assert "Witness Affidavit" not in even_line
+
+
+def test_build_individual_scrip_desc_line_excludes_document_type_without_claim():
+    """Same exclusion in the generic (no claim/affidavit) fallback path."""
+    rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
+           "type_specific_fields": {"scrip_number": "12761", "document_type": "Register Entry"},
+           "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
+    primary = rec["participants"][0]
+    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "Document Type" not in joined
+    assert "Register Entry" not in joined
+
+
 def test_parse_household_forms_second_family_unit_for_unrelated_boarder_household():
     """Regression: a family/dwelling-number group can legitimately contain two unrelated
     families (e.g. a boarder sharing a dwelling with an unrelated nuclear family) - real
@@ -289,3 +660,173 @@ def test_build_individual_alternate_name_renders_as_proposed_name_fact_with_even
     assert "1 NAME Baptiste /Ladoux/" in joined
     assert "2 _PROOF proposed" in joined
     assert "2 NOTE Margin note suggests alternate spelling: Baptiste Ladoux" in joined
+
+
+# ==========================================
+# Scrip custom RootsMagic source templates (Metis Scrip.rmst, Ids 20001-20005)
+# ==========================================
+def test_select_scrip_template_id_manitoba_from_commission_reference():
+    assert arc.select_scrip_template_id("Affidavit under Manitoba Act, 33 Vic. Cap 3", "Witness Affidavit") == 20001
+
+
+def test_select_scrip_template_id_north_west_from_commission_reference():
+    ref = "Form A - North-West Half-Breed Claims Commission under Order in Council of 30th March, 1885"
+    assert arc.select_scrip_template_id(ref, "Claimant's Own Affidavit") == 20002
+
+
+def test_select_scrip_template_id_treaty_8_from_commission_reference():
+    assert arc.select_scrip_template_id("Form C - Treaty No. 8", "Witness Affidavit") == 20003
+
+
+def test_select_scrip_template_id_certificate_from_document_type_regardless_of_commission():
+    """document_type wins over commission_reference - a Certificate is a structurally
+    different document from an affidavit no matter which commission issued it."""
+    assert arc.select_scrip_template_id("Manitoba Act, 33 Vic. Cap 3", "Scrip Certificate") == 20004
+
+
+def test_select_scrip_template_id_prefers_series_code_over_commission_reference_text():
+    """series_code is LAC's own catalog classification (Commissioner-fetched) - more
+    authoritative than the printed commission_reference text, so it wins when present,
+    even when commission_reference text alone would have matched a different template."""
+    assert arc.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
+                                        series_code="RG15-D-II-8-c") == 20002
+
+
+def test_select_scrip_template_id_returns_none_when_unrecognized():
+    """No guessing - an unresolved record must fall back to the plain freeform source,
+    not get mis-templated."""
+    assert arc.select_scrip_template_id("", "") is None
+    assert arc.select_scrip_template_id("some unrelated header text", "Register Entry") is None
+
+
+def test_scrip_template_field_value_microfilm_from_commissioner_reel_numbers():
+    rec = {"type_specific_fields": {"reel_numbers": "C-14929, C-14930"}}
+    part = {}
+    assert arc._scrip_template_field_value("Microfilm", rec, part, "1320") == "C-14929, C-14930"
+
+
+def test_scrip_template_field_value_issue_date_prefers_dedicated_field_over_application_date():
+    rec = {"type_specific_fields": {"issue_date": "5 May 1886", "application_date": "1 Jan 1886"}}
+    assert arc._scrip_template_field_value("IssueDate", rec, {}, "1320") == "5 May 1886"
+
+
+def test_scrip_template_field_value_issue_date_falls_back_to_application_date():
+    rec = {"type_specific_fields": {"application_date": "1 Jan 1886"}}
+    assert arc._scrip_template_field_value("IssueDate", rec, {}, "1320") == "1 Jan 1886"
+
+
+def test_scrip_template_field_value_treaty_8_delivery_fields():
+    rec = {"type_specific_fields": {"delivery_date": "3 Aug 1900", "delivery_place": "Fort Vermilion"}}
+    assert arc._scrip_template_field_value("DeliveryDate", rec, {}, "1") == "3 Aug 1900"
+    assert arc._scrip_template_field_value("DeliveryPlace", rec, {}, "1") == "Fort Vermilion"
+
+
+def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
+    """No claimant affidavit states these - they belong to a later, separately-cataloged
+    Dominion Lands Office patent record Commissioner doesn't fetch yet."""
+    rec = {"type_specific_fields": {}}
+    for field in ("OriginalClaimant", "LandDescription", "Liber", "Folio"):
+        assert arc._scrip_template_field_value(field, rec, {}, "1") == ""
+
+
+def test_get_scrip_citation_fields_skips_empty_values():
+    rec = {"type_specific_fields": {"affidavit_number": "5473"}, "lac_pid": ""}
+    part = make_participant("primary", given="Roger", surname="Letendre")
+    lines = arc.get_scrip_citation_fields(20001, rec, part, "1320")
+    joined = "\n".join(lines)
+    assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
+    assert "4 NAME ClaimantName" in joined and "4 VALUE Roger Letendre" in joined
+    # Microfilm/Parish/URL were never set on this record - must not appear at all.
+    assert "Microfilm" not in joined
+    assert "URL" not in joined
+
+
+def test_build_general_citation_scrip_cites_the_matching_template_source_with_field_block():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"page": "1", "record_id": "SC-1", "record_number": "5473", "lac_pid": "1506170",
+               "type_specific_fields": {"commission_reference": "Affidavit under Manitoba Act, 33 Vic. Cap 3",
+                                        "affidavit_number": "5473"}}
+        part = make_participant("primary", given="William", surname="Anderson")
+        blocks = arc.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
+        joined = blocks[0]
+        assert "2 SOUR @S20001@" in joined
+        assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
+        assert "LAC Digital Record" in joined
+        assert "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber=1506170" in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_general_citation_scrip_forces_proven_even_when_date_is_estimated():
+    """Every Scrip fact is read straight off a sworn primary source - get_proof_status'
+    generic BEF/ABT/EST downgrade (still correct for Parish/Census) must not apply here."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
+        part = make_participant("primary")
+        blocks = arc.build_general_citation(rec, part, "BIRT", "1324", "M0000000001",
+                                            proof_status="proposed", target_software="RM")
+        assert "2 _PROOF proven" in blocks[0]
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_general_citation_scrip_falls_back_to_freeform_when_template_unresolved():
+    """An unrecognized commission_reference must not get mis-templated - it cites the
+    existing per-volume freeform source instead, same @S{vol}@ id as before this change."""
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
+        part = make_participant("primary")
+        blocks = arc.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
+        assert "2 SOUR @S1324@" in blocks[0]
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_get_volume_sources_omits_church_template_for_scrip():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+        arc.GENERAL_CONFIG['parish_name'] = "Library and Archives Canada"
+        arc.GENERAL_CONFIG['register_name'] = "Scrip Records"
+        arc.GENERAL_CONFIG['volume_title'] = "Scrip Records"
+        arc.GENERAL_CONFIG['parish_location'] = "Ottawa, ON"
+        lines = arc.get_volume_sources({"1324"}, "RM")
+        joined = "\n".join(lines)
+        assert "TID 355" not in joined
+        assert "Church_Author" not in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_get_volume_sources_keeps_church_template_for_parish():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    try:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = False
+        arc.GENERAL_CONFIG['parish_name'] = "St. Boniface"
+        arc.GENERAL_CONFIG['register_name'] = "Baptisms"
+        arc.GENERAL_CONFIG['volume_title'] = "Baptisms"
+        arc.GENERAL_CONFIG['parish_location'] = "Manitoba"
+        lines = arc.get_volume_sources({"1"}, "RM")
+        joined = "\n".join(lines)
+        assert "TID 355" in joined
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_individual_researcher_citation_has_both_name_and_titl():
+    """RootsMagic needs both '2 NAME' and '2 _TITL' under the shared @S1@ researcher
+    citation to merge it across multiple people's citations in its own UI - confirmed
+    live by the user; _TITL alone displays but doesn't merge."""
+    rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1",
+          "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
+    primary = rec["participants"][0]
+    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+    assert "2 NAME Researcher:" in joined
+    assert "2 _TITL Researcher:" in joined

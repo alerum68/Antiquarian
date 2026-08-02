@@ -9,7 +9,7 @@ new record type never requires touching this file.
 
 import re
 import unicodedata
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 MONTH_NAMES = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -156,6 +156,118 @@ def derive_suffixes(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Opt
             and primary["std_surname"] == father.get("std_surname")):
         primary["suffix"] = "Jr"
         father["suffix"] = "Sr"
+
+
+def _participant_key(participant: Dict[str, Any]) -> tuple:
+    return ((participant.get("std_given") or "").strip().lower(),
+           (participant.get("std_surname") or "").strip().lower())
+
+
+def _label_for(record: Dict[str, Any]) -> str:
+    """Best available label for a record's own source document, for use as a section
+    header when its transcription gets merged into another record's. Prefers an explicit
+    document_type (e.g. Scrip.pmt's extra field, "Witness Affidavit"/"Claimant's Own
+    Affidavit") since that's a human-meaningful label a RootsMagic citation reader can
+    actually use; falls back to the page number, which is always present, if no
+    document_type was given (either the active record type doesn't define that field, or
+    the LLM left it null)."""
+    document_type = (record.get("type_specific_fields") or {}).get("document_type")
+    if document_type:
+        return document_type
+    page = record.get("page")
+    return f"Page {page}" if page else "Untitled section"
+
+
+def _source_document_entry(record: Dict[str, Any]) -> Dict[str, Any]:
+    """One record's own text, snapshotted as a source_documents list entry - see
+    _merge_record_into. document_type/page identify WHICH physical document this text
+    came from; Commissioner appends further entries to this same list later (certificate/
+    grant downloads) using media_path instead of transcription text."""
+    return {
+        "document_type": _label_for(record),
+        "page": record.get("page"),
+        "original_transcription": record.get("original_transcription"),
+        "english_translation": record.get("english_translation"),
+    }
+
+
+def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
+    """Merges `incoming` into `base` in place - `base` is what survives, `incoming` is
+    discarded by the caller afterward. See merge_same_claim_records for when this runs.
+
+    base's own top-level original_transcription/english_translation are left untouched
+    (still just base's own text, unlabeled) - every document's text, including base's,
+    instead lands in base["source_documents"], one entry per physical document. This
+    keeps every other record type (anything that never goes through this merge step)
+    completely unaffected, and lets Archivist emit one citation per source document
+    instead of one flattened, labeled blob."""
+    source_documents = base.setdefault("source_documents", [])
+    if not source_documents:
+        source_documents.append(_source_document_entry(base))
+    source_documents.append(_source_document_entry(incoming))
+
+    base_fields = base.setdefault("type_specific_fields", {})
+    for key, value in (incoming.get("type_specific_fields") or {}).items():
+        if key == "document_type":
+            continue  # already consumed above as a section label, not a fact about the claim
+        if value and not base_fields.get(key):
+            base_fields[key] = value
+
+    if incoming.get("review"):
+        base["review"] = True
+        reasons = [r for r in (base.get("review_reason"), incoming.get("review_reason")) if r]
+        base["review_reason"] = "; ".join(reasons) if reasons else base.get("review_reason")
+
+    base_participants = base.setdefault("participants", [])
+    by_key = {_participant_key(p): p for p in base_participants if _participant_key(p) != ("", "")}
+    for participant in incoming.get("participants", []):
+        key = _participant_key(participant)
+        existing = by_key.get(key) if key != ("", "") else None
+        if existing is None:
+            base_participants.append(participant)
+            continue
+        for field, value in participant.items():
+            if field == "type_specific_fields":
+                continue
+            if value and not existing.get(field):
+                existing[field] = value
+        existing_fields = existing.setdefault("type_specific_fields", {})
+        for tk, tv in (participant.get("type_specific_fields") or {}).items():
+            if tv and not existing_fields.get(tk):
+                existing_fields[tk] = tv
+
+
+def merge_same_claim_records(sheets: List[Dict[str, Any]]) -> None:
+    """Merges records that share the same derived record_id (event_type + record_number)
+    within one extraction result's sheets into a single record - e.g. a witness affidavit
+    and the claimant's own affidavit, sworn on different pages/images but supporting the
+    same underlying claim (confirmed live: Scrip.pmt records for the same claim correctly
+    share one record_number across documents; nothing previously merged them). Mutates
+    `sheets` in place - a merged-away record is removed from its own sheet, its content
+    folded into whichever same-record_id record was seen first, landing in the survivor's
+    source_documents list (one entry per physical document - see _source_document_entry)
+    rather than a single flattened, labeled text blob.
+
+    Distinct from Paleographer.py's continues_on_next_image/continues_from_previous_image
+    continuation mechanism, which is for ONE record's content literally cut off
+    mid-sentence at a page/chunk boundary - this is for genuinely separate, complete
+    documents that happen to support the same claim, identified purely by a shared
+    record_id, with no continuation flags involved. Must run after derive_record_identity
+    has set record_id on every record (records with no record_id - e.g. an unrecognized
+    event_type - are left alone, never merged)."""
+    seen: Dict[str, Dict[str, Any]] = {}
+    for sheet in sheets:
+        records = sheet.get("records", [])
+        kept: List[Dict[str, Any]] = []
+        for record in records:
+            record_id = record.get("record_id")
+            if record_id and record_id in seen:
+                _merge_record_into(seen[record_id], record)
+            else:
+                if record_id:
+                    seen[record_id] = record
+                kept.append(record)
+        sheet["records"] = kept
 
 
 def apply_defaults(target: Dict[str, Any], defaults_table: Dict[str, str]) -> None:

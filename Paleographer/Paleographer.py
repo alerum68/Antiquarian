@@ -20,8 +20,10 @@ from typing import Any, Dict, List, Optional, Union
 from dotenv import load_dotenv
 from google import genai
 
+import agy_engine
 import engine
 import postprocess
+from ScriptoriumMCP import agy_client
 
 # The Toolbox's own subprocess launcher sets PYTHONIOENCODING=utf-8, but this script also
 # supports being run directly from the command line (its debug mode), where stdout would
@@ -34,7 +36,19 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(ROOT_ENV, override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+# EXTRACTION_ENGINE picks which backend actually performs the AI extraction: "agy" (the
+# default) shells out to the Antigravity CLI, subscription-covered rather than metered
+# per-token; "api" uses the direct google-genai SDK against GEMINI_API_KEY. Read early
+# since it decides whether a genai client is even constructed below.
+EXTRACTION_ENGINE: str = (os.getenv("EXTRACTION_ENGINE", "agy") or "agy").strip().lower()
+if EXTRACTION_ENGINE not in ("api", "agy"):
+    raise RuntimeError(f"Unknown EXTRACTION_ENGINE '{EXTRACTION_ENGINE}' - expected 'api' or 'agy'.")
+
+# Only constructed for the api engine - the agy engine never calls engine.
+# build_content_part_for_file at all (rasterization replaces it for both images and
+# PDFs), so client is never touched/dereferenced on that path regardless of file type.
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if EXTRACTION_ENGINE == "api" else None
 
 # ==========================================
 # CONFIGURATION
@@ -84,6 +98,14 @@ if not MODEL_ID:
     raise RuntimeError("MODEL_NAME is not set. Check your .env configuration.")
 DEBUG_FILE: Union[str, None] = sys.argv[1] if len(sys.argv) > 1 else None
 
+# agy-engine-only settings. AGY_MODEL_ID is always passed explicitly to every agy call,
+# never left to agy's own default - confirmed live that agy's own default (when
+# --model is omitted) is a flash-tier model with materially worse OCR quality, and
+# that shorthand values like "pro"/"flash" are not valid --model values at all.
+AGY_MODEL_ID: str = os.getenv("AGY_MODEL_NAME") or agy_engine.DEFAULT_MODEL
+AGY_CLI_BIN: str = os.getenv("AGY_CLI_BIN") or agy_client.DEFAULT_CLI_BIN
+AGY_TIMEOUT_SECONDS: int = int(os.getenv("AGY_TIMEOUT_SECONDS", str(agy_client.DEFAULT_TIMEOUT_SECONDS)))
+
 SOURCE_SUFFIXES = engine.IMAGE_SUFFIXES + (".pdf",)
 
 with open(Path(__file__).resolve().parent / "schema.json", "r", encoding="utf-8") as _schema_file:
@@ -122,6 +144,11 @@ def finalize_page_data(page_data: Dict[str, Any]) -> Dict[str, Any]:
     for sheet in page_data.get("sheets", []):
         for record in sheet.get("records", []):
             finalize_record(record)
+    # After every record has its record_id (event_type + record_number) set, fold
+    # together any that share one - e.g. a witness affidavit and the claimant's own
+    # affidavit, sworn on different pages but supporting the same claim - into a single
+    # record, rather than leaving separate documents for the same claim unmerged.
+    postprocess.merge_same_claim_records(page_data.get("sheets", []))
     return page_data
 
 
@@ -170,13 +197,28 @@ def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) 
 
 
 def record_cost(master_data: Dict[str, Any], usage_metadata: Any) -> engine.CallCost:
-    cost = engine.compute_call_cost(usage_metadata, COST_CFG)
+    if isinstance(usage_metadata, agy_client.AgyUsage):
+        cost = agy_engine.adapt_agy_usage_to_call_cost(usage_metadata)
+    else:
+        cost = engine.compute_call_cost(usage_metadata, COST_CFG)
     master_data["total_spent"] = float(master_data.get("total_spent", 0.0)) + cost.call_cost
     master_data["total_pages_processed"] = int(master_data.get("total_pages_processed", 0)) + 1
     return cost
 
 
 def print_cost_line(master_data: Dict[str, Any], cost: engine.CallCost) -> None:
+    total_tokens = cost.cached_tokens + cost.in_tokens + cost.out_tokens + cost.thoughts_tokens
+    print(f" DONE! | Cost: ${cost.call_cost:.4f}")
+    print(f"      Tokens -> Cached: {cost.cached_tokens} | Input: {cost.in_tokens} | "
+          f"Output: {cost.out_tokens} | Thinking: {cost.thoughts_tokens} = Total: {total_tokens}")
+
+    if EXTRACTION_ENGINE == "agy":
+        # Subscription-covered - no per-call dollar cost, so the budget/pages-left
+        # arithmetic below (built around metered API pricing) would otherwise just
+        # print a meaningless "~0 pages left" forever, since avg_cost stays 0.
+        print("      Budget -> N/A (subscription backend, no per-call cost)")
+        return
+
     total_spent = master_data["total_spent"]
     total_pages = master_data["total_pages_processed"]
     avg_cost = total_spent / total_pages if total_pages else 0.0
@@ -185,11 +227,6 @@ def print_cost_line(master_data: Dict[str, Any], cost: engine.CallCost) -> None:
     live_budget = float(os.getenv("API_BUDGET", str(API_BUDGET)))
     remaining_budget = max(0.0, live_budget - total_spent)
     estimated_pages_left = math.floor(remaining_budget / avg_cost) if avg_cost > 0 else 0
-
-    total_tokens = cost.cached_tokens + cost.in_tokens + cost.out_tokens + cost.thoughts_tokens
-    print(f" DONE! | Cost: ${cost.call_cost:.4f}")
-    print(f"      Tokens -> Cached: {cost.cached_tokens} | Input: {cost.in_tokens} | "
-          f"Output: {cost.out_tokens} | Thinking: {cost.thoughts_tokens} = Total: {total_tokens}")
     print(f"      Budget -> Total Spent: ${total_spent:.4f} | Est Pages Left: ~{estimated_pages_left}")
 
 
@@ -234,42 +271,71 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
         file_ext = "JPEG"
     pages_str = file_base.split("_")[-1]
 
-    _, content_part = engine.build_content_part_for_file(client, file_path)
     file_metadata = {"File": file_base, "Pages": pages_str}
     dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
     dynamic_prompt += engine.build_continuation_context(pending_continuation)
 
-    if DEBUG_FILE:
-        prompt = engine.get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
-        prompt += engine.debug_schema_suffix(SCHEMA)
+    if EXTRACTION_ENGINE == "agy":
+        # PDFs are rasterized to images locally rather than trusting agy's own native
+        # PDF file-reading via --add-dir: confirmed live that native PDF reading works
+        # for light queries but is unreliable for a full schema-constrained extraction
+        # (agy's own agent can try an internal tool call that headless mode auto-denies,
+        # silently returning no structured output at all). Rasterizing reuses the same
+        # mechanism already proven reliable for direct image input. agy has no
+        # cached_content slot, so the full system instruction goes inline every call
+        # (the same concatenation the api engine only does for DEBUG_FILE).
+        images = (agy_engine.rasterize_pdf_to_images(file_path) if file_path.suffix.lower() == ".pdf"
+                  else [engine.optimize_image(str(file_path))])
+        full_prompt = engine.get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
+
+        def call_fn() -> Any:
+            # call_agy_extract_chunked (not call_agy_extract directly): confirmed live
+            # that a single call staging many pages at once (a real 38-page case file)
+            # fails consistently, not just intermittently - chunking is required for
+            # reliability on any large multi-page document, not just an optimization.
+            result = agy_engine.call_agy_extract_chunked(images, SCHEMA, full_prompt, model=AGY_MODEL_ID,
+                                                          cli_bin=AGY_CLI_BIN, timeout_seconds=AGY_TIMEOUT_SECONDS)
+            return result.structured_output, result.usage
+
+        try:
+            page_data, usage_metadata = agy_engine.run_with_agy_retries(call_fn)
+        except RuntimeError as e:
+            print(f"\n[FAILED] {filename}: {e}")
+            return None
     else:
-        prompt = dynamic_prompt
-
-    contents = [prompt, content_part]
-
-    def call_fn() -> Any:
-        response = client.models.generate_content(
-            model=MODEL_ID, contents=contents,
-            config=genai.types.GenerateContentConfig(**build_gen_config_kwargs(active_cache_name)),
-        )
+        _, content_part = engine.build_content_part_for_file(client, file_path)
 
         if DEBUG_FILE:
-            parts = (response.candidates[0].content.parts or []) if response.candidates and \
-                response.candidates[0].content else []
-            thought_parts = [p.text for p in parts if getattr(p, "thought", False) and p.text]
-            if thought_parts:
-                print("\n\n--- MODEL THINKING ---")
-                print("\n".join(thought_parts))
-                print("--- END THINKING ---\n")
+            prompt = engine.get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
+            prompt += engine.debug_schema_suffix(SCHEMA)
+        else:
+            prompt = dynamic_prompt
 
-        raw_text = engine.strip_markdown_fences((response.text or "").strip())
-        return json.loads(raw_text), response.usage_metadata
+        contents = [prompt, content_part]
 
-    try:
-        page_data, usage_metadata = engine.run_with_retries(call_fn)
-    except RuntimeError as e:
-        print(f"\n[FAILED] {filename}: {e}")
-        return None
+        def call_fn() -> Any:
+            response = client.models.generate_content(
+                model=MODEL_ID, contents=contents,
+                config=genai.types.GenerateContentConfig(**build_gen_config_kwargs(active_cache_name)),
+            )
+
+            if DEBUG_FILE:
+                parts = (response.candidates[0].content.parts or []) if response.candidates and \
+                    response.candidates[0].content else []
+                thought_parts = [p.text for p in parts if getattr(p, "thought", False) and p.text]
+                if thought_parts:
+                    print("\n\n--- MODEL THINKING ---")
+                    print("\n".join(thought_parts))
+                    print("--- END THINKING ---\n")
+
+            raw_text = engine.strip_markdown_fences((response.text or "").strip())
+            return json.loads(raw_text), response.usage_metadata
+
+        try:
+            page_data, usage_metadata = engine.run_with_retries(call_fn)
+        except RuntimeError as e:
+            print(f"\n[FAILED] {filename}: {e}")
+            return None
 
     page_data = finalize_page_data(page_data)
     tag_document_metadata(page_data, filename, file_ext)
@@ -320,11 +386,14 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
 
     if not DEBUG_FILE and files:
         print(f"Found {total_files} file(s) to process synchronously.")
-        print("Creating Context Cache for System Instructions to reduce costs...")
-        active_cache_name = engine.create_context_cache(
-            client, MODEL_ID, engine.get_cached_system_instruction(TYPE_CFG))
-        if active_cache_name:
-            print(f"Cache created successfully: {active_cache_name}\n")
+        if EXTRACTION_ENGINE == "api":
+            # Context caching is genai-only (and requires a working API key) - agy has
+            # no cached_content equivalent, see process_one_file_sync's agy branch.
+            print("Creating Context Cache for System Instructions to reduce costs...")
+            active_cache_name = engine.create_context_cache(
+                client, MODEL_ID, engine.get_cached_system_instruction(TYPE_CFG))
+            if active_cache_name:
+                print(f"Cache created successfully: {active_cache_name}\n")
 
     try:
         for index, filename in enumerate(files, start=1):
@@ -435,6 +504,18 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
 # MAIN EXECUTION
 # ==========================================
 def main() -> None:
+    if EXTRACTION_ENGINE == "agy":
+        # Deliberately interactive, separate from the per-file loop below (which stays
+        # fully headless) - lets first-time Google sign-in happen once, up front,
+        # rather than surprising the user mid-batch.
+        print("Verifying Antigravity CLI authentication...")
+        if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
+            print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
+                  "Connection' action in Scriptorium's Global Settings, or `agy` "
+                  "directly, to sign in, then try again.")
+            return
+        print("Authenticated.\n")
+
     master_data = load_master_db()
     all_files = list_source_files()
 
@@ -451,6 +532,18 @@ def main() -> None:
     already_in_batch = {fn for entry in master_data.get("pending_batch_jobs", [])
                         for fn in entry.get("file_names", [])}
     pending_files = [f for f in all_files if f not in processed_files and f not in already_in_batch]
+
+    if EXTRACTION_ENGINE == "agy":
+        # agy has no async Batch API equivalent at all (not a size cutoff like the api
+        # engine's page-count threshold - a total absence of an async path), so every
+        # file - image or PDF, any page count - goes through the same synchronous loop.
+        # PDFs are not skipped or treated as unsupported: process_one_file_sync handles
+        # them via rasterization on this path.
+        if pending_files:
+            run_synchronous_batch(pending_files, master_data)
+        else:
+            print("No new files to process.")
+        return
 
     sync_files: List[str] = []
     batch_files: List[str] = []
