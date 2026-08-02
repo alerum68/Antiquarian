@@ -297,6 +297,19 @@ def clean_val(val: CellValue) -> str:
     return "" if val_str.lower() in ["null", "none", ""] else val_str
 
 
+_PLACE_QUALIFIER_RE = re.compile(
+    r'^(?:near|around|about|approximately|close to|in the vicinity of)\s+', re.IGNORECASE)
+
+
+def clean_place(val: CellValue) -> str:
+    """Like clean_val, but also strips a leading descriptive qualifier ('near', 'around',
+    'about', ...) off a place name - per the user, that uncertainty reads as noise in a
+    structured PLAC field rather than useful information; it belongs in a note/citation,
+    not baked into the place name itself. Only strips a LEADING qualifier (not one
+    appearing mid-string, e.g. "Fort Near the River" stays untouched)."""
+    return _PLACE_QUALIFIER_RE.sub('', clean_val(val)).strip()
+
+
 def get_gender(val: Union[pd.Series, dict, CellValue]) -> str:
     if isinstance(val, (pd.Series, dict)):
         str_val = clean_val(val.get("Gender", ""))
@@ -2281,6 +2294,22 @@ def select_scrip_template_id(commission_reference: str, document_type: str,
     return None
 
 
+def resolve_scrip_template_id(rec: dict) -> Optional[int]:
+    """The single source of truth for which of the 5 real templates a Scrip record's ONE
+    claim-level citation cites (see build_general_citation - Scrip gets exactly one
+    citation per fact now, not one per source_documents entry, so template selection has
+    to work off the record's own single document_type, not a per-document loop). Reused
+    both by _build_citation_block (to pick the actual '2 SOUR' id) and by
+    build_gedcom_from_general's final template_ids_used/fallback_vols_used pass - using
+    the same function in both places guarantees a template's master source is only ever
+    emitted when a real citation cites it, and the per-volume freeform fallback source
+    only gets built for volumes some citation actually still needs it for."""
+    tf = rec.get('type_specific_fields') or {}
+    return select_scrip_template_id(
+        tf.get('commission_reference'), tf.get('document_type'), tf.get('rg_series_code'), _scrip_record_year(rec)
+    )
+
+
 def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str) -> str:
     """Resolves one Detail=True field's value for a Metis Scrip.rmst template citation,
     from fields Commissioner/Paleographer already put in the JSON. Fields with no current
@@ -2333,29 +2362,6 @@ def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str)
         if value:
             lines.extend(["3 FIELD", f"4 NAME {field_name}", f"4 VALUE {value}"])
     return lines
-
-
-def _scrip_full_package_text(rec: dict) -> Tuple[str, str]:
-    """Concatenates every source_documents entry's own transcription into one combined
-    'full package' reading, each headed by its own document_type - the user wants
-    Citation Text to show the whole claim's story, not just the one document a given
-    per-document SOUR block otherwise represents. Falls back to rec's own top-level
-    text when there's no source_documents list (a record merge/Commissioner never
-    touched, so there's only ever the one document to begin with)."""
-    docs = rec.get('source_documents') or []
-    if not docs:
-        return clean_val(rec.get('original_transcription')), clean_val(rec.get('english_translation'))
-
-    orig_parts, trans_parts = [], []
-    for doc in docs:
-        label = clean_val(doc.get('document_type')) or "Document"
-        orig = clean_val(doc.get('original_transcription'))
-        trans = clean_val(doc.get('english_translation'))
-        if orig:
-            orig_parts.append(f"=== {label} ===\n{orig}")
-        if trans:
-            trans_parts.append(f"=== {label} ===\n{trans}")
-    return "\n\n".join(orig_parts), "\n\n".join(trans_parts)
 
 
 def get_scrip_template_sources(template_ids_used: set, target_software: str) -> list:
@@ -2458,7 +2464,14 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     # has its own real reference numbers (claim/affidavit - the numbers actually printed
     # on the document), use those instead; every other record type keeps the original
     # page/record_id form, unaffected.
-    if claim_num or affdt_num:
+    if is_scrip:
+        # No page number at all - per the user, this is one citation for the whole claim
+        # (see build_general_citation), not one per page/document, so "Page X" has no
+        # single correct value to show here.
+        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
+                                f"Affdt {affdt_num}" if affdt_num else "") if b]
+        page_line = f"3 PAGE {'; '.join(ref_bits)}" if ref_bits else f"3 PAGE Record {rec_id}"
+    elif claim_num or affdt_num:
         ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
                                 f"Affdt {affdt_num}" if affdt_num else "") if b]
         page_line = f"3 PAGE {'; '.join(ref_bits)}, Page {page}"
@@ -2469,10 +2482,7 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     # Scrip.rmst, Template Ids 20001-20005) when its commission_reference/series_code/
     # document_type/year resolves to one; unresolved Scrip records (and every other
     # record type) fall back to the existing per-volume freeform source, unchanged.
-    template_id = select_scrip_template_id(
-        type_fields.get('commission_reference'), document_type, type_fields.get('rg_series_code'),
-        _scrip_record_year(rec)
-    ) if is_scrip else None
+    template_id = resolve_scrip_template_id(rec) if is_scrip else None
     sour_id = f"@S{template_id}@" if template_id else get_dynamic_source_id(vol)
 
     # Every Scrip fact is proven directly - it's read straight off a sworn government
@@ -2497,60 +2507,48 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     block.append("3 DATA")
 
     if is_scrip:
-        # The user wants the citation to show the whole claim's story, not just the one
-        # document this particular per-document SOUR block otherwise represents - every
-        # source_documents entry's own transcription, concatenated, headed by its own
-        # document_type. Falls back to rec's own top-level text when there's no
-        # source_documents list at all (a Scrip record Commissioner/merge never touched).
-        orig_val, trans_val = _scrip_full_package_text(rec)
+        # Per the user: no more English Translation/Original Transcription text at all in
+        # a Scrip citation - Citation Text is Agy's own package_summary (a new Scrip.pmt
+        # field) instead, in place of the transcription that used to live here.
+        summary = clean_val(type_fields.get('package_summary'))
+        summary_text = wrap_text(summary, '4 TEXT')
+        if summary_text:
+            block.append(summary_text)
     else:
         orig_val = clean_val(original_transcription if original_transcription is not None
                              else rec.get('original_transcription'))
         trans_val = clean_val(english_translation if english_translation is not None
                               else rec.get('english_translation'))
 
-    # A source document that's already in English (confirmed live: most Scrip
-    # affidavits are) has an identical original_transcription/english_translation -
-    # per the user, showing both "English Translation:"/"Original Transcription:"
-    # header blocks in that case just duplicates the same text twice for no reason.
-    # One plain "4 TEXT" block, no header label at all, when there's really only one
-    # distinct text (either they match, or only one side is populated).
-    #
-    # Whitespace-normalized comparison, not exact - confirmed live on a real
-    # verification run: Agy's own "translation" of an already-English document
-    # sometimes just reflows the text (multi-line printed form -> one line, newlines
-    # replaced with spaces) without translating anything, which an exact-match
-    # comparison doesn't catch as "the same content."
-    norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
-    norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
-    same_text = orig_val and trans_val and norm_orig == norm_trans
-    if same_text or not (orig_val and trans_val):
-        single_text = wrap_text(trans_val or orig_val, '4 TEXT')
-        if single_text:
-            block.append(single_text)
-    else:
-        block.append(f"4 TEXT {GENERAL_CONFIG['translation_header']}")
-        trans_text = wrap_text(trans_val, '5 CONT')
-        if trans_text:
-            block.append(trans_text)
+        # A source document that's already in English (confirmed live: most Scrip
+        # affidavits are) has an identical original_transcription/english_translation -
+        # per the user, showing both "English Translation:"/"Original Transcription:"
+        # header blocks in that case just duplicates the same text twice for no reason.
+        # One plain "4 TEXT" block, no header label at all, when there's really only one
+        # distinct text (either they match, or only one side is populated).
+        #
+        # Whitespace-normalized comparison, not exact - confirmed live on a real
+        # verification run: Agy's own "translation" of an already-English document
+        # sometimes just reflows the text (multi-line printed form -> one line, newlines
+        # replaced with spaces) without translating anything, which an exact-match
+        # comparison doesn't catch as "the same content."
+        norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
+        norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
+        same_text = orig_val and trans_val and norm_orig == norm_trans
+        if same_text or not (orig_val and trans_val):
+            single_text = wrap_text(trans_val or orig_val, '4 TEXT')
+            if single_text:
+                block.append(single_text)
+        else:
+            block.append(f"4 TEXT {GENERAL_CONFIG['translation_header']}")
+            trans_text = wrap_text(trans_val, '5 CONT')
+            if trans_text:
+                block.append(trans_text)
 
-        block.append(f"3 NOTE {GENERAL_CONFIG['transcription_header']}")
-        orig_text = wrap_text(orig_val, '4 CONT')
-        if orig_text:
-            block.append(orig_text)
-
-    # New feature, per the user: Agy's own one-paragraph summary of the whole Scrip
-    # package (a new Scrip.pmt field - see package_summary), rendered as this citation's
-    # own Details/Comments note. A second, independent "3 NOTE" - GEDCOM allows more than
-    # one, each starting its own CONT chain, so this never merges with the transcription
-    # NOTE above.
-    if is_scrip:
-        summary = clean_val(type_fields.get('package_summary'))
-        if summary:
-            block.append("3 NOTE Summary:")
-            summary_text = wrap_text(summary, '4 CONT')
-            if summary_text:
-                block.append(summary_text)
+            block.append(f"3 NOTE {GENERAL_CONFIG['transcription_header']}")
+            orig_text = wrap_text(orig_val, '4 CONT')
+            if orig_text:
+                block.append(orig_text)
 
     refn = clean_val(rec.get('record_number')) or rec_id
     if target_software == "RM":
@@ -2608,14 +2606,16 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
 def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media_uid: str,
                           proof_status: str = "proven", target_software: str = "RM") -> List[str]:
     """Constructs the source citation block(s) for an event. Returns a LIST - callers
-    extend() it onto their own line list rather than append() a single string, since a
-    Scrip claim supported by several separately-sworn documents (or by Commissioner-
-    attached certificate/grant downloads) needs one full "2 SOUR" block per document, not
-    one block with everything flattened together.
+    extend() it onto their own line list rather than append() a single string.
 
-    When rec['source_documents'] is present and non-empty, loops it and emits one block
-    per entry, using that entry's own document_type/page/transcription (and, for a
-    Commissioner-downloaded entry, its own OBJE media UID - preferring
+    Scrip always gets exactly ONE citation per fact, covering the whole claim, regardless
+    of how many source_documents entries the claim has - per the user, several separate
+    citations (one per page/document) for what's really one claim was the wrong shape;
+    _build_citation_block's own Scrip-specific TEXT (package_summary) and _TITL/PAGE
+    formatting don't vary per document anyway. Every other record type keeps its original
+    behavior: when rec['source_documents'] is present and non-empty, loops it and emits
+    one block per entry, using that entry's own document_type/page/transcription (and,
+    for a Commissioner-downloaded entry, its own OBJE media UID - preferring
     generate_media_uid_for_lac_asset when lac_asset_id is present, since that's LAC's own
     stable identifier rather than a hash of a local path, falling back to
     generate_media_uid_for_path when only media_path is known - rather than the shared
@@ -2623,6 +2623,9 @@ def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media
     from rec's own top-level fields, when source_documents is absent - every record type
     that never goes through postprocess.merge_same_claim_records or Commissioner is
     completely unaffected."""
+    if GENERAL_CONFIG.get('omit_source_id_prefix'):  # is_scrip
+        return [_build_citation_block(rec, part, tag_name, vol, media_uid, proof_status, target_software)]
+
     source_documents = rec.get('source_documents') or []
     if not source_documents:
         return [_build_citation_block(rec, part, tag_name, vol, media_uid, proof_status, target_software)]
@@ -2657,7 +2660,7 @@ def build_custom_fact_lines(fact_name: str, value: str, rec: dict, part: dict, v
     entry = FACT_TYPES.get('person', {}).get(fact_name, {})
     val = clean_val(value) if entry.get('use_value', True) else ""
     fact_date = format_gedcom_date(date) if entry.get('use_date') and date else ""
-    fact_place = clean_val(place) if entry.get('use_place') and place else ""
+    fact_place = clean_place(place) if entry.get('use_place') and place else ""
 
     if not (val or fact_date or fact_place):
         return []
@@ -2700,13 +2703,16 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     is_family_evt = is_family_event(event_type)
     is_bap_or_chr = event_tag in ("BAPM", "CHR")
     is_scrip = GENERAL_CONFIG.get('omit_source_id_prefix')
-    # Per the user: every fact taken from a Scrip document should carry the year that
-    # document was recorded as its own DATE - except Race, which describes an ongoing
-    # personal characteristic rather than something dated to one specific document.
-    scrip_fact_date = str(_scrip_record_year(rec)) if is_scrip and _scrip_record_year(rec) else ""
-
     semantic = part.get('role_semantic')
     is_primary = semantic == 'primary'
+    # Per the user: the Scrip document's own year is only a valid DATE fallback for facts
+    # about the PRIMARY claimant - everyone else (spouse, witness, parent, ...) only gets
+    # a date when the transcription itself actually states one for them; using the
+    # document's year for a witness's own Residence/Occupation would misdate a fact that
+    # was never actually about them at that time. Also never used for Race, which
+    # describes an ongoing characteristic rather than something dated to one document.
+    scrip_fact_date = (str(_scrip_record_year(rec))
+                      if is_scrip and is_primary and _scrip_record_year(rec) else "")
     is_parent = semantic in ('father', 'mother', 'father_in_law', 'mother_in_law')
     is_deceased = bool(part.get('deceased')) or bool(part.get('is_deceased'))
 
@@ -2718,7 +2724,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     race = clean_val(part.get('race'))
     religion = clean_val(part.get('religion'))
     occu = clean_val(part.get('occupation'))
-    resi = clean_val(part.get('residence'))
+    resi = clean_place(part.get('residence'))
 
     age = clean_val(part.get('age'))
     raw_event_date = clean_val(rec.get('event_date'))
@@ -2742,8 +2748,8 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
 
     b_date = format_gedcom_date(raw_b)
     d_date = format_gedcom_date(raw_d)
-    b_place = clean_val(part.get('birth_place'))
-    d_place = clean_val(part.get('death_place'))
+    b_place = clean_place(part.get('birth_place'))
+    d_place = clean_place(part.get('death_place'))
 
     indi = [f"0 @I{uid}@ INDI"]
     if target_software == "RM":
@@ -2860,15 +2866,18 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
             occu_lines.append(f"2 DATE {scrip_fact_date}")
         indi.append("\n".join(occu_lines))
         indi.extend(build_general_citation(rec, part, "OCCU", vol, media_uid, target_software=target_software))
-    if resi:
+    # An address must still attach even when there's no general residence/parish text at
+    # all (e.g. the document states only a lot/section number) - gating this whole block
+    # on `resi` alone silently dropped it in that case.
+    address = clean_val(part.get('address'))
+    if resi or address:
         resi_lines = [f"1 RESI"]
         if scrip_fact_date:
             resi_lines.append(f"2 DATE {scrip_fact_date}")
-        resi_lines.append(f"2 PLAC {resi}")
-        # If an address was captured separately from the general residence/parish
-        # description, RootsMagic's own Place Details field (PLAS) is where it belongs,
-        # not folded into the plain PLAC text.
-        address = clean_val(part.get('address'))
+        if resi:
+            resi_lines.append(f"2 PLAC {resi}")
+        # RootsMagic's own Place Details field (PLAS) is where a specific address
+        # belongs, not folded into the plain PLAC text.
         if address:
             resi_lines.append(f"3 PLAS {address}")
         indi.append("\n".join(resi_lines))
@@ -2940,7 +2949,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
             value_parts.extend(f"{k.replace('_', ' ').title()}: {clean_val(v)}"
                                for k, v in extra_fields.items() if k not in consumed and clean_val(v))
             scrip_value = "; ".join(value_parts)
-            scrip_place = clean_val(rec.get('event_place')) or resi or GENERAL_CONFIG['default_location']
+            scrip_place = clean_place(rec.get('event_place')) or resi or GENERAL_CONFIG['default_location']
 
             indi.extend(build_custom_fact_lines('Scrip', scrip_value, rec, part, vol, media_uid, target_software,
                                                 date=scrip_fact_date, place=scrip_place))
@@ -2959,7 +2968,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
             if event_tag == 'EVEN':
                 indi.append(f"2 TYPE {event_type}")
             indi.extend([f"2 DATE {format_gedcom_date(raw_event_date)}" if raw_event_date else "",
-                        f"2 PLAC {clean_val(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
+                        f"2 PLAC {clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
             if age:
                 indi.append(f"2 AGE {age}")
             if alt_names:
@@ -3052,7 +3061,7 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
             event_tag = get_event_gedcom_tag(event_type)
             event_date = format_gedcom_date(clean_val(rec.get('event_date')))
             main_fam.extend([f"1 {event_tag}", f"2 DATE {event_date}" if event_date else "",
-                             f"2 PLAC {clean_val(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
+                             f"2 PLAC {clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
 
             if clean_val(primary.get('age')):
                 slot = "HUSB" if husb is primary else "WIFE"
@@ -3293,23 +3302,30 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
 
     ged.extend(media_recs)
     ged.extend(get_source_root(target_software))
-    ged.extend(get_volume_sources(vols_used, target_software))
 
     if GENERAL_CONFIG.get('omit_source_id_prefix'):  # is_scrip
-        template_ids_used = set()
+        # Mirrors exactly what _build_citation_block/resolve_scrip_template_id decide for
+        # the real per-record citations - so a per-volume freeform source only gets built
+        # for a volume that some record's citation genuinely still falls back to, and a
+        # template's own master source only gets built when a real citation cites it.
+        # Confirmed live: emitting get_volume_sources(vols_used, ...) unconditionally left
+        # an empty, unused "Library and Archives Canada, RG15 Scrip Records" source
+        # sitting in the GEDCOM even when every citation resolved to a real template.
+        template_ids_used, fallback_vols_used = set(), set()
         for sheet in json_data.get('sheets', []):
+            sheet_vol = extract_volume(sheet)
             for rec in sheet.get('records', []):
-                rec_tf = rec.get('type_specific_fields') or {}
-                commission_ref = rec_tf.get('commission_reference')
-                series_code = rec_tf.get('rg_series_code')
-                docs = rec.get('source_documents') or [rec_tf]
-                rec_year = _scrip_record_year(rec)
-                for doc in docs:
-                    tid = select_scrip_template_id(commission_ref, doc.get('document_type'), series_code, rec_year)
-                    if tid:
-                        template_ids_used.add(tid)
+                tid = resolve_scrip_template_id(rec)
+                if tid:
+                    template_ids_used.add(tid)
+                else:
+                    fallback_vols_used.add(sheet_vol)
         if template_ids_used:
             ged.extend(get_scrip_template_sources(template_ids_used, target_software))
+        if fallback_vols_used:
+            ged.extend(get_volume_sources(fallback_vols_used, target_software))
+    else:
+        ged.extend(get_volume_sources(vols_used, target_software))
 
     ged.append("0 TRLR")
 

@@ -3,10 +3,12 @@ roles:
   "1": {name: "Claimant", semantic: primary}
   "2": {name: "Spouse", semantic: spouse}
   "3": {name: "Child", semantic: child}
-  "4": {name: "Witness", context: "A sworn witness attesting to the claimant's identity, with NO stated family relationship to the claimant. Confirmed live: never use this for a named parent, use Father/Mother instead - and the same rule applies to a spouse or child: if a person who physically signed as a household witness is ALSO identified elsewhere in the document as the claimant's spouse, father, mother, or child (e.g. \"my father Louison Letendre\", \"wife of the claimant\"), use that family role, not Witness. The family relationship always takes priority over the witnessing act - a household witness is very often a family member in these documents, not a stranger."}
-  "5": {name: "Commissioner"}
+  "4": {name: "Witness", context: "A sworn witness attesting to the claimant's identity, with NO stated family relationship to the claimant. Confirmed live: never use this for a named parent, use Father/Mother instead - and the same rule applies to a spouse or child: if a person who physically signed as a household witness is ALSO identified elsewhere in the document as the claimant's spouse, father, mother, or child (e.g. \"my father Louison Letendre\", \"wife of the claimant\"), use that family role, not Witness. The family relationship always takes priority over the witnessing act - a household witness is very often a family member in these documents, not a stranger. Per the user: use the bare name \"Witness\" only when nothing more specific is stated - when the document itself describes WHY this person can vouch for the claimant (e.g. \"neighbour of the claimant for twenty years\", \"the claimant's employer\", \"acquainted with the claimant since childhood\"), use that as role_name instead (\"Neighbour and Witness\", \"Employer and Witness\", ...) so the role reads as more than a generic label."}
   "6": {name: "Father", semantic: father}
   "7": {name: "Mother", semantic: mother}
+# Role "5" (Commissioner) removed per the user: the commissioner/officiant who
+# administered the oath is not a genealogically relevant person for this record -
+# don't create a participant for them at all, capture no detail about who they were.
 defaults: {}
 extra_fields:
   record:
@@ -104,13 +106,15 @@ Before generating JSON, process the file in this exact order:
    or affidavit testimony exactly as written.
 3. Translate any French text into English.
 4. Identify every participant named in that application (claimant, spouse, children,
-   father, mother, witnesses, commissioner) and assign their role. Check for a STATED
-   FAMILY RELATIONSHIP to the claimant first (spouse, father, mother, child) - a person
-   can both physically sign as a household witness AND be family; when both are true,
-   the family role always wins, never Witness (see the Witness role's own note). Never
-   silently drop a named spouse, parent, or child just because the document's main
-   purpose is establishing the claimant's own identity - every stated family
-   relationship gets its own participant with the matching role, not just the claimant.
+   father, mother, witnesses) and assign their role - do NOT create a participant for
+   the commissioner/officiating official who administered the oath (see the Witness
+   role's own note; role "5" Commissioner was removed). Check for a STATED FAMILY
+   RELATIONSHIP to the claimant first (spouse, father, mother, child) - a person can
+   both physically sign as a household witness AND be family; when both are true, the
+   family role always wins, never Witness. Never silently drop a named spouse, parent,
+   or child just because the document's main purpose is establishing the claimant's own
+   identity - every stated family relationship gets its own participant with the
+   matching role, not just the claimant.
 5. Standardize the names.
 6. Populate the final structured JSON, one record per application.
 
@@ -127,14 +131,32 @@ Before generating JSON, process the file in this exact order:
   review.
 - NEVER invent a surname.
 - is_priest is always false for every participant here - scrip commissions involved no
-  clergy (claimants, spouses, children, witnesses, and the commissioner are all laypeople
-  or government officials).
+  clergy (claimants, spouses, children, witnesses are all laypeople).
+- MARRIED WOMEN'S NAMES: when a female participant is recorded under a married surname
+  (e.g. "Mrs. John Smith", or explicitly stated as the wife of a named husband) AND her
+  own father is ALSO named somewhere in the same document, use her father's surname as
+  her std_surname (her maiden name), not the married name - genealogical convention
+  records a woman under her own birth family's name, not her husband's. Keep the married
+  surname available via relationship_to_claimant/marital_status, just don't use it as
+  std_surname when a maiden name can be determined this way. If no father is named
+  anywhere in the document, use whatever surname IS stated (there's nothing to correct
+  it against) - don't guess a maiden name that isn't actually derivable from the text.
 
 3. DATES
 - Record each date exactly as your best English-language reading of what's written (e.g.
   "March 3, 1876"). Final formatting is handled downstream, not by you.
 - If there is no evidence of a date stated, leave the field null.
 - Dates will span the 1870s through 1900s.
+- ATTRIBUTE EVERY DATE TO THE RIGHT PERSON: a single affidavit often states dates for
+  several different people (the claimant's own birth, a parent's death, a sibling's
+  birth) in the same paragraph - read carefully whose date each one actually is before
+  recording it. Confirmed live: a claimant's OWN record ended up with his FATHER's 1880
+  death date, because the document mentioned both in adjacent sentences. Before setting
+  any participant's birth_date/death_date, re-read the specific sentence stating it and
+  confirm which named person it's actually about - "my father died in 1880" is the
+  father's death_date, never the claimant's own, even if it's the only death date on the
+  page. When genuinely unsure whose date a stated date belongs to, leave it null and
+  flag the record for review rather than guessing.
 
 4. SCRIP-SPECIFIC FIELDS
 - scrip_number: the certificate or scrip number issued, exactly as written.
@@ -236,9 +258,11 @@ CONFIRMED FROM REAL SAMPLE (e011335187.pdf, 38 pages, register-shaped throughout
 
 CONFIRMED FROM SECOND REAL SAMPLE (BAC-LAC_fonandcol_1502188.pdf, 2 pages, a genuine
 application packet - not a register):
-- Commissioner role IS real and does get used on true application packets: "A. H.
-  Whitcher, Agent of Dominion Lands" appeared on both pages of a real claim, correctly
-  role_name "Commissioner".
+- Commissioner role IS real and does appear on true application packets: "A. H.
+  Whitcher, Agent of Dominion Lands" appeared on both pages of a real claim. SUPERSEDED
+  per the user: the commissioner is no longer captured as a participant at all (see the
+  roles table's own note) - kept here only as the historical confirmation that this
+  person really does appear on real documents, not as current guidance.
 - Witness role correctly fit the ACTUAL witnesses (household witnesses swearing to the
   claimant's identity) once Father/Mother existed as separate options - before those
   roles were added, a claimant's own named father/mother got coded as "Witness" for lack
@@ -279,3 +303,8 @@ TODO (still open):
   John Falster/Isabella Brown correctly tagged Father/Mother) before this wording change,
   so the underlying mechanism works - this addition specifically targets the case where a
   family member ALSO appears as a signing witness elsewhere in the same document.
+- Removing the Commissioner role, the more-descriptive-Witness-label instruction, the
+  married-woman maiden-name rule, and the person-date-attribution warning are all new,
+  added directly from the user's own review of real GEDCOM output (including a confirmed
+  real error: John Moar's own record picked up his FATHER's 1880 death date) - NONE of
+  the four has been re-run against a real sample yet.
