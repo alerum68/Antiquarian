@@ -2300,10 +2300,11 @@ def resolve_scrip_template_id(rec: dict) -> Optional[int]:
     citation per fact now, not one per source_documents entry, so template selection has
     to work off the record's own single document_type, not a per-document loop). Reused
     both by _build_citation_block (to pick the actual '2 SOUR' id) and by
-    build_gedcom_from_general's final template_ids_used/fallback_vols_used pass - using
-    the same function in both places guarantees a template's master source is only ever
-    emitted when a real citation cites it, and the per-volume freeform fallback source
-    only gets built for volumes some citation actually still needs it for."""
+    build_gedcom_from_general's final template_ids_used pass, so a template's master
+    source only ever gets built when a real citation actually cites it. The per-volume
+    freeform source (get_volume_sources) is still built unconditionally for every volume
+    used, same as every other record type - per the user, not worth the added complexity
+    of also gating that one on actual usage."""
     tf = rec.get('type_specific_fields') or {}
     return select_scrip_template_id(
         tf.get('commission_reference'), tf.get('document_type'), tf.get('rg_series_code'), _scrip_record_year(rec)
@@ -2507,13 +2508,22 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     block.append("3 DATA")
 
     if is_scrip:
-        # Per the user: no more English Translation/Original Transcription text at all in
-        # a Scrip citation - Citation Text is Agy's own package_summary (a new Scrip.pmt
-        # field) instead, in place of the transcription that used to live here.
+        # Citation Text is the verbatim transcription (original_transcription - the
+        # source-language text as written), no "English Translation:"/"Original
+        # Transcription:" header labels ever, and no separate translated block at all -
+        # per the user, Text must have the transcription; Agy's own package_summary is a
+        # SEPARATE citation Details/Comments note (right below), not a replacement for it.
+        orig_val = clean_val(rec.get('original_transcription'))
+        text = wrap_text(orig_val, '4 TEXT')
+        if text:
+            block.append(text)
+
         summary = clean_val(type_fields.get('package_summary'))
-        summary_text = wrap_text(summary, '4 TEXT')
-        if summary_text:
-            block.append(summary_text)
+        if summary:
+            block.append("3 NOTE Summary:")
+            summary_text = wrap_text(summary, '4 CONT')
+            if summary_text:
+                block.append(summary_text)
     else:
         orig_val = clean_val(original_transcription if original_transcription is not None
                              else rec.get('original_transcription'))
@@ -2611,8 +2621,8 @@ def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media
     Scrip always gets exactly ONE citation per fact, covering the whole claim, regardless
     of how many source_documents entries the claim has - per the user, several separate
     citations (one per page/document) for what's really one claim was the wrong shape;
-    _build_citation_block's own Scrip-specific TEXT (package_summary) and _TITL/PAGE
-    formatting don't vary per document anyway. Every other record type keeps its original
+    _build_citation_block's own Scrip-specific TEXT/_TITL/PAGE formatting don't vary per
+    document anyway. Every other record type keeps its original
     behavior: when rec['source_documents'] is present and non-empty, loops it and emits
     one block per entry, using that entry's own document_type/page/transcription (and,
     for a Commissioner-downloaded entry, its own OBJE media UID - preferring
@@ -3303,29 +3313,17 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
     ged.extend(media_recs)
     ged.extend(get_source_root(target_software))
 
+    ged.extend(get_volume_sources(vols_used, target_software))
+
     if GENERAL_CONFIG.get('omit_source_id_prefix'):  # is_scrip
-        # Mirrors exactly what _build_citation_block/resolve_scrip_template_id decide for
-        # the real per-record citations - so a per-volume freeform source only gets built
-        # for a volume that some record's citation genuinely still falls back to, and a
-        # template's own master source only gets built when a real citation cites it.
-        # Confirmed live: emitting get_volume_sources(vols_used, ...) unconditionally left
-        # an empty, unused "Library and Archives Canada, RG15 Scrip Records" source
-        # sitting in the GEDCOM even when every citation resolved to a real template.
-        template_ids_used, fallback_vols_used = set(), set()
+        template_ids_used = set()
         for sheet in json_data.get('sheets', []):
-            sheet_vol = extract_volume(sheet)
             for rec in sheet.get('records', []):
                 tid = resolve_scrip_template_id(rec)
                 if tid:
                     template_ids_used.add(tid)
-                else:
-                    fallback_vols_used.add(sheet_vol)
         if template_ids_used:
             ged.extend(get_scrip_template_sources(template_ids_used, target_software))
-        if fallback_vols_used:
-            ged.extend(get_volume_sources(fallback_vols_used, target_software))
-    else:
-        ged.extend(get_volume_sources(vols_used, target_software))
 
     ged.append("0 TRLR")
 
