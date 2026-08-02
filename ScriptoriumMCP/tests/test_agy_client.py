@@ -100,3 +100,35 @@ def test_check_or_prompt_auth_returns_true_on_success(monkeypatch):
 def test_check_or_prompt_auth_returns_false_on_failure(monkeypatch):
     monkeypatch.setenv("FAKE_AGY_MODE", "fail")
     assert agy_client.check_or_prompt_auth("gemini-3.1-pro-high", cli_bin=FAKE_AGY) is False
+
+
+# ==========================================
+# QUOTA & RATE LIMIT PARSING TESTS
+# ==========================================
+def test_is_quota_or_rate_limit():
+    assert agy_client.is_quota_or_rate_limit("ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).")
+    assert agy_client.is_quota_or_rate_limit("Rate limit exceeded for model gemini-3.1-pro-high. Please try again later.")
+    assert agy_client.is_quota_or_rate_limit("Quota limit reached: reset at 2026-08-02T14:00:00Z")
+    assert agy_client.is_quota_or_rate_limit("Too many requests (429)")
+    assert not agy_client.is_quota_or_rate_limit("File not found: test.pdf")
+    assert not agy_client.is_quota_or_rate_limit("Syntax error on line 5")
+
+
+def test_parse_quota_reset_wait_seconds():
+    # Relative durations in seconds / minutes
+    assert agy_client.parse_quota_reset_wait_seconds("Quota exceeded, please retry in 45 seconds") == 45
+    assert agy_client.parse_quota_reset_wait_seconds("Rate limit reached. Retry after 2 minutes.") == 120
+    assert agy_client.parse_quota_reset_wait_seconds("Please wait 1 hour 15 minutes before retry.") == 4500
+    assert agy_client.parse_quota_reset_wait_seconds("retry after 90s") == 90
+
+    # Clock time: e.g. "reset at 14:30:00"
+    wait = agy_client.parse_quota_reset_wait_seconds("Quota resets at 23:59:59")
+    assert wait is not None and wait > 0
+
+    # Default fallback when no specific time found in rate limit message
+    default_wait = agy_client.parse_quota_reset_wait_seconds("429 Too Many Requests: Rate limit exceeded.")
+    assert default_wait == 60
+
+    # Non-quota message returns None
+    assert agy_client.parse_quota_reset_wait_seconds("Unknown server error 500") is None
+

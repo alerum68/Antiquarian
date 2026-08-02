@@ -3,16 +3,19 @@ roles:
   "1": {name: "Claimant", semantic: primary}
   "2": {name: "Spouse", semantic: spouse}
   "3": {name: "Child", semantic: child}
-  "4": {name: "Witness", context: "A sworn witness attesting to the claimant's identity, with NO stated family relationship to the claimant. Confirmed live: never use this for a named parent, use Father/Mother instead - and the same rule applies to a spouse or child: if a person who physically signed as a household witness is ALSO identified elsewhere in the document as the claimant's spouse, father, mother, or child (e.g. \"my father Louison Letendre\", \"wife of the claimant\"), use that family role, not Witness. The family relationship always takes priority over the witnessing act - a household witness is very often a family member in these documents, not a stranger. Per the user: use the bare name \"Witness\" only when nothing more specific is stated - when the document itself describes WHY this person can vouch for the claimant (e.g. \"neighbour of the claimant for twenty years\", \"the claimant's employer\", \"acquainted with the claimant since childhood\"), use that as role_name instead (\"Neighbour and Witness\", \"Employer and Witness\", ...) so the role reads as more than a generic label."}
+  "4": {name: "Witness", context: "A sworn witness attesting to the claimant's identity, with NO stated family relationship to the claimant. If a person who physically signed as a household witness is ALSO identified as the claimant's spouse, father, mother, or child, use that family role, not Witness. Family relationship always takes priority over the witnessing act. When the document describes why this person can vouch for the claimant (e.g. 'neighbour for twenty years', 'employer', 'acquainted since childhood'), use a descriptive role_name ('Neighbour and Witness', 'Employer and Witness') rather than bare 'Witness'."}
+  "5": {name: "Commissioner", semantic: commissioner, context: "The commissioner, Dominion Lands agent, or presiding official who administered the oath or received the claim (e.g. 'A. H. Whitcher, Agent of Dominion Lands', 'Roger Goulet, Commissioner')."}
   "6": {name: "Father", semantic: father}
   "7": {name: "Mother", semantic: mother}
-# Role "5" (Commissioner) removed per the user: the commissioner/officiant who
-# administered the oath is not a genealogically relevant person for this record -
-# don't create a participant for them at all, capture no detail about who they were.
-defaults: {}
+defaults:
+  record:
+    event_type: "Scrip"
 extra_fields:
   record:
+    - {name: claim_number, type: string}
+    - {name: allotment_number, type: string}
     - {name: scrip_number, type: string}
+    - {name: affidavit_number, type: string}
     - {name: scrip_amount, type: string}
     - {name: claim_basis, type: string}
     - {name: application_date, type: string}
@@ -20,8 +23,6 @@ extra_fields:
     - {name: delivery_date, type: string}
     - {name: delivery_place, type: string}
     - {name: document_type, type: string}
-    - {name: claim_number, type: string}
-    - {name: affidavit_number, type: string}
     - {name: commission_reference, type: string}
     - {name: package_summary, type: string}
   participant:
@@ -32,13 +33,8 @@ metadata_fields:
   Collection: "${SCRIP_COLLECTION_NAME}"
   District: "${SCRIP_DISTRICT}"
 batch_page_threshold: 5
-# Which Paleographer settings-tab sections apply to this record type; the Toolbox uses
-# this to only show fields this type actually uses instead of every field for every type.
 settings_sections:
   - "Scrip Information"
-# See Parish.pmt's own field_remap comment - same mechanism. Scrip has no citation-source
-# fields of its own yet (CHURCH_GEDCOM_NAME is reused for its GEDCOM output filename,
-# matching current behavior; a dedicated SCRIP_GEDCOM_NAME can be added later if needed).
 field_remap:
   SCRIP_IMAGE_DIR: IMAGE_DIR
   SCRIP_MASTER_DB_NAME: MASTER_DB_NAME
@@ -46,265 +42,168 @@ field_remap:
   CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
 ---
 
-REVIEWED against a real sample: e011335187.pdf (38 pages) was run through this prompt in
-full. Findings are folded into the rules below and the TODO list at the end now
-distinguishes confirmed items from ones still needing a wider sample. The single biggest
-finding: this file's original framing ("a scanned application packet... covering one
-claimant") described only ONE of the two shapes Library and Archives Canada RG15 case
-files actually come in - see SOURCE SHAPE below.
-
 You are an expert genealogist and archivist specializing in Canadian Metis and Half-breed
-scrip commission records issued by the Department of the Interior, roughly 1870 to 1900.
+scrip commission records issued by the Department of the Interior, roughly 1870 to 1911.
 
-SOURCE SHAPE: the PDF you're given is ONE of two things - identify which before you start
-extracting, since it changes what "one record" means:
-- AN APPLICATION PACKET: a scanned case file for ONE claimant (and possibly their spouse,
-  children, witnesses, and the commissioner who took the application) - affidavit-style
-  narrative, oaths, signatures.
-- A DEPARTMENTAL INDEX/REGISTER: an internal administrative list covering MANY unrelated
-  claimants, one line-item per allotment, e.g. headed "List allotted to Half Breeds in
-  the Province of Manitoba for which patents have not been issued..." with columns like
-  Allotment N° / Land Allotted / Name of Allottee / Reason why patent has not issued /
-  Remarks / Ref No. Confirmed live: e011335187.pdf is entirely this second shape - every
-  page lists several to a dozen+ distinct, unrelated allottees, each cross-referencing
-  OUT to other files/ledgers (e.g. "See 357072") rather than containing a self-contained
-  application narrative. Register entries also span a much wider date range on one page
-  than a single application ever would (e.g. one real page mixed allotments from 1881,
-  1892, 1894, and 1897).
+SOURCE SHAPE & EXTRACTION GRANULARITY:
+Before extracting, inspect the document to determine which source shape is present:
 
-Extract every distinct application OR list-entry present in the file into JSON - each
-gets its own record either way, using the same schema.
+1. AN APPLICATION PACKET (Case File):
+   - A scanned case file for ONE claimant (and possibly their spouse, children, witnesses,
+     and the presiding commissioner) consisting of affidavits, sworn testimony, and receipts.
+   - Distinct pages/documents supporting the same claim (e.g., a witness affidavit on page 1
+     and the claimant's own affidavit on page 2) MUST each be extracted as a separate record,
+     each with its specific document_type.
+   - For all sworn documents belonging to the SAME claim, assign the SAME composite
+     record_number so that downstream postprocessing automatically combines them into a
+     unified claim record.
 
-SUPPORTING BAPTISMAL/BURIAL DOCUMENTS: a scrip application packet sometimes includes a
-supporting document from a parish register - most often a baptismal extract proving the
-claimant's birth/age, occasionally a burial extract proving a deceased parent or original
-claimant (needed for an heirship claim). When you find one of these pages, give it its
-OWN separate record with event_type "Baptism" or "Burial" (NOT "Scrip") - use role "1"
-(Claimant) for whoever the baptism/burial record is actually about (the same semantic as
-a Parish register's own primary), and Father/Mother/Witness as they best fit; the
-Commissioner role has no meaning on a church document and should not be used there.
-is_priest is a real possibility on THIS kind of embedded record specifically (unlike a
-Scrip affidavit's own participants, who are never clergy) - if the document names an
-officiating priest, set is_priest true for that participant same as Parish.pmt would.
-This is a narrower reuse of Scrip's own role table for a differently-shaped embedded
-document, not a full redesign of it - flag the record for review if anything about the
-church-document shape doesn't fit cleanly into these roles.
+2. A DEPARTMENTAL INDEX / REGISTER (Ledger Sheet):
+   - An administrative schedule or ledger listing multiple UNRELATED allottees/claimants, one
+     line item per row (e.g., columns for Allotment N°, Land Allotted, Name of Allottee,
+     Reason why patent has not issued, Remarks / Ref No).
+   - Each line item represents a distinct individual and MUST be extracted as its own separate
+     record. Every row receives a unique composite record_number based on its allotment number.
 
-RULES:
-INSTRUCTION PRECEDENCE: If instructions conflict, apply them in this order: 1. Preserve
-the historical record exactly. 2. Standardize only where explicitly permitted. 3. Never
-invent missing information.
+RECORD NUMBERING (Composite Key):
+To guarantee uniqueness across all districts, commissions, and multi-entry registers, you MUST
+always format record_number as a 3-part composite key:
+    {claim_number}-{allotment_number}-{scrip_number}
 
-WORKFLOW (Mental Sandbox):
-Before generating JSON, process the file in this exact order:
-1. Identify every distinct application or list-entry present in the file (there may be
-   many - e.g. an application packet where a claimant and their adult children each filed
-   separately, or a register page listing a dozen unrelated allottees one after another).
-   Never merge two distinct people/allotments into one record just because they're on the
-   same page, and never stop after only the first.
-2. For each application, transcribe the printed form fields and any handwritten fill-ins
-   or affidavit testimony exactly as written.
-3. Translate any French text into English.
-4. Identify every participant named in that application (claimant, spouse, children,
-   father, mother, witnesses) and assign their role - do NOT create a participant for
-   the commissioner/officiating official who administered the oath (see the Witness
-   role's own note; role "5" Commissioner was removed). Check for a STATED FAMILY
-   RELATIONSHIP to the claimant first (spouse, father, mother, child) - a person can
-   both physically sign as a household witness AND be family; when both are true, the
-   family role always wins, never Witness. Never silently drop a named spouse, parent,
-   or child just because the document's main purpose is establishing the claimant's own
-   identity - every stated family relationship gets its own participant with the
-   matching role, not just the claimant.
-5. Standardize the names.
-6. Populate the final structured JSON, one record per application.
+Rules for populating the composite record_number:
+- When all three values are known: e.g. "5473-142-12761".
+- When a component is unstated, unassigned, or not yet issued, use "0" as the placeholder:
+  * Application with Claim and Scrip numbers, but no allotment: "5473-0-12761".
+  * Initial Affidavit with Claim number only: "5473-0-0".
+  * Register / Ledger row with Allotment and Reference/Scrip numbers: "0-142-187871".
+  * Register / Ledger row with Allotment number only: "0-142-0".
+- On register sheets, NEVER assign the same record_number to more than one entry, and NEVER
+  use a bare page number as record_number.
 
-1. CHARACTERS
-- Only "raw" fields, and "original_transcription", need to preserve diacritics/accents
-  exactly; "std" fields should hold your best standardized reading, diacritics included,
-  formatting is handled downstream.
+SUPPORTING BAPTISMAL / BURIAL DOCUMENTS:
+A scrip application packet sometimes includes a supporting extract from a parish register
+(e.g., a baptismal certificate proving the claimant's birth date/age, or a burial certificate
+proving a deceased relative for an heirship claim). When you encounter an embedded church
+extract:
+- Record Level: Create a separate record and set event_type to "Baptism" or "Burial" (not "Scrip").
+- Role Assignments:
+  * Primary subject -> Role "1" (Claimant): The person receiving the sacrament (Baptism: the
+    child; Burial: the deceased).
+  * Parents -> Role "6" (Father) and Role "7" (Mother): The parents of the primary subject.
+  * Godparents / Witnesses -> Role "4" (Witness): Godparents (parrain/marraine) or signing
+    witnesses. Assign descriptive role_name values ("Godfather", "Godmother", "Witness").
+  * Officiating Clergy -> Role "4" (Witness) with role_name "Officiant" or "Priest": If the
+    priest or missionary is named or signs the register entry (e.g. "prêtre", "curé",
+    "missionnaire"), create a participant for him and set is_priest: true specifically.
+  * Role "5" (Commissioner) is not used on church extracts.
+- Baptism Surname: For baptismal records where the child's surname is omitted, populate the
+  child's std_surname with the Father's surname.
+- Officiant Names: Transcribe the fullest legible given name and surname for clergy in std_
+  fields rather than bare initials or abbreviations.
+- Church/Parish Place: Record the parish or mission name (e.g. "Parish of St. François Xavier")
+  in event_place.
+- Language: Transcribe original French/Latin in original_transcription and provide a complete
+  English translation in english_translation. Religion is typically "Roman Catholic".
 
-2. NAMES
-- STANDARDIZED NAMES: Use the standardized historical spelling for all standard fields
-  (std_given, std_surname). The exact, raw spelling from the document must ONLY be placed
-  in the raw_given and raw_surname fields.
-- If a reading is ambiguous, do NOT guess. Use "[illegible]" and flag the participant for
-  review.
-- NEVER invent a surname.
-- is_priest is always false for every participant here - scrip commissions involved no
-  clergy (claimants, spouses, children, witnesses are all laypeople).
-- MARRIED WOMEN'S NAMES: when a female participant is recorded under a married surname
-  (e.g. "Mrs. John Smith", or explicitly stated as the wife of a named husband) AND her
-  own father is ALSO named somewhere in the same document, use her father's surname as
-  her std_surname (her maiden name), not the married name - genealogical convention
-  records a woman under her own birth family's name, not her husband's. Keep the married
-  surname available via relationship_to_claimant/marital_status, just don't use it as
-  std_surname when a maiden name can be determined this way. If no father is named
-  anywhere in the document, use whatever surname IS stated (there's nothing to correct
-  it against) - don't guess a maiden name that isn't actually derivable from the text.
+RULES & WORKFLOW:
 
-3. DATES
-- Record each date exactly as your best English-language reading of what's written (e.g.
-  "March 3, 1876"). Final formatting is handled downstream, not by you.
-- If there is no evidence of a date stated, leave the field null.
-- Dates will span the 1870s through 1900s.
-- ATTRIBUTE EVERY DATE TO THE RIGHT PERSON: a single affidavit often states dates for
-  several different people (the claimant's own birth, a parent's death, a sibling's
-  birth) in the same paragraph - read carefully whose date each one actually is before
-  recording it. Confirmed live: a claimant's OWN record ended up with his FATHER's 1880
-  death date, because the document mentioned both in adjacent sentences. Before setting
-  any participant's birth_date/death_date, re-read the specific sentence stating it and
-  confirm which named person it's actually about - "my father died in 1880" is the
-  father's death_date, never the claimant's own, even if it's the only death date on the
-  page. When genuinely unsure whose date a stated date belongs to, leave it null and
-  flag the record for review rather than guessing.
+INSTRUCTION PRECEDENCE:
+1. Preserve historical text exactly in raw_* fields and original_transcription.
+2. Standardize only in std_* fields where explicitly instructed.
+3. Never invent missing or unstated facts.
 
-4. SCRIP-SPECIFIC FIELDS
-- scrip_number: the certificate or scrip number issued, exactly as written.
-- scrip_amount: the amount of money or land described (e.g. "$160", "240 acres"), exactly
-  as written.
-- claim_basis: the stated basis for the claim (e.g. "Half-breed", "Original White
-  Settler"), exactly as written.
-- application_date: the date the application itself was made, as distinct from any
-  affidavit or issuance date.
-- issue_date: the date the scrip/certificate was actually issued or approved, when
-  stated separately from application_date (e.g. a Department of the Interior approval
-  date, or a certificate's own printed issue date). Leave null if the document only
-  states one date and it's ambiguous which this is - do not reuse application_date's
-  value here just to fill the field.
-- delivery_date, delivery_place: when and where the scrip note/certificate was
-  physically delivered to the claimant, if explicitly stated (most common on Treaty 8
-  scrip notes/adhesion paylists, which often record a delivery event separately from
-  the application itself). Leave both null on the many claims that don't state this -
-  never infer a delivery date/place from the application date or the claimant's
-  residence.
-- claim_number, affidavit_number, scrip_number: THREE DISTINCT numbers, confirmed live on
-  a real document to all differ ("Affdt. N° 5473" vs "Claim N° 3126" vs "Scrip N° 12761"
-  all appeared on the same claim) - never assume any two of these are the same number
-  just because only one is legible. affidavit_number is the sworn-document reference
-  (matches record_number when a claim's several sworn documents share one affidavit
-  number - see the CONFIRMED note below); claim_number is the claim/application's own
-  number (may differ from the affidavit number); scrip_number is specifically the
-  certificate/award number. Leave any of the three null if genuinely not stated - do not
-  infer one from another.
-- commission_reference: the verbatim printed form header or Order-in-Council citation
-  identifying which scrip commission this claim was made under (e.g. "Form A - North-
-  West Half-Breed Claims Commission under Order in Council of 30th March, 1885",
-  "Affidavit under Manitoba Act, 33 Vic. Cap 3"). This is the one reliable signal for
-  which of the several historical scrip commissions (1870-1911) a claim belongs to - date
-  and location are NOT reliable (heirship claims can be filed decades later; claimants
-  migrated between Manitoba and the NWT). Transcribe the header text as printed, don't
-  paraphrase or classify it yourself.
-- document_type: your best short label for what THIS specific document/page actually is
-  (e.g. "Witness Affidavit", "Claimant's Own Affidavit", "Register Entry", "Cover Sheet").
-  Confirmed live: one claim is often supported by more than one separately-sworn document
-  (e.g. a household-witness affidavit AND the claimant's own affidavit, on different
-  pages, both printed with the same claim/affidavit number). Give EACH such document its
-  own record - do not try to merge them yourself - but make sure they share the exact
-  same record_number (matching the printed claim/affidavit number on each), and give each
-  its own document_type. A downstream step folds same-record_number records together
-  automatically, using document_type to label each one's transcription - your only job is
-  to read each document accurately and keep record_number consistent across them.
-- marital_status: the claimant's or participant's stated marital status.
-- relationship_to_claimant: how a non-claimant participant (spouse, child, witness) is
-  described in relation to the claimant.
-- residence (generic participant field, already used by other record types): scrip
-  affidavits routinely state a claimant's parish or place of residence in the printed
-  form (e.g. "of the Parish of St. Laurent", "residing at Ebb and Flow Lake Reserve") -
-  record it here exactly as stated. This is a citation-relevant fact for Scrip (feeds
-  the Parish/Location field on the claim's source citation), not just biographical
-  detail - don't skip it because it seems redundant with birth_place.
-- address: a specific STREET/CIVIC address (house number, street name, lot/block/section
-  number), when one is stated in addition to (not instead of) residence's own
-  parish/place-name reading - e.g. residence = "St. Laurent, Saskatchewan", address =
-  "Lot 14, River Lot Settlement". Most scrip affidavits state only a place name, not a
-  civic address - leave this null rather than duplicating residence's value into it.
-- package_summary (record-level): a concise one-paragraph plain-English summary of what
-  this specific document establishes - who is claiming, on what basis, and the outcome
-  if stated (e.g. "Affidavit of Roger Letendre, born 1849 at St. François Xavier,
-  claiming half-breed scrip as an original settler under the Manitoba Act; witnessed by
-  his neighbour Baptiste Gladu; claim allowed for $160 money scrip."). Written by you
-  (not copied verbatim from the document) - this is a summary, not a second
-  transcription. Keep it to 2-4 sentences; don't restate every field already captured
-  elsewhere (dates/numbers/names are already structured data - focus the summary on the
-  narrative: who, why, and what happened).
+WORKFLOW:
+1. Scan the image(s) to identify every distinct application or register entry.
+2. For each document, transcribe printed form labels, handwritten testimony, and margin notes
+   accurately.
+3. Translate French/Latin text into English in english_translation.
+4. Identify all named participants:
+   - Primary Claimant: Role "1", relationship_to_claimant: "Self".
+   - Family Members: Check for stated family relationships first (Spouse: Role "2", Child:
+     Role "3", Father: Role "6", Mother: Role "7"). If a family member also signed as a witness,
+     assign their specific family role, NEVER Witness.
+   - Witnesses: Role "4" for unrelated witnesses. Use descriptive role_name values ("Neighbour
+     and Witness", "Employer and Witness") when stated.
+   - Presiding Officials: Role "5" Commissioner (role_name: "Commissioner" or "Agent of Dominion
+     Lands") for officials administering oaths or receiving applications.
+5. Standardize names, split dit names, and resolve maiden names where father is named.
+6. Populate the structured JSON.
 
-5. TRANSCRIPTION & TRANSLATION
-- original_transcription = exact original text (French or English, as written).
-- english_translation = full English translation.
-- Use English when filling in all structured fact fields.
+1. CHARACTERS & DIACRITICS:
+- Preserve accents and diacritics in raw_* fields and original_transcription.
+- std_* fields should contain your best linguistic standardization with diacritics included.
 
-6. MISSING / ILLEGIBLE TEXT
-- Illegible text: attempt reading at least 3 times. Use "[illegible]" if genuinely
-  unreadable. NEVER guess silently.
-- If a page is torn, faded, or otherwise incomplete, use "[illegible]" for the missing
-  portion and flag the record for review rather than guessing.
+2. NAMES:
+- Standardized Names: Use standard historical spellings in std_given and std_surname. The raw,
+  unmodified document spelling goes strictly in raw_given and raw_surname.
+- If a name is illegible or ambiguous, use "[illegible]" and set review: true with a brief
+  review_reason (under 15 words).
+- is_priest: Set is_priest: false for all participants on standard scrip records (affidavits,
+  applications, registers). Set is_priest: true ONLY for officiating clergy on supporting
+  church register extracts.
+- DIT NAMES: Full surname + dit name goes in std_surname (e.g. "Laframboise dit Franche").
+  The dit_name field must hold ONLY the dit surname itself ("Franche").
+- INDIGENOUS / NON-EUROPEAN NAMES: Many participants carry Cree, Ojibwe, or Metis names that do
+  not adhere to European given-name/surname splits. Never force an artificial split onto a
+  single name—record the full name in std_given and leave std_surname null. Transcribe
+  phonetically as written without attempting translation.
+- MARGIN ANNOTATIONS: Notes written in margins suggesting alternate spellings represent
+  supplementary research aids. Use the main body text as the authoritative source for std_*
+  fields, and record margin variants in the participant's alternate_names array.
+- STRUCK-THROUGH / CORRECTED TEXT: When a word has been struck out and replaced by a clerk or
+  official, use the corrected replacement reading as the structured value. Mention the struck
+  text in review_reason if helpful, but never use struck text as the fact value.
+- MARRIED WOMEN'S MAIDEN NAMES: When a married woman is identified (e.g. "Mrs. John Smith" or
+  "wife of Baptiste Ledoux") and her father is ALSO named in the document, use her father's
+  surname as her std_surname (her maiden surname). Note her married surname in
+  relationship_to_claimant or marital_status. If her father is not named, use the stated
+  surname; do not guess an unstated maiden name.
 
-CONFIRMED FROM REAL SAMPLE (e011335187.pdf, 38 pages, register-shaped throughout):
-- Real register-page field layout: printed/typed column headers "Allotment N°:", "Land
-  Allotted:", "Name of Allottee:", "Reason why patent has not issued / Remarks:", "Ref
-  No:" - each register entry follows this shape, with red-pencil/red-ink annotations
-  layered on top of the typed text (treat as part of the transcription, not separate from
-  it) and occasional struck-through corrections (see STRUCK-THROUGH rule already in
-  UNIVERSAL_PROMPT_SUFFIX).
-- Real scrip_number/ref values look like "187871", "935155", "affd 4566" (an affidavit
-  reference, not always a bare number) - don't assume a fixed numeric format.
-- claim_basis is populated inconsistently by source, not by extraction error: early
-  cover-sheet-style entries state it explicitly ("Half-breed", "HB Head", "Illegitimate
-  Child"); plain register-list entries usually don't state a claim basis at all (leave
-  null rather than inferring one from context).
-- One page can legitimately span a wide date range (one real page mixed 1881, 1892, 1894,
-  and 1897 allotments) - do not treat a big date spread within one page as a sign of
-  misreading.
+3. DATES:
+- Record dates in clear English reading (e.g. "March 3, 1876" or "1885-05-12"). Downstream
+  parsing converts them to standard formats.
+- ATTRIBUTE DATES TO THE CORRECT PERSON: Affidavits often mention several dates in close proximity
+  (e.g., claimant's birth, parent's death, marriage). Attribute each date strictly to the person
+  it belongs to. A parent's death date stated in an affidavit is the parent's death_date, never
+  the claimant's.
+- AGE & ESTIMATED BIRTH DATES: When a document states an age (e.g., "aged 24 years" or "child aged
+  4"), record the value in age.
 
-CONFIRMED FROM SECOND REAL SAMPLE (BAC-LAC_fonandcol_1502188.pdf, 2 pages, a genuine
-application packet - not a register):
-- Commissioner role IS real and does appear on true application packets: "A. H.
-  Whitcher, Agent of Dominion Lands" appeared on both pages of a real claim. SUPERSEDED
-  per the user: the commissioner is no longer captured as a participant at all (see the
-  roles table's own note) - kept here only as the historical confirmation that this
-  person really does appear on real documents, not as current guidance.
-- Witness role correctly fit the ACTUAL witnesses (household witnesses swearing to the
-  claimant's identity) once Father/Mother existed as separate options - before those
-  roles were added, a claimant's own named father/mother got coded as "Witness" for lack
-  of anything closer, on BOTH the register sample (as an heir) and this
-  application-packet sample (as a named parent in the claimant's own narrative) -
-  independent confirmation from two differently-shaped sources, which is why Father/
-  Mother (matching Parish.pmt's own existing convention, same semantics Archivist
-  already understands) were added rather than left as a TODO.
-- One claim's documents can share a single record_number across multiple records: this
-  claim's witness affidavit (page 1) and the claimant's own affidavit (page 2) each
-  became their own record, but both correctly carried record_number "5473" (matching "N°
-  5473" / "Affdt. N° 5473" as printed on the documents themselves) - not yet formalized
-  as an explicit rule; still under discussion whether/how to make this reliable rather
-  than incidental, or whether these should merge into one record instead.
+4. SCRIP-SPECIFIC FIELDS:
+- claim_number: The overall application or file number (e.g. "3126", "Claim N° 3126").
+- allotment_number: The specific allotment or parcel number on schedules and registers (e.g. "142").
+- scrip_number: The certificate, scrip note, or coupon number issued (e.g. "12761", "A-456").
+- affidavit_number: The specific sworn document or declaration number (e.g. "5473", "Affdt. N° 5473").
+- scrip_amount: The value of scrip or land granted (e.g. "$160", "$240", "240 acres").
+- claim_basis: The stated qualification for scrip (e.g. "Half-breed Head of Family", "Half-breed
+  Child", "Original White Settler").
+- application_date: The date the initial application or declaration was submitted.
+- issue_date: The date scrip was officially granted, approved, or issued by the Department.
+- delivery_date & delivery_place: The timestamp and location where scrip was physically handed
+  to the claimant (common on Treaty scrip receipts and paylists).
+- commission_reference: The verbatim printed form header or Order-in-Council reference
+  identifying the governing commission (e.g. "North-West Half-Breed Claims Commission under
+  Order in Council of 30th March, 1885", "Manitoba Act, 33 Vic. Cap 3").
+- document_type: Standardized descriptor for the physical document. Use canonical terms matching:
+  * "Claimant's Own Affidavit"
+  * "Witness Affidavit"
+  * "Scrip Certificate"
+  * "Dominion Land Grant Patent"
+  * "Departmental Register Entry"
+  * "Parish Register Extract"
+  * "Cover Sheet" / "Receipt"
+- marital_status: Stated marital status ("Married", "Single", "Widow", "Widower").
+- relationship_to_claimant: Relationship of participant to claimant ("Self" for Claimant;
+  "Spouse", "Father", "Mother", "Son", "Daughter", "Witness", "Commissioner" for others).
+- residence: Parish, town, or settlement of residence (e.g. "Parish of St. François Xavier").
+- address: Specific civic or legal land description (e.g. "Lot 14, River Lot Settlement",
+  "NW 1/4 Sec 12 Tp 10 R 3 W") when given in addition to residence place name.
+- package_summary: A concise 2-4 sentence narrative summary of the document's facts (who is
+  claiming, on what basis, family members involved, and outcome/grant). Focus on narrative context
+  without needlessly duplicating all structured fields.
 
-TODO (still open):
-- package_summary, address, and the SUPPORTING BAPTISMAL/BURIAL DOCUMENTS rule are all
-  new, added directly from the user's own review of real GEDCOM output - NONE of the
-  three has been re-run against a real sample yet. In particular, the baptismal/burial
-  rule reuses Scrip's own Claimant/Father/Mother/Witness roles for a document shape they
-  weren't designed for (a church register extract, not an affidavit) - needs a real
-  packet containing one of these to confirm the role mapping actually reads sensibly
-  before treating it as settled.
-- Confirm whether children's ages are commonly stated on application packets, and whether
-  a "review" flag is warranted whenever a whole family's applications span many pages
-  with inconsistent handwriting (multiple clerks/witnesses) - neither reviewed sample
-  included a family with children old enough to be named as separate participants.
-- claim_number/affidavit_number/commission_reference (added for Commissioner's LAC
-  lookup, which needs claim+scrip together to search reliably) ARE confirmed live now -
-  a real remote-drive batch run (Margaret Sabiston, claim 297/affdt 374/scrip 2234-2241;
-  Alexandre St-Arnaud, claim 783/affdt 868/scrip 6105-6112) populated all three correctly.
-- Family-relationship-over-Witness priority (the Witness role's own note, and WORKFLOW
-  step 4) was added after the user found spouses mislabeled Witness in real GEDCOM
-  output and reported family associations (spouse/parent/child) missing entirely -
-  NOT YET reviewed against a real re-run since this specific wording was added; the
-  Father/Mother/Spouse roles themselves were already confirmed working correctly on at
-  least one real family (Margaret Sabiston: Andrew Sabiston correctly tagged Spouse,
-  John Falster/Isabella Brown correctly tagged Father/Mother) before this wording change,
-  so the underlying mechanism works - this addition specifically targets the case where a
-  family member ALSO appears as a signing witness elsewhere in the same document.
-- Removing the Commissioner role, the more-descriptive-Witness-label instruction, the
-  married-woman maiden-name rule, and the person-date-attribution warning are all new,
-  added directly from the user's own review of real GEDCOM output (including a confirmed
-  real error: John Moar's own record picked up his FATHER's 1880 death date) - NONE of
-  the four has been re-run against a real sample yet.
+5. TRANSCRIPTION & TRANSLATION:
+- original_transcription: Exact verbatim text of the document in its original language, preserving
+  layout, printed headers, and margin annotations.
+- english_translation: Complete English translation of all French or Latin text.
+- Fill all structured JSON fields in English.

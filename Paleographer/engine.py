@@ -37,6 +37,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from PDFix.PDFix import optimize_pdf, COMPRESSION_PARAMS  # noqa: E402
+from ScriptoriumMCP import agy_client  # noqa: E402
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_TYPE = "Parish.pmt"
@@ -445,12 +446,15 @@ def run_with_retries(call_fn: Callable[[], Any], max_retries: int = 10, max_json
             error_msg = str(api_error)
             if "PerDay" in error_msg:
                 raise DailyQuotaExhausted(error_msg) from api_error
-            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or agy_client.is_quota_or_rate_limit(error_msg):
                 match = re.search(r"retry in (\d+\.?\d*)s", error_msg)
-                wait_time = float(match.group(1)) + 1.5 if match else 35.0 * float(2 ** attempts)
-                print(f"   [!] Rate limit hit. Sleeping {wait_time:.2f}s (attempt {attempts + 1})...",
-                      end="", flush=True)
-                time.sleep(wait_time)
+                if match:
+                    wait_time = float(match.group(1)) + 1.5
+                else:
+                    wait_time = agy_client.parse_quota_reset_wait_seconds(error_msg)
+                    if wait_time is None:
+                        wait_time = 35.0 * float(2 ** attempts)
+                agy_client.pause_for_quota_reset(wait_time, reason=f"Rate limit hit ({error_msg[:60]})")
                 attempts += 1
             elif "500" in error_msg or "503" in error_msg or "504" in error_msg:
                 print(f"   [!] Google Server Error ({error_msg[:30]}). Sleeping 5s...", end="", flush=True)
@@ -458,6 +462,7 @@ def run_with_retries(call_fn: Callable[[], Any], max_retries: int = 10, max_json
                 attempts += 1
             else:
                 raise
+
 
     raise RuntimeError(f"Exhausted all {max_retries} retries")
 

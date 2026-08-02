@@ -311,16 +311,9 @@ def call_agy_extract_chunked(images: List[Image.Image], schema: Dict[str, Any], 
 # ==========================================
 def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_MAX_RETRIES,
                           backoff_seconds: float = DEFAULT_BACKOFF_SECONDS) -> Any:
-    """Retries agy_client.AgyCallError with linear backoff, EXCEPT fails fast (no
-    retry) when the error is an AgyBinaryNotFoundError - retrying a binary that will
-    never be found wastes max_retries x backoff for nothing. Raises RuntimeError after
-    exhausting retries, matching engine.run_with_retries' external contract so
-    Paleographer.py's existing `except RuntimeError` handling at the
-    process_one_file_sync call site needs no new branching.
-
-    No daily-quota-style stop-the-run signal exists for agy (accepted gap vs.
-    engine.DailyQuotaExhausted - not modeled as equivalent; no such signal has been
-    observed or documented for agy)."""
+    """Retries agy_client.AgyCallError with linear backoff, and automatically pauses
+    execution when quota or rate limit reset times are encountered, restarting gracefully
+    at the exact same spot once the reset time arrives. Fails fast on AgyBinaryNotFoundError."""
     last_error: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
         try:
@@ -329,12 +322,24 @@ def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_
             raise RuntimeError(str(e)) from e
         except agy_client.AgyCallError as e:
             last_error = e
+            err_msg = str(e)
+            if agy_client.is_quota_or_rate_limit(err_msg):
+                wait_time = agy_client.parse_quota_reset_wait_seconds(err_msg)
+                if wait_time is not None and wait_time > 0:
+                    agy_client.pause_for_quota_reset(wait_time, reason=f"agy quota limit hit: {err_msg[:80]}")
+                    continue
+                else:
+                    pause_wait = 30.0 * float(2 ** (attempt - 1))
+                    agy_client.pause_for_quota_reset(pause_wait, reason=f"agy rate limit hit: {err_msg[:80]}")
+                    continue
+
             if attempt < max_retries:
                 wait = backoff_seconds * attempt
                 print(f"   [!] agy call failed (attempt {attempt}/{max_retries}): {e} "
                       f"Retrying in {wait:.0f}s...", flush=True)
                 time.sleep(wait)
     raise RuntimeError(f"agy call failed after {max_retries} attempts: {last_error}") from last_error
+
 
 
 # ==========================================

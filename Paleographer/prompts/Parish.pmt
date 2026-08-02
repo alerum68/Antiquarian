@@ -110,7 +110,7 @@ Before generating JSON, you must process the record in this exact order:
 - Standard clerical phrases must make grammatical sense.
 
 5. DATES
-- Record the date exactly as your best English-language reading of what's written (e.g. "December 12, 1850"). Final formatting is handled downstream, not by you.
+- Record dates in standard ISO (YYYY-MM-DD) or standard genealogy format (DD MMM YYYY) when day and month are known (e.g. "1850-12-12" or "12 Dec 1850"); use YYYY or YYYY-MM if partially known. Final formatting is handled downstream.
 - If there is no evidence of a date stated, leave the field null. Infer if possible directly from text.
 - All dates will span either the 1700s or 1800s.
 

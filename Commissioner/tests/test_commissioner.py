@@ -428,3 +428,285 @@ def test_retrieve_volume_runs_both_passes(tmp_path, monkeypatch):
                                           checkpoint_path=checkpoint_path)
     assert result["pids"] == ["1", "2"]
     assert result["downloaded_pids"] == ["1", "2"]
+
+
+# ==========================================
+# extract_citation_fields
+# ==========================================
+def test_extract_citation_fields_parses_all_scrip_fields():
+    citation = "Scrip affidavit for Letendre, Roger; claim no. 5473; scrip no. 12751; allotment no. 142; date of issue: 5 May 1886; amount: 240 dollars"
+    parsed = commissioner.extract_citation_fields(citation)
+    assert parsed["claim_number"] == "5473"
+    assert parsed["scrip_number"] == "12751"
+    assert parsed["allotment_number"] == "142"
+    assert parsed["issue_date"] == "5 May 1886"
+    assert parsed["scrip_issue_date"] == "5 May 1886"
+    assert parsed["scrip_amount"] == "240 dollars"
+
+
+def test_extract_citation_fields_handles_empty():
+    assert commissioner.extract_citation_fields("") == {}
+    assert commissioner.extract_citation_fields(None) == {}
+
+
+# ==========================================
+# collection classification & partitioning
+# ==========================================
+def test_collection_for_series_code():
+    res = commissioner.collection_for_series_code("RG15-D-II-8-a-i")
+    assert res is not None
+    assert res[0] == "RG15-D-II-8-a"
+    assert res[1] == "Affidavits, 1870-1885"
+    assert res[2] == "Finding Aid 15-19"
+    assert res[3] == "confirmed"
+
+    assert commissioner.collection_for_series_code("UNKNOWN-CODE") is None
+    assert commissioner.collection_for_series_code(None) is None
+
+
+def test_collection_for_volume():
+    res_b = commissioner.collection_for_volume("1326", None)
+    assert res_b[0] == "RG15-D-II-8-b"
+    assert res_b[3] == "inferred"
+
+    res_c = commissioner.collection_for_volume(None, "1331-1340")
+    assert res_c[0] == "RG15-D-II-8-c"
+    assert res_c[3] == "inferred"
+
+    # Straddling range should return None
+    assert commissioner.collection_for_volume(None, "1324-1335") is None
+
+
+def test_classify_sheet_collection_prefers_series_code():
+    sheet = {
+        "records": [{"type_specific_fields": {"rg_series_code": "RG15-D-II-8-a"}}],
+        "document_metadata": {"volume": "1335"},  # in series c volume range
+    }
+    code, title, fa, status = commissioner.classify_sheet_collection(sheet)
+    assert code == "RG15-D-II-8-a"
+    assert status == "confirmed"
+
+
+def test_partition_json_by_collection(tmp_path):
+    data = {
+        "record_type_name": "Scrip",
+        "sheets": [
+            {
+                "page_id": "p1",
+                "records": [{"type_specific_fields": {"rg_series_code": "RG15-D-II-8-a"}}],
+            },
+            {
+                "page_id": "p2",
+                "document_metadata": {"volume": "1328"},
+                "records": [{}],
+            },
+            {
+                "page_id": "p3",
+                "records": [{}],
+            },
+        ],
+    }
+    out_dir = tmp_path / "by_collection"
+    partitions = commissioner.partition_json_by_collection(data, out_dir)
+
+    assert "RG15-D-II-8-a" in partitions
+    assert "RG15-D-II-8-b" in partitions
+    assert "unclassified" in partitions
+
+    with open(partitions["RG15-D-II-8-a"], encoding="utf-8") as f:
+        p_a = json.load(f)
+        assert p_a["collection_title"] == "Affidavits, 1870-1885"
+        assert len(p_a["sheets"]) == 1
+
+    with open(partitions["RG15-D-II-8-b"], encoding="utf-8") as f:
+        p_b = json.load(f)
+        assert p_b["collection_title"] == "Applications, 1885"
+        assert len(p_b["sheets"]) == 1
+
+    with open(partitions["unclassified"], encoding="utf-8") as f:
+        p_u = json.load(f)
+        assert len(p_u["sheets"]) == 1
+
+
+# ==========================================
+# Metadata Enrichment
+# ==========================================
+def test_enrich_record_from_lac_metadata():
+    sheet = {"document_metadata": {}}
+    record = {"type_specific_fields": {}}
+    meta = FakeMetadata(
+        "1502188",
+        "Scrip affidavit for Letendre, Roger; claim no. 5473; date of issue: 5 May 1886",
+        reel_numbers=["C-14929"],
+        series_code="RG15-D-II-8-a",
+    )
+
+    commissioner.enrich_record_from_lac_metadata(sheet, record, meta)
+
+    assert record["lac_catalog_title_live"] == meta.title
+    assert sheet["document_metadata"]["reel_numbers"] == ["C-14929"]
+    assert record["type_specific_fields"]["rg_series_code"] == "RG15-D-II-8-a"
+    assert record["type_specific_fields"]["reel_numbers"] == "C-14929"
+    assert record["type_specific_fields"]["claim_number"] == "5473"
+    assert record["type_specific_fields"]["issue_date"] == "5 May 1886"
+
+
+def test_enrich_json_data_with_checkpoint(tmp_path, monkeypatch):
+    monkeypatch.setattr(lac_client, "get_record_metadata",
+                        lambda pid: FakeMetadata(pid, f"Scrip affidavit; claim no. {pid}", reel_numbers=["C-1234"]))
+
+    checkpoint_path = str(tmp_path / "enrich_checkpoint.json")
+    data = {
+        "record_type_name": "Scrip",
+        "sheets": [
+            {"document_metadata": {"pid": "101"}, "records": [{}]},
+            {"document_metadata": {"pid": "102"}, "records": [{}]},
+        ],
+    }
+
+    result = commissioner.enrich_json_data(data, checkpoint_path=checkpoint_path, delay_seconds=0.0)
+    assert result["sheets"][0]["records"][0]["type_specific_fields"]["claim_number"] == "101"
+    assert result["sheets"][1]["records"][0]["type_specific_fields"]["claim_number"] == "102"
+
+    checkpoint = commissioner.load_checkpoint(checkpoint_path)
+    assert checkpoint["done_pids"] == ["101", "102"]
+
+
+# ==========================================
+# Mojibake & Maiden Name Resolution
+# ==========================================
+def test_fix_mojibake():
+    assert commissioner.fix_mojibake("Geneviã¨ve") == "Geneviève"
+    assert commissioner.fix_mojibake("mÃ©tis") == "métis"
+    assert commissioner.fix_mojibake("St. FranÃ§ois Xavier") == "St. François Xavier"
+    assert commissioner.fix_mojibake("Normal Name") == "Normal Name"
+
+
+def test_build_composite_record_number():
+    tf = {"claim_number": "297", "allotment_number": "", "scrip_number": "2234 to 2241"}
+    assert commissioner.build_composite_record_number(tf) == "297-0-2234 to 2241"
+
+    tf2 = {"claim_number": "100", "allotment_number": "50", "scrip_number": "200"}
+    assert commissioner.build_composite_record_number(tf2) == "100-50-200"
+
+    assert commissioner.build_composite_record_number({}) == "0-0-0"
+
+
+def test_resolve_maiden_name_for_record():
+    record = {
+        "lac_catalog_title": "scrip affidavit for sabiston, margaret; born: january 21, 1851; husband: john sabiston; father: john falster",
+        "participants": [
+            {
+                "role_number": "1", "role_name": "Claimant", "role_semantic": "primary",
+                "std_given": "Margaret", "std_surname": "Sabiston", "sex": "F",
+            },
+            {
+                "role_number": "6", "role_name": "Father", "role_semantic": "father",
+                "std_given": "John", "std_surname": "Falster", "sex": "M",
+            },
+            {
+                "role_number": "2", "role_name": "Spouse", "role_semantic": "spouse",
+                "std_given": "John", "std_surname": "Sabiston", "sex": "M",
+            },
+        ],
+    }
+
+    modified = commissioner.resolve_maiden_name_for_record(record)
+    assert modified is True
+    primary = record["participants"][0]
+    assert primary["std_surname"] == "Falster"
+    assert primary["alternate_names"] == [{"value": "Margaret Sabiston"}]
+
+
+def test_resolve_maiden_name_via_enrichment():
+    sheet = {"document_metadata": {}}
+    record = {
+        "type_specific_fields": {},
+        "participants": [
+            {
+                "role_number": "1", "role_name": "Claimant", "role_semantic": "primary",
+                "std_given": "Marie", "std_surname": "Grant", "sex": "F",
+            },
+            {
+                "role_number": "6", "role_name": "Father", "role_semantic": "father",
+                "std_given": "Pierre", "std_surname": "Bastien", "sex": "M",
+            },
+        ],
+    }
+    meta = FakeMetadata(
+        "1500000",
+        "Scrip affidavit for Grant, Marie; father: Pierre Bastien; claim no. 123",
+    )
+
+    commissioner.enrich_record_from_lac_metadata(sheet, record, meta)
+    primary = record["participants"][0]
+    assert primary["std_surname"] == "Bastien"
+    assert primary["alternate_names"] == [{"value": "Marie Grant"}]
+    assert record["record_number"] == "123-0-0"
+
+
+def test_parse_single_name_compound():
+    # Compound prefixes: St., De La, Le, Des
+    g, s, d = commissioner.parse_single_name("Bonaventure St. Arnaud")
+    assert g == "Bonaventure"
+    assert s == "St. Arnaud"
+    assert d == ""
+
+    g, s, d = commissioner.parse_single_name("Pierre De La Ronde")
+    assert g == "Pierre"
+    assert s == "De La Ronde"
+    assert d == ""
+
+    g, s, d = commissioner.parse_single_name("Joseph Le Blanc")
+    assert g == "Joseph"
+    assert s == "Le Blanc"
+    assert d == ""
+
+    g, s, d = commissioner.parse_single_name("Marie Des Ruisseaux")
+    assert g == "Marie"
+    assert s == "Des Ruisseaux"
+    assert d == ""
+
+    # Dit name parsing
+    g, s, d = commissioner.parse_single_name("Jean Baptiste Bruneau dit Charron")
+    assert g == "Jean Baptiste"
+    assert s == "Bruneau dit Charron"
+    assert d == "Charron"
+
+
+def test_fix_all_participant_names():
+    record = {
+        "participants": [
+            {
+                "role_number": "1", "role_name": "Claimant", "role_semantic": "primary",
+                "std_given": "Jean Baptiste", "std_surname": "St. Arnaud", "sex": "",
+            },
+            {
+                "role_number": "6", "role_name": "Father", "role_semantic": "father",
+                "std_given": "Bonaventure St.", "std_surname": "Arnaud", "sex": "M",
+            },
+            {
+                "role_number": "7", "role_name": "Mother", "role_semantic": "mother",
+                "std_given": "Marie De La", "std_surname": "Ronde", "sex": "F",
+            },
+        ],
+    }
+
+    modified = commissioner.fix_all_participant_names_in_record(record)
+    assert modified is True
+
+    p_claimant = record["participants"][0]
+    p_father = record["participants"][1]
+    p_mother = record["participants"][2]
+
+    assert p_claimant["std_given"] == "Jean Baptiste"
+    assert p_claimant["std_surname"] == "St. Arnaud"
+
+    assert p_father["std_given"] == "Bonaventure"
+    assert p_father["std_surname"] == "St. Arnaud"
+
+    assert p_mother["std_given"] == "Marie"
+    assert p_mother["std_surname"] == "De La Ronde"
+
+
+

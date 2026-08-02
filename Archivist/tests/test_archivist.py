@@ -717,6 +717,32 @@ def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
         arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
 
+def test_build_gedcom_from_general_excludes_commissioner_from_indis():
+    """Participants with role_semantic 'commissioner' are captured in JSON for archival reference
+    and LAC lookup, but must never be emitted as INDI records or witness associations in GEDCOM."""
+    data = {
+        "metadata": {"source_name": "Test Scrip", "volume": "1324"},
+        "sheets": [{
+            "sheet_metadata": {"file_name": "test.jpg"},
+            "records": [{
+                "event_type": "Scrip", "record_number": "101", "record_id": "SC-101", "page": "1",
+                "type_specific_fields": {"claim_number": "101"},
+                "participants": [
+                    make_participant("primary", given="Pierre", surname="Falcon"),
+                    make_participant("commissioner", role_name="Commissioner", given="Roger", surname="Goulet"),
+                    make_participant(None, role_name="Witness", given="Louis", surname="Riel"),
+                ],
+            }],
+        }],
+    }
+    ged = arc.build_gedcom_from_general(data, "RM")
+    # Pierre Falcon (claimant) and Louis Riel (witness) get INDIs; Roger Goulet (commissioner) must NOT
+    assert "1 NAME Pierre /Falcon/" in ged
+    assert "1 NAME Louis /Riel/" in ged
+    assert "Roger" not in ged
+    assert "Goulet" not in ged
+
+
 def test_build_individual_baptism_event_gets_no_type_line():
     """A standard GEDCOM-tagged event (Baptism -> BAPM) must not gain a '2 TYPE' line or
     any value text on its '1 BAPM' line - that's exclusively for the 'EVEN' fallback case."""
@@ -915,3 +941,18 @@ def test_build_individual_researcher_citation_has_both_name_and_titl():
     joined = "\n".join(lines)
     assert "2 NAME Researcher:" in joined
     assert "2 _TITL Researcher:" in joined
+
+
+def test_format_gedcom_date_handles_iso_and_natural_text():
+    assert arc.format_gedcom_date("1850-12-12") == "12 DEC 1850"
+    assert arc.format_gedcom_date("1850-06") == "JUN 1850"
+    assert arc.format_gedcom_date("1850") == "1850"
+    assert arc.format_gedcom_date("December 12, 1850") == "12 DEC 1850"
+    assert arc.format_gedcom_date("12 December 1850") == "12 DEC 1850"
+    assert arc.format_gedcom_date("15 Jun 1875") == "15 JUN 1875"
+    assert arc.format_gedcom_date("June 1875") == "JUN 1875"
+    assert arc.format_gedcom_date("ABT 1850-12-12") == "ABT 12 DEC 1850"
+    assert arc.format_gedcom_date("BEF December 12, 1850") == "BEF 12 DEC 1850"
+    assert arc.format_gedcom_date("BET 1850 AND 1855") == "BET 1850 AND 1855"
+    assert arc.format_gedcom_date("") == ""
+

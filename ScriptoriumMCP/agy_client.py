@@ -18,10 +18,13 @@ synchronously (subprocess, not asyncio) to match how Paleographer actually calls
 """
 
 import json
+import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -251,3 +254,105 @@ def check_or_prompt_auth(model: str, cli_bin: str = DEFAULT_CLI_BIN,
     result = _run_agy(["--model", model, "-p", "reply OK"], cwd=Path.cwd(),
                        cli_bin=cli_bin, timeout_seconds=timeout_seconds, interactive=True)
     return result.returncode == 0
+
+
+# ==========================================
+# QUOTA & RATE LIMIT HANDLING
+# ==========================================
+QUOTA_RATE_LIMIT_KEYWORDS = [
+    "429",
+    "resource_exhausted",
+    "resourceexhausted",
+    "rate limit",
+    "quota",
+    "too many requests",
+    "please wait",
+    "before retry",
+    "retry after",
+    "retry in",
+    "resets at",
+    "reset at",
+]
+
+
+def is_quota_or_rate_limit(error_msg: str) -> bool:
+    """Returns True if the given error string indicates an API rate limit or quota exhaustion."""
+    if not error_msg:
+        return False
+    lower = error_msg.lower()
+    return any(kw in lower for kw in QUOTA_RATE_LIMIT_KEYWORDS)
+
+
+def parse_quota_reset_wait_seconds(error_msg: str) -> Optional[float]:
+    """Parses relative duration or reset timestamp from a quota/rate limit error message.
+    Returns wait seconds (float or int), or 60 as default if it's a quota error without specific time.
+    Returns None if error_msg is not a quota/rate limit error."""
+    if not is_quota_or_rate_limit(error_msg):
+        return None
+
+    # Hours
+    hr_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b', error_msg, flags=re.I)
+    # Minutes
+    min_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:minutes?|mins?|m)\b', error_msg, flags=re.I)
+    # Seconds
+    sec_match = re.search(r'(?:in|after|retry|wait)?\s*(\d+(?:\.\d+)?)\s*(?:seconds?|secs?|s)\b', error_msg, flags=re.I)
+
+    total_seconds = 0.0
+    matched_duration = False
+
+    if hr_match:
+        total_seconds += float(hr_match.group(1)) * 3600
+        matched_duration = True
+    if min_match:
+        total_seconds += float(min_match.group(1)) * 60
+        matched_duration = True
+    if sec_match:
+        total_seconds += float(sec_match.group(1))
+        matched_duration = True
+
+    if matched_duration and total_seconds > 0:
+        return int(total_seconds) if total_seconds.is_integer() else total_seconds
+
+    # Check for ISO timestamp: e.g. "2026-08-02T14:00:00Z"
+    iso_match = re.search(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?', error_msg)
+    if iso_match:
+        try:
+            iso_str = iso_match.group(0)
+            if iso_str.endswith("Z"):
+                iso_str = iso_str[:-1] + "+00:00"
+            reset_dt = datetime.fromisoformat(iso_str)
+            if reset_dt.tzinfo is None:
+                reset_dt = reset_dt.replace(tzinfo=timezone.utc)
+            now = datetime.now(timezone.utc)
+            diff = (reset_dt - now).total_seconds()
+            return max(int(diff), 1)
+        except Exception:
+            pass
+
+    # Check for clock time: e.g. "resets at 23:59:59" or "at 14:30:00"
+    clock_match = re.search(r'\b(?:at|reset[s]?\s+at)\s+(\d{1,2}):(\d{2})(?::(\d{2}))?', error_msg, flags=re.I)
+    if clock_match:
+        try:
+            ch, cm, cs = int(clock_match.group(1)), int(clock_match.group(2)), int(clock_match.group(3) or 0)
+            now = datetime.now()
+            target = now.replace(hour=ch, minute=cm, second=cs, microsecond=0)
+            if target <= now:
+                target += timedelta(days=1)
+            diff = (target - now).total_seconds()
+            return max(int(diff), 1)
+        except Exception:
+            pass
+
+    # Default fallback when rate limit detected but no duration string parsed
+    return 60
+
+
+def pause_for_quota_reset(wait_seconds: float, reason: str = "") -> None:
+    """Pauses execution cleanly when a quota or rate limit is hit, informing the user
+    and resuming automatically when the wait duration expires."""
+    wait_int = int(wait_seconds)
+    print(f"\n   [PAUSE] Quota/rate limit encountered ({reason or 'waiting for reset'}). "
+          f"Pausing execution for {wait_int}s...", flush=True)
+    time.sleep(wait_seconds)
+    print("   [RESUME] Quota reset period elapsed. Resuming execution at current position.\n", flush=True)
+

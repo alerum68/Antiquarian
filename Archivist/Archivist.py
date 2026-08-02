@@ -327,29 +327,57 @@ def get_gender(val: Union[pd.Series, dict, CellValue]) -> str:
 
 def format_gedcom_date(date_str: str) -> str:
     """
-    Converts standard YYYY-MM-DD or YYYY-MM dates into GEDCOM standard format.
-    Handles genealogical prefixes (BEF, AFT, ABT, CAL, EST).
+    Converts dates (ISO YYYY-MM-DD, YYYY-MM, or natural text like "December 12, 1850",
+    "12 Dec 1850") into GEDCOM standard format (e.g. "12 DEC 1850", "DEC 1850", "1850").
+    Handles genealogical prefixes (BEF, AFT, ABT, CAL, EST, BET, FROM).
     """
     date_str = clean_val(date_str)
     if not date_str:
         return ""
 
     prefix = ""
-    valid_prefixes = ("BEF ", "AFT ", "ABT ", "CAL ", "EST ")
-    if date_str.upper().startswith(valid_prefixes):
-        prefix = date_str[:4].upper()
-        date_str = date_str[4:].strip()
+    valid_prefixes = ("BEF ", "AFT ", "ABT ", "CAL ", "EST ", "BET ", "FROM ")
+    for p in valid_prefixes:
+        if date_str.upper().startswith(p):
+            prefix = date_str[:len(p)].upper()
+            date_str = date_str[len(p):].strip()
+            break
 
-    try:
-        parts = date_str.split('-')
-        if len(parts) == 3 and len(parts[0]) == 4:
-            dt = datetime.datetime.strptime(date_str, "%Y-%m-%d")
+    if re.match(r"^\d{4}$", date_str):
+        return f"{prefix}{date_str}"
+
+    clean_text = re.sub(r"[,.]", " ", date_str).strip()
+    clean_text = re.sub(r"\s+", " ", clean_text)
+
+    formats_day = [
+        "%Y-%m-%d",
+        "%d %B %Y",
+        "%B %d %Y",
+        "%d %b %Y",
+        "%b %d %Y",
+        "%Y/%m/%d",
+        "%m/%d/%Y",
+    ]
+    for fmt in formats_day:
+        try:
+            dt = datetime.datetime.strptime(clean_text, fmt)
             return f"{prefix}{dt.day} {dt.strftime('%b').upper()} {dt.year}"
-        elif len(parts) == 2 and len(parts[0]) == 4:
-            dt = datetime.datetime.strptime(date_str, "%Y-%m")
+        except ValueError:
+            pass
+
+    formats_month = [
+        "%Y-%m",
+        "%B %Y",
+        "%b %Y",
+        "%Y/%m",
+        "%m/%Y",
+    ]
+    for fmt in formats_month:
+        try:
+            dt = datetime.datetime.strptime(clean_text, fmt)
             return f"{prefix}{dt.strftime('%b').upper()} {dt.year}"
-    except ValueError:
-        pass
+        except ValueError:
+            pass
 
     return prefix + date_str
 
@@ -2327,6 +2355,8 @@ def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str
         return clean_val(tf.get('affidavit_number'))
     if field_name == 'ClaimNumber':
         return clean_val(tf.get('claim_number'))
+    if field_name in ('AllotmentNumber', 'Allotment'):
+        return clean_val(tf.get('allotment_number'))
     if field_name in ('ScripNumber', 'ScripNoteNumber', 'CertificateNumber'):
         return clean_val(tf.get('scrip_number'))
     if field_name in ('ScripAmount', 'Amount'):
@@ -2927,7 +2957,8 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
         # have physically signed as a household witness stays a family link only, never
         # doubles as an Association too (confirmed live: it used to sweep in every
         # non-primary participant, including nuclear family).
-        witnesses = [p for p in rec.get('participants', []) if p.get('role_semantic') not in FAMILY_SEMANTICS]
+        witnesses = [p for p in rec.get('participants', [])
+                     if p.get('role_semantic') not in FAMILY_SEMANTICS and p.get('role_semantic') != 'commissioner']
 
         if is_scrip and event_tag == 'EVEN':
             # A dedicated "Scrip" custom fact (FactTypes.json code 10004), built the same
@@ -3090,7 +3121,7 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
                     main_fam.append(f"2 NOTE Margin note suggests alternate spelling for {who}: {alt_values}")
 
             witnesses = [p for p in rec.get('participants', [])
-                         if p.get('role_semantic') not in ('primary', 'spouse')]
+                         if p.get('role_semantic') not in ('primary', 'spouse') and p.get('role_semantic') != 'commissioner']
             main_fam.extend(build_witness_links(rec, witnesses, vol, target_software))
             main_fam.extend(build_general_citation(rec, primary, event_tag, vol, media_uid,
                                                   get_proof_status(event_date), target_software))
@@ -3285,6 +3316,8 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
                 printed_media.add(doc_media_uid)
 
             for part in rec.get('participants', []):
+                if part.get('role_semantic') == 'commissioner':
+                    continue
                 uid = generate_uid(rec, part, vol)
                 if uid in printed_indis:
                     continue
