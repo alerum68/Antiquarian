@@ -20,6 +20,7 @@ from typing import Dict, Hashable, List, Literal, Optional, Tuple, TypedDict, Un
 import pandas as pd
 import yaml
 from dotenv import load_dotenv
+from titlecase import titlecase
 
 # A raw scalar value as read from a JSON field or DataFrame cell.
 CellValue = Union[str, int, float, bool, None]
@@ -300,14 +301,36 @@ def clean_val(val: CellValue) -> str:
 _PLACE_QUALIFIER_RE = re.compile(
     r'^(?:near|around|about|approximately|close to|in the vicinity of)\s+', re.IGNORECASE)
 
+PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
+
+
+def _titlecase_callback(word: str, **kwargs) -> Optional[str]:
+    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+    if w_clean.upper() in PRESERVED_ACRONYMS:
+        return word.replace(w_clean, w_clean.upper())
+    if "-" in word:
+        parts = word.split("-")
+        return "-".join(
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            for p in parts
+        )
+    return None
+
+
+def cap_case(text: CellValue) -> str:
+    """Format string to Title Case using the titlecase library while preserving
+    genealogical acronyms (HBC, NWT, etc.) and handling nulls/empty strings safely."""
+    val = clean_val(text)
+    if not val:
+        return ""
+    return titlecase(val, callback=_titlecase_callback)
+
 
 def clean_place(val: CellValue) -> str:
     """Like clean_val, but also strips a leading descriptive qualifier ('near', 'around',
-    'about', ...) off a place name - per the user, that uncertainty reads as noise in a
-    structured PLAC field rather than useful information; it belongs in a note/citation,
-    not baked into the place name itself. Only strips a LEADING qualifier (not one
-    appearing mid-string, e.g. "Fort Near the River" stays untouched)."""
-    return _PLACE_QUALIFIER_RE.sub('', clean_val(val)).strip()
+    'about', ...) off a place name and normalizes to proper Title Case."""
+    cleaned = _PLACE_QUALIFIER_RE.sub('', clean_val(val)).strip()
+    return cap_case(cleaned) if cleaned else ""
 
 
 def get_gender(val: Union[pd.Series, dict, CellValue]) -> str:
@@ -1204,8 +1227,9 @@ def get_occupation_value(row: pd.Series) -> str:
     parts = [clean_val(row[c]) for c in ('Occupation', 'Occupation Category', 'Trade or Profession') if
              c in row and clean_val(row[c])]
     if industry := clean_val(row.get('Industry', '')):
-        parts.append(f"({industry})")
-    return " ".join(parts).strip()
+        parts.append(f"({cap_case(industry)})")
+    res = " ".join(parts).strip()
+    return cap_case(res) if res else ""
 
 
 def get_education_value(row: pd.Series) -> Optional[str]:
@@ -1677,7 +1701,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         if occ := get_occupation_value(row):
             ged.extend([f"1 OCCU {occ}", f"2 DATE {CENSUS_YEAR}", f"2 PLAC {row_loc}", "2 _PROOF proven"] + cit)
-        if race := clean_val(row.get('Race', row.get('Color', ''))):
+        if race := cap_case(row.get('Race', row.get('Color', ''))):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
         edu_val = get_education_value(row)
         if edu_val is not None:
@@ -2021,7 +2045,7 @@ def get_role_name(part: dict) -> str:
     assigned (Officiant, Witness, ...), matching how their OCCU field is handled below."""
     if part.get('is_priest'):
         return GENERAL_CONFIG['role_clergy']
-    return clean_val(part.get('role_name')) or GENERAL_CONFIG['role_default_witness']
+    return cap_case(part.get('role_name')) or GENERAL_CONFIG['role_default_witness']
 
 
 def resolve_family_links(rec: dict) -> Dict[str, object]:
@@ -2486,7 +2510,7 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
         # citation supports.
         titl = f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}"
         if document_type:
-            titl += f" -- {document_type}"
+            titl += f" -- {cap_case(document_type)}"
 
     # PAGE also doubles as RootsMagic/FTM's own auto-generated Citation Name, shown in
     # their flat Citations list - confirmed live: "Page {page}, Record {rec_id}" (rec_id
@@ -2761,9 +2785,9 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     dit_name = re.sub(r'(?i)^dit\s+', '', clean_val(part.get('dit_name'))).strip()
 
     sex = clean_val(part.get('sex'))[:1]
-    race = clean_val(part.get('race'))
-    religion = clean_val(part.get('religion'))
-    occu = clean_val(part.get('occupation'))
+    race = cap_case(part.get('race'))
+    religion = cap_case(part.get('religion'))
+    occu = cap_case(part.get('occupation'))
     resi = clean_place(part.get('residence'))
 
     age = clean_val(part.get('age'))
@@ -3007,7 +3031,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
                 event_value = f" {'; '.join(value_parts)}" if value_parts else ""
             indi.append(f"1 {event_tag}{event_value}")
             if event_tag == 'EVEN':
-                indi.append(f"2 TYPE {event_type}")
+                indi.append(f"2 TYPE {cap_case(event_type)}")
             indi.extend([f"2 DATE {format_gedcom_date(raw_event_date)}" if raw_event_date else "",
                         f"2 PLAC {clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
             if age:
@@ -3311,7 +3335,7 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
                     continue
                 doc_media_block = [f"0 @{doc_media_uid}@ OBJE", f"1 FILE {doc_media_path}",
                                    "2 FORM " + ("pdf" if doc_media_path.lower().endswith(".pdf") else "jpg"),
-                                   f"2 TITL {doc.get('document_type') or 'LAC Digital Object'}"]
+                                   f"2 TITL {cap_case(doc.get('document_type')) or 'LAC Digital Object'}"]
                 media_recs.append("\n".join(doc_media_block))
                 printed_media.add(doc_media_uid)
 

@@ -34,6 +34,31 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv, set_key
 from thefuzz import fuzz
+from titlecase import titlecase
+
+PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
+
+
+def _titlecase_callback(word: str, **kwargs) -> str | None:
+    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+    if w_clean.upper() in PRESERVED_ACRONYMS:
+        return word.replace(w_clean, w_clean.upper())
+    if "-" in word:
+        parts = word.split("-")
+        return "-".join(
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            for p in parts
+        )
+    return None
+
+
+def cap_case(text: str) -> str:
+    if not text:
+        return ""
+    val = str(text).strip()
+    if not val:
+        return ""
+    return titlecase(val, callback=_titlecase_callback)
 
 import census_schema
 
@@ -252,7 +277,7 @@ def build_participant(role_name: str, full_name: str, sex: str,
         type_specific_fields["person_ark"] = person_ark
     return {
         "role_number": None,
-        "role_name": role_name,
+        "role_name": cap_case(role_name),
         "std_given": given,
         "std_surname": surname or None,
         "raw_given": None,
@@ -321,7 +346,7 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
             primary["type_specific_fields"]["legitimacy"] = legitimacy
 
     raw_event_type = (columns.get("Event Type") or "").strip()
-    event_type = EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type)
+    event_type = cap_case(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
     event_date_raw = (columns.get("Event Date") or "").strip()
 
     page = (columns.get("Page Number") or "").strip() or item_id
@@ -335,7 +360,7 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
         "event_type": event_type,
         "year": (parse_to_iso(event_date_raw) or "")[:4] or None,
         "event_date": parse_to_iso(event_date_raw) or event_date_raw or None,
-        "event_place": (columns.get("Event Place") or "").strip() or None,
+        "event_place": cap_case((columns.get("Event Place") or "").strip()) or None,
         "english_translation": "",
         "original_transcription": "",
         "review": False,

@@ -22,7 +22,7 @@ periodically by the user, not something this module can obtain on its own.
 import json
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Tuple
 from urllib.parse import quote
 
 import cloudscraper
@@ -30,6 +30,7 @@ import requests
 import webbrowser
 from bs4 import BeautifulSoup
 
+session = requests.Session()
 RECORD_HOST = "https://recherche-collection-search.bac-lac.gc.ca"
 MANIFEST_HOST = "https://digitalmanifest.bac-lac.gc.ca"
 ASSET_HOST = "https://central.bac-lac.gc.ca"
@@ -46,7 +47,10 @@ ASSET_HOST = "https://central.bac-lac.gc.ca"
 CANADIANA_VIEW_HOST = "https://heritage.canadiana.ca"
 CANADIANA_IMAGE_HOST = "https://image-uab.canadiana.ca"
 
-DEFAULT_TIMEOUT_SECONDS = 30
+# Changed to a tuple: (connect_timeout, read_timeout) to prevent hanging connections
+DEFAULT_TIMEOUT_SECONDS = (5, 15)
+TimeoutType = Union[int, float, Tuple[int, int], Tuple[float, float]]
+
 # Confirmed live: manifest URLs are shaped {MANIFEST_HOST}/DigitalManifest/{source_code}/{PID}.
 # source_code=1 is the "fonandcol" reference system - confirmed live against a real item.
 # Not yet confirmed whether other reference systems (if LAC ever exposes them) use a
@@ -115,7 +119,7 @@ def _get_scraper() -> "cloudscraper.CloudScraper":
 # ==========================================
 # RECORD METADATA
 # ==========================================
-def get_record_metadata(pid: str, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+def get_record_metadata(pid: str, timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS
                         ) -> RecordMetadata:
     """Fetches the catalog record page for a known PID (Item ID) and pulls its title -
     confirmed live to carry a rich descriptive summary (names, birth year, parents,
@@ -163,7 +167,7 @@ def get_record_metadata(pid: str, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
 # MANIFEST (digital object list)
 # ==========================================
 def get_manifest(pid: str, source_code: int = FONANDCOL_SOURCE_CODE,
-                 timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> List[DigitalObject]:
+                 timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> List[DigitalObject]:
     """Fetches the IIIF Presentation API v3 manifest for a known PID and returns its
     digital objects - confirmed live against a real 2-document item: one entry per page
     image plus one for the combined PDF, each with its own `e0XXXXXXX` asset ID
@@ -202,7 +206,7 @@ def get_manifest(pid: str, source_code: int = FONANDCOL_SOURCE_CODE,
 # ==========================================
 # ASSET DOWNLOAD
 # ==========================================
-def download_asset(asset_id: str, op: str, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> bytes:
+def download_asset(asset_id: str, op: str, timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> bytes:
     """Downloads one digital object's actual file bytes. `op` is "pdf" or "img" - see
     DigitalObject.op for how to derive it from a manifest entry's media_format."""
     url = f"{ASSET_HOST}/.item/?id={asset_id}&app=fonandcol&op={op}"
@@ -226,14 +230,11 @@ def download_asset(asset_id: str, op: str, timeout_seconds: int = DEFAULT_TIMEOU
 _CANADIANA_IMAGE_REF_RE = re.compile(r"iiif/2/([^/\"]+)/info\.json")
 
 
-def get_canadiana_reel_pages(reel_id: str, timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+def get_canadiana_reel_pages(reel_id: str, timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS
                              ) -> List[str]:
     """Fetches a Canadiana reel's view page (reel_id like "lac_reel_c14950" - drop the
     "oocihm." prefix, added here) and returns the ordered list of IIIF image identifiers
-    for every page on that reel. Each returned identifier is already the exact
-    percent-encoded path segment Canadiana's own HTML uses (e.g.
-    "69429%2Fc00000039385") - pass it straight through to download_canadiana_page,
-    don't re-encode or decode it."""
+    for every page on that reel."""
     url = f"{CANADIANA_VIEW_HOST}/view/oocihm.{reel_id}"
     try:
         resp = requests.get(url, timeout=timeout_seconds)
@@ -247,18 +248,13 @@ def get_canadiana_reel_pages(reel_id: str, timeout_seconds: int = DEFAULT_TIMEOU
     if not image_ids:
         raise LacCallError(f"Canadiana reel {reel_id} page had no recognizable image references")
 
-    # dict.fromkeys dedupes while preserving first-seen (document) order - each page's
-    # info.json ref appears once per size variant on the page in practice, but this is
-    # defensive rather than assumed.
     return list(dict.fromkeys(image_ids))
 
 
 def download_canadiana_page(image_id: str, size: str = "full",
-                            timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> bytes:
+                            timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> bytes:
     """Downloads one page's full-resolution image bytes via Canadiana's IIIF Image API
-    v2 backend. `image_id` is one entry from get_canadiana_reel_pages. `size` follows
-    IIIF's size-parameter syntax ("full" for maximum resolution, confirmed live: a real
-    page downloaded this way was a genuine ~4MB, 6192x5664 JPEG)."""
+    v2 backend."""
     url = f"{CANADIANA_IMAGE_HOST}/iiif/2/{image_id}/{size}/full/0/default.jpg"
     try:
         resp = requests.get(url, timeout=timeout_seconds)
@@ -277,10 +273,7 @@ def download_canadiana_page(image_id: str, size: str = "full",
 # SEARCH (requires a real browser's cookie jar)
 # ==========================================
 def parse_cookie_header(raw_cookie_header: str) -> Dict[str, str]:
-    """Parses a raw `Cookie:` header string (exactly what a browser's DevTools "Copy as
-    cURL" gives you after the `-b` flag) into a plain dict `search()` can use. Splits on
-    `; ` - cookie values themselves may contain `=` (confirmed live, e.g. the
-    `cf_clearance` cookie does), so this only splits on the FIRST `=` per cookie."""
+    """Parses a raw `Cookie:` header string..."""
     cookies: Dict[str, str] = {}
     for part in raw_cookie_header.split(";"):
         part = part.strip()
@@ -304,11 +297,9 @@ _SEARCH_HEADERS = {
 }
 
 
-def _do_search_request(url: str, cookies: Dict[str, str], timeout_seconds: int,
+def _do_search_request(url: str, cookies: Dict[str, str], timeout_seconds: TimeoutType,
                        description: str) -> List[str]:
-    """Shared plumbing for search() and search_volume(): fire the request, detect an
-    expired/missing cookie jar, and pull PIDs out of the result HTML. `description` is
-    just the human-readable label used in the LacSearchAuthError message."""
+    """Shared plumbing for search() and search_volume()..."""
     try:
         resp = requests.get(url, headers=_SEARCH_HEADERS, cookies=cookies, timeout=timeout_seconds)
     except Exception as e:
@@ -320,30 +311,15 @@ def _do_search_request(url: str, cookies: Dict[str, str], timeout_seconds: int,
     if resp.status_code != 200 or "forbidden" in title.lower() or "just a moment" in title.lower():
         raise LacSearchAuthError(
             f"Search for {description} was rejected (status {resp.status_code}, title "
-            f"{title!r}) - the supplied cookie jar is likely missing or expired. Get a "
-            f"fresh one: search manually in a real browser, DevTools > Network > copy "
-            f"the successful request as cURL, and extract its cookies."
+            f"{title!r}) - the supplied cookie jar is likely missing or expired."
         )
 
     return sorted(set(re.findall(r"IdNumber=(\d+)", resp.text)))
 
 
 def search(query: str, cookies: Dict[str, str],
-           timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
-    """Searches by free-text query (confirmed live query shape: `"claim: {n} Scrip: {n}"`
-    reliably surfaces both the affidavit AND the award certificate as separate results -
-    per the user, scrip numbers alone are reused/not unique enough to search on solo).
-
-    `cookies` MUST be a real browser's cookie jar (see parse_cookie_header) - there is no
-    way to obtain a valid one programmatically (see module docstring). Raises
-    LacSearchAuthError specifically when the response indicates the cookie jar is
-    missing/expired (a "Forbidden: Request denied" or Cloudflare challenge page, rather
-    than real search-results HTML), so callers can surface a clear "go get a fresh
-    cookie jar" message instead of a generic failure.
-
-    Returns a list of Item ID (PID) strings found - confirmed live: searching "claim:
-    3126 Scrip: 12751" returned two distinct PIDs, one for the affidavit and one for the
-    certificate."""
+           timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
+    """Searches by free-text query..."""
     url = f"{RECORD_HOST}/eng/Home/Result?ST=STAD&q_type_1=q&q_1={quote(query)}&"
     return _do_search_request(url, cookies, timeout_seconds, description=repr(query))
 
@@ -352,23 +328,10 @@ DEFAULT_CDP_PORT = 9222
 
 
 def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{RECORD_HOST}/",
-                          timeout_seconds: int = 10) -> Dict[str, str]:
-    """Reads live session cookies straight out of a Chrome/Edge instance the user
-    launched with --remote-debugging-port={port} (a separate, dedicated browser window -
-    see Commissioner's "Launch Debug Browser" button) after they solved the LAC search
-    challenge normally in it - via the Chrome DevTools Protocol's Network.getCookies,
-    reading the browser's live in-memory cookie jar directly rather than its on-disk
-    store. This exists specifically because Chrome/Edge 127+'s "App-Bound Encryption"
-    makes the on-disk cookie store undecryptable by any third-party tool, admin
-    privileges included (confirmed via research this session) - CDP sidesteps that
-    entirely since it's reading the running browser's own memory, not its disk file.
-
-    Raises LacCallError if no debuggable browser is found on `port` (i.e. it wasn't
-    launched with --remote-debugging-port), LacSearchAuthError if a browser IS found but
-    has no cookies for the LAC domain yet (the user hasn't searched there yet, or the
-    session already expired)."""
+                          timeout_seconds: TimeoutType = (5, 10)) -> Dict[str, str]:
+    """Reads live session cookies straight out of a Chrome/Edge instance..."""
     try:
-        import websocket  # websocket-client - only needed for this one function
+        import websocket
     except ImportError as e:
         raise LacCallError(
             "The websocket-client package is required for CDP cookie reading "
@@ -387,7 +350,10 @@ def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{REC
     if not target or not target.get("webSocketDebuggerUrl"):
         raise LacCallError(f"No open browser tab found on debug port {port}.")
 
-    ws = websocket.create_connection(target["webSocketDebuggerUrl"], timeout=timeout_seconds)
+    # Websocket expects a single float/int for timeout, so we extract the read timeout if a tuple is passed
+    ws_timeout = timeout_seconds[1] if isinstance(timeout_seconds, tuple) else timeout_seconds
+    
+    ws = websocket.create_connection(target["webSocketDebuggerUrl"], timeout=ws_timeout)
     try:
         ws.send(json.dumps({"id": 1, "method": "Network.getCookies", "params": {"urls": [domain_url]}}))
         response = json.loads(ws.recv())
@@ -404,12 +370,7 @@ def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{REC
 
 
 def open_search_browser_for_refresh(query: str = "") -> None:
-    """Opens the LAC search page in the user's real default browser so they can run one
-    search manually and pass the challenge themselves - the only legitimate way to
-    refresh a search cookie (see module docstring; deliberately not something this
-    module tries to automate). Callers (Commissioner.py) call this when search()/
-    search_volume() raises LacSearchAuthError, alongside a printed message telling the
-    user to copy the resulting request as cURL and feed its cookies back in."""
+    """Opens the LAC search page in the user's real default browser..."""
     url = f"{RECORD_HOST}/eng/Home/SearchAdvanced"
     if query:
         url = f"{RECORD_HOST}/eng/Home/Result?ST=STAD&q_type_1=q&q_1={quote(query)}&"
@@ -417,24 +378,8 @@ def open_search_browser_for_refresh(query: str = "") -> None:
 
 
 def search_volume(vol: str, cookies: Dict[str, str], archival_number: str = "RG15",
-                  timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
-    """Harvests every PID filed under one volume/box number - the "Pass 1" whole-volume
-    harvest call: one search covers an entire volume rather than one claim at a time, so
-    a volume's worth of downstream (unguarded) record/manifest/asset calls never need
-    the cookie again. `vol` spans 1319-1372 for the RG15-D-II-8 scrip series per the
-    user (Finding Aid 15-19 covers 1319-1324; 15-20 through 15-23 cover the rest -
-    finding aid 15-18 appears to have been superseded by 15-19, never separately found).
-
-    Query shape is translated from baclac.py's original multi-field advanced search
-    (ArchivalNumber=RG15-D-II-8 AND VolumeBoxNumber={vol}, paginated via start/num=100 -
-    see DEV/Vols 1319-1324/Vols 1319-1324/baclac.py:260) onto the current site's
-    `/eng/Home/Result` route, using the exact field names the user supplied from their
-    own testing. NOT YET LIVE-VERIFIED end-to-end by this module (the old site's
-    ASP.NET WebForms param names carrying over to the new MVC backend is plausible but
-    unconfirmed) - treat the first real call as the test. Also NOT yet confirmed whether
-    the new site paginates the same start/num=100 way; this only fetches page one
-    (start=0) - a result count worth checking on that first real call before assuming a
-    volume with >100 items would be fully captured."""
+                  timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
+    """Harvests every PID filed under one volume/box number..."""
     query_string = (
         f"ST=STAD&DataSource=Archives|FonAndCol"
         f"&SearchIn_1=ArchivalNumber&SearchInText_1={quote(archival_number)}&Operator_1=AND"

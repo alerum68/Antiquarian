@@ -10,6 +10,31 @@ new record type never requires touching this file.
 import re
 import unicodedata
 from typing import Any, Dict, List, Optional
+from titlecase import titlecase
+
+PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
+
+
+def _titlecase_callback(word: str, **kwargs) -> str | None:
+    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+    if w_clean.upper() in PRESERVED_ACRONYMS:
+        return word.replace(w_clean, w_clean.upper())
+    if "-" in word:
+        parts = word.split("-")
+        return "-".join(
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            for p in parts
+        )
+    return None
+
+
+def cap_case(text: str) -> str:
+    if not text:
+        return ""
+    val = str(text).strip()
+    if not val:
+        return ""
+    return titlecase(val, callback=_titlecase_callback)
 
 MONTH_NAMES = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -101,9 +126,12 @@ def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str,
     before derive_suffixes(), which depends on role_number already being set."""
     name_to_number = {(role.get("name") or "").strip().lower(): number for number, role in roles_table.items()}
     for participant in record.get("participants", []):
+        raw_role_name = participant.get("role_name")
+        if raw_role_name:
+            participant["role_name"] = cap_case(raw_role_name)
         if participant.get("role_number"):
             continue
-        role_name = (participant.get("role_name") or "").strip().lower()
+        role_name = (raw_role_name or "").strip().lower()
         role_number = name_to_number.get(role_name)
         if role_number is not None:
             participant["role_number"] = role_number
@@ -173,7 +201,7 @@ def _label_for(record: Dict[str, Any]) -> str:
     the LLM left it null)."""
     document_type = (record.get("type_specific_fields") or {}).get("document_type")
     if document_type:
-        return document_type
+        return cap_case(document_type)
     page = record.get("page")
     return f"Page {page}" if page else "Untitled section"
 
