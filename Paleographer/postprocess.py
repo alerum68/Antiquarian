@@ -9,7 +9,7 @@ new record type never requires touching this file.
 
 import re
 import unicodedata
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, Set
 from titlecase import titlecase
 
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
@@ -305,3 +305,379 @@ def apply_defaults(target: Dict[str, Any], defaults_table: Dict[str, str]) -> No
     for key, value in defaults_table.items():
         if not target.get(key):
             target[key] = value
+
+
+# ==========================================
+# SCRIP DATA CLEANING & REPAIR
+# ==========================================
+MONTHS_REGEX = (
+    r'(?:january|february|march|april|may|june|july|august|september|october|november|december|'
+    r'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)'
+)
+DATE_PATTERN = re.compile(
+    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
+    rf'\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
+    rf'{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)|(?:17\d\d|18\d\d|19\d\d)(?:/(?:17\d\d|18\d\d|19\d\d))?)\b',
+    re.I)
+NARRATIVE_JUNK_REGEX = re.compile(
+    r'\b(?:settler|settled|grandchild|descendant|resided|surviving|heir|entitled|deceased|father|mother|daughter|son|'
+    r'brother|sister|wife|husband|married|leaving|claim|who\b|born\b|died\b)\b',
+    re.I)
+
+_MOJIBAKE_MAP = {
+    'ã©': 'é', 'ã¨': 'è', 'ãª': 'ê', 'ã«': 'ë', 'ã ': 'à', 'ã¢': 'â',
+    'ã®': 'î', 'ã¯': 'ï', 'ã´': 'ô', 'ã¹': 'ù', 'ã»': 'û', 'ã§': 'ç',
+    'ã‰': 'É', 'ãˆ': 'È', 'ãŠ': 'Ê', 'ã‹': 'Ë', 'ã€': 'À', 'ã‚': 'Â',
+    'ãŽ': 'Î', 'ã”': 'Ô', 'ã™': 'Ù', 'ã›': 'Û', 'ã‡': 'Ç',
+    'â€™': "'", 'â€˜': "'", 'â€œ': '"', 'â€\x9d': '"', 'â€"': '—',
+    'â€“': '–', 'ãfb': 'ï', 'ã\xaf': 'ï', 'ã\xad': 'í', 'ã\x89': 'É',
+    'ã\x88': 'È', 'ã\x8a': 'ê', 'ã\x8b': 'ë', 'ã\x80': 'À', 'ã\x82': 'Â',
+    'Ã©': 'é', 'Ã¨': 'è', 'Ãª': 'ê', 'Ã«': 'ë', 'Ã ': 'à', 'Ã¢': 'â',
+    'Ã®': 'î', 'Ã¯': 'ï', 'Ã´': 'ô', 'Ã¹': 'ù', 'Ã»': 'û', 'Ã§': 'ç',
+    'Ã‰': 'É', 'Ãˆ': 'È', 'ÃŠ': 'Ê', 'Ã‹': 'Ë', 'Ã€': 'À', 'Ã‚': 'Â',
+    'ÃŽ': 'Î', 'Ã”': 'Ô', 'Ã™': 'Ù', 'Ã›': 'Û', 'Ã‡': 'Ç',
+    '’': "'", '‘': "'", '“': '"', '”': '"', '—': '—', '–': '–',
+}
+
+
+def fix_mojibake(text: str) -> str:
+    """Repairs UTF-8 strings that were decoded as CP1252 / ISO-8859-1 (mojibake)."""
+    if not text:
+        return ""
+    fixed = re.sub(
+        r"ã([\x80-\xbf\u00a0-\u00bf\u0080-\u009f\u2018-\u201d\u2022\u20ac])",
+        lambda m: 'Ã' + m.group(1),
+        str(text)
+    )
+    if any(ch in fixed for ch in ("Ã", "Â", "â", "ð")):
+        try:
+            fixed = fixed.encode("cp1252").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            try:
+                fixed = fixed.encode("latin1").decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                pass
+    for bad, good in _MOJIBAKE_MAP.items():
+        if bad in fixed:
+            fixed = fixed.replace(bad, good)
+    return fixed
+
+
+def clean_race(val: Any) -> str:
+    if val is None:
+        return ""
+    text = str(val).strip()
+    if not text:
+        return ""
+    cleaned = re.sub(r'^(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\s*(?:and|&)?\s*', '', text, flags=re.I)
+    cleaned = re.sub(r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$', '', cleaned, flags=re.I)
+    cleaned = re.sub(r'[,;&\s]+$', '', cleaned).strip()
+    cleaned = re.sub(r'^[,;&\s]+', '', cleaned).strip()
+    if cleaned.lower() in ("deponent", "the deponent", "mother", "father", "wife", "husband", "widow", "as heir", ""):
+        return ""
+    if re.match(r'^(?:who|heir|file ref|was entitled|her brother)\b', cleaned, flags=re.I):
+        return ""
+    return cap_case(cleaned)
+
+
+def clean_date_and_place(raw_date: str, raw_place: str) -> Tuple[str, str]:
+    def strip_prefixes(s: str) -> str:
+        if not s:
+            return ""
+        t = str(s).strip()
+        t = re.sub(r'^(?:born|died|married|address)\s*,\s*', '', t, flags=re.I)
+        t = re.sub(r'^(?:born|died|married|address)\s+', '', t, flags=re.I)
+        t = re.sub(r'^(?:who\s+died|who\s+was\s+born|mother\s+married|father\s+married)\s*', '', t, flags=re.I)
+        return re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', t).strip()
+
+    d_clean = strip_prefixes(raw_date)
+    p_clean = strip_prefixes(raw_place)
+    found_date, candidate_place = "", ""
+    d_match = DATE_PATTERN.search(d_clean)
+    p_match = DATE_PATTERN.search(p_clean)
+
+    if d_match:
+        found_date = d_match.group(0).strip()
+        d_rem = (d_clean[:d_match.start()] + " " + d_clean[d_match.end():]).strip()
+        d_rem = re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', d_rem).strip()
+        if d_rem and not NARRATIVE_JUNK_REGEX.search(d_rem):
+            candidate_place = d_rem
+    elif d_clean and not NARRATIVE_JUNK_REGEX.search(d_clean):
+        candidate_place = d_clean
+
+    if p_match:
+        if not found_date:
+            found_date = p_match.group(0).strip()
+        p_rem = (p_clean[:p_match.start()] + " " + p_clean[p_match.end():]).strip()
+        p_rem = re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', p_rem).strip()
+        p_rem = re.sub(r'\s*\bor\s*$', '', p_rem, flags=re.I).strip()
+        if p_rem and not candidate_place and not NARRATIVE_JUNK_REGEX.search(p_rem):
+            candidate_place = p_rem
+    elif p_clean and not candidate_place and not NARRATIVE_JUNK_REGEX.search(p_clean):
+        candidate_place = p_clean
+
+    candidate_place = re.sub(r'\s*\bor\s*$', '', candidate_place, flags=re.I).strip()
+    return found_date, cap_case(candidate_place)
+
+
+COMPOUND_SURNAME_PREFIXES_2 = {
+    "de la", "de le", "de les", "de los", "de las",
+    "van der", "van den", "van de", "von der", "von den",
+}
+
+COMPOUND_SURNAME_PREFIXES_1 = {
+    "st.", "st", "ste.", "ste", "saint", "sainte", "san", "santa",
+    "de", "du", "des", "del", "della", "degli",
+    "la", "le", "les", "l'", "d'",
+    "van", "von", "der", "den", "ter", "ten",
+    "fitz", "mac", "mc", "o'"
+}
+
+
+def clean_dit_name(dit_str: str) -> str:
+    if not dit_str:
+        return ""
+    cleaned = re.sub(r'^(?:dit|dite|alias)\s+', '', (dit_str or "").strip(), flags=re.I).strip()
+    return " ".join(w.capitalize() for w in cleaned.split())
+
+
+def parse_single_name(raw: str, expected_surname: str = "") -> Tuple[str, str, str]:
+    """Parses a raw 'FIRSTNAME LASTNAME' string into (std_given, std_surname, dit_name)."""
+    text = (raw or "").strip()
+    if not text:
+        return "", "", ""
+
+    dit_name = ""
+    m_dit = re.search(r'\s+\b(dit|dite)\b\s+(.+)$', text, flags=re.I)
+    if m_dit:
+        dit_name = clean_dit_name(m_dit.group(2))
+        text = text[:m_dit.start()].strip()
+
+    if expected_surname:
+        exp_clean = expected_surname.strip()
+        exp_base = re.split(r'\s+\b(dit|dite)\b\s+', exp_clean, flags=re.I)[0].strip()
+        if exp_base and text.lower().endswith(exp_base.lower()):
+            prefix = text[:-len(exp_base)].strip()
+            if prefix:
+                given = " ".join(w.capitalize() for w in prefix.split())
+                surname = " ".join(w.capitalize() for w in exp_base.split())
+                if dit_name:
+                    surname = f"{surname} dit {dit_name}"
+                return given, surname, dit_name
+
+    parts = text.split()
+    if not parts:
+        return "", "", dit_name
+    if len(parts) == 1:
+        return parts[0].capitalize(), "", dit_name
+
+    surname_idx = len(parts) - 1
+    if len(parts) >= 3:
+        two_word = f"{parts[-3]} {parts[-2]}".lower()
+        if two_word in COMPOUND_SURNAME_PREFIXES_2:
+            surname_idx = len(parts) - 3
+        elif (parts[-2].lower().rstrip('.') in COMPOUND_SURNAME_PREFIXES_1
+              or parts[-2].lower() in COMPOUND_SURNAME_PREFIXES_1):
+            surname_idx = len(parts) - 2
+    elif len(parts) == 2:
+        if parts[0].lower().rstrip('.') in COMPOUND_SURNAME_PREFIXES_1:
+            return "", " ".join(w.capitalize() for w in text.split()), dit_name
+
+    given_parts = parts[:surname_idx]
+    surname_parts = parts[surname_idx:]
+
+    given = " ".join(w.capitalize() for w in given_parts)
+    s_formatted = []
+    for p in surname_parts:
+        low = p.lower()
+        if low in ("st", "st."):
+            s_formatted.append("St.")
+        elif low in ("ste", "ste."):
+            s_formatted.append("Ste.")
+        else:
+            s_formatted.append(p.capitalize())
+    surname = " ".join(s_formatted)
+
+    if dit_name and not re.search(r'\s+\bdit\b\s+', surname, flags=re.I):
+        surname = f"{surname} dit {dit_name}"
+
+    return given, surname, dit_name
+
+
+def fix_participant_name(p: Dict[str, Any], expected_surname: str = "") -> bool:
+    """Repairs participant's std_given and std_surname, moving compound prefixes properly."""
+    given = (p.get("std_given") or "").strip()
+    surname = (p.get("std_surname") or "").strip()
+    dit_name = (p.get("dit_name") or "").strip()
+
+    if not given and not surname:
+        return False
+
+    combined = f"{given} {surname}".strip()
+    new_given, new_surname, new_dit = parse_single_name(combined, expected_surname=expected_surname)
+
+    if dit_name and not new_dit:
+        new_dit = dit_name
+        if not re.search(r'\s+\bdit\b\s+', new_surname, flags=re.I):
+            new_surname = f"{new_surname} dit {new_dit}".strip()
+
+    modified = False
+    if new_given != given:
+        p["std_given"] = new_given
+        modified = True
+    if new_surname != surname:
+        p["std_surname"] = new_surname
+        modified = True
+    if new_dit and p.get("dit_name") != new_dit:
+        p["dit_name"] = new_dit
+        modified = True
+
+    return modified
+
+
+def fix_all_participant_names_in_record(record: Dict[str, Any]) -> bool:
+    """Repairs participant names across the entire record."""
+    participants = record.get("participants", [])
+    if not participants:
+        return False
+
+    primary = participants[0]
+    primary_surname = (primary.get("std_surname") or "").strip()
+
+    modified = False
+    if fix_participant_name(primary):
+        modified = True
+        primary_surname = (primary.get("std_surname") or "").strip()
+
+    for p in participants[1:]:
+        role = p.get("role_semantic") or str(p.get("role_number"))
+        exp = primary_surname if role in ("father", "6") else ""
+        if fix_participant_name(p, expected_surname=exp):
+            modified = True
+
+    return modified
+
+
+def build_composite_record_number(tf: Dict[str, Any], pid: str = "") -> str:
+    """Builds standard composite key: [Claim Number]-[Allotment Number]-[Scrip Number]."""
+    claim = (tf.get("claim_number") or "").strip() or "0"
+    allotment = (tf.get("allotment_number") or "").strip() or "0"
+    scrip = (tf.get("scrip_number") or "").strip() or "0"
+    return f"{claim}-{allotment}-{scrip}"
+
+
+def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") -> bool:
+    """Resolves maiden surname if married surname is currently in std_surname."""
+    participants = record.get("participants", [])
+    if not participants:
+        return False
+
+    primary = participants[0]
+    father = next((p for p in participants
+                   if p.get("role_semantic") == "father" or str(p.get("role_number")) == "6"), None)
+    spouse = next((p for p in participants
+                   if p.get("role_semantic") == "spouse" or str(p.get("role_number")) == "2"), None)
+
+    f_surname = (father.get("std_surname") or "").strip() if father else ""
+    c_surname = (primary.get("std_surname") or "").strip()
+    c_given = (primary.get("std_given") or "").strip()
+    nee = (row_nee or "").strip().title()
+
+    maiden_surname = ""
+    if f_surname and f_surname.lower() not in ("[illegible]", "unknown", ""):
+        maiden_surname = f_surname
+    elif nee and nee.lower() not in ("[illegible]", "unknown", ""):
+        maiden_surname = nee
+
+    if not maiden_surname:
+        return False
+
+    title_lower = (record.get("lac_catalog_title") or record.get("lac_catalog_title_live") or "").lower()
+    is_female = (
+        primary.get("sex") == "F"
+        or (spouse and spouse.get("sex") == "M")
+        or ("wife of" in title_lower)
+        or ("widow of" in title_lower)
+        or ("husband:" in title_lower)
+    )
+
+    modified = False
+    if is_female:
+        if primary.get("sex") != "F":
+            primary["sex"] = "F"
+            modified = True
+        if spouse and not spouse.get("sex"):
+            spouse["sex"] = "M"
+            modified = True
+
+        if c_surname and c_surname.lower() != maiden_surname.lower():
+            alt_names = primary.setdefault("alternate_names", [])
+            married_full = f"{c_given} {c_surname}".strip()
+            if married_full and not any(
+                (a.get("value") or "").strip().lower() == married_full.lower() for a in alt_names
+            ):
+                alt_names.append({"value": married_full})
+            primary["std_surname"] = maiden_surname
+            modified = True
+        elif not c_surname:
+            primary["std_surname"] = maiden_surname
+            modified = True
+
+    return modified
+
+
+def resolve_dataset_maiden_names(data: Dict[str, Any]) -> int:
+    """Resolves married/maiden surnames across an entire dataset."""
+    modified_count = 0
+    for sheet in data.get("sheets", []):
+        for record in sheet.get("records", []):
+            if record.get("lac_catalog_title"):
+                record["lac_catalog_title"] = fix_mojibake(record["lac_catalog_title"])
+            if record.get("lac_catalog_title_live"):
+                record["lac_catalog_title_live"] = fix_mojibake(record["lac_catalog_title_live"])
+
+            for p in record.get("participants", []):
+                for k in ("std_given", "std_surname", "race", "birth_place", "death_place"):
+                    if p.get(k):
+                        p[k] = fix_mojibake(p[k])
+
+            fix_all_participant_names_in_record(record)
+            if resolve_maiden_name_for_record(record):
+                modified_count += 1
+
+    return modified_count
+
+
+CITATION_PATTERNS = {
+    "claim_number": re.compile(r"claim no\.?:?\s*([^;]+)", re.I),
+    "affidavit_number": re.compile(r"aff(?:idavit|dt)?\.?\s*no\.?:?\s*([^;]+)", re.I),
+    "allotment_number": re.compile(r"allotment\s*no\.?:?\s*([^;]+)", re.I),
+    "scrip_number": re.compile(r"scrip no\.?:?\s*([^;]+)", re.I),
+    "grant_number": re.compile(r"grant no\.?:?\s*([^;]+)", re.I),
+    "patent_number": re.compile(r"patent no\.?:?\s*([^;]+)", re.I),
+    "case_number": re.compile(r"case no\.?:?\s*([^;]+)", re.I),
+    "scrip_amount": re.compile(r"amount:?\s*([^;]+)", re.I),
+    "scrip_issue_date": re.compile(r"date of issue:?\s*([^;]+)", re.I),
+    "issue_date": re.compile(r"date of issue:?\s*([^;]+)", re.I),
+    "application_date": re.compile(r"date of application:?\s*([^;]+)", re.I),
+}
+
+
+def extract_citation_fields(citation: str) -> Dict[str, str]:
+    """Extracts structured scrip fields from citation string."""
+    fields = {}
+    if not citation:
+        return fields
+    citation = fix_mojibake(citation)
+    for key, pattern in CITATION_PATTERNS.items():
+        m = pattern.search(citation)
+        if m:
+            val = m.group(1).strip().rstrip(".")
+            if val:
+                fields[key] = val
+    if "scrip_issue_date" in fields and "issue_date" not in fields:
+        fields["issue_date"] = fields["scrip_issue_date"]
+    elif "issue_date" in fields and "scrip_issue_date" not in fields:
+        fields["scrip_issue_date"] = fields["issue_date"]
+    return fields
+

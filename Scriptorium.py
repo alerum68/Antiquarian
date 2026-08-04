@@ -32,7 +32,6 @@ SCRIPT_PATHS = {
     "PDFIX_SCRIPT": "PDFix/PDFix.py",
     "CLEANUP_CACHE_SCRIPT": "Paleographer/CacheCleanup.py",
     "AGY_TEST_SCRIPT": "ScriptoriumMCP/test_agy_connection.py",
-    "COMMISSIONER_SCRIPT": "Commissioner/Commissioner.py",
 }
 
 
@@ -106,7 +105,9 @@ VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
 VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
                  "Ancestry": {"CENSUS_URL": ""},
                  "FamilySearch": {"FS_URL": ""},
-                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC"}}
+                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC",
+                         "LAC_HARVEST_VOLUME": "", "LAC_HARVEST_ARCHIVAL_NUMBER": "RG15",
+                         "LAC_COOKIE_FILE": "Working/LAC/lac_cookies.txt"}}
 
 PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
                                             "CHURCH_GEDCOM_NAME": "Parish.ged",
@@ -129,7 +130,8 @@ PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHU
                                                   "CHURCH_REPOSITORY_LOC": "Granite Mountain, UT"},
                      "Scrip Information": {"SCRIP_IMAGE_DIR": "Scrip", "SCRIP_MASTER_DB_NAME": "scrip_records.json",
                                            "SCRIP_COLLECTION_NAME": "Library and Archives Canada, RG15 Scrip Records",
-                                           "SCRIP_DISTRICT": ""}}
+                                           "SCRIP_DISTRICT": "", "SCRIP_DELAY_SECONDS": "0.4",
+                                           "SCRIP_ENRICH_LIMIT": "", "SCRIP_PARTITION_OUTPUT_DIR": ""}}
 
 REGISTRAR_VARS = {
     "File Paths (Relative to RootsMagic Dir)": {
@@ -153,22 +155,6 @@ PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVE
                                 "PDFIX_SIZE_THRESHOLD_MB": "0"},
               "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"}}
 
-COMMISSIONER_VARS = {
-    "Which JSON to Process": {
-        "COMMISSIONER_JSON_FILE": "",
-        "COMMISSIONER_OUTPUT_DIR": "",
-    },
-    "Enrichment & LAC Settings": {
-        "COMMISSIONER_ARCHIVAL_NUMBER": "RG15",
-        "COMMISSIONER_DELAY_SECONDS": "0.4",
-        "COMMISSIONER_ENRICH_LIMIT": "",
-    },
-    "Folders": {
-        "COMMISSIONER_MEDIA_DIR": "Media/Commissioner",
-        "COMMISSIONER_CHECKPOINT_DIR": "Working/Commissioner",
-        "COMMISSIONER_COOKIE_FILE": "Working/Commissioner/lac_cookies.txt",
-    },
-}
 
 # ==========================================
 # ENV FILE TARGETS
@@ -181,8 +167,7 @@ ENV_TARGETS = [(GLOBAL_VARS, None),
                (VOYAGEUR_VARS, "Voyageur"),
                (REGISTRAR_VARS, "Registrar"),
                (GAZETTEER_VARS, "Gazetteer"),
-               (PDFIX_VARS, "PDFix"),
-               (COMMISSIONER_VARS, "Commissioner")]
+               (PDFIX_VARS, "PDFix")]
 
 # ==========================================
 # TOOLTIP DESCRIPTIONS
@@ -199,25 +184,13 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
     "GEMINI_API_KEY": "Your personal API key from Google AI Studio. Used to read and transcribe handwritten images.",
-    # Commissioner
-    "COMMISSIONER_JSON_FILE": "Which Paleographer JSON file to enrich or partition. Leave blank to "
-                              "auto-select the most recently modified JSON file, same convention as Archivist.",
-    "COMMISSIONER_OUTPUT_DIR": "Directory where partitioned collection JSON files are saved. Leave blank to "
-                               "save to a 'by_collection' subfolder in your JSON directory.",
-    "COMMISSIONER_ARCHIVAL_NUMBER": "The LAC archival series prefix used when harvesting a whole volume "
-                                    "(e.g. 'RG15' for the Métis/Half-Breed scrip series).",
-    "COMMISSIONER_DELAY_SECONDS": "Pacing delay in seconds between LAC API requests during metadata enrichment "
-                                  "(default: 0.4s) to avoid rate-limiting on unauthenticated endpoints.",
-    "COMMISSIONER_ENRICH_LIMIT": "Optional maximum number of records to process during an enrichment run. "
-                                 "Leave blank to process all records.",
-    "COMMISSIONER_MEDIA_DIR": "Where downloaded LAC/Canadiana images and PDFs are saved, relative to PROGRAM_DIR.",
-    "COMMISSIONER_CHECKPOINT_DIR": "Where volume-harvest and enrichment progress is checkpointed, relative to "
-                                   "PROGRAM_DIR - makes runs safely resumable across pauses or cookie refreshes.",
-    "COMMISSIONER_COOKIE_FILE": "Manual fallback only - Commissioner normally reads the LAC session cookie "
-                                "automatically via 'Launch Debug Browser'. This plain text file (opened by "
-                                "'Open Cookie File') holds a raw Cookie header pasted from DevTools > Network "
-                                "> Copy as cURL, used only if no debuggable browser is found. Expires after "
-                                "roughly 30-60 minutes either way.",
+    # LAC & Scrip Enrichment
+    "LAC_HARVEST_VOLUME": "Volume number at Library and Archives Canada to harvest (e.g. '1320' or '1325-1330').",
+    "LAC_HARVEST_ARCHIVAL_NUMBER": "Archival series prefix used when harvesting an LAC volume (default 'RG15').",
+    "LAC_COOKIE_FILE": "Fallback text file for LAC search session cookies.",
+    "SCRIP_DELAY_SECONDS": "Pacing delay in seconds between LAC API requests during metadata enrichment (default: 0.4s).",
+    "SCRIP_ENRICH_LIMIT": "Optional maximum number of records to process during enrichment (blank for all).",
+    "SCRIP_PARTITION_OUTPUT_DIR": "Directory where partitioned collection JSON files are saved (default: 'partitioned' subfolder).",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
     "API_BUDGET": "A safety limit for your AI costs (e.g., '20' means $20). The script stops if it spends this much.",
     "MODEL_NAME": "The AI model version you want to use (usually gemini-3.1-pro-preview or gemini-2.5-pro).",
@@ -414,11 +387,8 @@ PATH_PICKER_FIELDS = {
     # PDFix
     "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
 
-    # Commissioner
-    "COMMISSIONER_JSON_FILE": {"kind": "open", "base_dir_key": "JSON_DIR", "filetypes": JSON_FILETYPES},
-    "COMMISSIONER_OUTPUT_DIR": {"kind": "directory", "base_dir_key": "JSON_DIR"},
-    "COMMISSIONER_MEDIA_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
-    "COMMISSIONER_CHECKPOINT_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
+    # Scrip Partition Output
+    "SCRIP_PARTITION_OUTPUT_DIR": {"kind": "directory", "base_dir_key": "JSON_DIR"},
 }
 
 # ==========================================
@@ -693,7 +663,6 @@ class Scriptorium(ctk.CTk):
         self.active_process = None
         self._cancel_requested = False
         self.debug_file_var = ctk.StringVar(value="")
-        self.commissioner_volume_var = ctk.StringVar(value="")
         self.tabs_built = set()
 
         self.help_texts = {"Voyageur": "Welcome to Voyageur!\n\n"
@@ -714,37 +683,21 @@ class Scriptorium(ctk.CTk):
                            "builds the GEDCOM as soon as it finishes cleanly, in one click - skip "
                            "this if the images still need Paleographer's AI transcription first.",
                            "Paleographer": "Welcome to Paleographer!\n\n"
-                           "Paleographer is the Analysis step: it reads historical document images "
-                           "and turns them into structured data using AI.\n\n"
+                           "Paleographer is the Analysis and Enrichment step: it reads historical document images "
+                           "and turns them into structured data using AI, and provides metadata enrichment and "
+                           "collection partitioning for Scrip datasets.\n\n"
                            "How to use:\n"
                            "1. Pick a record type from the dropdown (Parish, Scrip, or any other "
                            ".pmt file you've added to Paleographer/prompts).\n"
                            "2. Place your historical document images or PDFs into that type's "
                            "designated folder in your project.\n"
                            "3. Ensure you have your Gemini API key saved in the Global Settings.\n"
-                           "4. Click 'Run Analysis (API)'. The AI will read, transcribe, and "
-                           "translate the records into a database file. Large multi-page documents "
-                           "are submitted as a batch job; click the same button again later to "
-                           "retrieve the results once Gemini finishes.\n\n"
+                           "4. Click 'Run Analysis (API)' to transcribe. For Scrip records, use 'Enrich Metadata' "
+                           "to fetch live LAC catalog metadata or 'Partition Collections' to split records into "
+                           "official LAC archival series files.\n\n"
                            "When finished, head to Archivist to build your GEDCOM.\n\n"
                            "Note: If the AI gets stuck or runs out of memory, try clicking "
                            "'Clear Cache'.",
-                           "Commissioner": "Welcome to Commissioner!\n\n"
-                           "Commissioner is an enrichment, cross-referencing, and collection management step for "
-                           "Scrip records, sitting between Paleographer and Archivist:\n\n"
-                           "• 'Enrich Metadata': Direct LAC catalog lookup (unauthenticated, "
-                           "no browser/cookie needed). Fills in microfilm reel numbers "
-                           "(e.g. C-14929), archival series codes (e.g. RG15-D-II-8-c), live "
-                           "catalog titles, and extracts missing citation fields "
-                           "(claim, scrip, allotment numbers, dates).\n"
-                           "• 'Cross-Check Claims': Searches LAC for related certificates or "
-                           "land grants tied to the same claim and downloads digital objects "
-                           "(requires cookies via 'Launch Debug Browser').\n"
-                           "• 'Partition Collections': Organizes records in the active JSON into "
-                           "distinct collection JSON files grouped by official LAC archival "
-                           "series (Finding Aids 15-19, 15-20, 15-21) ready for Archivist.\n"
-                           "• 'Harvest Volume': Bulk-downloads every record in an entire LAC volume unattended.\n\n"
-                           "When finished, head to Archivist to build your GEDCOM.",
                            "Archivist": "Welcome to Archivist!\n\n"
                            "Archivist is the Create step: the single place that turns a finished "
                            "JSON file, from Voyageur's Gather or Paleographer's Analysis, into a "
@@ -796,7 +749,6 @@ class Scriptorium(ctk.CTk):
 
         self.tab_builders: Dict[str, Callable[[ctk.CTkFrame], None]] = {"Voyageur": self._build_tab_voyageur,
                                                                         "Paleographer": self._build_tab_paleographer,
-                                                                        "Commissioner": self._build_tab_commissioner,
                                                                         "Archivist": self._build_tab_archivist,
                                                                         "Registrar": self._build_tab_registrar,
                                                                         "Gazetteer": self._build_tab_gazetteer,
@@ -990,7 +942,6 @@ class Scriptorium(ctk.CTk):
 
         add_nav_button(self.nav_frame, "Voyageur")
         add_nav_button(self.nav_frame, "Paleographer")
-        add_nav_button(self.nav_frame, "Commissioner")
         add_nav_button(self.nav_frame, "Archivist")
 
         add_group_label("Utilities")
@@ -1608,6 +1559,15 @@ class Scriptorium(ctk.CTk):
                       text_color=C_TEXT,
                       command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
                       ).pack(side="left", padx=5)
+        ctk.CTkButton(btn_box, text="Enrich Metadata", fg_color="#2b7a4b", hover_color="#1e5935",
+                      text_color=C_TEXT,
+                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "enrich")).pack(side="left", padx=5)
+        ctk.CTkButton(btn_box, text="Partition Collections", fg_color="#7A5B2B", hover_color="#5B431E",
+                      text_color=C_TEXT,
+                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "partition")).pack(side="left", padx=5)
+        ctk.CTkButton(btn_box, text="Resolve Names", fg_color="#4A5568", hover_color="#2D3748",
+                      text_color=C_TEXT,
+                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "resolve-names")).pack(side="left", padx=5)
         ctk.CTkButton(btn_box, text="Clear Cache", fg_color="#991b1b", hover_color="#7f1d1d",
                       text_color=C_TEXT,
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
@@ -1644,18 +1604,13 @@ class Scriptorium(ctk.CTk):
             return
         self.debug_file_var.set(os.path.basename(selected))
 
-    def _launch_commissioner_debug_browser(self):
-        """Launches a separate, dedicated Chrome/Edge window with --remote-debugging-port
-        active (a fresh profile under Working/Commissioner/, never touching your normal
-        browsing profile) - search LAC in that window, and Commissioner reads its live
-        session cookies straight over the Chrome DevTools Protocol afterward (see
-        lac_client.load_cookies_from_cdp). Exists because Chrome/Edge 127+'s App-Bound
-        Encryption makes reading their on-disk cookie store impossible for any
-        third-party tool - CDP sidesteps that by reading the running browser's memory
-        instead of its encrypted disk file."""
+    def _launch_lac_debug_browser(self):
+        """Launches a dedicated Chrome/Edge window with --remote-debugging-port
+        active (fresh profile under Working/LAC/, never touching your normal
+        browsing profile) to obtain LAC session cookies via CDP."""
         program_dir_var = self.string_vars.get("PROGRAM_DIR")
         program_dir = program_dir_var.get().strip() if program_dir_var else ""
-        profile_dir = os.path.join(program_dir or os.getcwd(), "Working", "Commissioner", "DebugBrowserProfile")
+        profile_dir = os.path.join(program_dir or os.getcwd(), "Working", "LAC", "DebugBrowserProfile")
         os.makedirs(profile_dir, exist_ok=True)
 
         candidates = [
@@ -1668,70 +1623,22 @@ class Scriptorium(ctk.CTk):
         browser_path = next((p for p in candidates if p and os.path.isfile(p)), None)
         if not browser_path:
             self.console.put("\n[System] Could not find Chrome or Edge in a standard location. Launch one "
-                             "manually with --remote-debugging-port=9222 and a separate --user-data-dir "
-                             "instead.\n")
+                             "manually with --remote-debugging-port=9222 and a separate --user-data-dir instead.\n")
             return
 
-        # --remote-allow-origins=*: confirmed live - recent Chrome/Edge reject the CDP
-        # WebSocket handshake outright without this (a DNS-rebinding-attack hardening
-        # measure added after remote-debugging-port's original design), regardless of
-        # --remote-debugging-port being set correctly.
         subprocess.Popen([browser_path, "--remote-debugging-port=9222", f"--user-data-dir={profile_dir}",
                           "--remote-allow-origins=*",
                           "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/SearchAdvanced"])
         self.console.put("\n[System] Launched a debuggable browser window (port 9222). Search LAC in "
-                         "that window, then click Enrich Claims or Harvest Volume.\n")
+                         "that window to establish Cloudflare clearance.\n")
 
-    def _open_commissioner_cookie_file(self):
-        """Opens the LAC search-cookie file in the default text editor, creating an empty
-        one first if it doesn't exist yet - refreshing the cookie is then just "search
-        LAC, copy as cURL, paste the Cookie header here, save", no manual file setup."""
-        cookie_path = Path(self._resolve_base_dir("COMMISSIONER_COOKIE_FILE"))
+    def _open_lac_cookie_file(self):
+        """Opens the LAC cookie fallback file in the default text editor."""
+        cookie_path = Path(self._resolve_base_dir("LAC_COOKIE_FILE"))
         cookie_path.parent.mkdir(parents=True, exist_ok=True)
         if not cookie_path.is_file():
             cookie_path.write_text("", encoding="utf-8")
         os.startfile(str(cookie_path))
-
-    def _build_tab_commissioner(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Commissioner", "ENRICH & PARTITION",
-                               "Enriches Scrip records with live LAC catalog metadata, cross-checks claims and "
-                               "downloads related certificates/grants, and partitions datasets into official "
-                               "archival series. Metadata enrichment and partitioning require no cookies; claim "
-                               "cross-checking uses the debug browser.")
-
-        cookie_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        cookie_frame.pack(side="top", fill="x", pady=(10, 5))
-        ctk.CTkButton(cookie_frame, text="Launch Debug Browser", fg_color=C_ACCENT_STRONG,
-                      hover_color=C_ACCENT, text_color=C_ON_ACCENT,
-                      command=self._launch_commissioner_debug_browser).pack(side="left", padx=(0, 10))
-        ctk.CTkButton(cookie_frame, text="Open Cookie File (Manual Fallback)", fg_color="transparent",
-                      hover_color=C_SURFACE_RAISED, border_width=1, border_color=C_BRASS, text_color=C_BRASS,
-                      command=self._open_commissioner_cookie_file).pack(side="left")
-
-        volume_frame = ctk.CTkFrame(frame, fg_color="transparent")
-        volume_frame.pack(side="top", fill="x", pady=(10, 5))
-        ctk.CTkLabel(volume_frame, text="Harvest Volume Number:",
-                     font=ctk.CTkFont(weight="bold")).pack(side="left")
-        ctk.CTkEntry(volume_frame, textvariable=self.commissioner_volume_var, width=150).pack(side="left", padx=10)
-
-        # Unified action buttons (Docked to bottom)
-        btn_box = self._create_action_box(frame)
-        ctk.CTkButton(btn_box, text="Enrich Metadata", fg_color="#2b7a4b", hover_color="#1e5935",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "enrich")).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Cross-Check Claims", fg_color="#3B8ED0", hover_color="#2b7a4b",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT",
-                                                          "crosscheck")).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Partition Collections", fg_color="#7A5B2B", hover_color="#5B431E",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "partition")).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Harvest Volume", fg_color="transparent", hover_color=C_SURFACE_RAISED,
-                      border_width=1, border_color=C_BRASS, text_color=C_BRASS,
-                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "retrieve")
-                      ).pack(side="left", padx=5)
-
-        self._build_form_ui(frame, COMMISSIONER_VARS)
 
     @staticmethod
     def _voyageur_label_for_code(code: str) -> str:
@@ -1926,31 +1833,29 @@ class Scriptorium(ctk.CTk):
             self.progress_row.grid_remove()
 
         args = [target_script_path]
-        if mode == "paleographer_api" and self.debug_file_var.get().strip():
-            args.append(self.debug_file_var.get().strip())
+        if script_key == "ANALYSIS_SCRIPT":
+            if mode == "paleographer_api" and self.debug_file_var.get().strip():
+                args.append(self.debug_file_var.get().strip())
+            elif mode in ("enrich", "partition", "resolve-names", "crosscheck"):
+                args.append(mode)
+                if mode == "enrich":
+                    delay_val = self.string_vars.get("SCRIP_DELAY_SECONDS", ctk.StringVar(value="0.4")).get().strip()
+                    if delay_val:
+                        args.extend(["--delay", delay_val])
+                    limit_val = self.string_vars.get("SCRIP_ENRICH_LIMIT", ctk.StringVar(value="")).get().strip()
+                    if limit_val:
+                        args.extend(["--limit", limit_val])
+                elif mode == "partition":
+                    out_dir_val = self.string_vars.get("SCRIP_PARTITION_OUTPUT_DIR", ctk.StringVar(value="")).get().strip()
+                    if out_dir_val:
+                        args.extend(["--output-dir", out_dir_val])
         elif script_key == "VOYAGEUR_SCRIPT":
             # Voyageur.py is a thin dispatcher; the mode IS the source code (A/FS/LAC).
             args.append(mode)
-        elif script_key == "COMMISSIONER_SCRIPT":
-            commissioner_mode = "retrieve" if mode == "harvest" else mode
-            args.append(commissioner_mode)
-            if commissioner_mode == "retrieve" and self.commissioner_volume_var.get().strip():
-                args.extend(["--volume", self.commissioner_volume_var.get().strip()])
-            elif commissioner_mode == "enrich":
-                delay_val = self.string_vars.get("COMMISSIONER_DELAY_SECONDS", ctk.StringVar(value="0.4")).get().strip()
-                if delay_val:
-                    args.extend(["--delay", delay_val])
-                limit_val = self.string_vars.get("COMMISSIONER_ENRICH_LIMIT", ctk.StringVar(value="")).get().strip()
-                if limit_val:
-                    args.extend(["--limit", limit_val])
-            elif commissioner_mode == "partition":
-                out_dir_val = self.string_vars.get("COMMISSIONER_OUTPUT_DIR", ctk.StringVar(value="")).get().strip()
-                if out_dir_val:
-                    args.extend(["--output-dir", out_dir_val])
-
-            json_file_val = self.string_vars.get("COMMISSIONER_JSON_FILE", ctk.StringVar(value="")).get().strip()
-            if json_file_val and commissioner_mode in ("crosscheck", "enrich", "partition"):
-                args.extend(["--json", json_file_val])
+            if mode == "LAC":
+                vol = self.string_vars.get("LAC_HARVEST_VOLUME", ctk.StringVar(value="")).get().strip()
+                if vol:
+                    args.extend(["--volume", vol])
 
         target_cwd = os.path.dirname(target_script_path) if os.path.exists(target_script_path) else None
 

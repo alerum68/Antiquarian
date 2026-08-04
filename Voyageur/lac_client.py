@@ -1,7 +1,7 @@
 """
 Generic HTTP client for Library and Archives Canada's Collection Search
 (recherche-collection-search.bac-lac.gc.ca) - no genealogy domain knowledge, just the
-four LAC endpoints Commissioner.py needs, each confirmed live against the real site:
+four LAC endpoints needed for harvesting and downloading:
 
 - get_record_metadata: the catalog record page for a known Item ID (PID).
 - get_manifest: the IIIF Presentation API v3 manifest listing an item's digital objects.
@@ -21,13 +21,13 @@ periodically by the user, not something this module can obtain on its own.
 
 import json
 import re
+import webbrowser
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Union, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import quote
 
 import cloudscraper
 import requests
-import webbrowser
 from bs4 import BeautifulSoup
 
 session = requests.Session()
@@ -54,18 +54,18 @@ TimeoutType = Union[int, float, Tuple[int, int], Tuple[float, float]]
 # Confirmed live: manifest URLs are shaped {MANIFEST_HOST}/DigitalManifest/{source_code}/{PID}.
 # source_code=1 is the "fonandcol" reference system - confirmed live against a real item.
 # Not yet confirmed whether other reference systems (if LAC ever exposes them) use a
-# different source_code; fonandcol is the only one Commissioner needs so far.
+# different source_code; fonandcol is the only one needed so far.
 FONANDCOL_SOURCE_CODE = 1
 
 # Between-request pacing - this is a government site, not a target to hammer. Applied by
-# callers (Commissioner.py) between records, not enforced inside this module itself,
+# callers between records, not enforced inside this module itself,
 # since a single lookup here is already just one or two requests.
 POLITE_DELAY_SECONDS = 1.0
 
 
 class LacCallError(Exception):
     """Base error for any failed LAC call - a non-2xx response, a malformed body, or a
-    network failure. Commissioner.py's retry logic catches this specifically."""
+    network failure. Callers' retry logic catches this specifically."""
 
 
 class LacSearchAuthError(LacCallError):
@@ -273,9 +273,12 @@ def download_canadiana_page(image_id: str, size: str = "full",
 # SEARCH (requires a real browser's cookie jar)
 # ==========================================
 def parse_cookie_header(raw_cookie_header: str) -> Dict[str, str]:
-    """Parses a raw `Cookie:` header string..."""
+    """Parses a raw `Cookie:` header string (e.g. pasted from DevTools > Network > Copy
+    as cURL) into a dictionary requests/cloudscraper can use. Strips leading 'Cookie: '
+    if present, tolerates trailing semicolons and whitespace around names/values."""
     cookies: Dict[str, str] = {}
-    for part in raw_cookie_header.split(";"):
+    cleaned = re.sub(r"^cookie:\s*", "", raw_cookie_header.strip(), flags=re.IGNORECASE)
+    for part in cleaned.split(";"):
         part = part.strip()
         if not part or "=" not in part:
             continue
@@ -288,7 +291,7 @@ _SEARCH_HEADERS = {
     "user-agent": ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                    "(KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"),
     "accept": ("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,"
-              "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"),
+               "image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"),
     "accept-language": "en-US,en;q=0.9",
     "sec-fetch-dest": "document",
     "sec-fetch-mode": "navigate",
@@ -299,7 +302,11 @@ _SEARCH_HEADERS = {
 
 def _do_search_request(url: str, cookies: Dict[str, str], timeout_seconds: TimeoutType,
                        description: str) -> List[str]:
-    """Shared plumbing for search() and search_volume()..."""
+    """Shared plumbing for search() and search_volume() - runs the request with
+    _SEARCH_HEADERS and the supplied cookie jar, checks for Cloudflare challenge/auth
+    rejection, and extracts all IdNumber (PID) values from the results page.
+
+    Raises LacSearchAuthError on any auth failure, LacCallError on network/HTTP errors."""
     try:
         resp = requests.get(url, headers=_SEARCH_HEADERS, cookies=cookies, timeout=timeout_seconds)
     except Exception as e:
@@ -319,7 +326,12 @@ def _do_search_request(url: str, cookies: Dict[str, str], timeout_seconds: Timeo
 
 def search(query: str, cookies: Dict[str, str],
            timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
-    """Searches by free-text query..."""
+    """Searches LAC Collection Search by free-text query (e.g. a claim number, affidavit
+    number, scrip number, or e-number) and returns the list of matching Item IDs (PIDs).
+
+    Requires a valid browser cookie jar with an unexpired cf_clearance cookie - see
+    module docstring. Raises LacSearchAuthError on Cloudflare rejection, LacCallError
+    on network or response errors."""
     url = f"{RECORD_HOST}/eng/Home/Result?ST=STAD&q_type_1=q&q_1={quote(query)}&"
     return _do_search_request(url, cookies, timeout_seconds, description=repr(query))
 
@@ -329,7 +341,16 @@ DEFAULT_CDP_PORT = 9222
 
 def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{RECORD_HOST}/",
                           timeout_seconds: TimeoutType = (5, 10)) -> Dict[str, str]:
-    """Reads live session cookies straight out of a Chrome/Edge instance..."""
+    """Reads live session cookies straight out of a Chrome/Edge instance running with
+    --remote-debugging-port={port} via Chrome DevTools Protocol (Network.getCookies).
+
+    The user launches Chrome/Edge once with that flag, navigates to LAC, and solves a
+    search there; this function fetches the resulting cookie jar over localhost
+    websocket without requiring any manual DevTools copy-pasting.
+
+    Raises LacCallError if no browser is reachable on that port or if the websocket
+    connection fails; raises LacSearchAuthError if the browser tab has no cookies for
+    domain_url (i.e. the user hasn't visited LAC in that browser window yet)."""
     try:
         import websocket
     except ImportError as e:
@@ -350,9 +371,7 @@ def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{REC
     if not target or not target.get("webSocketDebuggerUrl"):
         raise LacCallError(f"No open browser tab found on debug port {port}.")
 
-    # Websocket expects a single float/int for timeout, so we extract the read timeout if a tuple is passed
     ws_timeout = timeout_seconds[1] if isinstance(timeout_seconds, tuple) else timeout_seconds
-    
     ws = websocket.create_connection(target["webSocketDebuggerUrl"], timeout=ws_timeout)
     try:
         ws.send(json.dumps({"id": 1, "method": "Network.getCookies", "params": {"urls": [domain_url]}}))
@@ -370,7 +389,9 @@ def load_cookies_from_cdp(port: int = DEFAULT_CDP_PORT, domain_url: str = f"{REC
 
 
 def open_search_browser_for_refresh(query: str = "") -> None:
-    """Opens the LAC search page in the user's real default browser..."""
+    """Opens the LAC search page in the user's real default browser so they can solve
+    the Cloudflare challenge interactively and refresh their session. If a query is
+    provided, opens directly to that search; otherwise opens Advanced Search."""
     url = f"{RECORD_HOST}/eng/Home/SearchAdvanced"
     if query:
         url = f"{RECORD_HOST}/eng/Home/Result?ST=STAD&q_type_1=q&q_1={quote(query)}&"
@@ -379,7 +400,14 @@ def open_search_browser_for_refresh(query: str = "") -> None:
 
 def search_volume(vol: str, cookies: Dict[str, str], archival_number: str = "RG15",
                   timeout_seconds: TimeoutType = DEFAULT_TIMEOUT_SECONDS) -> List[str]:
-    """Harvests every PID filed under one volume/box number..."""
+    """Harvests every PID filed under one volume/box number (and archival series prefix,
+    e.g. RG15) via LAC's Advanced Search fields.
+
+    Confirmed live: VolumeBoxNumber search on RG15 returns all matching items in one page
+    (num=100) - a single search call retrieves the entire volume's PID list.
+
+    Requires a valid browser cookie jar. Raises LacSearchAuthError on Cloudflare
+    rejection, LacCallError on network or response errors."""
     query_string = (
         f"ST=STAD&DataSource=Archives|FonAndCol"
         f"&SearchIn_1=ArchivalNumber&SearchInText_1={quote(archival_number)}&Operator_1=AND"

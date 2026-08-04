@@ -262,8 +262,16 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
 
 # ==============================================================================
 # LAC GATHER (folded from LAC.py)
-# Downloads Heritage Canadiana microfilm images via IIIF.
+# Downloads Heritage Canadiana microfilm images via IIIF or harvests LAC volumes/PIDs.
 # ==============================================================================
+
+try:
+    from . import lac_client
+    from . import LAC as _lac_module
+except (ImportError, ValueError):
+    import lac_client
+    import LAC as _lac_module
+
 
 def _lac_get_env_paths():
     """Reads the necessary foundational directories mapped by the Toolbox."""
@@ -271,8 +279,8 @@ def _lac_get_env_paths():
     media_dir = os.environ.get("MEDIA_DIR", "Media").strip()
     raw_url = os.environ.get("LAC_URL", "").strip()
 
-    if not raw_url:
-        print("[Error] No LAC_URL found in environment variables.")
+    if not raw_url and not os.environ.get("LAC_VOLUME"):
+        print("[Error] No LAC_URL or LAC_VOLUME found in environment variables.")
         sys.exit(1)
 
     return program_dir, media_dir, raw_url
@@ -390,11 +398,16 @@ def _lac_download_images(manifest_data, out_dir, roll_num):
 
 def _lac_main() -> None:
     print("========================================")
-    print(" Voyageur (LAC) - LAC IIIF Image Download")
+    print(" Voyageur (LAC) - LAC Microfilm / Volume Gather")
     print("========================================")
 
     load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
     load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
+
+    vol = os.environ.get("LAC_VOLUME", "").strip()
+    if vol:
+        _lac_module.main()
+        return
 
     p_dir, m_dir, url = _lac_get_env_paths()
     roll, manifest = _lac_parse_url(url)

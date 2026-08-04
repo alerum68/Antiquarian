@@ -12,6 +12,11 @@ cleanup with no new functionality.
   are unified as self-contained standalone execution entrypoints with folded sub-modules
   and embedded source templates, ensuring zero runtime sibling-import failure while keeping
   individual subfiles for modularity and test isolation.
+- **Commissioner Integration**: folded `Commissioner` into `Voyageur` (for LAC gathering,
+  volume harvesting, and search scraping) and `Paleographer` (for Scrip metadata enrichment,
+  name resolution, citation cleaning, and archival collection partitioning), streamlining
+  the pipeline into three core stages: Gathering (`Voyageur`) -> Analysis/Enrichment (`Paleographer`)
+  -> GEDCOM Compilation (`Archivist`). Removed the standalone Commissioner tab from `Scriptorium.py`.
 - **Cross-Source Merge Concept**: archived dual-source census merging prototype (`Merged.py`,
   `MergedCensus.py`, `test_merged_census.py`) into `DEV/merged_concept/` and catalogued on the
   roadmap for future development.
