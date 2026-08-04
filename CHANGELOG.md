@@ -8,6 +8,13 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
+- **Unified Pipeline Architecture**: `Voyageur.py`, `Paleographer.py`, and `Archivist.py`
+  are unified as self-contained standalone execution entrypoints with folded sub-modules
+  and embedded source templates, ensuring zero runtime sibling-import failure while keeping
+  individual subfiles for modularity and test isolation.
+- **Cross-Source Merge Concept**: archived dual-source census merging prototype (`Merged.py`,
+  `MergedCensus.py`, `test_merged_census.py`) into `DEV/merged_concept/` and catalogued on the
+  roadmap for future development.
 - **Voyageur (FamilySearch)**: full-resolution image download for census gathers, matching
   Ancestry's own per-page image capture. FamilySearch's deepzoomcloud storage endpoint
   blocks direct access from the record page's own origin across every mechanism tried

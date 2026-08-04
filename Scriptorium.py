@@ -100,13 +100,8 @@ ARCHIVIST_VARS = {"Which JSON to Build From": {"JSON_FILE": ""},
 # VOYAGEUR SOURCES
 # ==========================================
 # Each source is one Voyageur sub-script (Voyageur/<code>.py); adding a new Major Repository
-# is exactly this - a new sub-script plus one more entry here, nothing else touched. "Merged"
-# isn't a repository of its own - it orchestrates the Ancestry and FamilySearch gathers
-# back-to-back against the same two URL fields, then merges the results (see
-# Voyageur/Merged.py) - so its settings section below is filtered specially rather than
-# getting its own VOYAGEUR_VARS entry.
-VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC"),
-                    ("Merged", "Merged (Ancestry + FamilySearch)")]
+# is exactly this - a new sub-script plus one more entry here, nothing else touched.
+VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
 
 VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
                  "Ancestry": {"CENSUS_URL": ""},
@@ -158,14 +153,22 @@ PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVE
                                 "PDFIX_SIZE_THRESHOLD_MB": "0"},
               "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"}}
 
-COMMISSIONER_VARS = {"Which JSON to Process": {"COMMISSIONER_JSON_FILE": "",
-                                              "COMMISSIONER_OUTPUT_DIR": ""},
-                     "Enrichment & LAC Settings": {"COMMISSIONER_ARCHIVAL_NUMBER": "RG15",
-                                                   "COMMISSIONER_DELAY_SECONDS": "0.4",
-                                                   "COMMISSIONER_ENRICH_LIMIT": ""},
-                     "Folders": {"COMMISSIONER_MEDIA_DIR": "Media/Commissioner",
-                                 "COMMISSIONER_CHECKPOINT_DIR": "Working/Commissioner",
-                                 "COMMISSIONER_COOKIE_FILE": "Working/Commissioner/lac_cookies.txt"}}
+COMMISSIONER_VARS = {
+    "Which JSON to Process": {
+        "COMMISSIONER_JSON_FILE": "",
+        "COMMISSIONER_OUTPUT_DIR": "",
+    },
+    "Enrichment & LAC Settings": {
+        "COMMISSIONER_ARCHIVAL_NUMBER": "RG15",
+        "COMMISSIONER_DELAY_SECONDS": "0.4",
+        "COMMISSIONER_ENRICH_LIMIT": "",
+    },
+    "Folders": {
+        "COMMISSIONER_MEDIA_DIR": "Media/Commissioner",
+        "COMMISSIONER_CHECKPOINT_DIR": "Working/Commissioner",
+        "COMMISSIONER_COOKIE_FILE": "Working/Commissioner/lac_cookies.txt",
+    },
+}
 
 # ==========================================
 # ENV FILE TARGETS
@@ -208,8 +211,8 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "COMMISSIONER_ENRICH_LIMIT": "Optional maximum number of records to process during an enrichment run. "
                                  "Leave blank to process all records.",
     "COMMISSIONER_MEDIA_DIR": "Where downloaded LAC/Canadiana images and PDFs are saved, relative to PROGRAM_DIR.",
-    "COMMISSIONER_CHECKPOINT_DIR": "Where volume-harvest and enrichment progress is checkpointed, relative to PROGRAM_DIR - "
-                                   "makes runs safely resumable across pauses or cookie refreshes.",
+    "COMMISSIONER_CHECKPOINT_DIR": "Where volume-harvest and enrichment progress is checkpointed, relative to "
+                                   "PROGRAM_DIR - makes runs safely resumable across pauses or cookie refreshes.",
     "COMMISSIONER_COOKIE_FILE": "Manual fallback only - Commissioner normally reads the LAC session cookie "
                                 "automatically via 'Launch Debug Browser'. This plain text file (opened by "
                                 "'Open Cookie File') holds a raw Cookie header pasted from DevTools > Network "
@@ -433,8 +436,13 @@ FIELD_WIDGETS = {
     "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": {"type": "segmented",
                                            "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
     "PDFIX_COMPRESSION_LEVEL": {"type": "segmented", "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
-    "EXTRACTION_ENGINE": {"type": "segmented",
-                          "options": [("agy", "Antigravity CLI (subscription)"), ("api", "Gemini API (pay-per-token)")]},
+    "EXTRACTION_ENGINE": {
+        "type": "segmented",
+        "options": [
+            ("agy", "Antigravity CLI (subscription)"),
+            ("api", "Gemini API (pay-per-token)"),
+        ],
+    },
 
     # Bounded numeric tuning knobs.
     "MIN_MARRIAGE_AGE": {"type": "slider", "min": 0, "max": 30, "step": 1},
@@ -724,13 +732,17 @@ class Scriptorium(ctk.CTk):
                            "Commissioner": "Welcome to Commissioner!\n\n"
                            "Commissioner is an enrichment, cross-referencing, and collection management step for "
                            "Scrip records, sitting between Paleographer and Archivist:\n\n"
-                           "• 'Enrich Metadata': Direct LAC catalog lookup (unauthenticated, no browser/cookie needed). "
-                           "Fills in microfilm reel numbers (e.g. C-14929), archival series codes (e.g. RG15-D-II-8-c), "
-                           "live catalog titles, and extracts missing citation fields (claim, scrip, allotment numbers, dates).\n"
-                           "• 'Cross-Check Claims': Searches LAC for related certificates or land grants tied to the same claim "
-                           "and downloads digital objects (requires cookies via 'Launch Debug Browser').\n"
-                           "• 'Partition Collections': Organizes records in the active JSON into distinct collection JSON files "
-                           "grouped by official LAC archival series (Finding Aids 15-19, 15-20, 15-21) ready for Archivist.\n"
+                           "• 'Enrich Metadata': Direct LAC catalog lookup (unauthenticated, "
+                           "no browser/cookie needed). Fills in microfilm reel numbers "
+                           "(e.g. C-14929), archival series codes (e.g. RG15-D-II-8-c), live "
+                           "catalog titles, and extracts missing citation fields "
+                           "(claim, scrip, allotment numbers, dates).\n"
+                           "• 'Cross-Check Claims': Searches LAC for related certificates or "
+                           "land grants tied to the same claim and downloads digital objects "
+                           "(requires cookies via 'Launch Debug Browser').\n"
+                           "• 'Partition Collections': Organizes records in the active JSON into "
+                           "distinct collection JSON files grouped by official LAC archival "
+                           "series (Finding Aids 15-19, 15-20, 15-21) ready for Archivist.\n"
                            "• 'Harvest Volume': Bulk-downloads every record in an entire LAC volume unattended.\n\n"
                            "When finished, head to Archivist to build your GEDCOM.",
                            "Archivist": "Welcome to Archivist!\n\n"
@@ -1682,9 +1694,10 @@ class Scriptorium(ctk.CTk):
 
     def _build_tab_commissioner(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Commissioner", "ENRICH & PARTITION",
-                               "Enriches Scrip records with live LAC catalog metadata, cross-checks claims and downloads "
-                               "related certificates/grants, and partitions datasets into official archival series. "
-                               "Metadata enrichment and partitioning require no cookies; claim cross-checking uses the debug browser.")
+                               "Enriches Scrip records with live LAC catalog metadata, cross-checks claims and "
+                               "downloads related certificates/grants, and partitions datasets into official "
+                               "archival series. Metadata enrichment and partitioning require no cookies; claim "
+                               "cross-checking uses the debug browser.")
 
         cookie_frame = ctk.CTkFrame(frame, fg_color="transparent")
         cookie_frame.pack(side="top", fill="x", pady=(10, 5))
@@ -1708,7 +1721,8 @@ class Scriptorium(ctk.CTk):
                       command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "enrich")).pack(side="left", padx=5)
         ctk.CTkButton(btn_box, text="Cross-Check Claims", fg_color="#3B8ED0", hover_color="#2b7a4b",
                       text_color=C_TEXT,
-                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "crosscheck")).pack(side="left", padx=5)
+                      command=lambda: self.execute_script("COMMISSIONER_SCRIPT",
+                                                          "crosscheck")).pack(side="left", padx=5)
         ctk.CTkButton(btn_box, text="Partition Collections", fg_color="#7A5B2B", hover_color="#5B431E",
                       text_color=C_TEXT,
                       command=lambda: self.execute_script("COMMISSIONER_SCRIPT", "partition")).pack(side="left", padx=5)
@@ -1750,12 +1764,7 @@ class Scriptorium(ctk.CTk):
         if hasattr(self, "voyageur_form_container"):
             for child in self.voyageur_form_container.winfo_children():
                 child.destroy()
-            if code == "Merged":
-                # Needs both source's URL fields at once, not just its own section.
-                filtered = {name: fields for name, fields in VOYAGEUR_VARS.items()
-                            if name in ("Ancestry", "FamilySearch")}
-            else:
-                filtered = {name: fields for name, fields in VOYAGEUR_VARS.items() if name == label}
+            filtered = {name: fields for name, fields in VOYAGEUR_VARS.items() if name == label}
             self._build_form_ui(self.voyageur_form_container, filtered, skip_keys={"VOYAGEUR_SOURCE"})
 
     def _build_tab_voyageur(self, frame: ctk.CTkFrame):

@@ -1,0 +1,76 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<SourceTemplates>
+  <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
+  <Template Id="10001">
+    <Name>_Find A Grave</Name>
+    <Description>Info taken from FindAGrave website, http://www.findagrave.com</Description>
+    <Category>FAG - Find A Grave</Category>
+    <Footnote>Find A Grave, [web], Assessed on  [viewed]; Record,  [name]; [dates]; [Notes]; Memorial # [mem]; Record of the [cem]; Created by [created].</Footnote>
+    <ShortFootnote>Find A Grave, [web], Assessed on  [viewed]; Record,  [name];  Memorial # [mem]. </ShortFootnote>
+    <Bibliography>Find A Grave, [web]. </Bibliography>
+    <Field>
+      <Type>Text</Type>
+      <Name>Name</Name>
+      <Display>Deceased</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Dates</Name>
+      <Display>Born/Died</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Notes</Name>
+      <Display>Comments</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Web</Name>
+      <Display>URL</Display>
+      <Hint/>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Mem</Name>
+      <Display>Memorial No.</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Cem</Name>
+      <Display>Cemetery</Display>
+      <Hint/>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Created</Name>
+      <Display>Created By</Display>
+      <Hint/>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Viewed</Name>
+      <Display>Accessed on </Display>
+      <Hint/>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+</SourceTemplates>

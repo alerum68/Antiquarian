@@ -14,6 +14,7 @@ import hashlib
 import json
 import os
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Dict, Hashable, List, Literal, Optional, Tuple, TypedDict, Union, cast
 
@@ -248,8 +249,8 @@ GENERAL_CONFIG = {
     "default_location": os.getenv("DEFAULT_EVENT_LOCATION", ""),
     "collection_url": os.getenv("COLLECTION_URL", ""),
     "collection_name": os.getenv("COLLECTION_NAME", ""),
-    "transcription_header": os.getenv("TRANSCRIPTION_HEADER", "Original Transcription:"),
-    "translation_header": os.getenv("TRANSLATION_HEADER", "English Translation:"),
+    "transcription_header": os.getenv("TRANSCRIPTION_HEADER", "Citation Text:"),
+    "translation_header": os.getenv("TRANSLATION_HEADER", "Citation Details:"),
     "role_clergy": os.getenv("ROLE_CLERGY", "Priest"),
     "clergy_honorific": os.getenv("CLERGY_HONORIFIC", "Father"),
     "role_default_witness": os.getenv("ROLE_DEFAULT_WITNESS", "Witness"),
@@ -311,7 +312,8 @@ def _titlecase_callback(word: str, **kwargs) -> Optional[str]:
     if "-" in word:
         parts = word.split("-")
         return "-".join(
-            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
+             else titlecase(p, callback=_titlecase_callback).capitalize())
             for p in parts
         )
     return None
@@ -1132,25 +1134,34 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
     caps = CENSUS_TEMPLATES[get_census_template_id(CENSUS_YEAR)]
     ed_suffix = f", ED {row_ed}" if (caps["ed"] and row_ed) else ""
+    row_loc = ", ".join(filter(None, [row_town, row_county, row_state]))
 
     if target_software == "RM":
-        # No per-citation _TMPLT block here: the template (era-matched TID 47/48/49) lives
-        # once on the SOURCE record itself (get_census_sources) - a citation just points at
-        # that source (SOUR @S...@ above) and supplies its own detail via PAGE, the way RM's
-        # real Population Schedule templates actually work. A second, TID-less _TMPLT was
-        # previously duplicated here per citation, followed by a "3 NAME ..." line that's
-        # illegal as a SOURCE_CITATION child under GEDCOM 5.5.1 - confirmed as the root cause
-        # of RootsMagic/FTM import silently dropping NAME (and cascading to NOTE) lines and,
-        # in RM specifically, dropping individuals outright. Both removed; PAGE below already
-        # carries the same roll/town/ED/page/household/person detail.
         page_parts = [row_roll, f"{row_town}{ed_suffix}", real_page]
         if caps["household"]:
             page_parts.append(fam_num)
         page_parts.append(person_str)
 
         collection_title = COLLECTION_NAME or f'{CENSUS_YEAR} United States Federal Census'
-        cit.extend([f"3 PAGE {'; '.join(page_parts)}",
-                    "3 DATA", f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
+        cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
+
+        # Simplified Citations: Census Records (TID 10008) Detail=True fields
+        detail_fields = [
+            ("Page", f"p. {real_page}" if real_page else ""),
+            ("SourceDetailPerson", person_str),
+            ("Location", row_loc),
+            ("CensusED", row_ed),
+            ("HouseholdID", f"dwelling {dwell_num}, family {fam_num}" if (dwell_num and fam_num)
+             else (f"family {fam_num}" if fam_num else (f"dwelling {dwell_num}" if dwell_num else ""))),
+            ("Repository", "Ancestry.com" if not fs_url else "FamilySearch"),
+            ("URL", ancestry_url),
+            ("RefNumber", f"APID 1,{APID_DB}::{rec_id}" if (APID_DB and rec_id) else ""),
+        ]
+        for f_name, f_val in detail_fields:
+            if f_val:
+                cit.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
+
+        cit.extend(["3 DATA", f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
                     f"4 NAME Anc- {collection_title}",
                     f"4 URL {ancestry_url}"])
         if fsftid:
@@ -1334,37 +1345,46 @@ def build_census_task(rec_id: str, giv: str, sur: str, record_label: str, reason
 
 
 def get_census_sources(target_software: str) -> List[str]:
-    tid = get_census_template_id(CENSUS_YEAR)
-    caps = CENSUS_TEMPLATES[tid]
-    ed_frag = f", ED {ENUMERATION_DISTRICT}" if (caps["ed"] and ENUMERATION_DISTRICT) else ""
-    schedule_frag = ", Population" if caps["schedule"] else ""
+    tid = 10008  # Simplified Citations: Census Records
+    source_title = COLLECTION_NAME or f"{CENSUS_YEAR} U.S. Federal Census"
+    repository = clean_val(REPOSITORY) or "Ancestry.com Operations, Inc."
+    primary_creator = ("United States. Bureau of the Census"
+                       if ("U.S." in source_title or "United States" in source_title)
+                       else (clean_val(ORG_NAME) or "Census Bureau"))
+    department = "National Archives and Records Administration"
+    date_str = str(CENSUS_YEAR) if CENSUS_YEAR else ""
+    publisher = clean_val(PUBLISHER)
+    pub_loc = clean_val(PUB_LOC)
 
     if target_software == "RM":
-        tmplt_fields = ["2 FIELD", "3 NAME CensusID", f"3 VALUE {CENSUS_YEAR} U.S. Federal Census",
-                        "2 FIELD", "3 NAME Jurisdiction", f"3 VALUE {COUNTY}, {STATE}"]
-        if caps["schedule"]:
-            tmplt_fields += ["2 FIELD", "3 NAME Schedule", "3 VALUE Population"]
-        if caps["ed"]:
-            tmplt_fields += ["2 FIELD", "3 NAME ED", f"3 VALUE {ENUMERATION_DISTRICT}"]
-        tmplt_fields += ["2 FIELD", "3 NAME PublishLoc", f"3 VALUE {PUB_LOC}",
-                         "2 FIELD", "3 NAME Publisher", f"3 VALUE {PUBLISHER}",
-                         "2 FIELD", "3 NAME PubType", "3 VALUE on-line image",
-                         "2 FIELD", "3 NAME FilmID", f"3 VALUE {FILM_NUMBER}"]
+        tmplt_fields = [
+            "2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}",
+            "2 FIELD", "3 NAME Department", f"3 VALUE {department}",
+            "2 FIELD", "3 NAME Date", f"3 VALUE {date_str}",
+            "2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_title}",
+        ]
+        if publisher:
+            tmplt_fields += ["2 FIELD", "3 NAME Publisher", f"3 VALUE {publisher}"]
+        if pub_loc:
+            tmplt_fields += ["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {pub_loc}"]
+        if repository:
+            tmplt_fields += ["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"]
+
+        bibl = (f"{primary_creator}, {department}. {date_str}. {source_title}. {pub_loc}: {publisher}."
+                if (pub_loc and publisher)
+                else f"{primary_creator}, {department}. {date_str}. {source_title}.")
 
         return [f"0 @S{CENSUS_SOURCE_ID}@ SOUR", f"1 REFN {CENSUS_SOURCE_ID}",
-                f"1 ABBR {CENSUS_YEAR} U.S. Federal Census",
-                f"1 TITL , {CENSUS_YEAR} U.S. Federal Census, {COUNTY}, {STATE}{schedule_frag}{ed_frag}, ; "
-                f"on-line image {FILM_NUMBER}, .",
-                f"1 _SUBQ , {CENSUS_YEAR} U.S. Federal Census, {COUNTY}, {STATE}{schedule_frag}{ed_frag}, .",
-                f"1 _BIBL {COUNTY}, {STATE}, {CENSUS_YEAR} U.S. Federal Census{schedule_frag}{ed_frag}. on-line "
-                f"image {FILM_NUMBER}. {PUB_LOC}: {PUBLISHER}.",
+                f"1 ABBR {source_title}",
+                f"1 TITL {source_title}",
+                f"1 _BIBL {bibl}",
                 "1 REPO @R1@", "1 _TMPLT", f"2 TID {tid}"] + tmplt_fields + [
                 f"0 {ROOT_SOURCE_ID} SOUR", f"1 TITL {ORG_NAME}", "1 AUTH",
                 f"1 PUBL Researcher: {RESEARCHER}."] + weblink_lines(
             MGS_GROUP_URL, "Facebook Group", "RM") + weblink_lines(ANCESTRY_GROUP_URL, "Ancestry Group", "RM")
     else:
         return [f"0 @S{CENSUS_SOURCE_ID}@ SOUR", f"1 REFN {CENSUS_SOURCE_ID}",
-                f"1 TITL {CENSUS_YEAR} U.S. Federal Census",
+                f"1 TITL {source_title}",
                 f"1 PUBL {PUB_LOC}: {PUBLISHER}", "1 REPO @R1@", f"1 _APID 1,{APID_DB}::0",
                 f"0 {ROOT_SOURCE_ID} SOUR", f"1 TITL {ORG_NAME}", f"1 AUTH Research conducted by {RESEARCHER}.",
                 f"1 _LINK {MGS_GROUP_URL}", "2 NAME Facebook Group", f"1 _LINK {ANCESTRY_GROUP_URL}",
@@ -1740,6 +1760,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
              "1 SENT [person] was being educated < [Desc]>< [Date]>< [PlaceDetails]>< [Place].", "1 PLAC Y", "1 DATE Y",
              "1 DESC Y", "0 _EVDEF Military Service", "1 TYPE P", "1 TITL Military Service", "1 ABBR Mil. Service",
              "1 SENT [person] had military service.< [Desc]>< [Date]>.", "1 PLAC N", "1 DATE Y", "1 DESC Y"])
+        ged.extend(get_source_templates({10008}))
 
     ged.extend(["0 @SUB1@ SUBM", f"1 NAME {RESEARCHER}", f"1 ADDR {SUBM_ADDRESS}", f"1 NOTE {ORG_NAME}", "0 @R1@ REPO",
                 f"1 NAME {REPOSITORY}", f"1 ADDR {REPOSITORY_LOC}", f"1 CALN {CALL_NUMBER}", "2 MEDI Electronic",
@@ -1991,14 +2012,11 @@ def extract_volume(sheet: dict) -> str:
 
 
 def get_dynamic_source_id(vol_val: str) -> str:
-    """Constructs a dynamic GEDCOM Source ID based on the volume.
+    """Constructs a dynamic GEDCOM Source ID based on volume.
 
-    Scrip's LAC volume numbers (1319-1372 for RG15) are already globally unique on
-    their own - unlike Parish, which prefixes a register_source_id to disambiguate two
-    different parishes that happen to share a volume number, Scrip needs no such prefix
-    (per the user: "with Scrip it shouldn't have the @S1 just @S"). run_general_flavor
-    sets GENERAL_CONFIG['omit_source_id_prefix'] once per run, from record_type_name,
-    rather than threading it through every one of this function's many call sites."""
+    For Scrip records, volume identifiers (e.g. RG15 series volumes) are unique
+    without requiring a register source prefix.
+    """
     vol_digits = re.sub(r'\D', '', f"{vol_val or '1'}") or '1'
     if GENERAL_CONFIG.get('omit_source_id_prefix'):
         return f"@S{vol_digits.zfill(3)}@"
@@ -2161,6 +2179,12 @@ def generate_uid(rec: dict, part: dict, vol: str) -> str:
     pos = next((i for i, p in enumerate(participants) if p is part), None)
     occ = same_role.index(pos) if pos in same_role else 0
 
+    is_scrip = GENERAL_CONFIG.get('omit_source_id_prefix')
+    if is_scrip and identity:
+        if role == '0' and occ == 0:
+            return identity
+        return f"{identity}_{role}_{occ}" if occ > 0 else f"{identity}_{role}"
+
     unique_string = f"indi_{vol}_{identity}_{role}_{occ}"
     numeric_id = int(hashlib.md5(unique_string.encode('utf-8')).hexdigest(), 16) % (10 ** 10)
     return f"{src_id}{numeric_id:010d}"
@@ -2186,98 +2210,157 @@ def generate_media_uid(meta: dict, vol: str) -> str:
 
 
 def generate_media_uid_for_path(file_path: str) -> str:
-    """Same deterministic-hash convention as generate_media_uid, but for a file living
-    outside the sheet-based document_metadata/IMAGE_DIR structure entirely - a
-    Commissioner-downloaded certificate or land grant, saved to its own media folder, has
-    no sheet metadata to key on, only the path itself. There is no existing precedent for
-    multiple media per person/citation anywhere in this codebase; this is what makes it
-    possible - build_general_citation calls this once per source_documents entry that
-    carries a media_path, and build_gedcom_from_general calls it again (same input, same
-    deterministic output) to actually create that entry's own OBJE record - no object
-    identity needs to be threaded through call chains for the two to agree on the ID.
+    """Generates a deterministic media UID from a file path.
 
-    Only used when the entry has no lac_asset_id (see generate_media_uid_for_lac_asset) -
-    a Commissioner-downloaded LAC asset always has one and should prefer that instead,
-    since it's LAC's own stable identifier rather than an opaque hash of a local path."""
+    Used for external or downloaded documents that do not belong to a sheet
+    metadata context.
+    """
     numeric_id = int(hashlib.md5(clean_val(file_path).encode('utf-8')).hexdigest(), 16) % (10 ** 10)
     return f"M{numeric_id:010d}"
 
 
 def generate_media_uid_for_lac_asset(asset_id: str) -> str:
-    """Media UID built directly from LAC's own e-number asset ID (e.g. "e011359206"),
-    rather than a computed hash of a local file path - confirmed live in review: an
-    opaque hashed ID makes a real GEDCOM harder to cross-reference by hand, and LAC's own
-    e-number is already a stable, globally unique identifier with no need to hash it.
-    Every Commissioner-downloaded asset carries lac_asset_id (see
-    Commissioner.download_pid_bundle) - this is preferred over
-    generate_media_uid_for_path whenever it's present.
+    """Generates a media UID directly from an LAC asset identifier.
 
-    Strips the leading "e" (and any other non-digit characters) rather than keeping it -
-    per the user, an FTM import specifically breaks on a non-numeric media object ID, so
-    everything after the fixed "M" prefix must stay digits-only, same as every other
-    generate_media_uid* function in this file."""
+    Digits are extracted from the asset ID (e.g. e011359206 -> M011359206)
+    to maintain strict numeric format compatibility across target software.
+    """
     digits = re.sub(r'\D', '', clean_val(asset_id))
     return f"M{digits}"
 
 
-# The user's own hand-built RootsMagic custom Source Templates (Metis Scrip.rmst,
-# Templates 20001-20005) - each Field's Detail flag in that file tells us where its
-# value belongs: Detail=False fields (Commission/Collection/Repository) are entered
-# once on the shared master SOUR record; every Detail=True field is entered per
-# citation instead. 'commission'/'collection' below are the fixed, per-template text
-# for those three Detail=False fields; 'detail_fields' lists the per-citation fields
-# in the same order the template defines them.
-_SCRIP_TEMPLATES: Dict[int, Dict[str, object]] = {
+# RootsMagic custom Source Templates (Simplified Citations and Metis Scrip .rmst files).
+# Detail=False fields populate the master SOUR record; Detail=True fields populate citations.
+_SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
+    10001: {
+        'name': "_Find A Grave",
+        'category': "FAG - Find A Grave",
+        'label': "Find A Grave Memorial",
+        'source_description': "Find A Grave Memorials",
+        'master_fields': ['Web', 'Cem'],
+        'detail_fields': ['Name', 'Dates', 'Notes', 'Mem'],
+    },
+    10006: {
+        'name': "* Simplified Citations Master Template",
+        'category': "Simplified Citations for Genealogical Sources",
+        'label': "Master Template",
+        'source_description': "Master Citation Template",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
+                          'Person', 'Publisher', 'PublishLocation'],
+        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'CensusED',
+                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+    },
+    10008: {
+        'name': "* Simple Citations: Census Records",
+        'category': "Simplified Citations for Genealogical Sources",
+        'label': "Census Records",
+        'source_description': "Census Records and Population Schedules",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
+                          'Person', 'Publisher', 'PublishLocation'],
+        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'CensusED',
+                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+    },
+    10009: {
+        'name': "* Simple Citations: Non-traditional",
+        'category': "Simplified Citations for Genealogical Sources",
+        'label': "Non-traditional (Church / Parish / Vital / Cemetery)",
+        'source_description': "Church Registers, Vital Records, and Archives",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
+                          'Person', 'Publisher', 'PublishLocation'],
+        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'Repository',
+                          'URL', 'Accessed', 'RefNumber'],
+    },
+    10010: {
+        'name': "* Simple Citations: Traditional",
+        'category': "Simplified Citations for Genealogical Sources",
+        'label': "Traditional (Books / Newspapers / Periodicals)",
+        'source_description': "Published Books, Articles, and Periodicals",
+        'master_fields': ['Author', 'Role', 'Date', 'BookTitle', 'Subtitle', 'Publisher', 'PublishLocation'],
+        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+    },
     20001: {
+        'name': "* Simple Citations: Métis Scrip (Manitoba, 1870–1876)",
+        'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Manitoba (1870–1876)",
-        # The real LAC-website collection name (what a researcher browsing LAC itself
-        # would see), used for this source's own display TITL/ABBR - deliberately
-        # different from 'collection' below, which is the archival fonds/series
-        # citation the template's own "Collection" Detail=False field expects. Best
-        # effort from LAC's own naming conventions - worth the user double-checking
-        # against the live collection page before this ships to production.
+        'source_description': "Manitoba Métis Scrip Applications",
         'website_collection': "Manitoba Métis scrip applications",
+        'primary_creator': "Department of the Interior",
+        'department': "Manitoba Scrip Commission",
         'commission': "Manitoba Scrip Commission",
         'collection': "Department of the Interior fonds, RG 15, Series D-II-8-a",
         'date_range': [(1870, 1876)],
-        'detail_fields': ['ClaimantName', 'AffidavitNumber', 'Parish', 'ScripType', 'Volume', 'Microfilm', 'URL'],
+        'date_range_str': "1870–1876",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
+        'detail_fields': ['ClaimantName', 'AffidavitNumber', 'Parish', 'ScripType',
+                          'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20002: {
+        'name': "* Simple Citations: Métis Scrip (North-West, 1885 & 1900-1901)",
+        'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: North-West (1885 & 1900-1901)",
+        'source_description': "North-West Territories Métis Scrip Applications",
         'website_collection': "North-West Territories Métis scrip applications",
+        'primary_creator': "Department of the Interior",
+        'department': "North-West Half-Breed Claims Commission",
         'commission': "North-West Half-Breed Claims Commission",
         'collection': "Department of the Interior fonds, RG 15, Series D-II-8-c",
         'date_range': [(1885, 1885), (1900, 1901)],
-        'detail_fields': ['ClaimantName', 'ClaimNumber', 'ScripNumber', 'IssueDate', 'Location', 'Volume',
-                          'Microfilm', 'URL'],
+        'date_range_str': "1885 & 1900-1901",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
+        'detail_fields': ['ClaimantName', 'ClaimNumber', 'ScripNumber', 'IssueDate',
+                          'Location', 'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20003: {
+        'name': "* Simple Citations: Métis Scrip (Treaty 8, 1899-1908)",
+        'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Treaty 8 (1899-1908)",
+        'source_description': "Treaty No. 8 Métis Scrip Applications",
         'website_collection': "Treaty No. 8 Métis scrip applications",
+        'primary_creator': "Department of the Interior",
+        'department': "Treaty No. 8 Scrip Commission",
         'commission': "Treaty No. 8 Scrip Commission",
         'collection': "Department of the Interior fonds, RG 15, Series D-II-8-i",
         'date_range': [(1899, 1908)],
-        'detail_fields': ['ClaimantName', 'ClaimNumber', 'ScripAmount', 'ScripNoteNumber', 'DeliveryDate',
-                          'DeliveryPlace', 'Volume', 'URL'],
+        'date_range_str': "1899–1908",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
+        'detail_fields': ['ClaimantName', 'ClaimNumber', 'ScripAmount', 'ScripNoteNumber',
+                          'DeliveryDate', 'DeliveryPlace', 'Volume', 'URL', 'Accessed', 'RefNumber'],
     },
     20004: {
+        'name': "* Simple Citations: Métis Scrip (Certificates & Payments)",
+        'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Certificate",
+        'source_description': "Métis Scrip Certificates and Payments",
         'website_collection': "Métis scrip certificates and payments",
+        'primary_creator': "Department of the Interior",
+        'department': "Scrip Commission",
         'commission': "Scrip Commission",
         'collection': "Department of the Interior fonds, RG 15, Series D-II-8-e/f/j",
         'date_range': [],
-        'detail_fields': ['ClaimantName', 'ScripType', 'CertificateNumber', 'Amount', 'IssueDate', 'Volume',
-                          'Microfilm', 'URL'],
+        'date_range_str': "1870–1906",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
+        'detail_fields': ['ClaimantName', 'ScripType', 'CertificateNumber', 'Amount',
+                          'IssueDate', 'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20005: {
+        'name': "* Simple Citations: Dominion Land Grants & Patents",
+        'category': "Simplified Citations for Genealogical Sources",
         'label': "Land Records: Dominion Land Grant Patent",
+        'source_description': "Dominion Lands Patents",
         'website_collection': "Dominion Lands patents",
+        'primary_creator': "Department of the Interior",
+        'department': "Dominion Lands Branch",
         'commission': "",
         'collection': "Dominion Land Grants, RG 15",
         'date_range': [],
-        'detail_fields': ['GranteeName', 'OriginalClaimant', 'LandDescription', 'IssueDate', 'Liber', 'Folio',
-                          'Microfilm', 'URL'],
+        'date_range_str': "1870–1930",
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
+        'detail_fields': ['GranteeName', 'OriginalClaimant', 'LandDescription', 'IssueDate',
+                          'Liber', 'Folio', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
+}
+_SCRIP_TEMPLATES: Dict[int, Dict[str, object]] = {
+    k: v for k, v in _SIMPLIFIED_CITATION_TEMPLATES.items() if k in (20001, 20002, 20003, 20004, 20005)
 }
 
 
@@ -2285,11 +2368,7 @@ _SCRIP_YEAR_RE = re.compile(r"\b(1[89]\d{2})\b")
 
 
 def _scrip_record_year(rec: dict) -> Optional[int]:
-    """Best-effort 4-digit year for date-range template matching, tried in order: the
-    record's own resolved 'year' field, then application_date/issue_date text - not a
-    reliable signal on its own (heirship/late-filed claims can be signed decades after
-    their actual commission), which is why select_scrip_template_id only falls back to
-    it after series_code/commission_reference both come up empty."""
+    """Extracts a 4-digit year from record metadata or date fields."""
     tf = rec.get('type_specific_fields') or {}
     for source in (rec.get('year'), tf.get('application_date'), tf.get('issue_date')):
         match = _SCRIP_YEAR_RE.search(clean_val(source))
@@ -2300,20 +2379,7 @@ def _scrip_record_year(rec: dict) -> Optional[int]:
 
 def select_scrip_template_id(commission_reference: str, document_type: str,
                              series_code: Optional[str] = None, year: Optional[int] = None) -> Optional[int]:
-    """Maps a Scrip source document to one of the user's 5 real custom RootsMagic
-    templates (Metis Scrip.rmst, Template Ids 20001-20005). document_type is checked
-    first since a Certificate or Land Grant is a structurally different document from an
-    affidavit regardless of which commission issued it. series_code (Commissioner's
-    LAC-fetched RG15 sub-series, e.g. "RG15-D-II-8-a") is checked next when present -
-    it's LAC's own catalog classification, more authoritative than free text - matched
-    against the exact sub-series each template's own Description cites. Falls back to
-    commission_reference (the verbatim form/Order-in-Council header read directly off
-    the document). Per the user, the claim's own year (see _scrip_record_year) is also a
-    valid signal - checked last, against each template's own date_range, only when
-    document_type/series_code/commission_reference all came up empty, so a record with a
-    real, specific signal never gets overridden by a less certain one. Returns None when
-    nothing matches at all rather than guessing - the caller falls back to a plain
-    freeform source instead of mis-templating a record."""
+    """Maps a Scrip source document to one of the 5 custom RootsMagic templates (20001-20005)."""
     doc_l = (document_type or "").lower()
     if "certificate" in doc_l or "receipt" in doc_l:
         return 20004
@@ -2347,16 +2413,7 @@ def select_scrip_template_id(commission_reference: str, document_type: str,
 
 
 def resolve_scrip_template_id(rec: dict) -> Optional[int]:
-    """The single source of truth for which of the 5 real templates a Scrip record's ONE
-    claim-level citation cites (see build_general_citation - Scrip gets exactly one
-    citation per fact now, not one per source_documents entry, so template selection has
-    to work off the record's own single document_type, not a per-document loop). Reused
-    both by _build_citation_block (to pick the actual '2 SOUR' id) and by
-    build_gedcom_from_general's final template_ids_used pass, so a template's master
-    source only ever gets built when a real citation actually cites it. The per-volume
-    freeform source (get_volume_sources) is still built unconditionally for every volume
-    used, same as every other record type - per the user, not worth the added complexity
-    of also gating that one on actual usage."""
+    """Resolves the template ID for a single Scrip record."""
     tf = rec.get('type_specific_fields') or {}
     return select_scrip_template_id(
         tf.get('commission_reference'), tf.get('document_type'), tf.get('rg_series_code'), _scrip_record_year(rec)
@@ -2364,17 +2421,14 @@ def resolve_scrip_template_id(rec: dict) -> Optional[int]:
 
 
 def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str) -> str:
-    """Resolves one Detail=True field's value for a Metis Scrip.rmst template citation,
-    from fields Commissioner/Paleographer already put in the JSON. Fields with no current
-    JSON source (OriginalClaimant, LandDescription, Liber, Folio - all Dominion Lands
-    Office patent details no claimant affidavit would ever state) return "" - a real
-    gap, not something to invent a value for - and get_scrip_citation_fields skips
-    emitting an empty FIELD entirely."""
+    """Resolves a Detail=True field value for a Métis Scrip template citation."""
     tf = rec.get('type_specific_fields') or {}
     name = f"{clean_val(part.get('std_given'))} {clean_val(part.get('std_surname'))}".strip()
 
     if field_name in ('ClaimantName', 'GranteeName'):
         return name
+    if field_name == 'OriginalClaimant':
+        return clean_val(tf.get('original_claimant'))
     if field_name == 'AffidavitNumber':
         return clean_val(tf.get('affidavit_number'))
     if field_name == 'ClaimNumber':
@@ -2397,20 +2451,28 @@ def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str
         return clean_val(tf.get('reel_numbers'))
     if field_name in ('Parish', 'Location'):
         return clean_val(part.get('residence')) or clean_val(part.get('birth_place'))
+    if field_name == 'LandDescription':
+        return clean_val(tf.get('land_description'))
+    if field_name == 'Liber':
+        return clean_val(tf.get('liber'))
+    if field_name == 'Folio':
+        return clean_val(tf.get('folio'))
     if field_name == 'Volume':
         return clean_val(vol)
     if field_name == 'URL':
         pid = clean_val(rec.get('lac_pid'))
         return (f"https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record"
-               f"?app=fonandcol&IdNumber={pid}") if pid else ""
+                f"?app=fonandcol&IdNumber={pid}") if pid else ""
+    if field_name == 'Accessed':
+        return clean_val(tf.get('accessed'))
+    if field_name == 'RefNumber':
+        pid = clean_val(rec.get('lac_pid'))
+        return f"Item ID {pid}" if pid else ""
     return ""
 
 
 def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str) -> List[str]:
-    """Builds this citation's own per-document FIELD/VALUE block (RootsMagic citation
-    detail, one level deeper than the master source's own FIELD/VALUE block - see
-    get_scrip_template_sources) for every Detail=True field the given template defines,
-    skipping any field that resolves to an empty value."""
+    """Builds the citation detail FIELD/VALUE lines for a RootsMagic citation."""
     lines = []
     for field_name in _SCRIP_TEMPLATES[template_id]['detail_fields']:
         value = _scrip_template_field_value(field_name, rec, part, vol)
@@ -2420,50 +2482,155 @@ def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str)
 
 
 def get_scrip_template_sources(template_ids_used: set, target_software: str) -> list:
-    """Builds one shared master SOUR record per Metis Scrip.rmst template (Id
-    20001-20005) actually referenced by at least one citation - NOT one per volume like
-    Parish's get_volume_sources, since a template's own source-level (Detail=False)
-    fields don't vary per volume. FTM has no source-template concept at all, so its
-    block is a plain TITL/AUTH/PUBL record with no _TMPLT/FIELD lines, same convention
-    as get_volume_sources' own FTM branch."""
+    """Builds master SOUR records for each referenced Métis Scrip template."""
     lines = []
-    repository = clean_val(REPOSITORY) or "Library and Archives Canada"
+    repository = clean_val(REPOSITORY) or "Library and Archives Canada, Ottawa, Ontario"
     for tid in sorted(template_ids_used):
-        tpl = _SCRIP_TEMPLATES[tid]
+        tpl = _SCRIP_TEMPLATES.get(tid)
+        if not tpl:
+            continue
         s_id = f"@S{tid}@"
-        # The real LAC-website collection name (what a researcher browsing LAC's own site
-        # would see) is this source's display name - deliberately distinct from
-        # tpl['collection'], the archival fonds/series citation the template's own
-        # Collection Detail=False field expects.
-        display_name = clean_val(tpl['website_collection']) or tpl['label']
-        commission = clean_val(tpl['commission'])
-        collection = clean_val(tpl['collection'])
+        display_name = (clean_val(tpl.get('source_description'))
+                        or clean_val(tpl.get('website_collection'))
+                        or tpl['label'])
+        commission = clean_val(tpl.get('department') or tpl.get('commission'))
+        collection = clean_val(tpl.get('collection'))
+        primary_creator = clean_val(tpl.get('primary_creator', 'Department of the Interior'))
+        date_str = clean_val(tpl.get('date_range_str'))
+        source_desc = clean_val(tpl.get('source_description')) or display_name
         bibl = ". ".join(b for b in (repository, collection, commission) if b) + "."
 
         if target_software == "RM":
-            block = [f"0 {s_id} SOUR", f"1 ABBR {display_name}", f"1 REFN {tid}", f"1 TITL {display_name}",
-                     f"1 _BIBL {bibl}", "1 _TMPLT", f"2 TID {tid}"]
+            block = [
+                f"0 {s_id} SOUR",
+                f"1 ABBR {display_name}",
+                f"1 REFN {tid}",
+                f"1 TITL {display_name}",
+                f"1 _BIBL {bibl}",
+                "1 _TMPLT",
+                f"2 TID {tid}",
+            ]
+            if primary_creator:
+                block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
             if commission:
-                block.extend(["2 FIELD", "3 NAME Commission", f"3 VALUE {commission}"])
+                block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {commission}"])
+            if date_str:
+                block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+            if source_desc:
+                block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
             if collection:
                 block.extend(["2 FIELD", "3 NAME Collection", f"3 VALUE {collection}"])
             block.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"])
             block.extend(weblink_lines(COLLECTION_URL, COLLECTION_NAME, "RM"))
         else:
-            block = [f"0 {s_id} SOUR", f"1 TITL {display_name}", f"1 AUTH {repository}", f"1 PUBL {bibl}",
-                     f"1 REFN {tid}"]
+            block = [
+                f"0 {s_id} SOUR",
+                f"1 TITL {display_name}",
+                f"1 AUTH {repository}",
+                f"1 PUBL {bibl}",
+                f"1 REFN {tid}",
+            ]
             block.extend(weblink_lines(COLLECTION_URL, COLLECTION_NAME, "FTM"))
         lines.extend(block)
     return lines
 
 
+def _rmst_element_to_gedcom(elem: ET.Element) -> List[str]:
+    """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
+    tid = elem.get("Id", "")
+    name = (elem.findtext("Name") or "").strip()
+    desc = (elem.findtext("Description") or "").strip()
+    cat = (elem.findtext("Category") or "Simplified Citations for Genealogical Sources").strip()
+    foot = (elem.findtext("Footnote") or "").strip()
+    short = (elem.findtext("ShortFootnote") or "").strip()
+    bibl = (elem.findtext("Bibliography") or "").strip()
+
+    lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
+    if desc:
+        lines.append(f"1 DESC {desc}")
+    if cat:
+        lines.append(f"1 CAT {cat}")
+    if foot:
+        lines.append(f"1 FOOT {foot}")
+    if short:
+        lines.append(f"1 SHORT {short}")
+    if bibl:
+        lines.append(f"1 BIBL {bibl}")
+
+    for fld in elem.findall("Field"):
+        f_type = (fld.findtext("Type") or "Text").strip()
+        f_name = (fld.findtext("Name") or "").strip()
+        f_disp = (fld.findtext("Display") or "").strip()
+        f_hint = (fld.findtext("Hint") or "").strip()
+        f_detl = "Y" if (fld.findtext("Detail") or "False").strip().lower() in ("true", "1", "y") else "N"
+        f_lhnt = (fld.findtext("LongHint") or "").strip()
+
+        lines.append("1 FIELD")
+        lines.append(f"2 TYPE {f_type}")
+        lines.append(f"2 NAME {f_name}")
+        if f_disp:
+            lines.append(f"2 DISP {f_disp}")
+        if f_hint:
+            lines.append(f"2 HINT {f_hint}")
+        lines.append(f"2 DETL {f_detl}")
+        if f_lhnt:
+            lines.append(f"2 LHNT {f_lhnt}")
+    return lines
+
+
+# Built-in Simplified Citations and Métis Scrip Source Templates fallback (loaded dynamically from .rmst)
+_BUILTIN_SOURCE_TEMPLATES: Dict[int, List[str]] = {}
+
+
+def load_source_template_lines(template_id: int) -> List[str]:
+    """Finds and parses the given template ID from any .rmst files in Archivist or DEV,
+    or falls back to the embedded _BUILTIN_SOURCE_TEMPLATES."""
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    archivist_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_dirs = [
+        os.path.join(archivist_dir, "Source Templates"),
+        os.path.join(base_dir, "DEV", "Source Templates"),
+        os.path.join(base_dir, "DEV"),
+    ]
+    for cdir in candidate_dirs:
+        if os.path.isdir(cdir):
+            for fname in os.listdir(cdir):
+                if fname.endswith(".rmst"):
+                    fpath = os.path.join(cdir, fname)
+                    try:
+                        tree = ET.parse(fpath)
+                        root = tree.getroot()
+                        elem = root.find(f".//Template[@Id='{template_id}']")
+                        if elem is not None:
+                            return _rmst_element_to_gedcom(elem)
+                    except Exception:
+                        continue
+    return _BUILTIN_SOURCE_TEMPLATES.get(template_id, [])
+
+
+def get_source_templates(template_ids_used: set) -> List[str]:
+    """Generates 0 _SRCTEMPLATE GEDCOM blocks for all referenced template IDs."""
+    lines = []
+    for tid in sorted(template_ids_used):
+        t_lines = load_source_template_lines(tid)
+        if t_lines:
+            lines.extend(t_lines)
+    return lines
+
+
 def generate_fam_uid(rec: dict, vol: str) -> str:
     """Generates a deterministic Family ID to match the INDI logic."""
+    pid = clean_val(rec.get('lac_pid'))
+    rec_id = clean_val(rec.get('record_id'))
+    identity = pid or rec_id
+
+    is_scrip = GENERAL_CONFIG.get('omit_source_id_prefix')
+    if is_scrip and identity:
+        return f"FAM_{identity}"
+
     src_id = re.sub(r'\D', '', get_dynamic_source_id(vol))
     page_str = clean_val(rec.get('page'))
-    rec_id = clean_val(rec.get('record_id'))
-
-    unique_string = f"fam_{vol}_{page_str}_{rec_id}"
+    unique_string = f"fam_{vol}_{page_str}_{identity}"
     numeric_id = int(hashlib.md5(unique_string.encode('utf-8')).hexdigest(), 16) % (10 ** 10)
     return f"{src_id}{numeric_id:010d}"
 
@@ -2474,7 +2641,9 @@ def generate_fam_uid(rec: dict, vol: str) -> str:
 def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_uid: str,
                           proof_status: str, target_software: str, document_type: Optional[str] = None,
                           page: Optional[str] = None, original_transcription: Optional[str] = None,
-                          english_translation: Optional[str] = None) -> str:
+                          english_translation: Optional[str] = None,
+                          citation_text: Optional[str] = None,
+                          citation_details: Optional[str] = None) -> str:
     """One SOUR citation block. build_general_citation calls this once per source
     document (or once, from rec's own top-level fields, when there's only one) - see
     that function for why. page/original_transcription/english_translation, when given,
@@ -2515,87 +2684,83 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     # PAGE also doubles as RootsMagic/FTM's own auto-generated Citation Name, shown in
     # their flat Citations list - confirmed live: "Page {page}, Record {rec_id}" (rec_id
     # being an internal id_prefix+number like "EVEN-1964", not a real-world reference)
-    # made that list unbrowsable, every entry looking nearly identical. When this claim
-    # has its own real reference numbers (claim/affidavit - the numbers actually printed
-    # on the document), use those instead; every other record type keeps the original
-    # page/record_id form, unaffected.
+    ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
+                            f"Affdt {affdt_num}" if affdt_num else "") if b]
     if is_scrip:
-        # No page number at all - per the user, this is one citation for the whole claim
-        # (see build_general_citation), not one per page/document, so "Page X" has no
-        # single correct value to show here.
-        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
-                                f"Affdt {affdt_num}" if affdt_num else "") if b]
+        # Scrip citations represent the entire application/claim.
         page_line = f"3 PAGE {'; '.join(ref_bits)}" if ref_bits else f"3 PAGE Record {rec_id}"
-    elif claim_num or affdt_num:
-        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
-                                f"Affdt {affdt_num}" if affdt_num else "") if b]
+    elif ref_bits:
         page_line = f"3 PAGE {'; '.join(ref_bits)}, Page {page}"
     else:
         page_line = f"3 PAGE Page {page}, Record {rec_id}"
 
-    # Scrip cites one of the user's 5 real custom RootsMagic templates (Metis
-    # Scrip.rmst, Template Ids 20001-20005) when its commission_reference/series_code/
-    # document_type/year resolves to one; unresolved Scrip records (and every other
-    # record type) fall back to the existing per-volume freeform source, unchanged.
+    # Resolve template ID or fallback to volume source ID.
     template_id = resolve_scrip_template_id(rec) if is_scrip else None
     sour_id = f"@S{template_id}@" if template_id else get_dynamic_source_id(vol)
 
-    # Every Scrip fact is proven directly - it's read straight off a sworn government
-    # affidavit/certificate, a primary source, not inferred/indexed data - so this
-    # overrides get_proof_status' generic BEF/ABT/EST-based downgrade (still used
-    # as-is for Parish/Census, where an estimated date really does mean less certain).
+    # Scrip facts are taken directly from sworn primary affidavits/certificates.
     if is_scrip:
         proof_status = "proven"
 
-    # No plain "3 NAME ..." line here (it used to duplicate the _TITL/PAGE lines below) -
-    # NAME is not a legal SOURCE_CITATION child under GEDCOM 5.5.1, and both RootsMagic and
-    # FTM reject it on import (see census flavor's build_census_citation for the same fix
-    # and full explanation). _TITL is the safe custom-tag equivalent, already present.
+    # Emit standard citation block with _TITL (valid across RootsMagic and FTM).
     block = [
         f"2 _PROOF {proof_status}",
         f"2 SOUR {sour_id}",
         titl,
         page_line,
     ]
-    if template_id and target_software == "RM":
-        block.extend(get_scrip_citation_fields(template_id, rec, part, vol))
+    if is_scrip:
+        if template_id and target_software == "RM":
+            block.extend(get_scrip_citation_fields(template_id, rec, part, vol))
+    elif target_software == "RM":
+        # Simplified Citations: Non-traditional (TID 10009) detail fields
+        person_name = f"{std_g} {std_s}".strip()
+        parish_loc = clean_val(GENERAL_CONFIG.get('parish_location'))
+        ref_num_str = ('; '.join(ref_bits) if ref_bits
+                       else (f"Record {rec.get('record_number') or rec_id}" if rec_id and rec_id != 'Unknown' else ""))
+        parish_detail_fields = [
+            ("Page", f"Page {page}" if page and page != 'X' else ""),
+            ("SourceDetailPerson", person_name),
+            ("Location", parish_loc),
+            ("Repository", clean_val(REPOSITORY)),
+            ("URL", clean_val(COLLECTION_URL)),
+            ("RefNumber", ref_num_str),
+        ]
+        for f_name, f_val in parish_detail_fields:
+            if f_val:
+                block.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
     block.append("3 DATA")
 
+    raw_orig = citation_text if citation_text is not None else (
+        original_transcription if original_transcription is not None else (
+            rec.get('citation_text') or rec.get('original_transcription')
+        )
+    )
+    raw_trans = citation_details if citation_details is not None else (
+        english_translation if english_translation is not None else (
+            rec.get('citation_details') or rec.get('english_translation')
+        )
+    )
+
     if is_scrip:
-        # Citation Text is the verbatim transcription (original_transcription - the
-        # source-language text as written), no "English Translation:"/"Original
-        # Transcription:" header labels ever, and no separate translated block at all -
-        # per the user, Text must have the transcription; Agy's own package_summary is a
-        # SEPARATE citation Details/Comments note (right below), not a replacement for it.
-        orig_val = clean_val(rec.get('original_transcription'))
+        orig_val = clean_val(raw_orig)
         text = wrap_text(orig_val, '4 TEXT')
         if text:
             block.append(text)
 
-        summary = clean_val(type_fields.get('package_summary'))
-        if summary:
-            block.append("3 NOTE Summary:")
-            summary_text = wrap_text(summary, '4 CONT')
-            if summary_text:
-                block.append(summary_text)
+        review_val = clean_val(raw_trans if raw_trans is not None
+                               else type_fields.get('package_summary'))
+        if review_val:
+            block.append("3 NOTE Commissioner's Review:")
+            review_text = wrap_text(review_val, '4 CONT')
+            if review_text:
+                block.append(review_text)
     else:
-        orig_val = clean_val(original_transcription if original_transcription is not None
-                             else rec.get('original_transcription'))
-        trans_val = clean_val(english_translation if english_translation is not None
-                              else rec.get('english_translation'))
+        orig_val = clean_val(raw_orig)
+        trans_val = clean_val(raw_trans)
 
-        # A source document that's already in English (confirmed live: most Scrip
-        # affidavits are) has an identical original_transcription/english_translation -
-        # per the user, showing both "English Translation:"/"Original Transcription:"
-        # header blocks in that case just duplicates the same text twice for no reason.
-        # One plain "4 TEXT" block, no header label at all, when there's really only one
-        # distinct text (either they match, or only one side is populated).
-        #
-        # Whitespace-normalized comparison, not exact - confirmed live on a real
-        # verification run: Agy's own "translation" of an already-English document
-        # sometimes just reflows the text (multi-line printed form -> one line, newlines
-        # replaced with spaces) without translating anything, which an exact-match
-        # comparison doesn't catch as "the same content."
+        # When translation and transcription match after whitespace normalization,
+        # emit a single 4 TEXT block.
         norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
         norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
         same_text = orig_val and trans_val and norm_orig == norm_trans
@@ -2616,10 +2781,6 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
 
     refn = clean_val(rec.get('record_number')) or rec_id
     if target_software == "RM":
-        # No per-citation _TMPLT here either - the real template (hardcoded TID 355) lives
-        # once on the source record itself; this duplicate carried no TID at all, so it was
-        # never a valid RM template reference to begin with. PAGE/_TITL above already carry
-        # the same person/page/record detail this used to repeat.
         block.extend([
             f"3 REFN {refn}",
             "3 QUAY 3", "3 _QUAL", "4 _SOUR O", "4 _INFO P",
@@ -2628,19 +2789,10 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     else:
         block.extend([f"3 REFN {refn}", "3 QUAY 3"])
 
-    # A gather source (Ancestry/FamilySearch-derived church records) can supply its own
-    # per-person APID the same way the census flavor already does; only emitted when present
-    # since most church records have no APID at all (this is a citation-level identifier, not
-    # a general-flavor-wide field).
     apid_record_id = clean_val((part.get('type_specific_fields') or {}).get('apid'))
     if apid_record_id and APID_DB:
         block.append(f"3 _APID 1,{APID_DB}::{apid_record_id}")
 
-    # A gather source can supply this participant's own FamilySearch record ark (always
-    # present regardless of Family Tree attachment status - see Voyageur.js), giving the
-    # citation a direct web link back to that specific indexed entry. weblink_lines() isn't
-    # reused here since it hardcodes top-level (1 _WEBTAG) placement; this needs one level
-    # deeper to nest under this citation's own "2 SOUR" line.
     person_ark = clean_val((part.get('type_specific_fields') or {}).get('person_ark'))
     if person_ark:
         record_url = f"https://www.familysearch.org/ark:/61903/1:1:{person_ark}"
@@ -2649,10 +2801,6 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
         else:
             block.extend([f"3 _LINK {record_url}", f"3 NOTE {record_url}"])
 
-    # Commissioner's own LAC-resolved Item ID (once attached) gives every Scrip citation
-    # a direct link back to that claim's real LAC catalog page - confirmed live this was
-    # entirely absent before (only the FamilySearch ark and the volume-level generic
-    # COLLECTION_URL ever got a webtag).
     lac_pid = clean_val(rec.get('lac_pid'))
     if lac_pid:
         lac_url = f"https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber={lac_pid}"
@@ -2668,25 +2816,13 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
 
 
 def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media_uid: str,
-                          proof_status: str = "proven", target_software: str = "RM") -> List[str]:
-    """Constructs the source citation block(s) for an event. Returns a LIST - callers
-    extend() it onto their own line list rather than append() a single string.
+                           proof_status: str = "proven", target_software: str = "RM") -> List[str]:
+    """Constructs the source citation blocks for an event.
 
-    Scrip always gets exactly ONE citation per fact, covering the whole claim, regardless
-    of how many source_documents entries the claim has - per the user, several separate
-    citations (one per page/document) for what's really one claim was the wrong shape;
-    _build_citation_block's own Scrip-specific TEXT/_TITL/PAGE formatting don't vary per
-    document anyway. Every other record type keeps its original
-    behavior: when rec['source_documents'] is present and non-empty, loops it and emits
-    one block per entry, using that entry's own document_type/page/transcription (and,
-    for a Commissioner-downloaded entry, its own OBJE media UID - preferring
-    generate_media_uid_for_lac_asset when lac_asset_id is present, since that's LAC's own
-    stable identifier rather than a hash of a local path, falling back to
-    generate_media_uid_for_path when only media_path is known - rather than the shared
-    media_uid parameter). Falls back to exactly the original single-block behavior, built
-    from rec's own top-level fields, when source_documents is absent - every record type
-    that never goes through postprocess.merge_same_claim_records or Commissioner is
-    completely unaffected."""
+    Returns a list of formatted citation blocks. For Scrip records, a single
+    citation represents the entire claim. For multi-document records, iterates
+    over source_documents when present.
+    """
     if GENERAL_CONFIG.get('omit_source_id_prefix'):  # is_scrip
         return [_build_citation_block(rec, part, tag_name, vol, media_uid, proof_status, target_software)]
 
@@ -2709,18 +2845,15 @@ def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media
             document_type=doc.get('document_type'), page=doc.get('page'),
             original_transcription=doc.get('original_transcription'),
             english_translation=doc.get('english_translation'),
+            citation_text=doc.get('citation_text'),
+            citation_details=doc.get('citation_details'),
         ))
     return blocks
 
 
 def build_custom_fact_lines(fact_name: str, value: str, rec: dict, part: dict, vol: str, media_uid: str,
                             target_software: str, date: str = "", place: str = "") -> List[str]:
-    """Renders a RootsMagic custom fact (a person-bucket FactTypes.json entry with
-    custom=True, e.g. Race/dit Name) as a generic EVEN/TYPE block using that fact's own
-    use_value/use_date/use_place flags - the same shape RootsMagic itself expects to match
-    a custom fact back to its FactTypeTable entry by TYPE text, so a new custom fact only
-    ever needs an entry in FactTypes.json, never a bespoke code block here. Returns []
-    (nothing to render) when value/date/place all come back empty."""
+    """Renders a RootsMagic custom fact as an EVEN/TYPE block based on FactTypes.json config."""
     entry = FACT_TYPES.get('person', {}).get(fact_name, {})
     val = clean_val(value) if entry.get('use_value', True) else ""
     fact_date = format_gedcom_date(date) if entry.get('use_date') and date else ""
@@ -2739,10 +2872,7 @@ def build_custom_fact_lines(fact_name: str, value: str, rec: dict, part: dict, v
 
 
 def build_witness_links(rec: dict, witnesses: List[dict], vol: str, target_software: str) -> List[str]:
-    """
-    RM's proprietary _SHAR/ROLE tag links a witness/godparent directly to the shared
-    event. FTM has no equivalent, so witnesses are instead summarized in one NOTE line.
-    """
+    """Builds witness association links (_SHAR for RM, NOTE summary for others)."""
     if not witnesses:
         return []
     if target_software == "RM":
@@ -2769,14 +2899,9 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     is_scrip = GENERAL_CONFIG.get('omit_source_id_prefix')
     semantic = part.get('role_semantic')
     is_primary = semantic == 'primary'
-    # Per the user: the Scrip document's own year is only a valid DATE fallback for facts
-    # about the PRIMARY claimant - everyone else (spouse, witness, parent, ...) only gets
-    # a date when the transcription itself actually states one for them; using the
-    # document's year for a witness's own Residence/Occupation would misdate a fact that
-    # was never actually about them at that time. Also never used for Race, which
-    # describes an ongoing characteristic rather than something dated to one document.
+    # Scrip document year serves as a date fallback only for the primary claimant.
     scrip_fact_date = (str(_scrip_record_year(rec))
-                      if is_scrip and is_primary and _scrip_record_year(rec) else "")
+                       if is_scrip and is_primary and _scrip_record_year(rec) else "")
     is_parent = semantic in ('father', 'mother', 'father_in_law', 'mother_in_law')
     is_deceased = bool(part.get('deceased')) or bool(part.get('is_deceased'))
 
@@ -2954,7 +3079,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
         if b_place:
             indi.append(f"2 PLAC {b_place}")
         indi.extend(build_general_citation(rec, part, "BIRT", vol, media_uid, get_proof_status(b_date),
-                                          target_software))
+                                           target_software))
 
     if d_date or d_place:
         indi.append("1 DEAT")
@@ -2965,7 +3090,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
         if age:
             indi.append(f"2 AGE {age}")
         indi.extend(build_general_citation(rec, part, "DEAT", vol, media_uid, get_proof_status(d_date),
-                                          target_software))
+                                           target_software))
 
     # Link the record's own primary event, when it's a person-level fact (BAPM/BURI/DEAT/
     # a custom fact like Scrip/...). A family-level fact (Marriage) attaches to the FAM
@@ -3009,8 +3134,8 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
             # verbatim. claim_basis stays IN the generic loop below (e.g. "Claim Basis:
             # Half-breed Head") - short and meaningful, not shown anywhere else.
             consumed = ('claim_number', 'affidavit_number', 'scrip_number', 'scrip_amount', 'document_type',
-                       'commission_reference', 'rg_series_code', 'reel_numbers', 'application_date', 'issue_date',
-                       'delivery_date', 'delivery_place', 'package_summary')
+                        'commission_reference', 'rg_series_code', 'reel_numbers', 'application_date', 'issue_date',
+                        'delivery_date', 'delivery_place', 'package_summary')
             value_parts.extend(f"{k.replace('_', ' ').title()}: {clean_val(v)}"
                                for k, v in extra_fields.items() if k not in consumed and clean_val(v))
             scrip_value = "; ".join(value_parts)
@@ -3027,7 +3152,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
             if event_tag == 'EVEN':
                 extra_fields = rec.get('type_specific_fields') or {}
                 value_parts = [f"{k.replace('_', ' ').title()}: {clean_val(v)}"
-                              for k, v in extra_fields.items() if k != 'document_type' and clean_val(v)]
+                               for k, v in extra_fields.items() if k != 'document_type' and clean_val(v)]
                 event_value = f" {'; '.join(value_parts)}" if value_parts else ""
             indi.append(f"1 {event_tag}{event_value}")
             if event_tag == 'EVEN':
@@ -3042,7 +3167,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
 
             indi.extend(build_witness_links(rec, witnesses, vol, target_software))
             indi.extend(build_general_citation(rec, part, event_tag, vol, media_uid, get_proof_status(raw_event_date),
-                                              target_software))
+                                               target_software))
 
     # Link families - driven entirely by which family-position role semantics are present
     # (see resolve_family_links), not by which record type this is.
@@ -3145,10 +3270,11 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
                     main_fam.append(f"2 NOTE Margin note suggests alternate spelling for {who}: {alt_values}")
 
             witnesses = [p for p in rec.get('participants', [])
-                         if p.get('role_semantic') not in ('primary', 'spouse') and p.get('role_semantic') != 'commissioner']
+                         if p.get('role_semantic') not in ('primary', 'spouse')
+                         and p.get('role_semantic') != 'commissioner']
             main_fam.extend(build_witness_links(rec, witnesses, vol, target_software))
             main_fam.extend(build_general_citation(rec, primary, event_tag, vol, media_uid,
-                                                  get_proof_status(event_date), target_software))
+                                                   get_proof_status(event_date), target_software))
 
         fams.append("\n".join([line for line in main_fam if line]))
 
@@ -3189,7 +3315,7 @@ def get_volume_sources(volumes_used: set, target_software: str) -> list:
     This is Scrip's fallback path too, for any record whose commission_reference/
     document_type didn't resolve to one of the 5 real templates in
     get_scrip_template_sources - such a record still needs SOME master source to cite,
-    just not the church-register template (TID 355), which is Parish-only now."""
+    just not the church-register template (TID 10009), which is Parish-only now."""
     is_scrip = GENERAL_CONFIG.get('omit_source_id_prefix')
     loc_full = GENERAL_CONFIG['parish_location']
     sour_lines = []
@@ -3206,22 +3332,29 @@ def get_volume_sources(volumes_used: set, target_software: str) -> list:
                      f"1 TITL {GENERAL_CONFIG['parish_name']}, , {GENERAL_CONFIG['register_name']}{v_clause} ; "
                      f"{v_title}, {GENERAL_CONFIG['parish_name']}, {loc_full}.",
                      f"1 _SUBQ {GENERAL_CONFIG['parish_name']} - {loc_full}.",
-                     f"1 _BIBL {GENERAL_CONFIG['parish_name']}. {v_title}. {GENERAL_CONFIG['parish_name']}, {loc_full}."]
+                     f"1 _BIBL {GENERAL_CONFIG['parish_name']}. {v_title}. "
+                     f"{GENERAL_CONFIG['parish_name']}, {loc_full}."]
 
             if not is_scrip:
-                block.extend(["1 _TMPLT", "2 TID 355",
-                             "2 FIELD", "3 NAME Church_Author", f"3 VALUE {GENERAL_CONFIG['parish_name']}", "2 FIELD",
-                             "3 NAME Title", f"3 VALUE {GENERAL_CONFIG['volume_title']}",
-                             "2 FIELD", "3 NAME Location", f"3 VALUE {loc_full}", "2 FIELD", "3 NAME ChurchLoc",
-                             f"3 VALUE {GENERAL_CONFIG['parish_name']}",
-                             "2 FIELD", "3 NAME RegisterName", f"3 VALUE {GENERAL_CONFIG['register_name']}"])
+                tid = 10009  # Simplified Citations: Non-traditional
+                primary_creator = clean_val(GENERAL_CONFIG.get('parish_name'))
+                dept = clean_val(GENERAL_CONFIG.get('diocese')) or clean_val(GENERAL_CONFIG.get('parish_location'))
+                source_desc = f"{GENERAL_CONFIG.get('register_name', '')}{v_clause}".strip()
+                date_str = clean_val(GENERAL_CONFIG.get('date_range_str'))
 
-                if vol:
-                    block.extend(["2 FIELD", "3 NAME Volume", f"3 VALUE Volume {vol}"])
-
-                block.extend(["2 FIELD", "3 NAME ArchRegNo", f"3 VALUE {CALL_NUMBER}",
-                              "2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}",
-                              "2 FIELD", "3 NAME RepositoryLoc", f"3 VALUE {REPOSITORY_LOC}"])
+                block.extend(["1 _TMPLT", f"2 TID {tid}"])
+                if primary_creator:
+                    block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
+                if dept:
+                    block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {dept}"])
+                if date_str:
+                    block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+                if source_desc:
+                    block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
+                if REPOSITORY:
+                    block.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}"])
+                if REPOSITORY_LOC:
+                    block.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
             block.extend(weblink_lines(COLLECTION_URL, COLLECTION_NAME, "RM"))
         else:
             block = [f"0 {s_id} SOUR",
@@ -3294,8 +3427,8 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
                 f"Scrip: {clean_val(scrip_tf.get('scrip_number'))}" if scrip_tf.get('scrip_number') else "",
             ) if b]
             media_title = (f"{media_std_s}, {media_std_g}: {'; '.join(media_ref_bits)}"
-                          if (media_std_s or media_std_g) else
-                          f"Scrip Records - Vol {vol or 'Unknown'} - Page {clean_val(meta.get('pages')) or 'X'}")
+                           if (media_std_s or media_std_g) else
+                           f"Scrip Records - Vol {vol or 'Unknown'} - Page {clean_val(meta.get('pages')) or 'X'}")
         else:
             media_title = (f"{GENERAL_CONFIG['parish_name_short']} - Vol {vol or 'Unknown'} - "
                            f"Page {clean_val(meta.get('pages')) or 'X'}")
@@ -3381,6 +3514,11 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
                     template_ids_used.add(tid)
         if template_ids_used:
             ged.extend(get_scrip_template_sources(template_ids_used, target_software))
+            if target_software == "RM":
+                ged.extend(get_source_templates(template_ids_used))
+    elif target_software == "RM":
+        # Simplified Citations: Non-traditional (TID 10009)
+        ged.extend(get_source_templates({10009}))
 
     ged.append("0 TRLR")
 
@@ -3478,7 +3616,7 @@ def apply_resolved_source_id(data: dict) -> None:
 
 
 def run_general_flavor(data: dict) -> None:
-    global REPOSITORY, REPOSITORY_LOC
+    global REPOSITORY, REPOSITORY_LOC, GEDCOM_OUTPUT_NAME
     is_scrip = data.get("record_type_name") == "Scrip"
     apply_record_type_field_remap(data.get("record_type_name", ""))
 
@@ -3492,6 +3630,8 @@ def run_general_flavor(data: dict) -> None:
     if is_scrip:
         REPOSITORY = REPOSITORY or "Library and Archives Canada"
         REPOSITORY_LOC = REPOSITORY_LOC or "Ottawa, ON"
+        if GEDCOM_OUTPUT_NAME == "Family_Register.ged" and not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
+            GEDCOM_OUTPUT_NAME = "Scrip.ged"
     else:
         REPOSITORY = REPOSITORY or "FamilySearch.org"
         REPOSITORY_LOC = REPOSITORY_LOC or "Granite Mountain, UT"

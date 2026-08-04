@@ -231,7 +231,8 @@ def parse_single_name(raw: str, expected_surname: str = "") -> Tuple[str, str, s
         two_word = f"{parts[-3]} {parts[-2]}".lower()
         if two_word in COMPOUND_SURNAME_PREFIXES_2:
             surname_idx = len(parts) - 3
-        elif parts[-2].lower().rstrip('.') in COMPOUND_SURNAME_PREFIXES_1 or parts[-2].lower() in COMPOUND_SURNAME_PREFIXES_1:
+        elif (parts[-2].lower().rstrip('.') in COMPOUND_SURNAME_PREFIXES_1
+              or parts[-2].lower() in COMPOUND_SURNAME_PREFIXES_1):
             surname_idx = len(parts) - 2
     elif len(parts) == 2:
         if parts[0].lower().rstrip('.') in COMPOUND_SURNAME_PREFIXES_1:
@@ -332,8 +333,10 @@ def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") ->
         return False
 
     primary = participants[0]
-    father = next((p for p in participants if p.get("role_semantic") == "father" or str(p.get("role_number")) == "6"), None)
-    spouse = next((p for p in participants if p.get("role_semantic") == "spouse" or str(p.get("role_number")) == "2"), None)
+    father = next((p for p in participants
+                   if p.get("role_semantic") == "father" or str(p.get("role_number")) == "6"), None)
+    spouse = next((p for p in participants
+                   if p.get("role_semantic") == "spouse" or str(p.get("role_number")) == "2"), None)
 
     f_surname = (father.get("std_surname") or "").strip() if father else ""
     c_surname = (primary.get("std_surname") or "").strip()
@@ -370,7 +373,9 @@ def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") ->
         if c_surname and c_surname.lower() != maiden_surname.lower():
             alt_names = primary.setdefault("alternate_names", [])
             married_full = f"{c_given} {c_surname}".strip()
-            if married_full and not any((a.get("value") or "").strip().lower() == married_full.lower() for a in alt_names):
+            if married_full and not any(
+                (a.get("value") or "").strip().lower() == married_full.lower() for a in alt_names
+            ):
                 alt_names.append({"value": married_full})
             primary["std_surname"] = maiden_surname
             modified = True
@@ -551,17 +556,12 @@ def expand_scrip_number_range(scrip_number: Optional[str]) -> List[str]:
 
 
 def build_claim_search_queries(record: Dict[str, Any]) -> List[str]:
-    """Builds the free-text quer(ies) search() needs to find a claim's related documents.
-    Confirmed live: "claim: {n} Scrip: {n}" together reliably surfaces both the
-    affidavit and the award certificate - scrip numbers alone are reused across claims
-    and not unique enough to search on solo (per the user). Falls back to affidavit
-    number if claim_number is missing, and to the record's own e-number (parsed from
-    document_metadata.file_name) if nothing else is available.
+    """Builds search queries to find a claim's related documents from LAC.
 
-    Returns one query PER individual scrip number when scrip_number is a range (see
-    expand_scrip_number_range) - so every certificate in the range actually gets searched
-    for. Returns [] when there's genuinely not enough to search on - callers should flag
-    the record for review rather than skip it silently."""
+    Combines claim number and scrip number to disambiguate awards and affidavits.
+    Expands scrip number ranges if present. Falls back to affidavit number or
+    file name asset identifier if primary numbers are absent.
+    """
     claim_number = record.get("claim_number")
     affidavit_number = record.get("affidavit_number")
     scrip_numbers = expand_scrip_number_range(record.get("scrip_number"))
@@ -921,19 +921,26 @@ def load_cookies(cookie_file: str, cdp_port: int = CDP_PORT) -> Dict[str, str]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Commissioner: LAC-linked cross-referencing and metadata enrichment for Scrip records")
-    parser.add_argument("mode", choices=["crosscheck", "retrieve", "enrich", "partition", "resolve-names"], nargs="?", default="crosscheck",
+    parser = argparse.ArgumentParser(
+        description="Commissioner: LAC-linked cross-referencing and metadata enrichment for Scrip records"
+    )
+    parser.add_argument("mode", choices=["crosscheck", "retrieve", "enrich", "partition", "resolve-names"],
+                        nargs="?", default="crosscheck",
                         help="'crosscheck' searches and attaches related claim documents (requires cookies); "
                              "'retrieve' bulk-downloads one whole volume's worth of PIDs; "
                              "'enrich' fills reel numbers, series codes, and live titles from LAC (no cookies); "
                              "'partition' splits a master JSON file into series-specific files under by_collection/; "
                              "'resolve-names' cleans mojibake and resolves married surnames to maiden surnames.")
-    parser.add_argument("--json", default="", help="Path to input JSON file (defaults to auto-selected most recent in JSON_DIR).")
+    parser.add_argument("--json", default="",
+                        help="Path to input JSON file (defaults to auto-selected most recent in JSON_DIR).")
     parser.add_argument("--volume", default=os.getenv("COMMISSIONER_VOLUME", ""),
                         help="Volume/box number to retrieve (retrieve mode only).")
-    parser.add_argument("--output-dir", default="", help="Output directory for partitioned collections (partition mode only).")
-    parser.add_argument("--limit", type=int, default=None, help="Maximum number of records to process (enrich mode).")
-    parser.add_argument("--delay", type=float, default=0.4, help="Pacing delay in seconds between LAC requests (default 0.4s).")
+    parser.add_argument("--output-dir", default="",
+                        help="Output directory for partitioned collections (partition mode only).")
+    parser.add_argument("--limit", type=int, default=None,
+                        help="Maximum number of records to process (enrich mode).")
+    parser.add_argument("--delay", type=float, default=0.4,
+                        help="Pacing delay in seconds between LAC requests (default 0.4s).")
     args = parser.parse_args()
 
     os.makedirs(MEDIA_DIR, exist_ok=True)

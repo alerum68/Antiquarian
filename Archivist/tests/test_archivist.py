@@ -160,8 +160,8 @@ def test_build_general_citation_normalization_is_whitespace_only_not_fuzzy():
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
-    assert "English Translation:" in blocks[0]
-    assert "Original Transcription:" in blocks[0]
+    assert "Citation Details:" in blocks[0]
+    assert "Citation Text:" in blocks[0]
 
 
 def test_build_general_citation_collapses_whitespace_only_reflow():
@@ -174,8 +174,8 @@ def test_build_general_citation_collapses_whitespace_only_reflow():
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
-    assert "English Translation:" not in blocks[0]
-    assert "Original Transcription:" not in blocks[0]
+    assert "Citation Details:" not in blocks[0]
+    assert "Citation Text:" not in blocks[0]
     assert "NORTH-WEST HALFBREED CLAIMS COMMISSION" in blocks[0]
 
 
@@ -187,8 +187,8 @@ def test_build_general_citation_collapses_when_only_one_side_populated():
 
     assert len(blocks) == 1
     assert "Only a translation exists here." in blocks[0]
-    assert "English Translation:" not in blocks[0]
-    assert "Original Transcription:" not in blocks[0]
+    assert "Citation Details:" not in blocks[0]
+    assert "Citation Text:" not in blocks[0]
 
 
 def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
@@ -201,8 +201,8 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
-    assert "English Translation:" in blocks[0]
-    assert "Original Transcription:" in blocks[0]
+    assert "Citation Details:" in blocks[0]
+    assert "Citation Text:" in blocks[0]
     assert "Je soussigné" in blocks[0]
     assert "I, the undersigned" in blocks[0]
     assert "-- " not in blocks[0]  # no document_type suffix when there's nothing to distinguish
@@ -925,7 +925,7 @@ def test_get_volume_sources_keeps_church_template_for_parish():
         arc.GENERAL_CONFIG['parish_location'] = "Manitoba"
         lines = arc.get_volume_sources({"1"}, "RM")
         joined = "\n".join(lines)
-        assert "TID 355" in joined
+        assert "TID 10009" in joined
     finally:
         arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
@@ -955,4 +955,118 @@ def test_format_gedcom_date_handles_iso_and_natural_text():
     assert arc.format_gedcom_date("BEF December 12, 1850") == "BEF 12 DEC 1850"
     assert arc.format_gedcom_date("BET 1850 AND 1855") == "BET 1850 AND 1855"
     assert arc.format_gedcom_date("") == ""
+
+
+def test_build_general_citation_scrip_emits_commissioners_review_note():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    try:
+        rec = {
+            "page": "1", "record_id": "SCRIP-5473", "year": "1885",
+            "original_transcription": "Verbatim French / English affidavit text...",
+            "english_translation": "Commissioner's Review: Roger Letendre claims as Half-breed head of family.",
+            "type_specific_fields": {"claim_number": "5473"}
+        }
+        part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+        blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+        assert len(blocks) == 1
+        assert "4 TEXT Verbatim French / English affidavit text" in blocks[0]
+        assert "3 NOTE Commissioner's Review:" in blocks[0]
+        assert "Roger Letendre claims as Half-breed head of family" in blocks[0]
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_apply_record_type_field_remap_scrip_maps_scrip_gedcom_name(monkeypatch):
+    monkeypatch.setenv("SCRIP_GEDCOM_NAME", "Custom_Scrip.ged")
+    arc.apply_record_type_field_remap("Scrip")
+    assert arc.GEDCOM_OUTPUT_NAME == "Custom_Scrip.ged"
+
+
+def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
+    monkeypatch.setattr(arc, "resolve_gedcom_output_targets", lambda: [])
+    monkeypatch.delenv("GEDCOM_OUTPUT_NAME", raising=False)
+    monkeypatch.delenv("SCRIP_GEDCOM_NAME", raising=False)
+    arc.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
+    arc.run_general_flavor({"record_type_name": "Scrip", "sheets": []})
+    assert arc.GEDCOM_OUTPUT_NAME == "Scrip.ged"
+
+
+def test_load_source_template_lines_from_rmst():
+    lines = arc.load_source_template_lines(20001)
+    joined = "\n".join(lines)
+    assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
+    assert "1 TID 20001" in joined
+    assert "1 CAT Simplified Citations for Genealogical Sources" in joined
+    assert "1 FOOT" in joined
+    assert "1 SHORT" in joined
+    assert "1 BIBL" in joined
+    assert "1 FIELD\n2 TYPE Name\n2 NAME ClaimantName" in joined
+
+
+def test_get_scrip_template_sources_simplified_citations_fields():
+    sources = arc.get_scrip_template_sources({20001}, "RM")
+    joined = "\n".join(sources)
+    assert "0 @S20001@ SOUR" in joined
+    assert "2 TID 20001" in joined
+    assert "3 NAME PrimaryCreator\n3 VALUE Department of the Interior" in joined
+    assert "3 NAME Department\n3 VALUE Manitoba Scrip Commission" in joined
+    assert "3 NAME Date\n3 VALUE 1870–1876" in joined
+    assert "3 NAME SourceDescription\n3 VALUE Manitoba Métis Scrip Applications" in joined
+
+
+def test_generate_uid_scrip_uses_pid_or_record_id_directly():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    try:
+        rec = {"page": "1", "record_id": "SC-100", "lac_pid": "1502188", "participants": [
+            {"role_number": "0", "std_given": "Jean", "std_surname": "Riel"},
+            {"role_number": "1", "std_given": "Marie", "std_surname": "Lafreniere"}
+        ]}
+        # Primary participant role 0 -> returns PID directly
+        primary_uid = arc.generate_uid(rec, rec["participants"][0], "1")
+        assert primary_uid == "1502188"
+
+        # Secondary participant role 1 -> returns PID_role
+        spouse_uid = arc.generate_uid(rec, rec["participants"][1], "1")
+        assert spouse_uid == "1502188_1"
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
+
+def test_build_gedcom_from_general_emits_srctemplates_for_rm():
+    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    try:
+        json_data = {
+            "record_type_name": "Scrip",
+            "sheets": [
+                {
+                    "volume_identifier": "1324",
+                    "records": [
+                        {
+                            "page": "1",
+                            "record_id": "SC-1",
+                            "lac_pid": "1506170",
+                            "event_type": "Affidavit",
+                            "event_date": "1875",
+                            "type_specific_fields": {
+                                "commission_reference": "Affidavit under Manitoba Act, 33 Vic. Cap 3",
+                                "affidavit_number": "5473"
+                            },
+                            "participants": [
+                                {"role_number": "0", "role_semantic": "primary", "std_given": "William", "std_surname": "Anderson"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+        ged_text = arc.build_gedcom_from_general(json_data, target_software="RM")
+        assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
+        assert "0 @S20001@ SOUR" in ged_text
+        assert "0 @I1506170@ INDI" in ged_text
+    finally:
+        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+
 

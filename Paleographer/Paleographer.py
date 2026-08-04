@@ -6,24 +6,37 @@ record type and extract structured records into a JSON master database,
 following one universal schema. Which record type is active, and every
 piece of type-specific vocabulary (event types, roles, defaults, schema
 extensions), comes entirely from a single .pmt file in prompts/; this
-script and engine.py never change when a new record type is added.
+script never changes when a new record type is added.
+
+This file is self-contained: postprocess.py, engine.py, and agy_engine.py
+are all folded in directly below so no sibling-file imports are required at
+runtime. The original subfiles are kept in place for test-suite compatibility.
 """
 
+import copy
 import json
 import math
 import os
+import re
+import shutil
 import sys
+import tempfile
 import time
+import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from string import Template
+from textwrap import dedent
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+import pdfplumber
+import yaml
 from dotenv import load_dotenv
 from google import genai
-
-import agy_engine
-import engine
-import postprocess
-from ScriptoriumMCP import agy_client
+# noinspection unresolved-references
+from google.genai import types
+from PIL import Image
+from titlecase import titlecase
 
 # The Toolbox's own subprocess launcher sets PYTHONIOENCODING=utf-8, but this script also
 # supports being run directly from the command line (its debug mode), where stdout would
@@ -31,11 +44,1011 @@ from ScriptoriumMCP import agy_client
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
+# PDFix and ScriptoriumMCP live in sibling tool folders, not installed packages - add the
+# repo root to sys.path so they can be imported by absolute path.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from PDFix.PDFix import optimize_pdf, COMPRESSION_PARAMS  # noqa: E402
+from ScriptoriumMCP import agy_client  # noqa: E402
+
 # Global settings come from the project root's .env; this tool's own settings come from
 # its own subfolder's .env, so Paleographer stays runnable standalone.
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(ROOT_ENV, override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
+
+
+# ==============================================================================
+# POSTPROCESS (folded from postprocess.py)
+# ==============================================================================
+
+PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
+
+
+def _titlecase_callback(word: str, **kwargs) -> str | None:
+    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
+    if w_clean.upper() in PRESERVED_ACRONYMS:
+        return word.replace(w_clean, w_clean.upper())
+    if "-" in word:
+        parts = word.split("-")
+        return "-".join(
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
+             else titlecase(p, callback=_titlecase_callback).capitalize())
+            for p in parts
+        )
+    return None
+
+
+def cap_case(text: str) -> str:
+    if not text:
+        return ""
+    val = str(text).strip()
+    if not val:
+        return ""
+    return titlecase(val, callback=_titlecase_callback)
+
+
+MONTH_NAMES = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+    "august": 8, "aug": 8, "september": 9, "sept": 9, "sep": 9,
+    "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+}
+
+_ISO_DATE_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
+_ISO_YEAR_MONTH_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})\s*$")
+
+_DATE_PATTERNS = [
+    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{3,4})\s*$"),  # "December 12, 1850"
+    re.compile(r"^\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\.?,?\s+(\d{3,4})\s*$"),  # "12 December 1850"
+    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{3,4})\s*$"),                                # "December 1850"
+    re.compile(r"^\s*(\d{3,4})\s*$"),                                                  # bare year "1850"
+]
+
+
+def strip_diacritics(text: Optional[str]) -> Optional[str]:
+    """Mechanically strips diacritics/accents, keeping only plain ASCII letters/numbers/
+    punctuation. Applies to any std_* field regardless of record type."""
+    if text is None:
+        return None
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(c for c in normalized if not unicodedata.combining(c))
+
+
+def parse_to_iso(reading: Optional[str]) -> Optional[str]:
+    """Parses the LLM's best English-language date reading into YYYY-MM-DD (or a
+    coarser YYYY-MM / YYYY if day/month aren't stated). Also passes through a date the
+    LLM already gave in ISO form unchanged. Returns None if the reading can't be
+    confidently parsed, rather than guessing."""
+    if not reading:
+        return None
+    text = reading.strip()
+
+    if _ISO_DATE_PATTERN.match(text) or _ISO_YEAR_MONTH_PATTERN.match(text):
+        return text
+
+    m = _DATE_PATTERNS[0].match(text)
+    if m:
+        month = MONTH_NAMES.get(m.group(1).lower())
+        if month:
+            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(2)):02d}"
+
+    m = _DATE_PATTERNS[1].match(text)
+    if m:
+        month = MONTH_NAMES.get(m.group(2).lower())
+        if month:
+            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(1)):02d}"
+
+    m = _DATE_PATTERNS[2].match(text)
+    if m:
+        month = MONTH_NAMES.get(m.group(1).lower())
+        if month:
+            return f"{int(m.group(2)):04d}-{month:02d}"
+
+    m = _DATE_PATTERNS[3].match(text)
+    if m:
+        return f"{int(m.group(1)):04d}"
+
+    return None
+
+
+def derive_record_identity(record: Dict[str, Any], event_types_table: Dict[str, Dict[str, str]]) -> None:
+    """Sets record_id (id_prefix + record_number) from the LLM's plain word event_type,
+    looked up in the active type's event_types table."""
+    event_type = record.get("event_type")
+    entry: Optional[Dict[str, str]] = event_types_table.get(event_type) if event_type else None
+    if not entry:
+        return
+
+    record_number: Optional[str] = record.get("record_number")
+    if record_number:
+        record["record_id"] = f"{entry.get('id_prefix', '')}{record_number}"
+
+
+def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Optional[str]]]) -> None:
+    """Sets each participant's role_number from their plain-word role_name."""
+    name_to_number = {(role.get("name") or "").strip().lower(): number for number, role in roles_table.items()}
+    for participant in record.get("participants", []):
+        raw_role_name = participant.get("role_name")
+        if raw_role_name:
+            participant["role_name"] = cap_case(raw_role_name)
+        if participant.get("role_number"):
+            continue
+        role_name = (raw_role_name or "").strip().lower()
+        role_number = name_to_number.get(role_name)
+        if role_number is not None:
+            participant["role_number"] = role_number
+
+
+def derive_role_semantics(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Optional[str]]]) -> None:
+    """Sets each participant's role_semantic from their already-resolved role_number."""
+    for participant in record.get("participants", []):
+        role_number = participant.get("role_number")
+        role = roles_table.get(role_number) if role_number else None
+        semantic = role.get("semantic") if role else None
+        if semantic:
+            participant["role_semantic"] = semantic
+
+
+def _find_role_number(roles_table: Dict[str, Dict[str, Optional[str]]], semantic: str) -> Optional[str]:
+    for role_number, role in roles_table.items():
+        if role.get("semantic") == semantic:
+            return role_number
+    return None
+
+
+def derive_suffixes(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Optional[str]]]) -> None:
+    """Sets 'Jr'/'Sr' on a primary participant and their father when their standardized
+    names match exactly."""
+    primary_role = _find_role_number(roles_table, "primary")
+    father_role = _find_role_number(roles_table, "father")
+    if primary_role is None or father_role is None:
+        return
+
+    participants = record.get("participants", [])
+    primary: Optional[Dict[str, Any]] = next(
+        (p for p in participants if p.get("role_number") == primary_role), None)
+    father: Optional[Dict[str, Any]] = next(
+        (p for p in participants if p.get("role_number") == father_role), None)
+    if not primary or not father:
+        return
+
+    if (primary.get("std_given") and primary.get("std_surname")
+            and primary["std_given"] == father.get("std_given")
+            and primary["std_surname"] == father.get("std_surname")):
+        primary["suffix"] = "Jr"
+        father["suffix"] = "Sr"
+
+
+def _participant_key(participant: Dict[str, Any]) -> tuple:
+    return (
+        (participant.get("std_given") or "").strip().lower(),
+        (participant.get("std_surname") or "").strip().lower(),
+    )
+
+
+def _label_for(record: Dict[str, Any]) -> str:
+    """Best available label for a record's own source document."""
+    document_type = (record.get("type_specific_fields") or {}).get("document_type")
+    if document_type:
+        return cap_case(document_type)
+    page = record.get("page")
+    return f"Page {page}" if page else "Untitled section"
+
+
+def _source_document_entry(record: Dict[str, Any]) -> Dict[str, Any]:
+    """One record's own text, snapshotted as a source_documents list entry."""
+    return {
+        "document_type": _label_for(record),
+        "page": record.get("page"),
+        "original_transcription": record.get("original_transcription"),
+        "english_translation": record.get("english_translation"),
+    }
+
+
+def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
+    """Merges `incoming` into `base` in place."""
+    source_documents = base.setdefault("source_documents", [])
+    if not source_documents:
+        source_documents.append(_source_document_entry(base))
+    source_documents.append(_source_document_entry(incoming))
+
+    base_fields = base.setdefault("type_specific_fields", {})
+    for key, value in (incoming.get("type_specific_fields") or {}).items():
+        if key == "document_type":
+            continue
+        if value and not base_fields.get(key):
+            base_fields[key] = value
+
+    if incoming.get("review"):
+        base["review"] = True
+        reasons = [r for r in (base.get("review_reason"), incoming.get("review_reason")) if r]
+        base["review_reason"] = "; ".join(reasons) if reasons else base.get("review_reason")
+
+    base_participants = base.setdefault("participants", [])
+    by_key = {_participant_key(p): p for p in base_participants if _participant_key(p) != ("", "")}
+    for participant in incoming.get("participants", []):
+        key = _participant_key(participant)
+        existing = by_key.get(key) if key != ("", "") else None
+        if existing is None:
+            base_participants.append(participant)
+            continue
+        for field, value in participant.items():
+            if field == "type_specific_fields":
+                continue
+            if value and not existing.get(field):
+                existing[field] = value
+        existing_fields = existing.setdefault("type_specific_fields", {})
+        for tk, tv in (participant.get("type_specific_fields") or {}).items():
+            if tv and not existing_fields.get(tk):
+                existing_fields[tk] = tv
+
+
+def merge_same_claim_records(sheets: List[Dict[str, Any]]) -> None:
+    """Merges records that share the same derived record_id within one extraction result's
+    sheets into a single record."""
+    seen: Dict[str, Dict[str, Any]] = {}
+    for sheet in sheets:
+        records = sheet.get("records", [])
+        kept: List[Dict[str, Any]] = []
+        for record in records:
+            record_id = record.get("record_id")
+            if record_id and record_id in seen:
+                _merge_record_into(seen[record_id], record)
+            else:
+                if record_id:
+                    seen[record_id] = record
+                kept.append(record)
+        sheet["records"] = kept
+
+
+def apply_defaults(target: Dict[str, Any], defaults_table: Dict[str, str]) -> None:
+    """Fills only null/empty fields on target from defaults_table."""
+    for key, value in defaults_table.items():
+        if not target.get(key):
+            target[key] = value
+
+
+# ==============================================================================
+# ENGINE (folded from engine.py)
+# ==============================================================================
+
+PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+DEFAULT_TYPE = "Parish.pmt"
+FACT_TYPES_PATH = Path(__file__).resolve().parent.parent / "FactTypes.json"
+
+# A PDF with more pages than this routes through the Batch API instead of the
+# synchronous path; a single-page image never crosses it.
+BATCH_PAGE_THRESHOLD = 5
+
+FRONT_MATTER_DELIM = "---"
+
+UNIVERSAL_PROMPT_SUFFIX = dedent("""
+    UNIVERSAL OUTPUT RULES (apply regardless of record type):
+    - Output must match the provided JSON schema exactly. No extra fields. Use null when data isn't
+      explicitly present.
+    - raw_* fields preserve the exact original reading (diacritics, spelling, everything). std_* fields are
+      your best linguistic standardization; formatting, diacritic-stripping, and code/ID derivation are
+      handled downstream, not by you.
+    - Set "review": true and give a short plain-English "review_reason" (under 15 words) whenever any part
+      of a record or participant is uncertain, guessed, illegible, or otherwise needs a human to double-check
+      it. Otherwise "review": false and "review_reason": null.
+    - Illegible text: attempt reading at least 3 times. Use "[illegible]" if genuinely unreadable. NEVER
+      guess silently.
+    - Strikethroughs: insert "[struck through: <best reading>]" inline in the transcription.
+    - PAGE CONTINUITY: each image is processed independently, with no memory of any other image -
+      except when a "CONTINUATION FROM PREVIOUS IMAGE" context block is explicitly given to you below,
+      which is the one case where you DO have information from the previous image. If your OWN last
+      record on THIS image is cut off at the bottom of the page (no natural ending, mid-sentence, no
+      closing/signature), set that record's "continues_on_next_image": true - do not guess how it
+      would have ended. If you were given a "CONTINUATION FROM PREVIOUS IMAGE" block and the TOP of
+      this image is what completes it, output ONE merged record combining the given content with what
+      you read here (reusing its record_number/year), set "continues_from_previous_image": true on it,
+      and do not also output a second, separate record for the same entry. If that context was given
+      but nothing on this image continues it, ignore it entirely - do not force a merge.
+""").strip()
+
+
+class DailyQuotaExhausted(Exception):
+    """Raised when Gemini reports the daily quota is exhausted. The whole run should stop, not retry."""
+
+
+@dataclass
+class TypeConfig:
+    """A record type's resolved configuration."""
+    name: str
+    event_types: Dict[str, Dict[str, str]]
+    roles: Dict[str, Dict[str, Optional[str]]]
+    defaults: Dict[str, Dict[str, str]]
+    extra_fields: Dict[str, List[Dict[str, str]]]
+    metadata_fields: Dict[str, str]
+    field_remap: Dict[str, str]
+    batch_page_threshold: int
+    prose: str
+
+
+@dataclass
+class CostConfig:
+    cost_per_1m_in: float
+    cost_per_1m_out: float
+    cache_discount_multiplier: float
+
+
+@dataclass
+class CallCost:
+    in_tokens: int
+    out_tokens: int
+    cached_tokens: int
+    thoughts_tokens: int
+    call_cost: float
+
+
+# ==========================================
+# TYPE CONFIG RESOLUTION
+# ==========================================
+def _substitute_env(value: Any) -> Any:
+    """Recursively substitutes ${VAR_NAME} placeholders from the environment."""
+    if isinstance(value, str):
+        return Template(value).safe_substitute(os.environ)
+    if isinstance(value, dict):
+        return {k: _substitute_env(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_substitute_env(v) for v in value]
+    return value
+
+
+def resolve_prompt_path(requested_name: str) -> Path:
+    """Finds the .pmt file for the requested record type, falling back to DEFAULT_TYPE."""
+    requested = (requested_name or "").strip() or DEFAULT_TYPE
+    if not requested.lower().endswith(".pmt"):
+        requested += ".pmt"
+
+    available = {p.name.lower(): p for p in PROMPTS_DIR.glob("*.pmt")} if PROMPTS_DIR.is_dir() else {}
+
+    match = available.get(requested.lower())
+    if match:
+        return match
+
+    fallback = available.get(DEFAULT_TYPE.lower())
+    if fallback:
+        return fallback
+
+    raise FileNotFoundError(
+        f"Could not find record type '{requested}' or fallback '{DEFAULT_TYPE}' in {PROMPTS_DIR}"
+    )
+
+
+def load_event_types() -> Dict[str, Dict[str, str]]:
+    """Loads the toolbox-wide fact/event vocabulary from FactTypes.json."""
+    data = json.loads(FACT_TYPES_PATH.read_text(encoding="utf-8"))
+    merged: Dict[str, Dict[str, str]] = {}
+    for bucket in ("person", "family"):
+        for name, entry in data.get(bucket, {}).items():
+            merged[name] = {"id_prefix": f"{entry['gedcom_tag']}-"}
+    return merged
+
+
+def parse_type_config(pmt_path: Path) -> TypeConfig:
+    """Parses a .pmt file's YAML front matter and prose body."""
+    raw = pmt_path.read_text(encoding="utf-8")
+    stripped = raw.lstrip()
+
+    front_matter: Dict[str, Any] = {}
+    prose = raw
+
+    if stripped.startswith(FRONT_MATTER_DELIM):
+        parts = stripped.split(FRONT_MATTER_DELIM, 2)
+        if len(parts) >= 3:
+            front_matter = yaml.safe_load(parts[1]) or {}
+            prose = parts[2]
+
+    front_matter = _substitute_env(front_matter)
+
+    return TypeConfig(
+        name=pmt_path.stem,
+        event_types=load_event_types(),
+        roles=front_matter.get("roles", {}),
+        defaults=front_matter.get("defaults", {}),
+        extra_fields=front_matter.get("extra_fields", {}),
+        metadata_fields=front_matter.get("metadata_fields", {}),
+        field_remap=front_matter.get("field_remap", {}),
+        batch_page_threshold=int(front_matter.get("batch_page_threshold", BATCH_PAGE_THRESHOLD)),
+        prose=prose.strip(),
+    )
+
+
+# ==========================================
+# SCHEMA MERGING
+# ==========================================
+def build_merged_schema(core_schema: Dict[str, Any],
+                        extra_fields: Dict[str, List[Dict[str, str]]]) -> Dict[str, Any]:
+    """Deep-copies the universal core schema and injects a record type's extra fields."""
+    merged = copy.deepcopy(core_schema)
+
+    def inject(container: Dict[str, Any], fields: List[Dict[str, str]]) -> None:
+        properties = container.setdefault("properties", {})
+        for f in fields:
+            properties[f["name"]] = {"type": f.get("type", "string"), "nullable": True}
+
+    record_props = merged["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
+    inject(record_props["type_specific_fields"], extra_fields.get("record", []))
+
+    participant_props = record_props["participants"]["items"]["properties"]
+    inject(participant_props["type_specific_fields"], extra_fields.get("participant", []))
+
+    return merged
+
+
+# ==========================================
+# PROMPT BUILDING
+# ==========================================
+def optimize_image(image_path: str, max_dimension: int = 2048) -> Image.Image:
+    """Downscale an image before sending it to the API, to cut token costs."""
+    img = Image.open(image_path)
+    img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+    return img
+
+
+def build_vocabulary_summary(type_cfg: TypeConfig) -> str:
+    """Auto-generates the valid event_type/role_name vocabulary lines."""
+    event_type_names = ", ".join(sorted(type_cfg.event_types.keys()))
+
+    role_context_by_name: Dict[str, Optional[str]] = {}
+    for r in type_cfg.roles.values():
+        name = r.get("name")
+        if name and name not in role_context_by_name:
+            role_context_by_name[name] = r.get("context")
+    role_lines = [f"{name} ({context})" if context else name
+                  for name, context in sorted(role_context_by_name.items())]
+    role_names = ", ".join(role_lines)
+
+    return dedent(f"""
+        VALID VOCABULARY FOR THIS RECORD TYPE:
+        - event_type (choose exactly one): {event_type_names}
+        - role_name (choose exactly one per participant - where a role's own meaning
+          depends on the event type, that's noted in parentheses): {role_names}
+    """).strip()
+
+
+def get_cached_system_instruction(type_cfg: TypeConfig) -> str:
+    """The static system-instruction ruleset for this record type."""
+    return f"{type_cfg.prose}\n\n{build_vocabulary_summary(type_cfg)}\n\n{UNIVERSAL_PROMPT_SUFFIX}"
+
+
+def get_dynamic_prompt(type_cfg: TypeConfig, file_metadata: Dict[str, str]) -> str:
+    """Per-file metadata block appended to the cached prompt."""
+    combined = {**type_cfg.metadata_fields, **file_metadata}
+    lines = "\n".join(f"{k}: {v}," for k, v in combined.items())
+    return f"\nMetadata Context:\n{lines}\n"
+
+
+def build_continuation_context(pending_record: Optional[Dict[str, Any]]) -> str:
+    """Formats the previous image's cut-off last record as extra prompt context."""
+    if not pending_record:
+        return ""
+    participants_summary = [
+        {"role_name": p.get("role_name"), "std_given": p.get("std_given"), "std_surname": p.get("std_surname")}
+        for p in pending_record.get("participants", [])
+    ]
+    return dedent(f"""
+
+        CONTINUATION FROM PREVIOUS IMAGE:
+        The record below was cut off at the bottom of the previous image and may continue
+        at the top of THIS one. If it does, merge it into ONE complete record reusing its
+        record_number/year, and set that record's continues_from_previous_image: true. If
+        nothing on this image continues it, ignore this block entirely.
+
+        record_number: {pending_record.get("record_number")}
+        year: {pending_record.get("year")}
+        event_type: {pending_record.get("event_type")}
+        transcription so far: {pending_record.get("original_transcription")}
+        translation so far: {pending_record.get("english_translation")}
+        participants captured so far: {json.dumps(participants_summary, ensure_ascii=False)}
+    """)
+
+
+# ==========================================
+# CONTENT-TRANSPORT ROUTING
+# ==========================================
+IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".tiff", ".tif")
+
+
+def has_usable_text_layer(pdf_path: Union[str, Path], sample_pages: int = 3,
+                          min_alpha_ratio: float = 0.5, min_chars: int = 40) -> bool:
+    """Probes a PDF's first few pages for a genuine, non-garbage text layer."""
+    # noinspection broad-exception
+    try:
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            sampled = "".join((page.extract_text() or "") for page in pdf.pages[:sample_pages])
+    except Exception:
+        return False
+
+    if len(sampled) < min_chars:
+        return False
+
+    alpha_count = sum(1 for c in sampled if c.isalpha())
+    return (alpha_count / len(sampled)) >= min_alpha_ratio
+
+
+def get_pdf_page_count(pdf_path: Union[str, Path]) -> int:
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        return len(pdf.pages)
+
+
+def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path:
+    """Runs PDFix's lossless structural optimization against a throwaway temp copy."""
+    tmp_fd, tmp_path_str = tempfile.mkstemp(suffix=".pdf", prefix="pdfix_upload_")
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_path_str)
+    try:
+        shutil.copy2(file_path, tmp_path)
+        params = COMPRESSION_PARAMS.get(compression_level, COMPRESSION_PARAMS[2])
+        optimize_pdf(str(tmp_path), params)
+        return tmp_path
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        return file_path
+
+
+def build_content_part_for_file(client: genai.Client, file_path: Path) -> Tuple[str, Any]:
+    """Classifies a source file and returns (mode, content_part)."""
+    suffix = file_path.suffix.lower()
+    if suffix in IMAGE_SUFFIXES:
+        return "image", optimize_image(str(file_path))
+
+    if suffix == ".pdf":
+        if has_usable_text_layer(file_path):
+            with pdfplumber.open(str(file_path)) as pdf:
+                text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+            return "pdf_text", text
+
+        compression_level = int(os.getenv("PALEOGRAPHER_PDF_COMPRESSION_LEVEL", "2"))
+        optimized_path = optimize_pdf_for_upload(file_path, compression_level)
+        try:
+            uploaded = client.files.upload(file=str(optimized_path))
+        finally:
+            if optimized_path != file_path:
+                optimized_path.unlink(missing_ok=True)
+        return "pdf_native", uploaded
+
+    raise ValueError(f"Unsupported file type: {file_path}")
+
+
+# ==========================================
+# COST TRACKING
+# ==========================================
+def compute_call_cost(usage_metadata: Any, cost_cfg: CostConfig) -> CallCost:
+    """Computes the dollar cost of one API call from its usage_metadata."""
+    if usage_metadata is None:
+        return CallCost(0, 0, 0, 0, 0.0)
+
+    in_tokens = getattr(usage_metadata, "prompt_token_count", 0) or 0
+    out_tokens = getattr(usage_metadata, "candidates_token_count", 0) or 0
+    cached_tokens = getattr(usage_metadata, "cached_content_token_count", 0) or 0
+    thoughts_tokens = getattr(usage_metadata, "thoughts_token_count", 0) or 0
+
+    cache_rate = cost_cfg.cost_per_1m_in * cost_cfg.cache_discount_multiplier
+    cost_cached = (cached_tokens / 1_000_000) * cache_rate
+    cost_in = (in_tokens / 1_000_000) * cost_cfg.cost_per_1m_in
+    cost_out = ((out_tokens + thoughts_tokens) / 1_000_000) * cost_cfg.cost_per_1m_out
+
+    return CallCost(in_tokens, out_tokens, cached_tokens, thoughts_tokens, cost_cached + cost_in + cost_out)
+
+
+# ==========================================
+# SYNCHRONOUS RETRY LOOP
+# ==========================================
+def run_with_retries(call_fn: Callable[[], Any], max_retries: int = 10, max_json_retries: int = 3) -> Any:
+    """Calls call_fn() until it succeeds, retrying on transient errors."""
+    attempts = 0
+    json_attempts = 0
+
+    while attempts < max_retries:
+        try:
+            return call_fn()
+        except json.JSONDecodeError as e:
+            json_attempts += 1
+            if json_attempts >= max_json_retries:
+                raise RuntimeError(
+                    f"Malformed JSON {max_json_retries}x in a row (likely a systemic issue, not transient): {e}"
+                ) from e
+            print(f"   [!] Malformed JSON generated. Retrying... ({e})", end="", flush=True)
+            time.sleep(2)
+            attempts += 1
+        except genai.errors.ClientError as api_error:
+            error_msg = str(api_error)
+            if "PerDay" in error_msg:
+                raise DailyQuotaExhausted(error_msg) from api_error
+            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg or agy_client.is_quota_or_rate_limit(error_msg):
+                match = re.search(r"retry in (\d+\.?\d*)s", error_msg)
+                if match:
+                    wait_time = float(match.group(1)) + 1.5
+                else:
+                    wait_time = agy_client.parse_quota_reset_wait_seconds(error_msg)
+                    if wait_time is None:
+                        wait_time = 35.0 * float(2 ** attempts)
+                agy_client.pause_for_quota_reset(wait_time, reason=f"Rate limit hit ({error_msg[:60]})")
+                attempts += 1
+            elif "500" in error_msg or "503" in error_msg or "504" in error_msg:
+                print(f"   [!] Google Server Error ({error_msg[:30]}). Sleeping 5s...", end="", flush=True)
+                time.sleep(5)
+                attempts += 1
+            else:
+                raise
+
+    raise RuntimeError(f"Exhausted all {max_retries} retries")
+
+
+# ==========================================
+# BATCH API (for large multi-page documents)
+# ==========================================
+def build_batch_request(model_id: str, contents: list, source_file: str,
+                        gen_config_kwargs: Dict[str, Any]) -> types.InlinedRequest:
+    """Builds one Gemini batch request."""
+    return types.InlinedRequest(
+        model=model_id, contents=contents, metadata={"source_file": source_file},
+        config=genai.types.GenerateContentConfig(**gen_config_kwargs),
+    )
+
+
+def submit_batch_job(client: genai.Client, model_id: str, requests: List[types.InlinedRequest],
+                     display_name: str = "paleographer-batch") -> str:
+    """Submits a list of pre-built requests as one Gemini batch job."""
+    job = client.batches.create(model=model_id, src=requests,
+                                config=types.CreateBatchJobConfig(display_name=display_name))
+    if not job.name:
+        raise RuntimeError("Gemini created a batch job but returned no job name.")
+    return job.name
+
+
+def check_batch_jobs(client: genai.Client, pending: List[dict]) -> Tuple[List[dict], List[dict]]:
+    """Checks every pending batch job entry against Gemini."""
+    completed, still_pending = [], []
+    for entry in pending:
+        job = client.batches.get(name=entry["job_name"])
+        if job.state == types.JobState.JOB_STATE_SUCCEEDED:
+            completed.append(entry)
+        elif job.state in (types.JobState.JOB_STATE_FAILED, types.JobState.JOB_STATE_CANCELLED,
+                           types.JobState.JOB_STATE_EXPIRED):
+            print(f"   [!] Batch job {entry['job_name']} ended in state {job.state}; "
+                  "not retried automatically, resubmit manually if needed.")
+        else:
+            still_pending.append(entry)
+    return completed, still_pending
+
+
+def retrieve_batch_results(client: genai.Client, job_name: str) -> List[Tuple[str, Any]]:
+    """Fetches a completed batch job's results."""
+    job = client.batches.get(name=job_name)
+    results: List[Tuple[str, Any]] = []
+    dest = job.dest
+    if dest is None or not dest.inlined_responses:
+        return results
+    for r in dest.inlined_responses:
+        source_file = (r.metadata or {}).get("source_file", "")
+        if r.error:
+            print(f"   [!] Batch item for {source_file} failed: {r.error}")
+            continue
+        results.append((source_file, r.response))
+    return results
+
+
+# ==========================================
+# CONTEXT CACHING
+# ==========================================
+def create_context_cache(client: genai.Client, model_id: str, system_instruction: str,
+                         ttl_seconds: int = 86400) -> Optional[str]:
+    """Uploads the system instruction as a Gemini Context Cache."""
+    try:
+        cache = client.caches.create(
+            model=model_id,
+            config=genai.types.CreateCachedContentConfig(system_instruction=system_instruction,
+                                                         ttl=f"{ttl_seconds}s"),
+        )
+        return cache.name
+    except Exception as e:
+        print(f"Warning: Failed to create cache. Proceeding without it. Error: {e}")
+        return None
+
+
+def delete_context_cache(client: genai.Client, cache_name: str) -> None:
+    try:
+        client.caches.delete(name=cache_name)
+    except Exception as e:
+        print(f"Warning: Failed to delete cache {cache_name} (it will expire on its own via TTL). Error: {e}")
+
+
+# ==========================================
+# DEBUG MODE HELPERS
+# ==========================================
+def strip_markdown_fences(text: str) -> str:
+    """Removes ```json ... ``` (or bare ```) code fences some models add."""
+    backticks = "`" * 3
+    if text.startswith(backticks):
+        pattern = r"^" + backticks + r"(?:json)?\s*|\s*" + backticks + r"$"
+        return re.sub(pattern, "", text.strip())
+    return text
+
+
+def debug_schema_suffix(schema: Dict[str, Any]) -> str:
+    """Debug mode schema appended as text when thinking_config is active."""
+    return ("\n\nOUTPUT FORMAT: Respond with ONLY raw JSON matching this schema, no markdown code "
+            f"fences, no commentary before or after:\n{json.dumps(schema)}")
+
+
+def build_debug_generation_config() -> Dict[str, Any]:
+    return dict(thinking_config=genai.types.ThinkingConfig(include_thoughts=True))
+
+
+# ==============================================================================
+# AGY ENGINE (folded from agy_engine.py)
+# ==============================================================================
+
+# Paleographer's own default model for the agy backend.
+DEFAULT_MODEL = "gemini-3.1-pro-high"
+
+DEFAULT_MAX_RETRIES = 5
+DEFAULT_BACKOFF_SECONDS = 5.0
+
+
+# ==========================================
+# PDF RASTERIZATION
+# ==========================================
+def rasterize_pdf_to_images(pdf_path: Path, max_dimension: int = 2048,
+                            resolution: int = 200) -> List[Image.Image]:
+    """One PIL Image per page, via pdfplumber's page.to_image()."""
+    images: List[Image.Image] = []
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page in pdf.pages:
+            page_image = page.to_image(resolution=resolution)
+            img = page_image.original.convert("RGB")
+            img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+            images.append(img)
+    return images
+
+
+# ==========================================
+# EXTRACTION CALL
+# ==========================================
+def call_agy_extract(images: List[Image.Image], schema: Dict[str, Any], prompt_text: str,
+                     model: str = DEFAULT_MODEL,
+                     cli_bin: str = agy_client.DEFAULT_CLI_BIN,
+                     timeout_seconds: int = agy_client.DEFAULT_TIMEOUT_SECONDS) -> agy_client.AgyStructuredResult:
+    """Provisions a fresh scratch dir, saves images, calls agy_client.call_agy_structured."""
+    if not images:
+        raise ValueError("call_agy_extract requires at least one image")
+
+    scratch_dir = Path(tempfile.mkdtemp(prefix="paleographer_agy_"))
+    try:
+        filenames = []
+        for index, img in enumerate(images, start=1):
+            filename = f"page_{index:03d}.jpg"
+            img.convert("RGB").save(scratch_dir / filename, "JPEG", quality=90)
+            filenames.append(filename)
+
+        if len(filenames) == 1:
+            file_instruction = f"The file to process is staged in your workspace directory as: {filenames[0]}."
+        else:
+            file_instruction = (
+                f"The files to process are staged in your workspace directory, in page "
+                f"order, as: {', '.join(filenames)}."
+            )
+        full_prompt = (
+            f"{prompt_text}\n\n{file_instruction} Open/view "
+            f"{'it' if len(filenames) == 1 else 'them, in order,'} and produce the JSON "
+            f"output now, matching the schema exactly."
+        )
+
+        return agy_client.call_agy_structured(
+            workspace_dir=scratch_dir, model=model, prompt=full_prompt, schema=schema,
+            cli_bin=cli_bin, timeout_seconds=timeout_seconds,
+        )
+    finally:
+        shutil.rmtree(scratch_dir, ignore_errors=True)
+
+
+# ==========================================
+# CHUNKED EXTRACTION (large multi-page documents)
+# ==========================================
+DEFAULT_CHUNK_SIZE = 10
+
+
+def _agy_pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """Same logic as pop_trailing_cutoff_record below, operating at chunk scope."""
+    if not sheets:
+        return None
+    last_sheet = sheets[-1]
+    records = last_sheet.get("records", [])
+    if not records or not records[-1].get("continues_on_next_image"):
+        return None
+    record = records.pop()
+    record["_pending_sheet_info"] = {"page_id": last_sheet.get("page_id"),
+                                     "document_metadata": last_sheet.get("document_metadata")}
+    return record
+
+
+def _agy_consumed_leading_continuation(sheets: List[Dict[str, Any]]) -> bool:
+    """Chunk-scoped equivalent of consumed_leading_continuation below."""
+    if not sheets:
+        return False
+    first_records = sheets[0].get("records", [])
+    return bool(first_records and first_records[0].get("continues_from_previous_image"))
+
+
+def _agy_reattach_leftover_record(sheets: List[Dict[str, Any]], leftover: Dict[str, Any]) -> None:
+    """Chunk-scoped equivalent of reattach_leftover_record below."""
+    sheet_info = leftover.pop("_pending_sheet_info", {}) or {}
+    sheets.insert(0, {"page_id": sheet_info.get("page_id", ""),
+                      "document_metadata": sheet_info.get("document_metadata", {}), "records": [leftover]})
+
+
+def _consolidate_chunked_result(all_sheets: List[Dict[str, Any]], collection_title: Optional[str],
+                                schema: Dict[str, Any], model: str, cli_bin: str,
+                                timeout_seconds: int) -> agy_client.AgyStructuredResult:
+    """Final pass over the full concatenated result from every chunk."""
+    scratch_dir = Path(tempfile.mkdtemp(prefix="paleographer_agy_consolidate_"))
+    try:
+        records_path = scratch_dir / "extracted_records.json"
+        records_path.write_text(
+            json.dumps({"collection_title": collection_title, "sheets": all_sheets}, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        prompt = (
+            "The file extracted_records.json in your workspace directory contains records "
+            "already extracted from a multi-page document, processed in sequential "
+            "page-order sections due to its length. Read it, then review the FULL set for "
+            "consistency:\n"
+            "- If any two records actually describe the SAME application (e.g. duplicated "
+            "across a section boundary), merge them into one record, keeping the most "
+            "complete data from either.\n"
+            "- Do not invent, drop, or renumber any distinct record that is genuinely "
+            "separate - only merge genuine duplicates.\n"
+            "- Preserve every field exactly as given except where merging duplicates "
+            "requires combining two records' data.\n\n"
+            "Output the final, reconciled JSON now, matching the schema exactly."
+        )
+        return agy_client.call_agy_structured(
+            workspace_dir=scratch_dir, model=model, prompt=prompt, schema=schema,
+            cli_bin=cli_bin, timeout_seconds=timeout_seconds,
+        )
+    finally:
+        shutil.rmtree(scratch_dir, ignore_errors=True)
+
+
+def call_agy_extract_chunked(images: List[Image.Image], schema: Dict[str, Any], prompt_text: str,
+                             model: str = DEFAULT_MODEL,
+                             cli_bin: str = agy_client.DEFAULT_CLI_BIN,
+                             timeout_seconds: int = agy_client.DEFAULT_TIMEOUT_SECONDS,
+                             chunk_size: int = DEFAULT_CHUNK_SIZE) -> agy_client.AgyStructuredResult:
+    """For documents with more pages than one agy call can reliably hold: splits images
+    into chunk_size-page groups and processes sequentially with page continuity threaded
+    between chunks, then runs one final consolidation pass."""
+    if len(images) <= chunk_size:
+        return call_agy_extract(images, schema, prompt_text, model=model, cli_bin=cli_bin,
+                                timeout_seconds=timeout_seconds)
+
+    chunks = [images[i:i + chunk_size] for i in range(0, len(images), chunk_size)]
+    all_sheets: List[Dict[str, Any]] = []
+    pending_continuation: Optional[Dict[str, Any]] = None
+    collection_title: Optional[str] = None
+    usage_totals = {"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0,
+                    "cache_read_tokens": 0, "total_tokens": 0}
+
+    def _add_usage(usage: agy_client.AgyUsage) -> None:
+        usage_totals["input_tokens"] += usage.input_tokens
+        usage_totals["output_tokens"] += usage.output_tokens
+        usage_totals["thinking_tokens"] += usage.thinking_tokens
+        usage_totals["cache_read_tokens"] += usage.cache_read_tokens
+        usage_totals["total_tokens"] += usage.total_tokens
+
+    for chunk_index, chunk_images in enumerate(chunks, start=1):
+        print(f"   [agy] section {chunk_index}/{len(chunks)} ({len(chunk_images)} page(s))...",
+              end="", flush=True)
+        chunk_prompt = (
+            f"{prompt_text}\n\nNOTE: This is section {chunk_index} of {len(chunks)} of a "
+            f"longer multi-page document, processed in sequential page-order sections "
+            f"due to its length. Apply the same PAGE CONTINUITY rules across this section "
+            f"boundary as you would between any two consecutive images."
+        )
+        chunk_prompt += build_continuation_context(pending_continuation)
+
+        def call_fn(imgs=chunk_images, prm=chunk_prompt) -> agy_client.AgyStructuredResult:
+            return call_agy_extract(imgs, schema, prm, model=model, cli_bin=cli_bin,
+                                    timeout_seconds=timeout_seconds)
+
+        chunk_result = run_with_agy_retries(call_fn)
+        print(" done.", flush=True)
+        _add_usage(chunk_result.usage)
+        if collection_title is None:
+            collection_title = chunk_result.structured_output.get("collection_title")
+
+        chunk_sheets = chunk_result.structured_output.get("sheets", [])
+        if pending_continuation is not None and not _agy_consumed_leading_continuation(chunk_sheets):
+            _agy_reattach_leftover_record(chunk_sheets, pending_continuation)
+        pending_continuation = _agy_pop_trailing_cutoff_record(chunk_sheets)
+        all_sheets.extend(chunk_sheets)
+
+    if pending_continuation is not None:
+        _agy_reattach_leftover_record(all_sheets, pending_continuation)
+
+    unconsolidated_output = {"collection_title": collection_title, "sheets": all_sheets}
+
+    print(f"   [agy] consolidating {len(chunks)} section(s)...", end="", flush=True)
+
+    def consolidation_call_fn() -> agy_client.AgyStructuredResult:
+        return _consolidate_chunked_result(all_sheets, collection_title, schema, model,
+                                           cli_bin, timeout_seconds)
+
+    try:
+        final_result = run_with_agy_retries(consolidation_call_fn)
+    except RuntimeError as e:
+        print(f" FAILED ({e}) - using unconsolidated per-section result instead.", flush=True)
+        return agy_client.AgyStructuredResult(
+            structured_output=unconsolidated_output,
+            usage=agy_client.AgyUsage(**usage_totals),
+        )
+
+    print(" done.", flush=True)
+    _add_usage(final_result.usage)
+
+    return agy_client.AgyStructuredResult(
+        structured_output=final_result.structured_output,
+        usage=agy_client.AgyUsage(**usage_totals),
+    )
+
+
+# ==========================================
+# RETRY POLICY
+# ==========================================
+def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_MAX_RETRIES,
+                         backoff_seconds: float = DEFAULT_BACKOFF_SECONDS) -> Any:
+    """Retries agy_client.AgyCallError with linear backoff."""
+    last_error: Optional[Exception] = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            return call_fn()
+        except agy_client.AgyBinaryNotFoundError as e:
+            raise RuntimeError(str(e)) from e
+        except agy_client.AgyCallError as e:
+            last_error = e
+            err_msg = str(e)
+            if agy_client.is_quota_or_rate_limit(err_msg):
+                wait_time = agy_client.parse_quota_reset_wait_seconds(err_msg)
+                if wait_time is not None and wait_time > 0:
+                    agy_client.pause_for_quota_reset(wait_time, reason=f"agy quota limit hit: {err_msg[:80]}")
+                    continue
+                else:
+                    pause_wait = 30.0 * float(2 ** (attempt - 1))
+                    agy_client.pause_for_quota_reset(pause_wait, reason=f"agy rate limit hit: {err_msg[:80]}")
+                    continue
+
+            if attempt < max_retries:
+                wait = backoff_seconds * attempt
+                print(f"   [!] agy call failed (attempt {attempt}/{max_retries}): {e} "
+                      f"Retrying in {wait:.0f}s...", flush=True)
+                time.sleep(wait)
+    raise RuntimeError(f"agy call failed after {max_retries} attempts: {last_error}") from last_error
+
+
+# ==========================================
+# COST ADAPTATION
+# ==========================================
+def adapt_agy_usage_to_call_cost(usage: agy_client.AgyUsage) -> CallCost:
+    """Maps agy's usage shape onto CallCost so record_cost/print_cost_line treat both
+    engines uniformly. call_cost is always 0.0 (subscription-covered)."""
+    return CallCost(
+        in_tokens=usage.input_tokens,
+        out_tokens=usage.output_tokens,
+        cached_tokens=usage.cache_read_tokens,
+        thoughts_tokens=usage.thinking_tokens,
+        call_cost=0.0,
+    )
+
+
+# ==============================================================================
+# PALEOGRAPHER CONFIGURATION
+# ==============================================================================
 
 # EXTRACTION_ENGINE picks which backend actually performs the AI extraction: "agy" (the
 # default) shells out to the Antigravity CLI, subscription-covered rather than metered
@@ -45,7 +1058,7 @@ EXTRACTION_ENGINE: str = (os.getenv("EXTRACTION_ENGINE", "agy") or "agy").strip(
 if EXTRACTION_ENGINE not in ("api", "agy"):
     raise RuntimeError(f"Unknown EXTRACTION_ENGINE '{EXTRACTION_ENGINE}' - expected 'api' or 'agy'.")
 
-# Only constructed for the api engine - the agy engine never calls engine.
+# Only constructed for the api engine - the agy engine never calls
 # build_content_part_for_file at all (rasterization replaces it for both images and
 # PDFs), so client is never touched/dereferenced on that path regardless of file type.
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if EXTRACTION_ENGINE == "api" else None
@@ -57,17 +1070,12 @@ RECORD_TYPE_NAME = os.getenv("PALEOGRAPHER_RECORD_TYPE", "")
 COLLECTION_TITLE = os.getenv("VOLUME_TITLE")
 VOLUME_NUM = os.getenv("VOLUME_NUM", "")
 
-TYPE_CFG = engine.parse_type_config(engine.resolve_prompt_path(RECORD_TYPE_NAME))
+TYPE_CFG = parse_type_config(resolve_prompt_path(RECORD_TYPE_NAME))
 
 
 def resolve_setting(generic_key: str, default: str = "") -> str:
-    """Resolves a generic runtime setting (IMAGE_DIR, MASTER_DB_NAME, ...) via the active
-    record type's own field_remap table (see Parish.pmt/Scrip.pmt's front matter): finds
-    whichever of this record type's own prefixed .env keys maps to generic_key, and reads
-    that. Falls back to reading generic_key directly so a record type with no field_remap
-    entry for it (or no field_remap at all) still works. This is what lets Paleographer.py
-    resolve its own settings from its own .env with no dependency on Scriptorium.py's GUI
-    layer bridging prefixed settings-tab names to the generic names this script reads."""
+    """Resolves a generic runtime setting via the active record type's own field_remap
+    table, falling back to reading generic_key directly."""
     for prefixed_key, target in TYPE_CFG.field_remap.items():
         if target == generic_key:
             val = os.getenv(prefixed_key, "")
@@ -77,7 +1085,7 @@ def resolve_setting(generic_key: str, default: str = "") -> str:
 
 
 API_BUDGET: float = float(os.getenv("API_BUDGET", "5.00"))
-COST_CFG = engine.CostConfig(
+COST_CFG = CostConfig(
     cost_per_1m_in=float(os.getenv("COST_PER_1M_INPUT", "0.075")),
     cost_per_1m_out=float(os.getenv("COST_PER_1M_OUTPUT", "0.30")),
     cache_discount_multiplier=float(os.getenv("CACHE_DISCOUNT_MULTIPLIER", "0.10")),
@@ -99,43 +1107,41 @@ if not MODEL_ID:
 DEBUG_FILE: Union[str, None] = sys.argv[1] if len(sys.argv) > 1 else None
 
 # agy-engine-only settings. AGY_MODEL_ID is always passed explicitly to every agy call,
-# never left to agy's own default - confirmed live that agy's own default (when
-# --model is omitted) is a flash-tier model with materially worse OCR quality, and
-# that shorthand values like "pro"/"flash" are not valid --model values at all.
-AGY_MODEL_ID: str = os.getenv("AGY_MODEL_NAME") or agy_engine.DEFAULT_MODEL
+# never left to agy's own default.
+AGY_MODEL_ID: str = os.getenv("AGY_MODEL_NAME") or DEFAULT_MODEL
 AGY_CLI_BIN: str = os.getenv("AGY_CLI_BIN") or agy_client.DEFAULT_CLI_BIN
 AGY_TIMEOUT_SECONDS: int = int(os.getenv("AGY_TIMEOUT_SECONDS", str(agy_client.DEFAULT_TIMEOUT_SECONDS)))
 
-SOURCE_SUFFIXES = engine.IMAGE_SUFFIXES + (".pdf",)
+SOURCE_SUFFIXES = IMAGE_SUFFIXES + (".pdf",)
 
 with open(Path(__file__).resolve().parent / "schema.json", "r", encoding="utf-8") as _schema_file:
     CORE_SCHEMA: Dict[str, Any] = json.load(_schema_file)
 
-SCHEMA: Dict[str, Any] = engine.build_merged_schema(CORE_SCHEMA, TYPE_CFG.extra_fields)
+SCHEMA: Dict[str, Any] = build_merged_schema(CORE_SCHEMA, TYPE_CFG.extra_fields)
 
 
-# ==========================================
+# ==============================================================================
 # RECORD POST-PROCESSING
-# ==========================================
+# ==============================================================================
 def finalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """Applies every generic mechanical post-processing step to one extracted record."""
-    postprocess.derive_role_numbers(record, TYPE_CFG.roles)
-    postprocess.derive_role_semantics(record, TYPE_CFG.roles)
-    postprocess.derive_record_identity(record, TYPE_CFG.event_types)
-    postprocess.derive_suffixes(record, TYPE_CFG.roles)
-    postprocess.apply_defaults(record, TYPE_CFG.defaults.get("record", {}))
+    derive_role_numbers(record, TYPE_CFG.roles)
+    derive_role_semantics(record, TYPE_CFG.roles)
+    derive_record_identity(record, TYPE_CFG.event_types)
+    derive_suffixes(record, TYPE_CFG.roles)
+    apply_defaults(record, TYPE_CFG.defaults.get("record", {}))
 
     if record.get("event_date"):
-        record["event_date"] = postprocess.parse_to_iso(record["event_date"])
+        record["event_date"] = parse_to_iso(record["event_date"])
 
     for participant in record.get("participants", []):
-        participant["std_given"] = postprocess.strip_diacritics(participant.get("std_given"))
-        participant["std_surname"] = postprocess.strip_diacritics(participant.get("std_surname"))
+        participant["std_given"] = strip_diacritics(participant.get("std_given"))
+        participant["std_surname"] = strip_diacritics(participant.get("std_surname"))
         if participant.get("birth_date"):
-            participant["birth_date"] = postprocess.parse_to_iso(participant["birth_date"])
+            participant["birth_date"] = parse_to_iso(participant["birth_date"])
         if participant.get("death_date"):
-            participant["death_date"] = postprocess.parse_to_iso(participant["death_date"])
-        postprocess.apply_defaults(participant, TYPE_CFG.defaults.get("participant", {}))
+            participant["death_date"] = parse_to_iso(participant["death_date"])
+        apply_defaults(participant, TYPE_CFG.defaults.get("participant", {}))
 
     return record
 
@@ -144,11 +1150,8 @@ def finalize_page_data(page_data: Dict[str, Any]) -> Dict[str, Any]:
     for sheet in page_data.get("sheets", []):
         for record in sheet.get("records", []):
             finalize_record(record)
-    # After every record has its record_id (event_type + record_number) set, fold
-    # together any that share one - e.g. a witness affidavit and the claimant's own
-    # affidavit, sworn on different pages but supporting the same claim - into a single
-    # record, rather than leaving separate documents for the same claim unmerged.
-    postprocess.merge_same_claim_records(page_data.get("sheets", []))
+    # After every record has its record_id set, fold together any that share one.
+    merge_same_claim_records(page_data.get("sheets", []))
     return page_data
 
 
@@ -160,9 +1163,9 @@ def tag_document_metadata(page_data: Dict[str, Any], file_name: str, file_ext: s
         metadata["volume"] = VOLUME_NUM
 
 
-# ==========================================
+# ==============================================================================
 # MASTER DB HELPERS
-# ==========================================
+# ==============================================================================
 def load_master_db() -> Dict[str, Any]:
     if os.path.exists(MASTER_DB):
         with open(MASTER_DB, "r", encoding="utf-8") as f:
@@ -196,26 +1199,23 @@ def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) 
         master_data["sheets"] = new_sheets
 
 
-def record_cost(master_data: Dict[str, Any], usage_metadata: Any) -> engine.CallCost:
+def record_cost(master_data: Dict[str, Any], usage_metadata: Any) -> CallCost:
     if isinstance(usage_metadata, agy_client.AgyUsage):
-        cost = agy_engine.adapt_agy_usage_to_call_cost(usage_metadata)
+        cost = adapt_agy_usage_to_call_cost(usage_metadata)
     else:
-        cost = engine.compute_call_cost(usage_metadata, COST_CFG)
+        cost = compute_call_cost(usage_metadata, COST_CFG)
     master_data["total_spent"] = float(master_data.get("total_spent", 0.0)) + cost.call_cost
     master_data["total_pages_processed"] = int(master_data.get("total_pages_processed", 0)) + 1
     return cost
 
 
-def print_cost_line(master_data: Dict[str, Any], cost: engine.CallCost) -> None:
+def print_cost_line(master_data: Dict[str, Any], cost: CallCost) -> None:
     total_tokens = cost.cached_tokens + cost.in_tokens + cost.out_tokens + cost.thoughts_tokens
     print(f" DONE! | Cost: ${cost.call_cost:.4f}")
     print(f"      Tokens -> Cached: {cost.cached_tokens} | Input: {cost.in_tokens} | "
           f"Output: {cost.out_tokens} | Thinking: {cost.thoughts_tokens} = Total: {total_tokens}")
 
     if EXTRACTION_ENGINE == "agy":
-        # Subscription-covered - no per-call dollar cost, so the budget/pages-left
-        # arithmetic below (built around metered API pricing) would otherwise just
-        # print a meaningless "~0 pages left" forever, since avg_cost stays 0.
         print("      Budget -> N/A (subscription backend, no per-call cost)")
         return
 
@@ -230,9 +1230,9 @@ def print_cost_line(master_data: Dict[str, Any], cost: engine.CallCost) -> None:
     print(f"      Budget -> Total Spent: ${total_spent:.4f} | Est Pages Left: ~{estimated_pages_left}")
 
 
-# ==========================================
+# ==============================================================================
 # FILE CLASSIFICATION
-# ==========================================
+# ==============================================================================
 def list_source_files() -> List[str]:
     return sorted(f for f in os.listdir(SOURCE_DIR) if f.lower().endswith(SOURCE_SUFFIXES))
 
@@ -242,15 +1242,15 @@ def is_batch_eligible(file_path: Path) -> bool:
     (or engine's default) threshold. Images are never batch-eligible."""
     if file_path.suffix.lower() != ".pdf":
         return False
-    return engine.get_pdf_page_count(file_path) > TYPE_CFG.batch_page_threshold
+    return get_pdf_page_count(file_path) > TYPE_CFG.batch_page_threshold
 
 
-# ==========================================
+# ==============================================================================
 # SYNCHRONOUS PROCESSING
-# ==========================================
+# ==============================================================================
 def build_gen_config_kwargs(active_cache_name: Optional[str]) -> Dict[str, Any]:
     if DEBUG_FILE:
-        return engine.build_debug_generation_config()
+        return build_debug_generation_config()
     kwargs: Dict[str, Any] = dict(response_mime_type="application/json", response_schema=SCHEMA)
     if active_cache_name:
         kwargs["cached_content"] = active_cache_name
@@ -259,11 +1259,9 @@ def build_gen_config_kwargs(active_cache_name: Optional[str]) -> Dict[str, Any]:
 
 def process_one_file_sync(filename: str, active_cache_name: Optional[str],
                           pending_continuation: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """Processes one file synchronously (real-time API call with retries). Returns a
-    dict with page_data/usage_metadata on success, or None on failure (already printed).
-    Raises engine.DailyQuotaExhausted, which the caller must handle by stopping the run.
-    pending_continuation, if given, is the previous image's cut-off last record - see
-    engine.build_continuation_context and UNIVERSAL_PROMPT_SUFFIX's PAGE CONTINUITY rule."""
+    """Processes one file synchronously. Returns a dict with page_data/usage_metadata on
+    success, or None on failure. Raises DailyQuotaExhausted, which the caller must handle
+    by stopping the run."""
     file_path = Path(SOURCE_DIR) / filename
     file_base = file_path.stem
     file_ext = file_path.suffix.upper().replace(".", "")
@@ -272,42 +1270,30 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
     pages_str = file_base.split("_")[-1]
 
     file_metadata = {"File": file_base, "Pages": pages_str}
-    dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
-    dynamic_prompt += engine.build_continuation_context(pending_continuation)
+    dynamic_prompt = get_dynamic_prompt(TYPE_CFG, file_metadata)
+    dynamic_prompt += build_continuation_context(pending_continuation)
 
     if EXTRACTION_ENGINE == "agy":
-        # PDFs are rasterized to images locally rather than trusting agy's own native
-        # PDF file-reading via --add-dir: confirmed live that native PDF reading works
-        # for light queries but is unreliable for a full schema-constrained extraction
-        # (agy's own agent can try an internal tool call that headless mode auto-denies,
-        # silently returning no structured output at all). Rasterizing reuses the same
-        # mechanism already proven reliable for direct image input. agy has no
-        # cached_content slot, so the full system instruction goes inline every call
-        # (the same concatenation the api engine only does for DEBUG_FILE).
-        images = (agy_engine.rasterize_pdf_to_images(file_path) if file_path.suffix.lower() == ".pdf"
-                  else [engine.optimize_image(str(file_path))])
-        full_prompt = engine.get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
+        images = (rasterize_pdf_to_images(file_path) if file_path.suffix.lower() == ".pdf"
+                  else [optimize_image(str(file_path))])
+        full_prompt = get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
 
         def call_fn() -> Any:
-            # call_agy_extract_chunked (not call_agy_extract directly): confirmed live
-            # that a single call staging many pages at once (a real 38-page case file)
-            # fails consistently, not just intermittently - chunking is required for
-            # reliability on any large multi-page document, not just an optimization.
-            result = agy_engine.call_agy_extract_chunked(images, SCHEMA, full_prompt, model=AGY_MODEL_ID,
-                                                          cli_bin=AGY_CLI_BIN, timeout_seconds=AGY_TIMEOUT_SECONDS)
+            result = call_agy_extract_chunked(images, SCHEMA, full_prompt, model=AGY_MODEL_ID,
+                                              cli_bin=AGY_CLI_BIN, timeout_seconds=AGY_TIMEOUT_SECONDS)
             return result.structured_output, result.usage
 
         try:
-            page_data, usage_metadata = agy_engine.run_with_agy_retries(call_fn)
+            page_data, usage_metadata = run_with_agy_retries(call_fn)
         except RuntimeError as e:
             print(f"\n[FAILED] {filename}: {e}")
             return None
     else:
-        _, content_part = engine.build_content_part_for_file(client, file_path)
+        _, content_part = build_content_part_for_file(client, file_path)
 
         if DEBUG_FILE:
-            prompt = engine.get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
-            prompt += engine.debug_schema_suffix(SCHEMA)
+            prompt = get_cached_system_instruction(TYPE_CFG) + "\n\n" + dynamic_prompt
+            prompt += debug_schema_suffix(SCHEMA)
         else:
             prompt = dynamic_prompt
 
@@ -328,11 +1314,11 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
                     print("\n".join(thought_parts))
                     print("--- END THINKING ---\n")
 
-            raw_text = engine.strip_markdown_fences((response.text or "").strip())
+            raw_text = strip_markdown_fences((response.text or "").strip())
             return json.loads(raw_text), response.usage_metadata
 
         try:
-            page_data, usage_metadata = engine.run_with_retries(call_fn)
+            page_data, usage_metadata = run_with_retries(call_fn)
         except RuntimeError as e:
             print(f"\n[FAILED] {filename}: {e}")
             return None
@@ -344,10 +1330,8 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
 
 
 def pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """If the last record of the last sheet is flagged continues_on_next_image, pops it out
-    (carrying its origin sheet's page_id/document_metadata along for pending_sheet_info,
-    in case nothing continues it and it needs to be saved back on its own) and returns it.
-    None if there's nothing pending."""
+    """If the last record of the last sheet is flagged continues_on_next_image, pops it
+    out and returns it. None if there's nothing pending."""
     if not sheets:
         return None
     last_sheet = sheets[-1]
@@ -361,9 +1345,7 @@ def pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[st
 
 
 def consumed_leading_continuation(sheets: List[Dict[str, Any]]) -> bool:
-    """True if the first record of the first sheet says it merged the pending continuation
-    context it was given - the pending record should be discarded (it was never saved),
-    not reattached."""
+    """True if the first record of the first sheet merged the pending continuation context."""
     if not sheets:
         return False
     first_records = sheets[0].get("records", [])
@@ -371,9 +1353,8 @@ def consumed_leading_continuation(sheets: List[Dict[str, Any]]) -> bool:
 
 
 def reattach_leftover_record(sheets: List[Dict[str, Any]], leftover: Dict[str, Any]) -> None:
-    """Nothing on the new image continued the pending record after all - save it back as
-    its own one-record sheet, using the sheet info it originally came from, ahead of this
-    file's own sheets so reading order is preserved."""
+    """Nothing on the new image continued the pending record - save it back as its own
+    one-record sheet, ahead of this file's own sheets."""
     sheet_info = leftover.pop("_pending_sheet_info", {}) or {}
     sheets.insert(0, {"page_id": sheet_info.get("page_id", ""),
                       "document_metadata": sheet_info.get("document_metadata", {}), "records": [leftover]})
@@ -387,11 +1368,9 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
     if not DEBUG_FILE and files:
         print(f"Found {total_files} file(s) to process synchronously.")
         if EXTRACTION_ENGINE == "api":
-            # Context caching is genai-only (and requires a working API key) - agy has
-            # no cached_content equivalent, see process_one_file_sync's agy branch.
             print("Creating Context Cache for System Instructions to reduce costs...")
-            active_cache_name = engine.create_context_cache(
-                client, MODEL_ID, engine.get_cached_system_instruction(TYPE_CFG))
+            active_cache_name = create_context_cache(
+                client, MODEL_ID, get_cached_system_instruction(TYPE_CFG))
             if active_cache_name:
                 print(f"Cache created successfully: {active_cache_name}\n")
 
@@ -400,7 +1379,7 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
             print(f"[{index}/{total_files}] Processing {filename} with {MODEL_ID}...", end="", flush=True)
             try:
                 result = process_one_file_sync(filename, active_cache_name, pending_continuation)
-            except engine.DailyQuotaExhausted:
+            except DailyQuotaExhausted:
                 print("\n\n[FATAL ERROR] Daily Quota Exhausted.")
                 print("Progress saved. Exiting script to prevent infinite crashing.")
                 if not DEBUG_FILE and pending_continuation is not None:
@@ -423,8 +1402,6 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
                 print_cost_line(master_data, cost)
             else:
                 if pending_continuation is not None and not consumed_leading_continuation(sheets):
-                    # Nothing here continued it after all - save it as its own record,
-                    # still exactly as flagged/reviewable as before this feature existed.
                     reattach_leftover_record(sheets, pending_continuation)
                 pending_continuation = pop_trailing_cutoff_record(sheets)
                 merge_sheets(master_data, sheets)
@@ -432,35 +1409,32 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
                 print_cost_line(master_data, cost)
 
         if not DEBUG_FILE and pending_continuation is not None:
-            # The very last file's last record was cut off with no further image to
-            # check against - save it rather than silently drop it.
             reattach_leftover_record(master_data.setdefault("sheets", []), pending_continuation)
             save_master_db(master_data)
     finally:
         if active_cache_name:
-            engine.delete_context_cache(client, active_cache_name)
+            delete_context_cache(client, active_cache_name)
             print(f"\nDeleted context cache: {active_cache_name}")
 
 
-# ==========================================
+# ==============================================================================
 # BATCH PROCESSING (large multi-page documents)
-# ==========================================
+# ==============================================================================
 def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
-    """Batch-eligible files (large multipage PDFs) go through Gemini's Batch API
-    instead of the synchronous loop. One run both retrieves any previously-submitted
-    job that has since completed and submits any newly-pending files as a new job,
-    then returns without blocking on Gemini."""
+    """Batch-eligible files go through Gemini's Batch API instead of the synchronous
+    loop. One run both retrieves any previously-submitted job and submits newly-pending
+    files, then returns without blocking on Gemini."""
     pending_jobs = master_data.setdefault("pending_batch_jobs", [])
 
     if pending_jobs:
-        completed, still_pending = engine.check_batch_jobs(client, pending_jobs)
+        completed, still_pending = check_batch_jobs(client, pending_jobs)
         master_data["pending_batch_jobs"] = still_pending
 
         for entry in completed:
             print(f"Retrieving results for completed batch job {entry['job_name']}...")
-            for source_file, response in engine.retrieve_batch_results(client, entry["job_name"]):
+            for source_file, response in retrieve_batch_results(client, entry["job_name"]):
                 try:
-                    raw_text = engine.strip_markdown_fences((response.text or "").strip())
+                    raw_text = strip_markdown_fences((response.text or "").strip())
                     page_data = json.loads(raw_text)
                 except (json.JSONDecodeError, AttributeError) as e:
                     print(f"   [!] Could not parse batch result for {source_file}: {e}")
@@ -481,18 +1455,18 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
         return
 
     print(f"Submitting {len(files)} file(s) as a new batch job...")
-    system_instruction = engine.get_cached_system_instruction(TYPE_CFG)
+    system_instruction = get_cached_system_instruction(TYPE_CFG)
     requests = []
     for filename in files:
         file_path = Path(SOURCE_DIR) / filename
-        _, content_part = engine.build_content_part_for_file(client, file_path)
-        file_metadata = {"File": file_path.stem, "Pages": str(engine.get_pdf_page_count(file_path))}
-        prompt = system_instruction + "\n\n" + engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
+        _, content_part = build_content_part_for_file(client, file_path)
+        file_metadata = {"File": file_path.stem, "Pages": str(get_pdf_page_count(file_path))}
+        prompt = system_instruction + "\n\n" + get_dynamic_prompt(TYPE_CFG, file_metadata)
         gen_config_kwargs: Dict[str, Any] = dict(response_mime_type="application/json", response_schema=SCHEMA)
-        requests.append(engine.build_batch_request(MODEL_ID, [prompt, content_part], filename,
-                                                   gen_config_kwargs))
+        requests.append(build_batch_request(MODEL_ID, [prompt, content_part], filename,
+                                            gen_config_kwargs))
 
-    job_name = engine.submit_batch_job(client, MODEL_ID, requests)
+    job_name = submit_batch_job(client, MODEL_ID, requests)
     master_data.setdefault("pending_batch_jobs", []).append(
         {"job_name": job_name, "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"), "file_names": files})
     save_master_db(master_data)
@@ -500,14 +1474,11 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
           "re-run this same step to retrieve results once Gemini finishes.")
 
 
-# ==========================================
+# ==============================================================================
 # MAIN EXECUTION
-# ==========================================
+# ==============================================================================
 def main() -> None:
     if EXTRACTION_ENGINE == "agy":
-        # Deliberately interactive, separate from the per-file loop below (which stays
-        # fully headless) - lets first-time Google sign-in happen once, up front,
-        # rather than surprising the user mid-batch.
         print("Verifying Antigravity CLI authentication...")
         if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
             print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
@@ -534,11 +1505,6 @@ def main() -> None:
     pending_files = [f for f in all_files if f not in processed_files and f not in already_in_batch]
 
     if EXTRACTION_ENGINE == "agy":
-        # agy has no async Batch API equivalent at all (not a size cutoff like the api
-        # engine's page-count threshold - a total absence of an async path), so every
-        # file - image or PDF, any page count - goes through the same synchronous loop.
-        # PDFs are not skipped or treated as unsupported: process_one_file_sync handles
-        # them via rasterization on this path.
         if pending_files:
             run_synchronous_batch(pending_files, master_data)
         else:

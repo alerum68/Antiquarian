@@ -126,43 +126,35 @@ a second userscript. Per repository:
 
 ## Cross-source merge (Ancestry + FamilySearch)
 
-Merge logic is built: `FS.py` now has a census-shaped output path (`build_census_json`,
-parallel to the church-flavor `build_universal_json`, auto-selected via
-`detect_record_family`), a new `Voyageur/MergedCensus.py` merges two already-gathered
-Ancestry + FamilySearch JSON files into one, and `Archivist.py`'s census citation builder
-emits a single citation for a merged person - both `_APID` and `_FSFTID`, both web links,
-and NARA (not Ancestry.com/FamilySearch.org) as the cited repository. Verified against
-synthetic fixtures built from a real FamilySearch citation (see below); not yet verified
-against a real dual-source live gather.
+Dual-source census merging (combining Ancestry + FamilySearch gathers for the same physical page
+into a unified record with joint citations referencing NARA, both source IDs, and web links) is
+catalogued for future development. A working prototype concept and test suite have been moved to
+`DEV/merged_concept/` (`Merged.py`, `MergedCensus.py`, `test_merged_census.py`).
 
-Matching by fuzzy name+date across two *independent* indexing efforts is risky - a
-same-named household, or a name transcribed differently on the two sides, can silently
-attach the wrong FamilySearch link to the wrong Ancestry person. The safer key is a
-locator both sides reference: **Roll/ED/Page + Line Number**. Ancestry's index reliably
-has (or already synthesizes) Line Number; FamilySearch's doesn't expose one directly on
-any year checked, so `FS.py` synthesizes its own from each row's position on the page, the
-same way Ancestry's side already does. Page matching itself only requires ED + page
-number to agree - film/roll is checked as a tie-breaker when both sides have one, but
-isn't required, since two independent gathers won't always format it identically.
-
-FamilySearch's roll number isn't on the Image Index table itself, but it is recoverable:
-the citation's own "citing NARA microfilm publication `<ID>`" clause plus the Catalog
-Record table's Film/Digital Note ("NARA Series `<ID>`, Roll `<N>`") together give an
-`<ID>_<N>` string matching Ancestry's own Roll-field convention (e.g. `M653_1`) - `FS.py`
-now parses both. That same citation tail also broke the general-purpose `parse_citation()`
-regex for census specifically: it still technically matches (doesn't error), but silently
-captures garbage into `publisher`/`pub_loc` instead of the real NARA holder, since census
-citations end in a longer, differently-shaped clause than the simple "Publisher, Loc."
-ending church-register citations use. `FS.py` now parses that clause separately
-(`parse_nara_citing_clause`) rather than patching the shared regex, to avoid risking the
-already-working church-flavor path.
-
-The convenience layer is built too: Voyageur's Gather tab has a new "Merged (Ancestry +
-FamilySearch)" source showing both URL fields at once; picking it and clicking Gather runs
-`Voyageur/Merged.py`, which calls `A.py`'s gather, then `FS.py`'s, then
-`MergedCensus.merge_census`, writing one merged JSON ready for Archivist. Still open: live
-verification against a real Ancestry + FamilySearch dual gather of the same physical page
-(synthetic-fixture verification only so far).
+Key architecture notes from the prototype:
+- Matching by fuzzy name+date across two *independent* indexing efforts is risky - a
+  same-named household, or a name transcribed differently on the two sides, can silently
+  attach the wrong FamilySearch link to the wrong Ancestry person. The safer key is a
+  locator both sides reference: **Roll/ED/Page + Line Number**. Ancestry's index reliably
+  has (or already synthesizes) Line Number; FamilySearch's doesn't expose one directly on
+  any year checked, so `FS.py` synthesizes its own from each row's position on the page, the
+  same way Ancestry's side already does. Page matching itself only requires ED + page
+  number to agree - film/roll is checked as a tie-breaker when both sides have one, but
+  isn't required, since two independent gathers won't always format it identically.
+- FamilySearch's roll number isn't on the Image Index table itself, but it is recoverable:
+  the citation's own "citing NARA microfilm publication `<ID>`" clause plus the Catalog
+  Record table's Film/Digital Note ("NARA Series `<ID>`, Roll `<N>`") together give an
+  `<ID>_<N>` string matching Ancestry's own Roll-field convention (e.g. `M653_1`) - `FS.py`
+  now parses both. That same citation tail also broke the general-purpose `parse_citation()`
+  regex for census specifically: it still technically matches (doesn't error), but silently
+  captures garbage into `publisher`/`pub_loc` instead of the real NARA holder, since census
+  citations end in a longer, differently-shaped clause than the simple "Publisher, Loc."
+  ending church-register citations use. `FS.py` now parses that clause separately
+  (`parse_nara_citing_clause`) rather than patching the shared regex, to avoid risking the
+  already-working church-flavor path.
+- When ready to reintegrate into production: provide a unified dual-gather UI action that runs
+  the respective single-source gathers and merges the normalized JSON files into one output
+  for Archivist.
 
 ## Reunion (Mac) GEDCOM output support
 

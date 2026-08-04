@@ -491,7 +491,6 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
     monkeypatch.setattr(sys, "argv", ["Paleographer.py"])
 
     sys.modules.pop("Paleographer", None)
-    sys.modules.pop("agy_engine", None)
     module = importlib.import_module("Paleographer")
 
     from ScriptoriumMCP import agy_client
@@ -502,7 +501,11 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
     # rasterize_pdf_to_images would otherwise really try to open the fake PDF bytes
     # above via pdfplumber - returning a single blank image is enough for this
     # orchestration-level test (rasterization itself is unit-tested separately).
-    monkeypatch.setattr(module.agy_engine, "rasterize_pdf_to_images",
+    # Both functions are now inlined into Paleographer.py, so we patch directly on
+    # the module: Python resolves module globals at call time, so any function defined
+    # in Paleographer.py that calls rasterize_pdf_to_images/call_agy_extract by name
+    # will pick up the replacement automatically.
+    monkeypatch.setattr(module, "rasterize_pdf_to_images",
                         lambda pdf_path, **k: [Image.new("RGB", (10, 10), color="white")])
 
     call_log = []
@@ -518,7 +521,7 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
                                        cache_read_tokens=0, total_tokens=1600),
         )
 
-    monkeypatch.setattr(module.agy_engine, "call_agy_extract", fake_call_agy_extract)
+    monkeypatch.setattr(module, "call_agy_extract", fake_call_agy_extract)
 
     return module, program_dir / json_dir_name / "master.json", call_log
 
@@ -573,7 +576,7 @@ def test_agy_engine_stages_multiple_rasterized_pages_for_pdf(tmp_path, monkeypat
         pdf_filenames=("CaseFile_001.pdf",),
     )
 
-    monkeypatch.setattr(module.agy_engine, "rasterize_pdf_to_images",
+    monkeypatch.setattr(module, "rasterize_pdf_to_images",
                         lambda pdf_path, **k: [Image.new("RGB", (10, 10), color=c) for c in ("white", "gray", "black")])
 
     module.main()
