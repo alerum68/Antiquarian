@@ -221,7 +221,7 @@ def save_checkpoint(checkpoint_path: str, data: Dict[str, Any]) -> None:
 
 
 def retrieve_volume_pids(vol: str, cookies: Dict[str, str], checkpoint_path: str,
-                         archival_number: str = "RG15") -> List[str]:
+                         archival_number: str = DEFAULT_ARCHIVAL_NUMBER) -> List[str]:
     """Discovers all PIDs in an archival volume using LAC search endpoint."""
     checkpoint = load_checkpoint(checkpoint_path)
     if checkpoint.get("pids"):
@@ -374,7 +374,7 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
 
 
 def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoint_path: str,
-                    archival_number: str = "RG15", max_workers: int = 1) -> Dict[str, Any]:
+                    archival_number: str = DEFAULT_ARCHIVAL_NUMBER, max_workers: int = 1) -> Dict[str, Any]:
     """High-level volume retrieval: gathers PIDs and downloads all associated assets."""
     pids = retrieve_volume_pids(vol, cookies, checkpoint_path, archival_number=archival_number)
     if max_workers > 1:
@@ -385,58 +385,69 @@ def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoin
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Voyageur LAC Gatherer: Canadiana IIIF and LAC Volume Harvester")
-    parser.add_argument("--url", default=os.environ.get("LAC_URL", ""),
-                        help="Canadiana IIIF URL (e.g., https://heritage.canadiana.ca/view/oocihm.lac_reel_c2170).")
-    parser.add_argument("--volume", default=os.environ.get("LAC_VOLUME", ""),
-                        help="LAC Volume number to harvest (e.g., 1325).")
-    parser.add_argument("--archival-number", default=DEFAULT_ARCHIVAL_NUMBER,
-                        help="Archival series number (default: RG15).")
-    parser.add_argument("--cookie-file", default=COOKIE_FILE,
-                        help="Path to browser cookies file for LAC search.")
-    parser.add_argument("--media-dir", default=MEDIA_DIR,
-                        help="Base output media directory.")
-    parser.add_argument("--workers", type=int, default=int(os.environ.get("LAC_MAX_WORKERS", "1")),
-                        help="Number of concurrent workers for volume downloading (default 1).")
-    args = parser.parse_args()
-
-    # Route 1: Volume harvesting
-    if args.volume:
-        print(f"[System] Starting LAC Volume retrieval for Volume {args.volume}...")
-        try:
-            cookies = load_cookies(args.cookie_file)
-        except (FileNotFoundError, ValueError) as e:
-            print(f"[FATAL ERROR] {e} Search LAC once in a real browser, then paste its Cookie header "
-                  f"into that file. Opening search browser...")
-            lac_client.open_search_browser_for_refresh()
-            return
-
-        checkpoint_path = str(Path(CHECKPOINT_DIR) / f"volume_{args.volume}.json")
-        try:
-            result = retrieve_volume(args.volume, cookies, args.media_dir, checkpoint_path,
-                                     archival_number=args.archival_number, max_workers=args.workers)
-        except lac_client.LacSearchAuthError as e:
-            print(f"[FATAL ERROR] {e} Opening the search page now.")
-            lac_client.open_search_browser_for_refresh()
-            return
-
-        print(f"[System] Harvested volume {args.volume}: {len(result.get('pids', []))} PID(s), "
-              f"{len(result.get('downloaded_pids', []))} downloaded, "
-              f"{len(result.get('failed_pids', {}))} failed.")
+def _run_volume(args: argparse.Namespace) -> None:
+    print(f"[System] Starting LAC Volume retrieval for Volume {args.volume}...")
+    try:
+        cookies = load_cookies(args.cookie_file)
+    except (FileNotFoundError, ValueError) as e:
+        print(f"[FATAL ERROR] {e} Search LAC once in a real browser, then paste its Cookie header "
+              f"into that file. Opening search browser...")
+        lac_client.open_search_browser_for_refresh()
         return
 
-    # Route 2: Canadiana IIIF Reel URL
-    url = args.url
-    if not url:
-        print("[Error] Either LAC_URL or LAC_VOLUME must be provided.")
+    checkpoint_path = str(Path(CHECKPOINT_DIR) / f"volume_{args.volume}.json")
+    try:
+        result = retrieve_volume(args.volume, cookies, args.media_dir, checkpoint_path,
+                                 archival_number=args.archival_number, max_workers=args.workers)
+    except lac_client.LacSearchAuthError as e:
+        print(f"[FATAL ERROR] {e} Opening the search page now.")
+        lac_client.open_search_browser_for_refresh()
+        return
+
+    print(f"[System] Harvested volume {args.volume}: {len(result.get('pids', []))} PID(s), "
+          f"{len(result.get('downloaded_pids', []))} downloaded, "
+          f"{len(result.get('failed_pids', {}))} failed.")
+
+
+def _run_reel(args: argparse.Namespace) -> None:
+    if not args.url:
+        print("[Error] --url is required for the reel subcommand.")
         sys.exit(1)
 
     program_dir = os.environ.get("PROGRAM_DIR", "").strip()
-    roll, manifest = parse_url(url)
+    roll, manifest = parse_url(args.url)
     output_directory = setup_directories(program_dir, args.media_dir, roll)
     manifest_json = download_manifest(manifest)
     download_images(manifest_json, output_directory, roll)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Voyageur LAC Gatherer: Canadiana IIIF and LAC Volume Harvester")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    volume_parser = subparsers.add_parser("volume", help="Harvest an LAC archival volume by number.")
+    volume_parser.add_argument("--volume", default=os.environ.get("LAC_VOLUME", ""),
+                               help="LAC Volume number to harvest (e.g., 1325).")
+    volume_parser.add_argument("--archival-number", default=DEFAULT_ARCHIVAL_NUMBER,
+                               help="Archival series number (default: RG15).")
+    volume_parser.add_argument("--cookie-file", default=COOKIE_FILE,
+                               help="Path to browser cookies file for LAC search.")
+    volume_parser.add_argument("--media-dir", default=MEDIA_DIR,
+                               help="Base output media directory.")
+    volume_parser.add_argument("--workers", type=int, default=int(os.environ.get("LAC_MAX_WORKERS", "1")),
+                               help="Number of concurrent workers for volume downloading (default 1).")
+    volume_parser.set_defaults(func=_run_volume)
+
+    reel_parser = subparsers.add_parser("reel", help="Download a Canadiana IIIF reel by URL.")
+    reel_parser.add_argument(
+        "--url", default=os.environ.get("LAC_URL", ""),
+        help="Canadiana IIIF URL (e.g., https://heritage.canadiana.ca/view/oocihm.lac_reel_c2170).")
+    reel_parser.add_argument("--media-dir", default=MEDIA_DIR,
+                             help="Base output media directory.")
+    reel_parser.set_defaults(func=_run_reel)
+
+    args = parser.parse_args()
+    args.func(args)
 
 
 if __name__ == "__main__":
