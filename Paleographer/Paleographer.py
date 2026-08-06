@@ -321,24 +321,6 @@ def apply_defaults(target: Dict[str, Any], defaults_table: Dict[str, str]) -> No
             target[key] = value
 
 
-# ==========================================
-# SCRIP DATA CLEANING & REPAIR
-# ==========================================
-MONTHS_REGEX = (
-    r'(?:january|february|march|april|may|june|july|august|september|october|november|december|'
-    r'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)'
-)
-DATE_PATTERN = re.compile(
-    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+'
-    rf'\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
-    rf'\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
-    rf'{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)|(?:17\d\d|18\d\d|19\d\d)(?:/(?:17\d\d|18\d\d|19\d\d))?)\b',
-    re.I)
-NARRATIVE_JUNK_REGEX = re.compile(
-    r'\b(?:settler|settled|grandchild|descendant|resided|surviving|heir|entitled|deceased|father|mother|daughter|son|'
-    r'brother|sister|wife|husband|married|leaving|claim|who\b|born\b|died\b)\b',
-    re.I)
-
 _MOJIBAKE_MAP = {
     'ã©': 'é', 'ã¨': 'è', 'ãª': 'ê', 'ã«': 'ë', 'ã ': 'à', 'ã¢': 'â',
     'ã®': 'î', 'ã¯': 'ï', 'ã´': 'ô', 'ã¹': 'ù', 'ã»': 'û', 'ã§': 'ç',
@@ -376,65 +358,6 @@ def fix_mojibake(text: str) -> str:
         if bad in fixed:
             fixed = fixed.replace(bad, good)
     return fixed
-
-
-def clean_race(val: Any) -> str:
-    if val is None:
-        return ""
-    text = str(val).strip()
-    if not text:
-        return ""
-    cleaned = re.sub(r'^(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\s*(?:and|&)?\s*', '', text, flags=re.I)
-    cleaned = re.sub(
-        r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$',
-        '', cleaned, flags=re.I)
-    cleaned = re.sub(r'[,;&\s]+$', '', cleaned).strip()
-    cleaned = re.sub(r'^[,;&\s]+', '', cleaned).strip()
-    if cleaned.lower() in ("deponent", "the deponent", "mother", "father", "wife", "husband", "widow", "as heir", ""):
-        return ""
-    if re.match(r'^(?:who|heir|file ref|was entitled|her brother)\b', cleaned, flags=re.I):
-        return ""
-    return cap_case(cleaned)
-
-
-def clean_date_and_place(raw_date: str, raw_place: str) -> Tuple[str, str]:
-    def strip_prefixes(s: str) -> str:
-        if not s:
-            return ""
-        t = str(s).strip()
-        t = re.sub(r'^(?:born|died|married|address)\s*,\s*', '', t, flags=re.I)
-        t = re.sub(r'^(?:born|died|married|address)\s+', '', t, flags=re.I)
-        t = re.sub(r'^(?:who\s+died|who\s+was\s+born|mother\s+married|father\s+married)\s*', '', t, flags=re.I)
-        return re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', t).strip()
-
-    d_clean = strip_prefixes(raw_date)
-    p_clean = strip_prefixes(raw_place)
-    found_date, candidate_place = "", ""
-    d_match = DATE_PATTERN.search(d_clean)
-    p_match = DATE_PATTERN.search(p_clean)
-
-    if d_match:
-        found_date = d_match.group(0).strip()
-        d_rem = (d_clean[:d_match.start()] + " " + d_clean[d_match.end():]).strip()
-        d_rem = re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', d_rem).strip()
-        if d_rem and not NARRATIVE_JUNK_REGEX.search(d_rem):
-            candidate_place = d_rem
-    elif d_clean and not NARRATIVE_JUNK_REGEX.search(d_clean):
-        candidate_place = d_clean
-
-    if p_match:
-        if not found_date:
-            found_date = p_match.group(0).strip()
-        p_rem = (p_clean[:p_match.start()] + " " + p_clean[p_match.end():]).strip()
-        p_rem = re.sub(r'^[,\s\-:]+|[,\s\-:]+$', '', p_rem).strip()
-        p_rem = re.sub(r'\s*\bor\s*$', '', p_rem, flags=re.I).strip()
-        if p_rem and not candidate_place and not NARRATIVE_JUNK_REGEX.search(p_rem):
-            candidate_place = p_rem
-    elif p_clean and not candidate_place and not NARRATIVE_JUNK_REGEX.search(p_clean):
-        candidate_place = p_clean
-
-    candidate_place = re.sub(r'\s*\bor\s*$', '', candidate_place, flags=re.I).strip()
-    return found_date, cap_case(candidate_place)
 
 
 COMPOUND_SURNAME_PREFIXES_2 = {
