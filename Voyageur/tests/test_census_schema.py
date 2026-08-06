@@ -13,6 +13,32 @@ def _page(people, **overrides):
     return page
 
 
+def test_validate_against_commissioner_accepts_valid_normalized_output(capsys):
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Relationship to Head": "Head", "Family Number": "5"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    census_schema.validate_against_commissioner(doc, "1900 US Census")
+
+    captured = capsys.readouterr()
+    assert "[WARN]" not in captured.out
+
+
+def test_validate_against_commissioner_logs_and_does_not_raise_on_bad_shape(capsys):
+    bad_doc = {"collection_title": "Bad Collection", "sheets": [{"records": "not-a-list"}]}
+
+    census_schema.validate_against_commissioner(bad_doc, "Bad Collection")
+
+    captured = capsys.readouterr()
+    assert "[WARN]" in captured.out
+    assert "Bad Collection" in captured.out
+
+
 def test_relationship_era_groups_household_and_maps_role_name():
     raw = {
         "census_year": "1900",

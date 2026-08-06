@@ -19,10 +19,19 @@ reference, nothing else), each row is its own single-participant record - there 
 other household member data to group.
 """
 import re
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 from titlecase import titlecase
 import yaml
+
+# Commissioner lives in a sibling tool folder, not an installed package - add the repo
+# root to sys.path so it can be imported by absolute path, matching Paleographer.py's own
+# precedent for cross-package imports (Paleographer/Paleographer.py:47-53).
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from Commissioner.record_registry import parse_collection  # noqa: E402
 
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
@@ -270,3 +279,15 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
         "citation": citation,
         "sheets": sheets,
     }
+
+
+def validate_against_commissioner(normalized: dict, collection_title: str) -> None:
+    """Runs a normalize_census_pages() result through Commissioner's schema validation as
+    a visibility check, never a gate: a failure is logged and swallowed here so a
+    Commissioner-side gap can never block a real gather or corrupt its output. This is
+    Commissioner validation's first production call site - see the sub-project 2 design
+    spec (docs/superpowers/specs/2026-08-06-census-commissioner-wiring-design.md)."""
+    try:
+        parse_collection(normalized, "Census")
+    except Exception as e:
+        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")

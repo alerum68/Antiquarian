@@ -898,6 +898,7 @@ def main() -> None:
         final_data = census_schema.normalize_census_pages(
             raw_census, "familysearch_census", collection_title,
             f"Census_{raw_census.get('census_year', '')}")
+        census_schema.validate_against_commissioner(final_data, collection_title)
         clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
     else:
         print("\n[System] Converting raw scrape into the universal Gather JSON...")

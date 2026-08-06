@@ -162,6 +162,7 @@ def main() -> Path:
     collection_title = f"{census_year_raw} US Federal Census - {raw_gather.get('location', '')}".strip(" -")
     normalized = census_schema.normalize_census_pages(
         raw_gather, "ancestry_census", collection_title, f"Census_{census_year_raw}")
+    census_schema.validate_against_commissioner(normalized, collection_title)
     with open(final_json, "w", encoding="utf-8") as f:
         json.dump(normalized, f, indent=2, ensure_ascii=False)
 
