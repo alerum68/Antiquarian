@@ -26,8 +26,8 @@ def _record(participants, family_number=None, ed="12", roll="T624_1"):
     if family_number:
         ts["family_number"] = family_number
     return {"record_id": None, "page": "3", "record_number": family_number or "", "event_type": "Census (family)",
-            "year": "1900", "event_date": "", "event_place": "", "english_translation": "",
-            "original_transcription": "", "review": False, "review_reason": None,
+            "year": "1900", "event_date": "", "event_place": "", "citation_details": "",
+            "citation_text": "", "review": False, "review_reason": None,
             "continues_on_next_image": False, "continues_from_previous_image": False,
             "type_specific_fields": ts, "participants": participants}
 

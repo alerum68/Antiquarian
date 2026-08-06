@@ -2640,13 +2640,11 @@ def generate_fam_uid(rec: dict, vol: str) -> str:
 # ==========================================
 def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_uid: str,
                           proof_status: str, target_software: str, document_type: Optional[str] = None,
-                          page: Optional[str] = None, original_transcription: Optional[str] = None,
-                          english_translation: Optional[str] = None,
-                          citation_text: Optional[str] = None,
+                          page: Optional[str] = None, citation_text: Optional[str] = None,
                           citation_details: Optional[str] = None) -> str:
     """One SOUR citation block. build_general_citation calls this once per source
     document (or once, from rec's own top-level fields, when there's only one) - see
-    that function for why. page/original_transcription/english_translation, when given,
+    that function for why. page/citation_text/citation_details, when given,
     override rec's own top-level fields (a specific source_documents entry's own text);
     None falls back to rec's top-level fields, preserving the single-document path
     exactly as it always worked."""
@@ -2731,16 +2729,8 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
                 block.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
     block.append("3 DATA")
 
-    raw_orig = citation_text if citation_text is not None else (
-        original_transcription if original_transcription is not None else (
-            rec.get('citation_text') or rec.get('original_transcription')
-        )
-    )
-    raw_trans = citation_details if citation_details is not None else (
-        english_translation if english_translation is not None else (
-            rec.get('citation_details') or rec.get('english_translation')
-        )
-    )
+    raw_orig = citation_text if citation_text is not None else rec.get('citation_text')
+    raw_trans = citation_details if citation_details is not None else rec.get('citation_details')
 
     if is_scrip:
         orig_val = clean_val(raw_orig)
@@ -2843,8 +2833,6 @@ def build_general_citation(rec: dict, part: dict, tag_name: str, vol: str, media
         blocks.append(_build_citation_block(
             rec, part, tag_name, vol, doc_media_uid, proof_status, target_software,
             document_type=doc.get('document_type'), page=doc.get('page'),
-            original_transcription=doc.get('original_transcription'),
-            english_translation=doc.get('english_translation'),
             citation_text=doc.get('citation_text'),
             citation_details=doc.get('citation_details'),
         ))

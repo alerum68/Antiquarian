@@ -102,7 +102,7 @@ def test_build_general_citation_page_line_uses_claim_affdt_when_present():
     the claim's own real reference numbers instead when known."""
     rec = {"page": "3", "record_id": "EVEN-1964", "year": "1901",
            "type_specific_fields": {"claim_number": "1964", "affidavit_number": "850"},
-           "original_transcription": "text", "english_translation": "text"}
+           "citation_text": "text", "citation_details": "text"}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
     assert "3 PAGE Claim 1964; Affdt 850, Page 3" in blocks[0]
@@ -111,7 +111,7 @@ def test_build_general_citation_page_line_uses_claim_affdt_when_present():
 
 def test_build_general_citation_page_line_falls_back_without_claim_affdt():
     rec = {"page": "3", "record_id": "B-1", "year": "1876",
-           "original_transcription": "text", "english_translation": "text"}
+           "citation_text": "text", "citation_details": "text"}
     part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
     assert "3 PAGE Page 3, Record B-1" in blocks[0]
@@ -122,7 +122,7 @@ def test_build_general_citation_single_block_without_source_documents():
     (everything except Parish/Scrip claims that went through the merge step) must get
     exactly the same single-block behavior as before."""
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "orig text", "english_translation": "eng text"}
+           "citation_text": "orig text", "citation_details": "eng text"}
     part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
     assert isinstance(blocks, list)
@@ -133,12 +133,12 @@ def test_build_general_citation_single_block_without_source_documents():
 
 def test_build_general_citation_collapses_identical_original_and_translation():
     """Per the user: most Scrip affidavits are already in English, so
-    original_transcription and english_translation end up identical - showing both the
+    citation_text and citation_details end up identical - showing both the
     "English Translation:"/"Original Transcription:" headers in that case just duplicates
     the same text twice. Only one plain text block, no header labels, when they match."""
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "I, Roger Letendre, do solemnly swear...",
-           "english_translation": "I, Roger Letendre, do solemnly swear..."}
+           "citation_text": "I, Roger Letendre, do solemnly swear...",
+           "citation_details": "I, Roger Letendre, do solemnly swear..."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
@@ -154,8 +154,8 @@ def test_build_general_citation_normalization_is_whitespace_only_not_fuzzy():
     not just reflow - must NOT collapse, proving the normalization added for whitespace
     reflow doesn't also hide a real mismatch via fuzzy/reordering matching."""
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "1964\nForm A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.",
-           "english_translation": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. 1964"}
+           "citation_text": "1964\nForm A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.",
+           "citation_details": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. 1964"}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
@@ -168,8 +168,8 @@ def test_build_general_citation_collapses_whitespace_only_reflow():
     """The actual confirmed-live case: same words, same order, only newlines vs. spaces
     differ - this one must collapse."""
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "Form A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.\nBefore me.",
-           "english_translation": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. Before me."}
+           "citation_text": "Form A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.\nBefore me.",
+           "citation_details": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. Before me."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
@@ -181,7 +181,7 @@ def test_build_general_citation_collapses_whitespace_only_reflow():
 
 def test_build_general_citation_collapses_when_only_one_side_populated():
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "", "english_translation": "Only a translation exists here."}
+           "citation_text": "", "citation_details": "Only a translation exists here."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
@@ -195,8 +195,8 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
     """The other direction: a real French-original document with a distinct English
     translation must keep both labeled sections - nothing to collapse there."""
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
-           "original_transcription": "Je soussigné jure solennellement...",
-           "english_translation": "I, the undersigned, do solemnly swear..."}
+           "citation_text": "Je soussigné jure solennellement...",
+           "citation_details": "I, the undersigned, do solemnly swear..."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
@@ -211,9 +211,9 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
 def test_build_general_citation_one_block_per_source_document():
     rec = {"page": "1", "record_id": "SCRIP-5473", "year": "1880", "source_documents": [
         {"document_type": "Witness Affidavit", "page": "page_001",
-         "original_transcription": "witness orig", "english_translation": "witness eng"},
+         "citation_text": "witness orig", "citation_details": "witness eng"},
         {"document_type": "Claimant's Own Affidavit", "page": "page_002",
-         "original_transcription": "claimant orig", "english_translation": "claimant eng"},
+         "citation_text": "claimant orig", "citation_details": "claimant eng"},
     ]}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
     blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
@@ -963,8 +963,8 @@ def test_build_general_citation_scrip_emits_commissioners_review_note():
     try:
         rec = {
             "page": "1", "record_id": "SCRIP-5473", "year": "1885",
-            "original_transcription": "Verbatim French / English affidavit text...",
-            "english_translation": "Commissioner's Review: Roger Letendre claims as Half-breed head of family.",
+            "citation_text": "Verbatim French / English affidavit text...",
+            "citation_details": "Commissioner's Review: Roger Letendre claims as Half-breed head of family.",
             "type_specific_fields": {"claim_number": "5473"}
         }
         part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
