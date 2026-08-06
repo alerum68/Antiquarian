@@ -8,9 +8,11 @@ piece of type-specific vocabulary (event types, roles, defaults, schema
 extensions), comes entirely from a single .pmt file in prompts/; this
 script never changes when a new record type is added.
 
-This file is self-contained: postprocess.py, engine.py, and agy_engine.py
-are all folded in directly below so no sibling-file imports are required at
-runtime. The original subfiles are kept in place for test-suite compatibility.
+This file is self-contained: engine.py and agy_engine.py are folded in
+directly below so no sibling-file imports are required at runtime (kept in
+place for test-suite compatibility). postprocess.py has been fully
+absorbed and deleted - see Commissioner/normalization.py for the shared
+normalization logic it used to hold.
 """
 
 import copy
