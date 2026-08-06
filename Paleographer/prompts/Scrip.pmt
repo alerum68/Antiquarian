@@ -9,6 +9,7 @@ roles:
   "7": {name: "Witness", semantic: witness, context: "A sworn witness attesting to the claimant's identity, residence, or birth."}
   "8": {name: "Commissioner", semantic: commissioner, context: "The Dominion Lands agent or presiding commissioner administering oaths or issuing certificates."}
   "0": {name: "Other", context: "Any other named person (e.g., previous landholder, attorney, interpreter, or relative)."}
+role_validation: closed
 defaults:
   record:
     event_type: "Scrip"

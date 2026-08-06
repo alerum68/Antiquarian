@@ -10,6 +10,7 @@ roles:
   "8": {name: "Godmother/Witness 2"}
   "9": {name: "Officiant"}
   "0": {name: "Other"}
+role_validation: closed
 defaults:
   record:
     event_place: "${DEFAULT_EVENT_LOCATION}"

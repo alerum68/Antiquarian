@@ -93,13 +93,18 @@ def test_census_participant_extra_fields_validate():
     assert extra.pid == "MXHY-ABC"
 
 
-def test_census_roles_cover_standard_household_relationships():
+def test_census_roles_are_restricted_to_family_relationships():
     roles = get_valid_roles("Census")
-    assert "Head" in roles
-    assert "Wife" in roles
-    assert "Son" in roles
-    assert "Boarder" in roles
-    assert "Coordinator" not in roles
+    assert roles == {
+        "Head", "Wife", "Husband", "Son", "Daughter",
+        "Father", "Mother", "Father-In-Law", "Mother-In-Law",
+    }
+
+
+def test_census_role_validation_is_open():
+    validate_role_name("Census", "Boarder")
+    validate_role_name("Census", "Roomer")
+    validate_role_name("Census", "Coordinator")
 
 
 def test_validate_role_name_accepts_known_role():
@@ -470,8 +475,8 @@ def test_parse_collection_validates_census_payload_end_to_end():
     assert participants[2].role_name == "Son"
 
 
-def test_parse_collection_rejects_invalid_role_for_census():
-    bad_payload = {
+def test_parse_collection_accepts_any_role_for_census():
+    payload = {
         **SAMPLE_CENSUS_PAYLOAD,
         "sheets": [
             {
@@ -482,7 +487,7 @@ def test_parse_collection_rejects_invalid_role_for_census():
                         "participants": [
                             {
                                 **SAMPLE_CENSUS_PAYLOAD["sheets"][0]["records"][0]["participants"][0],
-                                "role_name": "Coordinator",
+                                "role_name": "Boarder",
                             }
                         ],
                     }
@@ -490,5 +495,34 @@ def test_parse_collection_rejects_invalid_role_for_census():
             }
         ],
     }
-    with pytest.raises(InvalidRoleError, match="Coordinator"):
-        parse_collection(bad_payload, document_type="Census")
+    collection = parse_collection(payload, document_type="Census")
+    assert collection.sheets[0].records[0].participants[0].role_name == "Boarder"
+
+
+def test_parse_collection_validates_census_unmapped_dict_field():
+    payload = {
+        **SAMPLE_CENSUS_PAYLOAD,
+        "sheets": [
+            {
+                **SAMPLE_CENSUS_PAYLOAD["sheets"][0],
+                "records": [
+                    {
+                        **SAMPLE_CENSUS_PAYLOAD["sheets"][0]["records"][0],
+                        "participants": [
+                            {
+                                **SAMPLE_CENSUS_PAYLOAD["sheets"][0]["records"][0]["participants"][0],
+                                "type_specific_fields": {
+                                    "line_number": "17",
+                                    "pid": "MXHY-ABC",
+                                    "unmapped": {"Race": "W", "Column_9": "Yes"},
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    collection = parse_collection(payload, document_type="Census")
+    participant = collection.sheets[0].records[0].participants[0]
+    assert participant.type_specific_fields["unmapped"] == {"Race": "W", "Column_9": "Yes"}

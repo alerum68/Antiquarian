@@ -9,17 +9,7 @@ roles:
   "7": {name: "Mother", semantic: mother}
   "8": {name: "Father-In-Law", semantic: father_in_law}
   "9": {name: "Mother-In-Law", semantic: mother_in_law}
-  "10": {name: "Brother"}
-  "11": {name: "Sister"}
-  "12": {name: "Grandson"}
-  "13": {name: "Granddaughter"}
-  "14": {name: "Nephew"}
-  "15": {name: "Niece"}
-  "16": {name: "Cousin"}
-  "17": {name: "Boarder"}
-  "18": {name: "Servant"}
-  "19": {name: "Lodger"}
-  "0": {name: "Other", context: "Any household member whose relationship to the head doesn't match one of the above (e.g. partner, employee, ward, inmate of an institutional dwelling)."}
+role_validation: open
 defaults:
   record:
     event_type: "Census (family)"
@@ -41,6 +31,7 @@ extra_fields:
     - {name: fsftid, type: string}
     - {name: person_ark, type: string}
     - {name: familysearch_url, type: string}
+    - {name: unmapped, type: dict}
 ---
 
 You are an expert genealogist specializing in historical census enumeration
@@ -70,9 +61,13 @@ READING THE IMAGE:
   the image's column headers for this schedule/year; column meaning varies by
   census year, so infer the year and schedule type from the image itself, not
   from an assumption.
-- Relationship to head: use the role vocabulary declared above. If the image
-  shows a relationship term not on that list, use "Other" and record the literal
-  term in that participant's type_specific_fields so a human can review it.
+- Relationship to head: if the image shows one of the family relationships
+  declared above (Head, Wife, Husband, Son, Daughter, Father, Mother,
+  Father-In-Law, Mother-In-Law), use that exact term. For any other household
+  relationship the image shows (Boarder, Servant, Roomer, Lodger, Grandson,
+  Aunt, Cousin, or anything else) record the term exactly as it appears on the
+  image - it is not restricted to a fixed list, and is used for association
+  only, not family-tree linking.
 
 CITATION FIELDS:
 citation_text and citation_details describe what's on the image (enumeration
