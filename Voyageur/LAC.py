@@ -43,17 +43,6 @@ COOKIE_FILE = _safe_path(PROGRAM_DIR, os.environ.get("LAC_COOKIE_FILE", "Working
 DEFAULT_ARCHIVAL_NUMBER = os.environ.get("LAC_ARCHIVAL_NUMBER", "RG15")
 CDP_PORT = int(os.environ.get("LAC_CDP_PORT", str(lac_client.DEFAULT_CDP_PORT)))
 
-_PID_FROM_FILENAME_RE = re.compile(r"_(\d+)\.pdf$", re.IGNORECASE)
-
-
-def resolve_pid_from_filename(file_name: str) -> Optional[str]:
-    """Returns the PID embedded in a locally-chosen filename (e.g. BAC-LAC_fonandcol_1502188.pdf),
-    or None if the filename doesn't follow that convention."""
-    if not file_name:
-        return None
-    match = _PID_FROM_FILENAME_RE.search(file_name)
-    return match.group(1) if match else None
-
 
 def load_cookies(cookie_file: str = COOKIE_FILE, cdp_port: int = CDP_PORT) -> Dict[str, str]:
     """Loads search cookies from a debuggable browser or a cookie file."""
@@ -74,14 +63,6 @@ def load_cookies(cookie_file: str = COOKIE_FILE, cdp_port: int = CDP_PORT) -> Di
 # ==========================================
 # CANADIANA IIIF MANIFEST & DOWNLOAD
 # ==========================================
-def get_env_paths() -> Tuple[str, str, str]:
-    """Reads the necessary foundational directories mapped by the Toolbox."""
-    program_dir = os.environ.get("PROGRAM_DIR", "").strip()
-    media_dir = os.environ.get("MEDIA_DIR", "Media").strip()
-    raw_url = os.environ.get("LAC_URL", "").strip()
-    return program_dir, media_dir, raw_url
-
-
 def parse_url(raw_url: str) -> Tuple[str, str]:
     """Sanitizes the user's pasted URL into a proper IIIF manifest API call."""
     print(f"[Info] Target URL: {raw_url}")
