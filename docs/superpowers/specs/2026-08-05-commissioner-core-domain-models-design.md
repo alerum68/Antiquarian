@@ -20,10 +20,14 @@ scaffold (`Commissioner/.env`, empty `Commissioner/tests/`) as part of this work
 - Strongly-typed models (Pydantic) for the ingestion shape every AI-transcription
   pipeline (Paleographer/Voyageur) already produces: a `Collection` of `Sheet`s, each
   with `Record`s, each with `Participant`s, each carrying `Fact`s.
-- A registry that reads `FactTypes.json` (the ~60 GEDCOM fact types: Birth, Death,
-  Marriage, Occupation, etc.) once, so any fact a person/family carries can be
-  validated and, later, rendered generically instead of via a hardcoded per-type
-  branch.
+- The fact vocabulary itself (the ~60 GEDCOM fact types: Birth, Death, Marriage,
+  Occupation, etc. — currently `FactTypes.json`) defined directly in `models.py` as
+  real Python data, not loaded from a file at runtime. Any fact a person/family
+  carries validates against this data immediately, and it's what a later emission
+  layer would iterate over to render facts generically instead of via a hardcoded
+  per-type branch. This is the same "one authored source, no drift" treatment
+  already applied to the record/participant schema below — applied consistently
+  this time, so this package doesn't need revisiting once the next stage begins.
 - A registry that reads every `.pmt` file in `Paleographer/prompts/` (currently
   `Parish.pmt` and `Scrip.pmt`) and builds, per document type:
   - its extra fields (e.g. Scrip's `claim_number`, `scrip_amount`...) as real typed
@@ -38,11 +42,17 @@ scaffold (`Commissioner/.env`, empty `Commissioner/tests/`) as part of this work
 ## Non-goals (explicitly out of scope for this pilot)
 
 - Not touching the Census pipeline, `Archivist.py`, or any other legacy code.
-- Not wiring `Commissioner` into Paleographer's actual ingestion calls yet.
-- Not retiring `Paleographer/schema.json` yet — Paleographer keeps using it exactly
-  as it does today. (Longer-term, once Paleographer adopts `Commissioner`,
-  `schema.json` could be generated on the fly from the Pydantic models instead of
-  hand-maintained — but that's a later phase, not this one.)
+- Not wiring `Commissioner` into Paleographer's/Voyageur's actual ingestion calls yet.
+- Not deleting or overwriting the physical `Paleographer/schema.json` or `FactTypes.json`
+  files yet. Both are still read directly, right now, by live legacy code —
+  `schema.json` by Paleographer's LLM calls, and `FactTypes.json` by five separate
+  call sites across `Archivist.py`, `Paleographer.py`, `engine.py`, `Voyageur.py`,
+  and `FS.py`. Commissioner treats both as data it *authors* (in `models.py`) rather
+  than data it *loads*, and each gets a guardrail test proving the authored version
+  matches the file those legacy modules still depend on. That symmetry is
+  deliberate: when the next stage migrates those modules onto `Commissioner`, the
+  physical files can be retired using the export helpers already built here —
+  without needing to touch this package again.
 - Not building the emission/GEDCOM-writing side. This pilot builds the typed data and
   proves it can be validated; using it to write output is future work.
 
@@ -50,8 +60,11 @@ scaffold (`Commissioner/.env`, empty `Commissioner/tests/`) as part of this work
 
 ```
 Commissioner/
-    models.py           # Collection, Sheet, Record, Participant, Fact (Pydantic)
-    fact_registry.py     # loads FactTypes.json -> FactDefinition lookup
+    models.py           # Collection, Sheet, Record, Participant, Fact,
+                          # FactDefinition, and the FACT_DEFINITIONS vocabulary itself
+    fact_registry.py     # lookup helpers + JSON-export over models.FACT_DEFINITIONS
+                          # (no file I/O for validation - export is for the guardrail
+                          # test and for the next stage's eventual migration)
     record_registry.py   # scans Paleographer/prompts/*.pmt -> per-doc-type models + role lists
     __init__.py           # public API
     tests/
@@ -74,10 +87,24 @@ on disk. If someone changes `models.py` in a way that no longer matches what
 Paleographer expects, this test fails loudly, immediately — not months later as a
 mystery bug.
 
-**`fact_registry.py`** loads `FactTypes.json` once and builds a lookup of fact name
--> its rendering rule (GEDCOM tag, whether it uses a value/date/place, whether it's a
-person-level or family-level fact). Any `Fact.fact_type` gets checked against this
-list; an unrecognized name is rejected immediately, naming the bad value.
+**The fact vocabulary lives directly in `models.py`** as a `FACT_DEFINITIONS` list of
+`FactDefinition` entries (name, GEDCOM tag, whether it uses a value/date/place,
+person-vs-family scope, custom flag, code) — a straight Python transcription of what
+`FactTypes.json` holds today. Any `Fact.fact_type` is checked against this list
+directly, in-process, with no file read involved; an unrecognized name is rejected
+immediately, naming the bad value. Adding a new fact type in the future (rare,
+compared to how often new `.pmt` document types get authored) means adding an entry
+to this list — normal maintenance, not a package refactor.
+
+**`fact_registry.py`** is a thin layer on top of `models.FACT_DEFINITIONS`: lookup
+helpers (`get_fact_definition(name)`, `is_family_fact(name)`, etc.) for whatever
+later consumes this data, plus one export function,
+`export_fact_types_json() -> dict`, that reproduces `FactTypes.json`'s exact shape
+from `FACT_DEFINITIONS`. That export function exists for two reasons right now: the
+guardrail test below, and so the next stage (migrating `Archivist`/`Paleographer`/
+`Voyageur` off their own five independent file-loaders) has a ready-made way to
+regenerate or retire the physical file without writing new code in `Commissioner`
+at that point.
 
 **`record_registry.py`** scans every `.pmt` file once and, per document type
 (`Parish`, `Scrip`, and whatever gets added later), builds two things from that
@@ -124,7 +151,7 @@ guessing.
 Every failure case below raises immediately and names the specific problem, rather
 than silently coercing, dropping data, or failing somewhere else downstream:
 
-- Unknown `fact_type` (not in `FactTypes.json`)
+- Unknown `fact_type` (not in `models.FACT_DEFINITIONS`)
 - Unknown `document_type` (no matching `.pmt`)
 - Unknown `type:` token in a `.pmt`'s extra fields (outside string/int/float/bool/
   date/enum) — caught when `Commissioner` loads, before any data flows through it
@@ -140,22 +167,30 @@ Not an error: a document type with no extra fields at all (Parish today).
 Tested against the real files (`FactTypes.json`, `Parish.pmt`, `Scrip.pmt`), not
 mocks, matching how `Archivist/tests` is already written:
 
-- `fact_registry`: known fact names resolve correctly, person/family scope is
-  respected, an unknown name raises.
+- `models.FACT_DEFINITIONS` / `fact_registry`: known fact names resolve correctly,
+  person/family scope is respected, an unknown name raises.
 - `record_registry`: Parish yields empty extra-field models; Scrip yields exactly
   its (updated) record/participant fields with correct types, including the new
   `scrip_type` enum; an unsupported type token in a test fixture `.pmt` raises at
   load time; an invalid role name for a given document type raises.
 - A round-trip test: a small, realistic Scrip-shaped payload parses into a fully
   typed object graph with correct values.
-- The `models.py` <-> `schema.json` guardrail test described above.
+- Guardrail: `Collection.model_json_schema()` matches the real
+  `Paleographer/schema.json` on disk today.
+- Guardrail: `fact_registry.export_fact_types_json()` matches the real
+  `FactTypes.json` on disk today.
 - Negative tests for every error case listed above.
 
 ## What comes after this pilot (not part of it)
 
 - Wiring `Commissioner` into Paleographer/Voyageur's actual ingestion path.
-- Using `fact_registry` to drive generic GEDCOM emission (no more per-fact-type
-  branches).
+- Using `models.FACT_DEFINITIONS` to drive generic GEDCOM emission (no more
+  per-fact-type branches).
+- Migrating `Archivist.py`, `Paleographer.py`, `engine.py`, `Voyageur.py`, and
+  `FS.py` off their own independent `FactTypes.json` file-loaders onto
+  `Commissioner`'s data, then retiring the physical `FactTypes.json` file (or
+  regenerating it from `fact_registry.export_fact_types_json()` for any consumer
+  not yet migrated) — the export helper already exists, built in this pilot.
 - Retiring `schema.json` as a hand-maintained file once Paleographer no longer needs
   it maintained separately from `models.py`.
 - Migrating the Census pipeline (`Archivist.py`'s `build_census_dataframe_from_unified`
