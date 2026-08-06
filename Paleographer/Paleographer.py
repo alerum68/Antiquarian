@@ -36,7 +36,6 @@ from google import genai
 # noinspection unresolved-references
 from google.genai import types
 from PIL import Image
-from titlecase import titlecase
 
 # The Toolbox's own subprocess launcher sets PYTHONIOENCODING=utf-8, but this script also
 # supports being run directly from the command line (its debug mode), where stdout would
