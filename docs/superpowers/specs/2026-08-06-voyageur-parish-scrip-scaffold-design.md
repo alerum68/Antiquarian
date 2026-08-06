@@ -62,8 +62,8 @@ to its source image for a later, user-triggered AI-fill pass."
 ## Non-goals (explicitly out of scope for this sub-project)
 
 - No change to `Voyageur/A.py`. It has no Parish/Scrip path today (Census/
-  Ancestry only) — adding one is a separate, future concern if Ancestry ever
-  becomes a Parish/Scrip source.
+  Ancestry only) — adding one is a separate, future concern, tracked as
+  Sub-project 7 (see "What comes after this sub-project").
 - No change to `FS.py`'s Census-only `build_census_json` path — Census is
   already fully wired per Sub-project 2.
 - No rework of Paleographer's actual extraction/prompt logic to treat a
@@ -259,5 +259,11 @@ introduced.
   Paleographer boundaries — hard-fail/blocking mode decision.
 - Sub-project 6: cross-script invocation (Paleographer/Voyageur calling into
   each other's real functions).
+- Sub-project 7: `Voyageur/A.py` gains a Parish/Scrip gather path (it is
+  Census/Ancestry-URL-only today), following whatever pattern this
+  sub-project establishes for `FS.py`/`LAC.py` — image-reference scaffold
+  writes into the type-resolved `MASTER_DB`, non-blocking Commissioner
+  validation. Not scoped further here since Ancestry has no current
+  Parish/Scrip source to gather from.
 - Census family-linking (`role_name` → `role_semantic` derivation for
   Voyageur-sourced data) — still unscoped, not part of this sub-project.
