@@ -19,6 +19,7 @@ extra_fields:
     - {name: allotment_number, type: string}
     - {name: scrip_number, type: string}
     - {name: scrip_amount, type: string}
+    - {name: scrip_type, type: enum, choices: [Cash, Land]}
     - {name: claim_basis, type: string}
     - {name: application_date, type: string}
     - {name: issue_date, type: string}
@@ -177,7 +178,8 @@ SCRIP-SPECIFIC FIELDS:
 - allotment_number: The specific allotment or parcel number on schedules and registers (e.g. "142").
 - scrip_number: The certificate, scrip note, or coupon number issued (e.g. "12761", "A-456").
 - affidavit_number: The specific sworn declaration number (e.g. "5473", "Affdt. N° 5473").
-- scrip_amount: The value of scrip or land granted (e.g. "$160", "$240", "240 acres").
+- scrip_amount: The numeric value of scrip or land granted (e.g. "160", "240").
+- scrip_type: Whether the grant was "Cash" or "Land" - choose exactly one.
 - claim_basis: The stated qualification for scrip (e.g. "Half-breed Head of Family", "Half-breed Child",
   "Original White Settler", "Heir to Deceased Child").
 - application_date: The date the initial application or declaration was submitted.

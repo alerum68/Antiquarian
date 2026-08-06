@@ -73,3 +73,100 @@ def test_validate_role_name_accepts_known_role():
 def test_validate_role_name_rejects_unknown_role():
     with pytest.raises(InvalidRoleError, match="Coordinator"):
         validate_role_name("Scrip", "Coordinator")
+
+
+import pytest
+from pydantic import ValidationError
+
+from Commissioner.record_registry import InvalidRoleError, parse_collection
+
+
+SAMPLE_SCRIP_PAYLOAD = {
+    "collection_title": "Test Scrip Collection",
+    "sheets": [
+        {
+            "page_id": "page_001",
+            "document_metadata": {"source_location": "Manitoba"},
+            "records": [
+                {
+                    "page": "page_001",
+                    "record_number": "5473-0-0",
+                    "event_type": "Scrip",
+                    "review": False,
+                    "continues_on_next_image": False,
+                    "continues_from_previous_image": False,
+                    "type_specific_fields": {
+                        "claim_number": "5473",
+                        "scrip_amount": "160",
+                        "scrip_type": "Cash",
+                    },
+                    "participants": [
+                        {
+                            "role_name": "Claimant",
+                            "std_given": "Jean",
+                            "std_surname": "Gagnon",
+                            "is_priest": False,
+                            "sex": "M",
+                            "review": False,
+                            "type_specific_fields": {
+                                "marital_status": "Married",
+                                "race_or_origin": "Metis",
+                            },
+                        }
+                    ],
+                }
+            ],
+        }
+    ],
+}
+
+
+def test_parse_collection_validates_scrip_payload_end_to_end():
+    collection = parse_collection(SAMPLE_SCRIP_PAYLOAD, document_type="Scrip")
+    record = collection.sheets[0].records[0]
+    assert record.type_specific_fields["scrip_type"] == "Cash"
+    participant = record.participants[0]
+    assert participant.type_specific_fields["race_or_origin"] == "Metis"
+
+
+def test_parse_collection_rejects_bad_extra_field_type():
+    bad_payload = {
+        **SAMPLE_SCRIP_PAYLOAD,
+        "sheets": [
+            {
+                **SAMPLE_SCRIP_PAYLOAD["sheets"][0],
+                "records": [
+                    {
+                        **SAMPLE_SCRIP_PAYLOAD["sheets"][0]["records"][0],
+                        "type_specific_fields": {"scrip_type": "Currency"},
+                    }
+                ],
+            }
+        ],
+    }
+    with pytest.raises(ValidationError, match="Land"):
+        parse_collection(bad_payload, document_type="Scrip")
+
+
+def test_parse_collection_rejects_invalid_role_for_document_type():
+    bad_payload = {
+        **SAMPLE_SCRIP_PAYLOAD,
+        "sheets": [
+            {
+                **SAMPLE_SCRIP_PAYLOAD["sheets"][0],
+                "records": [
+                    {
+                        **SAMPLE_SCRIP_PAYLOAD["sheets"][0]["records"][0],
+                        "participants": [
+                            {
+                                **SAMPLE_SCRIP_PAYLOAD["sheets"][0]["records"][0]["participants"][0],
+                                "role_name": "Coordinator",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    with pytest.raises(InvalidRoleError, match="Coordinator"):
+        parse_collection(bad_payload, document_type="Scrip")

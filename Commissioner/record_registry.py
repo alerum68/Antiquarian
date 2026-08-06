@@ -126,3 +126,26 @@ def validate_role_name(document_type: str, role_name: Optional[str]) -> None:
             f"{role_name!r} is not a valid role for document_type {document_type!r} "
             f"(valid roles: {sorted(valid_roles)})"
         )
+
+
+from Commissioner.models import Collection
+
+
+def parse_collection(raw_json: dict, document_type: str) -> Collection:
+    _get_schema(document_type)  # raises UnknownDocumentTypeError early if unrecognized
+
+    collection = Collection.model_validate(raw_json)
+
+    for sheet in collection.sheets:
+        for record in sheet.records:
+            validated_record_extra = validate_record_extra_fields(document_type, record.type_specific_fields)
+            record.type_specific_fields = validated_record_extra.model_dump()
+
+            for participant in record.participants:
+                validated_participant_extra = validate_participant_extra_fields(
+                    document_type, participant.type_specific_fields
+                )
+                participant.type_specific_fields = validated_participant_extra.model_dump()
+                validate_role_name(document_type, participant.role_name)
+
+    return collection
