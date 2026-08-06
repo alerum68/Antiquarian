@@ -331,3 +331,104 @@ def test_parse_collection_rejects_invalid_role_for_document_type():
     }
     with pytest.raises(InvalidRoleError, match="Coordinator"):
         parse_collection(bad_payload, document_type="Scrip")
+
+
+SAMPLE_CENSUS_PAYLOAD = {
+    "collection_title": "Test 1900 Census Collection",
+    "sheets": [
+        {
+            "page_id": "12",
+            "document_metadata": {
+                "source_name": "United States Census (Population Schedule)",
+                "source_location": "Minnesota, USA",
+            },
+            "records": [
+                {
+                    "page": "12",
+                    "record_number": "4",
+                    "event_type": "Census (family)",
+                    "year": "1900",
+                    "event_place": "Township of Example, Example County, Minnesota",
+                    "citation_text": "",
+                    "citation_details": "",
+                    "review": False,
+                    "continues_on_next_image": False,
+                    "continues_from_previous_image": False,
+                    "type_specific_fields": {
+                        "family_number": "4",
+                        "enumeration_district": "0042",
+                        "state": "Minnesota",
+                        "county": "Example County",
+                    },
+                    "participants": [
+                        {
+                            "role_name": "Head",
+                            "std_given": "Baptiste",
+                            "std_surname": "Gagnon",
+                            "is_priest": False,
+                            "sex": "M",
+                            "age": "42",
+                            "review": False,
+                            "type_specific_fields": {"line_number": "17", "pid": "MXHY-ABC"},
+                        },
+                        {
+                            "role_name": "Wife",
+                            "std_given": "Marie",
+                            "std_surname": "Gagnon",
+                            "is_priest": False,
+                            "sex": "F",
+                            "age": "39",
+                            "review": False,
+                            "type_specific_fields": {"line_number": "18", "pid": "MXHY-ABD"},
+                        },
+                        {
+                            "role_name": "Son",
+                            "std_given": "Louis",
+                            "std_surname": "Gagnon",
+                            "is_priest": False,
+                            "sex": "M",
+                            "age": "12",
+                            "review": False,
+                            "type_specific_fields": {"line_number": "19", "pid": "MXHY-ABE"},
+                        },
+                    ],
+                }
+            ],
+        }
+    ],
+}
+
+
+def test_parse_collection_validates_census_payload_end_to_end():
+    collection = parse_collection(SAMPLE_CENSUS_PAYLOAD, document_type="Census")
+    record = collection.sheets[0].records[0]
+    assert record.type_specific_fields["family_number"] == "4"
+    participants = record.participants
+    assert participants[0].role_name == "Head"
+    assert participants[0].type_specific_fields["pid"] == "MXHY-ABC"
+    assert participants[1].role_name == "Wife"
+    assert participants[2].role_name == "Son"
+
+
+def test_parse_collection_rejects_invalid_role_for_census():
+    bad_payload = {
+        **SAMPLE_CENSUS_PAYLOAD,
+        "sheets": [
+            {
+                **SAMPLE_CENSUS_PAYLOAD["sheets"][0],
+                "records": [
+                    {
+                        **SAMPLE_CENSUS_PAYLOAD["sheets"][0]["records"][0],
+                        "participants": [
+                            {
+                                **SAMPLE_CENSUS_PAYLOAD["sheets"][0]["records"][0]["participants"][0],
+                                "role_name": "Coordinator",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+    with pytest.raises(InvalidRoleError, match="Coordinator"):
+        parse_collection(bad_payload, document_type="Census")
