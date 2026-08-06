@@ -27,11 +27,12 @@ import yaml
 
 # Commissioner lives in a sibling tool folder, not an installed package - add the repo
 # root to sys.path so it can be imported by absolute path, matching Paleographer.py's own
-# precedent for cross-package imports (Paleographer/Paleographer.py:47-53).
+# precedent for cross-package imports (Paleographer/Paleographer.py:47-53). The import of
+# Commissioner.record_registry itself happens inside validate_against_commissioner()'s try
+# block, not here at module scope - see that function's docstring for why.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from Commissioner.record_registry import parse_collection  # noqa: E402
 
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
@@ -286,8 +287,17 @@ def validate_against_commissioner(normalized: dict, collection_title: str) -> No
     a visibility check, never a gate: a failure is logged and swallowed here so a
     Commissioner-side gap can never block a real gather or corrupt its output. This is
     Commissioner validation's first production call site - see the sub-project 2 design
-    spec (docs/superpowers/specs/2026-08-06-census-commissioner-wiring-design.md)."""
+    spec (docs/superpowers/specs/2026-08-06-census-commissioner-wiring-design.md).
+
+    The `Commissioner.record_registry` import is deliberately made here, inside the try
+    block, rather than at module scope: importing it triggers _build_registry(), which
+    parses every .pmt file in the toolbox - a malformed or newly-incompatible .pmt file
+    would raise at import time, before this function's own try/except could ever catch
+    it. A.py/FS.py both import census_schema at their own module scope, so a module-scope
+    import here would crash their whole run on startup - a far worse failure than the
+    soft-fail this function exists to guarantee."""
     try:
+        from Commissioner.record_registry import parse_collection
         parse_collection(normalized, "Census")
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")

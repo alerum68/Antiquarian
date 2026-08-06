@@ -1,4 +1,6 @@
 """Tests for census_schema.py's field-map normalization across all three census eras."""
+import sys
+
 import census_schema
 
 
@@ -37,6 +39,23 @@ def test_validate_against_commissioner_logs_and_does_not_raise_on_bad_shape(caps
     captured = capsys.readouterr()
     assert "[WARN]" in captured.out
     assert "Bad Collection" in captured.out
+
+
+def test_validate_against_commissioner_survives_broken_commissioner_import(capsys, monkeypatch):
+    """The Commissioner.record_registry import happens inside validate_against_commissioner's
+    own try block (Fix 2), not at census_schema's module scope - so even if
+    Commissioner.record_registry itself is unimportable/broken (e.g. a malformed .pmt file
+    raising inside _build_registry() at import time), this function must still catch it
+    and warn rather than let the import propagate and crash A.py/FS.py at startup."""
+    monkeypatch.setitem(sys.modules, "Commissioner.record_registry", None)
+
+    doc = {"collection_title": "Test Collection", "sheets": []}
+
+    census_schema.validate_against_commissioner(doc, "Test Collection")
+
+    captured = capsys.readouterr()
+    assert "[WARN]" in captured.out
+    assert "Test Collection" in captured.out
 
 
 def test_relationship_era_groups_household_and_maps_role_name():

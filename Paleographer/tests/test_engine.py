@@ -68,6 +68,29 @@ def test_parse_type_config_defaults_batch_threshold(tmp_path, monkeypatch):
     assert cfg.batch_page_threshold == engine.BATCH_PAGE_THRESHOLD
 
 
+def test_parse_type_config_defaults_role_validation_to_closed(tmp_path, monkeypatch):
+    """Matches Commissioner.record_registry's own default (role_validation_mode =
+    front_matter.get("role_validation", "closed")) - a .pmt with no role_validation key
+    at all must resolve to closed, not open."""
+    _write_fact_types_fixture(tmp_path, monkeypatch)
+    pmt_path = tmp_path / "Minimal.pmt"
+    pmt_path.write_text("---\nroles: {}\n---\nSome prose.", encoding="utf-8")
+
+    cfg = engine.parse_type_config(pmt_path)
+
+    assert cfg.role_validation == "closed"
+
+
+def test_parse_type_config_reads_explicit_role_validation(tmp_path, monkeypatch):
+    _write_fact_types_fixture(tmp_path, monkeypatch)
+    pmt_path = tmp_path / "Open.pmt"
+    pmt_path.write_text("---\nroles: {}\nrole_validation: open\n---\nSome prose.", encoding="utf-8")
+
+    cfg = engine.parse_type_config(pmt_path)
+
+    assert cfg.role_validation == "open"
+
+
 def test_parse_type_config_handles_no_front_matter(tmp_path, monkeypatch):
     _write_fact_types_fixture(tmp_path, monkeypatch)
     pmt_path = tmp_path / "NoFrontMatter.pmt"
@@ -118,6 +141,51 @@ def test_build_vocabulary_summary_appends_context_when_present(tmp_path, monkeyp
     assert "Father," in summary and "Father (" not in summary
 
 
+def test_build_vocabulary_summary_closed_mode_uses_choose_exactly_one_phrasing(tmp_path, monkeypatch):
+    """Regression test for existing Parish/Scrip behavior - role_validation: closed (or
+    unset) must keep the original 'choose exactly one' phrasing unchanged."""
+    _write_fact_types_fixture(tmp_path, monkeypatch)
+    pmt_path = tmp_path / "Closed.pmt"
+    pmt_path.write_text(
+        "---\n"
+        "role_validation: closed\n"
+        "roles: {\"1\": {name: \"Primary\"}, \"2\": {name: \"Father\"}}\n"
+        "---\nPrompt body.",
+        encoding="utf-8",
+    )
+    cfg = engine.parse_type_config(pmt_path)
+
+    summary = engine.build_vocabulary_summary(cfg)
+
+    assert ("- role_name (choose exactly one per participant - where a role's own meaning\n"
+            "  depends on the event type, that's noted in parentheses): Father, Primary") in summary
+    assert "use one of these when it applies" not in summary
+
+
+def test_build_vocabulary_summary_open_mode_uses_escape_hatch_phrasing(tmp_path, monkeypatch):
+    """Census.pmt's open mode (Fix 3): the model must be told the role list isn't
+    exhaustive and that anything else is recorded verbatim as an association, never
+    coerced into one of the listed family roles."""
+    _write_fact_types_fixture(tmp_path, monkeypatch)
+    pmt_path = tmp_path / "Open.pmt"
+    pmt_path.write_text(
+        "---\n"
+        "role_validation: open\n"
+        "roles: {\"1\": {name: \"Head\"}, \"2\": {name: \"Wife\"}}\n"
+        "---\nPrompt body.",
+        encoding="utf-8",
+    )
+    cfg = engine.parse_type_config(pmt_path)
+
+    summary = engine.build_vocabulary_summary(cfg)
+
+    assert ("- role_name: use one of these when it applies - Head, Wife - and record the\n"
+            "  source's own relationship term verbatim when none of these fit (e.g. Boarder,\n"
+            "  Servant, Roomer, Grandson). Only the listed names carry a family relationship;\n"
+            "  anything else is recorded as-is and treated as an association, not a family link.") in summary
+    assert "choose exactly one per participant" not in summary
+
+
 def test_load_event_types_flattens_person_and_family_buckets(tmp_path, monkeypatch):
     _write_fact_types_fixture(tmp_path, monkeypatch)
 
@@ -155,6 +223,29 @@ def test_build_merged_schema_injects_extra_fields_without_mutating_core():
     # The original core schema must be untouched (deep copy, not aliasing).
     original_rec_props = core["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
     assert original_rec_props["type_specific_fields"]["properties"] == {}
+
+
+def test_build_merged_schema_maps_dict_field_type_to_json_schema_object():
+    """Census.pmt declares `unmapped: {type: dict}` - "dict" is not a valid JSON-Schema
+    type (the correct token is "object"), so inject() must translate it rather than pass
+    the raw front-matter token straight through (Fix 1)."""
+    core = {
+        "properties": {
+            "sheets": {"items": {"properties": {"records": {"items": {"properties": {
+                "type_specific_fields": {"type": "object", "properties": {}},
+                "participants": {"items": {"properties": {
+                    "type_specific_fields": {"type": "object", "properties": {}}
+                }}}
+            }}}}}}
+        }
+    }
+    extra_fields = {"participant": [{"name": "unmapped", "type": "dict"}]}
+
+    merged = engine.build_merged_schema(core, extra_fields)
+
+    rec_props = merged["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
+    part_props = rec_props["participants"]["items"]["properties"]
+    assert part_props["type_specific_fields"]["properties"]["unmapped"] == {"type": "object", "nullable": True}
 
 
 # ==========================================

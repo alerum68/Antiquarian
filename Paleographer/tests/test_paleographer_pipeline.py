@@ -320,6 +320,86 @@ def test_scrip_pipeline_end_to_end(tmp_path, monkeypatch):
     assert claimant["type_specific_fields"]["relationship_to_claimant"] == "Self"
 
 
+def test_build_merged_schema_maps_dict_field_type_to_json_schema_object(tmp_path, monkeypatch):
+    """Paleographer.py's own copy of build_merged_schema/inject() (duplicated from
+    engine.py) must also translate a `dict` field type to JSON-Schema's `object` - Fix 1
+    of the final-review fix brief. Uses a synthetic core schema, same as engine.py's own
+    unit test, rather than exercising the full pipeline."""
+    module, _ = _import_paleographer_fresh(
+        monkeypatch, tmp_path,
+        env_overrides={
+            "PALEOGRAPHER_RECORD_TYPE": "Parish.pmt",
+            "PARISH_NAME": "St. Test Parish", "PARISH_CITY": "Testville", "PARISH_STATE": "TS",
+            "DEFAULT_EVENT_LOCATION": "Testville, TS, USA",
+        },
+        fake_page_data=PARISH_FAKE_RESPONSE,
+    )
+
+    core = {
+        "properties": {
+            "sheets": {"items": {"properties": {"records": {"items": {"properties": {
+                "type_specific_fields": {"type": "object", "properties": {}},
+                "participants": {"items": {"properties": {
+                    "type_specific_fields": {"type": "object", "properties": {}}
+                }}}
+            }}}}}}
+        }
+    }
+    extra_fields = {"participant": [{"name": "unmapped", "type": "dict"}]}
+
+    merged = module.build_merged_schema(core, extra_fields)
+
+    rec_props = merged["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
+    part_props = rec_props["participants"]["items"]["properties"]
+    assert part_props["type_specific_fields"]["properties"]["unmapped"] == {"type": "object", "nullable": True}
+
+
+def test_build_vocabulary_summary_closed_mode_matches_parish_pmt(tmp_path, monkeypatch):
+    """Regression test for Parish.pmt's existing closed-mode phrasing - must stay
+    byte-for-byte unchanged from before Fix 3."""
+    module, _ = _import_paleographer_fresh(
+        monkeypatch, tmp_path,
+        env_overrides={
+            "PALEOGRAPHER_RECORD_TYPE": "Parish.pmt",
+            "PARISH_NAME": "St. Test Parish", "PARISH_CITY": "Testville", "PARISH_STATE": "TS",
+            "DEFAULT_EVENT_LOCATION": "Testville, TS, USA",
+        },
+        fake_page_data=PARISH_FAKE_RESPONSE,
+    )
+
+    cfg = module.parse_type_config(module.resolve_prompt_path("Parish.pmt"))
+    assert cfg.role_validation == "closed"
+
+    summary = module.build_vocabulary_summary(cfg)
+
+    assert "role_name (choose exactly one per participant - where a role's own meaning" in summary
+    assert "use one of these when it applies" not in summary
+
+
+def test_build_vocabulary_summary_open_mode_matches_census_pmt(tmp_path, monkeypatch):
+    """Census.pmt declares role_validation: open (Task 2) - Paleographer.py's own prompt
+    generator must produce the escape-hatch phrasing, not force-fit a boarder/lodger into
+    one of the 9 family roles (Fix 3, the most important finding)."""
+    module, _ = _import_paleographer_fresh(
+        monkeypatch, tmp_path,
+        env_overrides={
+            "PALEOGRAPHER_RECORD_TYPE": "Parish.pmt",
+            "PARISH_NAME": "St. Test Parish", "PARISH_CITY": "Testville", "PARISH_STATE": "TS",
+            "DEFAULT_EVENT_LOCATION": "Testville, TS, USA",
+        },
+        fake_page_data=PARISH_FAKE_RESPONSE,
+    )
+
+    cfg = module.parse_type_config(module.resolve_prompt_path("Census.pmt"))
+    assert cfg.role_validation == "open"
+
+    summary = module.build_vocabulary_summary(cfg)
+
+    assert "role_name: use one of these when it applies" in summary
+    assert "treated as an association, not a family link." in summary
+    assert "choose exactly one per participant" not in summary
+
+
 def test_debug_mode_does_not_write_master_db(tmp_path, monkeypatch):
     """DEBUG_FILE mode (the Toolbox's 'Run Analysis (API)' with a specific file picked)
     must print the extracted JSON without ever touching the master DB on disk."""

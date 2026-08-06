@@ -751,6 +751,7 @@ class TypeConfig:
     metadata_fields: Dict[str, str]
     field_remap: Dict[str, str]
     batch_page_threshold: int
+    role_validation: str
     prose: str
 
 
@@ -840,6 +841,7 @@ def parse_type_config(pmt_path: Path) -> TypeConfig:
         metadata_fields=front_matter.get("metadata_fields", {}),
         field_remap=front_matter.get("field_remap", {}),
         batch_page_threshold=int(front_matter.get("batch_page_threshold", BATCH_PAGE_THRESHOLD)),
+        role_validation=front_matter.get("role_validation", "closed"),
         prose=prose.strip(),
     )
 
@@ -857,6 +859,8 @@ def build_merged_schema(core_schema: Dict[str, Any],
         for f in fields:
             if f.get("type") == "enum":
                 properties[f["name"]] = {"type": "string", "enum": f.get("choices", []), "nullable": True}
+            elif f.get("type") == "dict":
+                properties[f["name"]] = {"type": "object", "nullable": True}
             else:
                 properties[f["name"]] = {"type": f.get("type", "string"), "nullable": True}
 
@@ -892,12 +896,24 @@ def build_vocabulary_summary(type_cfg: TypeConfig) -> str:
                   for name, context in sorted(role_context_by_name.items())]
     role_names = ", ".join(role_lines)
 
+    if type_cfg.role_validation == "open":
+        # Census.pmt's open mode: the 9-name list is not exhaustive - a role outside it
+        # (e.g. Boarder, Roomer) must be recorded verbatim as an association, never
+        # coerced into one of the family roles (see the sub-project 2 design spec).
+        role_name_line = dedent(f"""\
+            - role_name: use one of these when it applies - {role_names} - and record the
+              source's own relationship term verbatim when none of these fit (e.g. Boarder,
+              Servant, Roomer, Grandson). Only the listed names carry a family relationship;
+              anything else is recorded as-is and treated as an association, not a family link.""")
+    else:
+        role_name_line = dedent(f"""\
+            - role_name (choose exactly one per participant - where a role's own meaning
+              depends on the event type, that's noted in parentheses): {role_names}""")
+
     return dedent(f"""
         VALID VOCABULARY FOR THIS RECORD TYPE:
         - event_type (choose exactly one): {event_type_names}
-        - role_name (choose exactly one per participant - where a role's own meaning
-          depends on the event type, that's noted in parentheses): {role_names}
-    """).strip()
+    """).strip() + "\n" + role_name_line
 
 
 def get_cached_system_instruction(type_cfg: TypeConfig) -> str:
