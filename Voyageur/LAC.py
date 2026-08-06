@@ -207,6 +207,50 @@ def download_pid_bundle(pid: str, media_dir: str,
     }
 
 
+# ==========================================
+# COLLECTION CLASSIFICATION
+# ==========================================
+COLLECTIONS = [
+    ("RG15-D-II-8-a", "Affidavits, 1870-1885", "Finding Aid 15-19", 1319, 1324),
+    ("RG15-D-II-8-b", "Applications, 1885", "Finding Aid 15-20", 1325, 1330),
+    ("RG15-D-II-8-c", "Applications, 1886-1906", "Finding Aid 15-21", 1331, 1372),
+]
+
+
+def collection_for_series_code(code: Optional[str]) -> Optional[Tuple[str, str, str, str]]:
+    if not code:
+        return None
+    for series_code, title, finding_aid, _lo, _hi in COLLECTIONS:
+        if code.startswith(series_code):
+            return series_code, title, finding_aid, "confirmed"
+    return None
+
+
+def collection_for_volume(volume: Any, volume_range: Any) -> Optional[Tuple[str, str, str, str]]:
+    def in_range(v):
+        try:
+            v_int = int(v)
+            for series_code, title, finding_aid, lo, hi in COLLECTIONS:
+                if lo <= v_int <= hi:
+                    return series_code, title, finding_aid, "inferred"
+        except (ValueError, TypeError):
+            pass
+        return None
+
+    if volume and str(volume).isdigit():
+        res = in_range(volume)
+        if res:
+            return res
+    if volume_range:
+        parts = str(volume_range).split("-")
+        if len(parts) == 2 and all(p.strip().isdigit() for p in parts):
+            lo_res = in_range(parts[0].strip())
+            hi_res = in_range(parts[1].strip())
+            if lo_res and hi_res and lo_res[0] == hi_res[0]:
+                return lo_res
+    return None
+
+
 def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:
     if os.path.exists(checkpoint_path):
         with open(checkpoint_path, "r", encoding="utf-8") as f:

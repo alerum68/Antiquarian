@@ -1832,46 +1832,7 @@ def resolve_pid_for_sheet_or_record(sheet: Dict[str, Any], record: Dict[str, Any
     return resolve_pid_from_filename(file_name)
 
 
-COLLECTIONS = [
-    ("RG15-D-II-8-a", "Affidavits, 1870-1885", "Finding Aid 15-19", 1319, 1324),
-    ("RG15-D-II-8-b", "Applications, 1885", "Finding Aid 15-20", 1325, 1330),
-    ("RG15-D-II-8-c", "Applications, 1886-1906", "Finding Aid 15-21", 1331, 1372),
-]
 UNKNOWN_COLLECTION_LABEL = "Unclassified (no rg_series_code or inferable volume yet)"
-
-
-def collection_for_series_code(code: Optional[str]) -> Optional[Tuple[str, str, str, str]]:
-    if not code:
-        return None
-    for series_code, title, finding_aid, _lo, _hi in COLLECTIONS:
-        if code.startswith(series_code):
-            return series_code, title, finding_aid, "confirmed"
-    return None
-
-
-def collection_for_volume(volume: Any, volume_range: Any) -> Optional[Tuple[str, str, str, str]]:
-    def in_range(v):
-        try:
-            v_int = int(v)
-            for series_code, title, finding_aid, lo, hi in COLLECTIONS:
-                if lo <= v_int <= hi:
-                    return series_code, title, finding_aid, "inferred"
-        except (ValueError, TypeError):
-            pass
-        return None
-
-    if volume and str(volume).isdigit():
-        res = in_range(volume)
-        if res:
-            return res
-    if volume_range:
-        parts = str(volume_range).split("-")
-        if len(parts) == 2 and all(p.strip().isdigit() for p in parts):
-            lo_res = in_range(parts[0].strip())
-            hi_res = in_range(parts[1].strip())
-            if lo_res and hi_res and lo_res[0] == hi_res[0]:
-                return lo_res
-    return None
 
 
 def classify_sheet_collection(sheet: Dict[str, Any]) -> Tuple[Optional[str], str, Optional[str], str]:
@@ -1880,12 +1841,12 @@ def classify_sheet_collection(sheet: Dict[str, Any]) -> Tuple[Optional[str], str
     if records:
         record = records[0]
         series_code = (record.get("type_specific_fields") or {}).get("rg_series_code")
-        res = collection_for_series_code(series_code)
+        res = voyageur_lac.collection_for_series_code(series_code)
         if res:
             return res
 
     meta = sheet.get("document_metadata", {})
-    res = collection_for_volume(meta.get("volume"), meta.get("volume_range"))
+    res = voyageur_lac.collection_for_volume(meta.get("volume"), meta.get("volume_range"))
     if res:
         return res
 
