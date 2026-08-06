@@ -101,7 +101,7 @@ def main() -> Path:
                 if candidates:
                     json_file = max(candidates, key=lambda p: p.stat().st_mtime)
                     print(f"[System] Detected Final JSON: {json_file.name}")
-            except Exception:
+            except OSError:
                 pass
 
             if json_file:
@@ -180,8 +180,8 @@ def main() -> Path:
             final_img = img_target_dir / file_path.name[len(image_prefix):]
             move_with_retry(file_path, final_img)
             img_count += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ERROR] Could not move image {file_path.name}: {e}")
 
     print(f"[System] Moved JSON and {img_count} images to Project folders.")
     print(f"[System] Gather complete. Run Archivist's \"Generate GEDCOM\" when you're ready to "

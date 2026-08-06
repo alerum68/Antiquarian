@@ -796,7 +796,8 @@ def has_usable_text_layer(pdf_path: Union[str, Path], sample_pages: int = 3,
     try:
         with pdfplumber.open(str(pdf_path)) as pdf:
             sampled = "".join((page.extract_text() or "") for page in pdf.pages[:sample_pages])
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] Could not probe text layer for {pdf_path}: {e}")
         return False
 
     if len(sampled) < min_chars:
@@ -821,7 +822,8 @@ def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path
         params = COMPRESSION_PARAMS.get(compression_level, COMPRESSION_PARAMS[2])
         optimize_pdf(str(tmp_path), params)
         return tmp_path
-    except Exception:
+    except Exception as e:
+        print(f"[ERROR] PDF optimization failed for {file_path}: {e}")
         tmp_path.unlink(missing_ok=True)
         return file_path
 

@@ -9,6 +9,7 @@ output. Event/fact vocabulary comes from the shared FactTypes.json (RootsMagic's
 types); participant role vocabulary comes from Parish.pmt's roles table, since every FS
 gather so far is a parish/church register. Both are read directly as data (YAML/JSON) rather
 than imported as code, keeping this tool self-contained like every other one in the toolbox.
+(Commissioner.normalization is a deliberate shared-code exception to this usual data-only convention.)
 
 Also handles same-person matching across duplicate index entries (stamping a shared link_id
 rather than merging records - see Archivist's generate_uid, which already knows to prefer
@@ -23,7 +24,6 @@ no tile-stitching needed at all.
 import json
 import os
 import re
-import shutil
 import sys
 import time
 import webbrowser
@@ -645,7 +645,7 @@ def _read_text_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> 
     """Chrome (or antivirus scanning it) can still hold a freshly-downloaded file open for
     a brief moment after it appears in the folder listing, so an immediate read can lose to
     a transient PermissionError/WinError 32 on Windows. Same reasoning as A.py's
-    _move_with_retry."""
+    move_with_retry."""
     for attempt in range(1, attempts + 1):
         try:
             return path.read_text(encoding="utf-8")
@@ -741,7 +741,7 @@ def main() -> None:
                 if candidates:
                     raw_json_file = max(candidates, key=lambda p: p.stat().st_mtime)
                     print(f"[System] Detected raw gather JSON: {raw_json_file.name}")
-            except Exception:
+            except OSError:
                 pass
 
             if raw_json_file:
@@ -830,8 +830,8 @@ def main() -> None:
             final_img = img_target_dir / file_path.name[len(image_prefix):]
             move_with_retry(file_path, final_img)
             img_count += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ERROR] Could not move image {file_path.name}: {e}")
 
     print(f"[System] Moved {img_count} image(s) to Project folder.")
 
