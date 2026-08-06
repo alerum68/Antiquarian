@@ -1,5 +1,6 @@
 import pytest
 
+import Commissioner.record_registry as record_registry
 from Commissioner.record_registry import (
     InvalidRoleError,
     UnknownDocumentTypeError,
@@ -155,9 +156,6 @@ def test_build_registry_accepts_a_valid_fixture_dir(tmp_path):
     registry = _build_registry(tmp_path)
     assert set(registry) == {"Fixture"}
     assert registry["Fixture"].valid_roles == frozenset({"Claimant"})
-
-
-import Commissioner.record_registry as record_registry
 
 
 OPEN_ROLE_PMT = """---
