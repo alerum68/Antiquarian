@@ -34,38 +34,17 @@ import pandas as pd
 import yaml
 from dotenv import load_dotenv, set_key
 from thefuzz import fuzz
-from titlecase import titlecase
 
 import census_schema
 from _retry_utils import cleanup_checkpoint_files, move_with_retry
 
-PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
-
-
-def _titlecase_callback(word: str, **kwargs) -> str | None:
-    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
-    if w_clean.upper() in PRESERVED_ACRONYMS:
-        return word.replace(w_clean, w_clean.upper())
-    if "-" in word:
-        parts = word.split("-")
-        return "-".join(
-            (
-                p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
-                else titlecase(p, callback=_titlecase_callback).capitalize()
-            )
-            for p in parts
-        )
-    return None
-
-
-def cap_case(text: str) -> str:
-    if not text:
-        return ""
-    val = str(text).strip()
-    if not val:
-        return ""
-    return titlecase(val, callback=_titlecase_callback)
-
+# Commissioner lives in a sibling tool folder, not an installed package - add the repo
+# root to sys.path so it can be imported by absolute path, matching census_schema.py's own
+# precedent for cross-package imports.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from Commissioner import normalization  # noqa: E402
 
 SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
 FACT_TYPES_PATH = SCRIPTORIUM_DIR / "FactTypes.json"
@@ -151,89 +130,6 @@ CITATION_RE = re.compile(
     r'(?P<browse_path>.+?);\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?)\.\s*$'
 )
 
-MONTH_NAMES = {
-    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
-    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
-    "august": 8, "aug": 8, "september": 9, "sept": 9, "sep": 9,
-    "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
-}
-_ISO_DATE_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
-_ISO_YEAR_MONTH_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})\s*$")
-_DATE_PATTERNS = [
-    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{3,4})\s*$"),  # "December 12, 1850"
-    re.compile(r"^\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\.?,?\s+(\d{3,4})\s*$"),  # "12 December 1850"
-    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{3,4})\s*$"),                                # "December 1850"
-    re.compile(r"^\s*(\d{3,4})\s*$"),                                                 # bare year "1850"
-]
-
-
-def parse_to_iso(reading: Optional[str]) -> Optional[str]:
-    """Parses a plain English-language date reading into YYYY-MM-DD (or a coarser YYYY-MM /
-    YYYY if day/month aren't stated). Mirrors Paleographer/postprocess.py's parse_to_iso -
-    duplicated locally rather than imported, per this project's convention of every tool
-    folder staying self-contained (see module docstring)."""
-    if not reading:
-        return None
-    text = reading.strip()
-
-    if _ISO_DATE_PATTERN.match(text) or _ISO_YEAR_MONTH_PATTERN.match(text):
-        return text
-
-    m = _DATE_PATTERNS[0].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(1).lower())
-        if month:
-            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(2)):02d}"
-
-    m = _DATE_PATTERNS[1].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(2).lower())
-        if month:
-            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(1)):02d}"
-
-    m = _DATE_PATTERNS[2].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(1).lower())
-        if month:
-            return f"{int(m.group(2)):04d}-{month:02d}"
-
-    m = _DATE_PATTERNS[3].match(text)
-    if m:
-        return f"{int(m.group(1)):04d}"
-
-    return None
-
-
-def derive_record_identity(record: Dict[str, Any], event_types_table: Dict[str, Dict[str, str]]) -> None:
-    """Sets record_type_code and record_id (prefix + record_number) from event_type, looked
-    up in the shared FactTypes.json table. No-ops if event_type isn't recognized."""
-    event_type = record.get("event_type")
-    entry = event_types_table.get(event_type) if event_type else None
-    if not entry:
-        return
-    record["record_type_code"] = entry.get("code")
-    record_number = record.get("record_number")
-    if record_number:
-        record["record_id"] = f"{entry.get('id_prefix', '')}{record_number}"
-
-
-def derive_role_number(role_name: str, roles_table: Dict[str, Dict[str, Optional[str]]]) -> Optional[str]:
-    """Looks up a participant's role_number from their plain-word role_name (case-insensitive
-    match on the role's display name), same convention as Paleographer/postprocess.py."""
-    name_to_number = {(role.get("name") or "").strip().lower(): number for number, role in roles_table.items()}
-    return name_to_number.get((role_name or "").strip().lower())
-
-
-def derive_role_semantic(role_number: Optional[str],
-                         roles_table: Dict[str, Dict[str, Optional[str]]]) -> Optional[str]:
-    """Looks up a participant's role_semantic from their already-resolved role_number, same
-    convention as Paleographer/postprocess.py.derive_role_semantics - this is the field
-    Archivist actually reads to build FAMC/FAMS/associations, so an indexed row's plain
-    'Relationship'/'Role' column value has to reach it the same way an AI-read role_name
-    does, not just role_number (which Archivist no longer uses for family linking)."""
-    role = roles_table.get(role_number) if role_number else None
-    return role.get("semantic") if role else None
-
 
 # ==========================================
 # ROW -> RECORD MAPPING
@@ -282,7 +178,7 @@ def build_participant(role_name: str, full_name: str, sex: str,
         type_specific_fields["person_ark"] = person_ark
     return {
         "role_number": None,
-        "role_name": cap_case(role_name),
+        "role_name": normalization.cap_case(role_name),
         "std_given": given,
         "std_surname": surname or None,
         "raw_given": None,
@@ -343,15 +239,15 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
     if primary is not None:
         primary["age"] = (columns.get("Age") or "").strip() or None
         birth_date = (columns.get("Birth Date") or "").strip() or (columns.get("Birth Year (Estimated)") or "").strip()
-        primary["birth_date"] = parse_to_iso(birth_date) or (birth_date or None)
+        primary["birth_date"] = normalization.parse_to_iso(birth_date) or (birth_date or None)
         death_date = (columns.get("Death Date") or "").strip()
-        primary["death_date"] = parse_to_iso(death_date) or (death_date or None)
+        primary["death_date"] = normalization.parse_to_iso(death_date) or (death_date or None)
         legitimacy = (columns.get("Legitimacy") or "").strip()
         if legitimacy:
             primary["type_specific_fields"]["legitimacy"] = legitimacy
 
     raw_event_type = (columns.get("Event Type") or "").strip()
-    event_type = cap_case(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
+    event_type = normalization.cap_case(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
     event_date_raw = (columns.get("Event Date") or "").strip()
 
     page = (columns.get("Page Number") or "").strip() or item_id
@@ -363,9 +259,9 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
         "record_number": record_number,
         "record_type_code": None,
         "event_type": event_type,
-        "year": (parse_to_iso(event_date_raw) or "")[:4] or None,
-        "event_date": parse_to_iso(event_date_raw) or event_date_raw or None,
-        "event_place": cap_case((columns.get("Event Place") or "").strip()) or None,
+        "year": (normalization.parse_to_iso(event_date_raw) or "")[:4] or None,
+        "event_date": normalization.parse_to_iso(event_date_raw) or event_date_raw or None,
+        "event_place": normalization.cap_case((columns.get("Event Place") or "").strip()) or None,
         "citation_details": "",
         "citation_text": "",
         "review": False,
@@ -539,12 +435,12 @@ def build_universal_json(raw: dict, items_raw: List[dict], catalog_items: Dict[s
         match_and_link_records(records)
 
         for record in records:
-            derive_record_identity(record, event_types_table)
+            normalization.derive_record_identity(record, event_types_table, set_type_code=True)
             for participant in record["participants"]:
-                role_number = derive_role_number(participant["role_name"], roles_table)
+                role_number = normalization.derive_role_number(participant["role_name"], roles_table)
                 if role_number is not None:
                     participant["role_number"] = role_number
-                    role_semantic = derive_role_semantic(role_number, roles_table)
+                    role_semantic = normalization.derive_role_semantic(role_number, roles_table)
                     if role_semantic is not None:
                         participant["role_semantic"] = role_semantic
 

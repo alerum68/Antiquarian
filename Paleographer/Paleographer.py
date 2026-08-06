@@ -63,6 +63,8 @@ except (ImportError, ValueError):
         import lac_client
         import LAC as voyageur_lac
 
+from Commissioner import normalization  # noqa: E402
+
 # Global settings come from the project root's .env; this tool's own settings come from
 # its own subfolder's .env, so Paleographer stays runnable standalone.
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
@@ -74,50 +76,6 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 # POSTPROCESS (folded from postprocess.py)
 # ==============================================================================
 
-PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
-
-
-def _titlecase_callback(word: str, **kwargs) -> str | None:
-    w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
-    if w_clean.upper() in PRESERVED_ACRONYMS:
-        return word.replace(w_clean, w_clean.upper())
-    if "-" in word:
-        parts = word.split("-")
-        return "-".join(
-            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
-             else titlecase(p, callback=_titlecase_callback).capitalize())
-            for p in parts
-        )
-    return None
-
-
-def cap_case(text: str) -> str:
-    if not text:
-        return ""
-    val = str(text).strip()
-    if not val:
-        return ""
-    return titlecase(val, callback=_titlecase_callback)
-
-
-MONTH_NAMES = {
-    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
-    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
-    "august": 8, "aug": 8, "september": 9, "sept": 9, "sep": 9,
-    "october": 10, "oct": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
-}
-
-_ISO_DATE_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
-_ISO_YEAR_MONTH_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})\s*$")
-
-_DATE_PATTERNS = [
-    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{3,4})\s*$"),  # "December 12, 1850"
-    re.compile(r"^\s*(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\.?,?\s+(\d{3,4})\s*$"),  # "12 December 1850"
-    re.compile(r"^\s*([A-Za-z]+)\.?\s+(\d{3,4})\s*$"),                                # "December 1850"
-    re.compile(r"^\s*(\d{3,4})\s*$"),                                                  # bare year "1850"
-]
-
-
 def strip_diacritics(text: Optional[str]) -> Optional[str]:
     """Mechanically strips diacritics/accents, keeping only plain ASCII letters/numbers/
     punctuation. Applies to any std_* field regardless of record type."""
@@ -127,67 +85,15 @@ def strip_diacritics(text: Optional[str]) -> Optional[str]:
     return "".join(c for c in normalized if not unicodedata.combining(c))
 
 
-def parse_to_iso(reading: Optional[str]) -> Optional[str]:
-    """Parses the LLM's best English-language date reading into YYYY-MM-DD (or a
-    coarser YYYY-MM / YYYY if day/month aren't stated). Also passes through a date the
-    LLM already gave in ISO form unchanged. Returns None if the reading can't be
-    confidently parsed, rather than guessing."""
-    if not reading:
-        return None
-    text = reading.strip()
-
-    if _ISO_DATE_PATTERN.match(text) or _ISO_YEAR_MONTH_PATTERN.match(text):
-        return text
-
-    m = _DATE_PATTERNS[0].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(1).lower())
-        if month:
-            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(2)):02d}"
-
-    m = _DATE_PATTERNS[1].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(2).lower())
-        if month:
-            return f"{int(m.group(3)):04d}-{month:02d}-{int(m.group(1)):02d}"
-
-    m = _DATE_PATTERNS[2].match(text)
-    if m:
-        month = MONTH_NAMES.get(m.group(1).lower())
-        if month:
-            return f"{int(m.group(2)):04d}-{month:02d}"
-
-    m = _DATE_PATTERNS[3].match(text)
-    if m:
-        return f"{int(m.group(1)):04d}"
-
-    return None
-
-
-def derive_record_identity(record: Dict[str, Any], event_types_table: Dict[str, Dict[str, str]]) -> None:
-    """Sets record_id (id_prefix + record_number) from the LLM's plain word event_type,
-    looked up in the active type's event_types table."""
-    event_type = record.get("event_type")
-    entry: Optional[Dict[str, str]] = event_types_table.get(event_type) if event_type else None
-    if not entry:
-        return
-
-    record_number: Optional[str] = record.get("record_number")
-    if record_number:
-        record["record_id"] = f"{entry.get('id_prefix', '')}{record_number}"
-
-
 def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Optional[str]]]) -> None:
     """Sets each participant's role_number from their plain-word role_name."""
-    name_to_number = {(role.get("name") or "").strip().lower(): number for number, role in roles_table.items()}
     for participant in record.get("participants", []):
         raw_role_name = participant.get("role_name")
         if raw_role_name:
-            participant["role_name"] = cap_case(raw_role_name)
+            participant["role_name"] = normalization.cap_case(raw_role_name)
         if participant.get("role_number"):
             continue
-        role_name = (raw_role_name or "").strip().lower()
-        role_number = name_to_number.get(role_name)
+        role_number = normalization.derive_role_number(raw_role_name or "", roles_table)
         if role_number is not None:
             participant["role_number"] = role_number
 
@@ -196,8 +102,7 @@ def derive_role_semantics(record: Dict[str, Any], roles_table: Dict[str, Dict[st
     """Sets each participant's role_semantic from their already-resolved role_number."""
     for participant in record.get("participants", []):
         role_number = participant.get("role_number")
-        role = roles_table.get(role_number) if role_number else None
-        semantic = role.get("semantic") if role else None
+        semantic = normalization.derive_role_semantic(role_number, roles_table)
         if semantic:
             participant["role_semantic"] = semantic
 
@@ -243,7 +148,7 @@ def _label_for(record: Dict[str, Any]) -> str:
     """Best available label for a record's own source document."""
     document_type = (record.get("type_specific_fields") or {}).get("document_type")
     if document_type:
-        return cap_case(document_type)
+        return normalization.cap_case(document_type)
     page = record.get("page")
     return f"Page {page}" if page else "Untitled section"
 
@@ -1462,20 +1367,20 @@ def finalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """Applies every generic mechanical post-processing step to one extracted record."""
     derive_role_numbers(record, TYPE_CFG.roles)
     derive_role_semantics(record, TYPE_CFG.roles)
-    derive_record_identity(record, TYPE_CFG.event_types)
+    normalization.derive_record_identity(record, TYPE_CFG.event_types)
     derive_suffixes(record, TYPE_CFG.roles)
     apply_defaults(record, TYPE_CFG.defaults.get("record", {}))
 
     if record.get("event_date"):
-        record["event_date"] = parse_to_iso(record["event_date"])
+        record["event_date"] = normalization.parse_to_iso(record["event_date"])
 
     for participant in record.get("participants", []):
         participant["std_given"] = strip_diacritics(participant.get("std_given"))
         participant["std_surname"] = strip_diacritics(participant.get("std_surname"))
         if participant.get("birth_date"):
-            participant["birth_date"] = parse_to_iso(participant["birth_date"])
+            participant["birth_date"] = normalization.parse_to_iso(participant["birth_date"])
         if participant.get("death_date"):
-            participant["death_date"] = parse_to_iso(participant["death_date"])
+            participant["death_date"] = normalization.parse_to_iso(participant["death_date"])
         apply_defaults(participant, TYPE_CFG.defaults.get("participant", {}))
 
     return record
