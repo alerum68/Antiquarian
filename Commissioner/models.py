@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import List
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 
 
 class FactScope(str, Enum):
@@ -99,3 +99,88 @@ def get_fact_definition(name: str) -> FactDefinition:
         return _FACT_DEFINITIONS_BY_NAME[name]
     except KeyError:
         raise KeyError(f"Unknown fact_type {name!r}; not present in FACT_DEFINITIONS") from None
+
+
+class AlternateName(BaseModel):
+    value: str
+
+
+class Fact(BaseModel):
+    fact_type: str
+    value: Optional[str] = None
+    date: Optional[str] = None
+    place: Optional[str] = None
+
+    @field_validator("fact_type")
+    @classmethod
+    def _validate_fact_type(cls, v: str) -> str:
+        if v not in _FACT_DEFINITIONS_BY_NAME:
+            raise ValueError(f"Unknown fact_type {v!r}; not present in FACT_DEFINITIONS")
+        return v
+
+
+class DocumentMetadata(BaseModel):
+    file_name: Optional[str] = None
+    file_type: Optional[str] = None
+    volume: Optional[str] = None
+    pages: Optional[str] = None
+    source_name: Optional[str] = None
+    source_location: Optional[str] = None
+
+
+class Participant(BaseModel):
+    role_number: Optional[str] = None
+    role_name: Optional[str]
+    std_given: str
+    std_surname: Optional[str] = None
+    raw_given: Optional[str] = None
+    raw_surname: Optional[str] = None
+    dit_name: Optional[str] = None
+    alternate_names: Optional[List[AlternateName]] = None
+    prefix: Optional[str] = None
+    suffix: Optional[str] = None
+    sex: Literal["M", "F", "U"]
+    is_priest: bool
+    age: Optional[str] = None
+    age_unit: Optional[Literal["years", "months", "days"]] = None
+    occupation: Optional[str] = None
+    race: Optional[str] = None
+    religion: Optional[str] = None
+    residence: Optional[str] = None
+    birth_date: Optional[str] = None
+    birth_place: Optional[str] = None
+    death_date: Optional[str] = None
+    death_place: Optional[str] = None
+    review: bool = False
+    review_reason: Optional[str] = None
+    facts: Optional[List[Fact]] = None
+    type_specific_fields: Dict[str, Any] = Field(default_factory=dict)
+
+
+class Record(BaseModel):
+    record_id: Optional[str] = None
+    page: str
+    record_number: str
+    event_type: str
+    year: Optional[str] = None
+    event_date: Optional[str] = None
+    event_place: Optional[str] = None
+    english_translation: Optional[str] = None
+    original_transcription: Optional[str] = None
+    review: bool = False
+    review_reason: Optional[str] = None
+    continues_on_next_image: bool = False
+    continues_from_previous_image: bool = False
+    type_specific_fields: Dict[str, Any] = Field(default_factory=dict)
+    participants: List[Participant] = Field(default_factory=list)
+
+
+class Sheet(BaseModel):
+    page_id: str
+    document_metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
+    records: List[Record] = Field(default_factory=list)
+
+
+class Collection(BaseModel):
+    collection_title: Optional[str] = None
+    sheets: List[Sheet] = Field(default_factory=list)
