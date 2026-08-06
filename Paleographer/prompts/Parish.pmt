@@ -61,7 +61,7 @@ Before generating JSON, you must process the record in this exact order:
 
 1. CHARACTERS
 - Margin numbers are load-bearing identifiers. Read each digit individually.
-- Only "raw" fields, and "Original Transcription", need to preserve diacritics/accents exactly; "std" fields should hold your best standardized reading, diacritics included, formatting is handled downstream.
+- Only "raw" fields, and citation_text, need to preserve diacritics/accents exactly; "std" fields should hold your best standardized reading, diacritics included, formatting is handled downstream.
 
 2. NAMES & PRE-COMPUTATION VERIFICATION
 - BAPTISM SURNAME: For baptismal records where the child's surname is not explicitly written, you MUST populate the child's structured surname field with the Father's surname.
