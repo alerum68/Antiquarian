@@ -37,6 +37,7 @@ from thefuzz import fuzz
 from titlecase import titlecase
 
 import census_schema
+from _retry_utils import cleanup_checkpoint_files, move_with_retry
 
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
@@ -769,37 +770,6 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
-def _move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
-    """Same reasoning as A.py's own _move_with_retry: Chrome (or antivirus scanning it) can
-    still hold a freshly-downloaded file open for a brief moment after it appears in the
-    folder listing."""
-    for attempt in range(1, attempts + 1):
-        try:
-            shutil.move(str(src), str(dst))
-            return
-        except OSError as e:
-            if attempt == attempts:
-                print(f"[ERROR] Could not move {src.name} to {dst} after {attempts} attempts: {e}")
-                raise
-            time.sleep(delay)
-
-
-def _cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float) -> None:
-    """Deletes this run's own leftover periodic checkpoint downloads (see
-    downloadCheckpointJson in Voyageur.js) now that the final combined JSON has already
-    been written - they're superseded and, unlike the final JSON, nothing else ever cleans
-    them up, so a long gather would otherwise leave several of them sitting in the
-    Downloads folder permanently. Best-effort: a checkpoint that can't be deleted (still
-    briefly locked, already gone) is left in place rather than raising."""
-    for p in downloads_dir.iterdir():
-        if (p.is_file() and p.suffix.lower() == '.json' and p.name.startswith(prefix)
-                and '[checkpoint' in p.name and p.stat().st_mtime >= start_time):
-            try:
-                p.unlink(missing_ok=True)
-            except OSError:
-                pass
-
-
 def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[str]:
     """Builds a "{year} - {state} - {county} - {city} - FS.json" name (matching A.py/
     Ancestry's own "{year} - {locationStr} - ANC" convention, so both sources' output files
@@ -922,7 +892,7 @@ def main() -> None:
     final_json = json_target_dir / out_name
     final_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
     _unlink_with_retry(raw_json_file)
-    _cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
+    cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
 
     # Mirrors A.py's own nested {year} US Federal Census / {location} image folder
     # convention, derived from this same run's own clean filename (when one was built) so
@@ -962,7 +932,7 @@ def main() -> None:
         # noinspection broad-exception
         try:
             final_img = img_target_dir / file_path.name[len(image_prefix):]
-            _move_with_retry(file_path, final_img)
+            move_with_retry(file_path, final_img)
             img_count += 1
         except Exception:
             pass
