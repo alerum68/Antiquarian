@@ -855,7 +855,10 @@ def build_merged_schema(core_schema: Dict[str, Any],
     def inject(container: Dict[str, Any], fields: List[Dict[str, str]]) -> None:
         properties = container.setdefault("properties", {})
         for f in fields:
-            properties[f["name"]] = {"type": f.get("type", "string"), "nullable": True}
+            if f.get("type") == "enum":
+                properties[f["name"]] = {"type": "string", "enum": f.get("choices", []), "nullable": True}
+            else:
+                properties[f["name"]] = {"type": f.get("type", "string"), "nullable": True}
 
     record_props = merged["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
     inject(record_props["type_specific_fields"], extra_fields.get("record", []))
