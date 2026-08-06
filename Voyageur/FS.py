@@ -36,6 +36,8 @@ from dotenv import load_dotenv, set_key
 from thefuzz import fuzz
 from titlecase import titlecase
 
+import census_schema
+
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
 
@@ -46,7 +48,10 @@ def _titlecase_callback(word: str, **kwargs) -> str | None:
     if "-" in word:
         parts = word.split("-")
         return "-".join(
-            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            (
+                p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
+                else titlecase(p, callback=_titlecase_callback).capitalize()
+            )
             for p in parts
         )
     return None
@@ -60,7 +65,6 @@ def cap_case(text: str) -> str:
         return ""
     return titlecase(val, callback=_titlecase_callback)
 
-import census_schema
 
 SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
 FACT_TYPES_PATH = SCRIPTORIUM_DIR / "FactTypes.json"

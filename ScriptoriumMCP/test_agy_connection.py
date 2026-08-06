@@ -18,7 +18,7 @@ _THIS_DIR = Path(__file__).resolve().parent
 load_dotenv(_THIS_DIR.parent / ".env", override=True)
 
 sys.path.insert(0, str(_THIS_DIR))
-import agy_client
+import agy_client  # noqa: E402
 
 DEFAULT_MODEL = "gemini-3.1-pro-high"
 

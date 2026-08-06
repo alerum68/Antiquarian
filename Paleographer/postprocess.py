@@ -22,7 +22,8 @@ def _titlecase_callback(word: str, **kwargs) -> str | None:
     if "-" in word:
         parts = word.split("-")
         return "-".join(
-            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
+             else titlecase(p, callback=_titlecase_callback).capitalize())
             for p in parts
         )
     return None
@@ -35,6 +36,7 @@ def cap_case(text: str) -> str:
     if not val:
         return ""
     return titlecase(val, callback=_titlecase_callback)
+
 
 MONTH_NAMES = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -188,7 +190,7 @@ def derive_suffixes(record: Dict[str, Any], roles_table: Dict[str, Dict[str, Opt
 
 def _participant_key(participant: Dict[str, Any]) -> tuple:
     return ((participant.get("std_given") or "").strip().lower(),
-           (participant.get("std_surname") or "").strip().lower())
+            (participant.get("std_surname") or "").strip().lower())
 
 
 def _label_for(record: Dict[str, Any]) -> str:
@@ -315,7 +317,8 @@ MONTHS_REGEX = (
     r'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)'
 )
 DATE_PATTERN = re.compile(
-    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
+    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+'
+    rf'\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
     rf'\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
     rf'{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)|(?:17\d\d|18\d\d|19\d\d)(?:/(?:17\d\d|18\d\d|19\d\d))?)\b',
     re.I)
@@ -370,7 +373,9 @@ def clean_race(val: Any) -> str:
     if not text:
         return ""
     cleaned = re.sub(r'^(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\s*(?:and|&)?\s*', '', text, flags=re.I)
-    cleaned = re.sub(r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$', '', cleaned, flags=re.I)
+    cleaned = re.sub(
+        r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$',
+        '', cleaned, flags=re.I)
     cleaned = re.sub(r'[,;&\s]+$', '', cleaned).strip()
     cleaned = re.sub(r'^[,;&\s]+', '', cleaned).strip()
     if cleaned.lower() in ("deponent", "the deponent", "mother", "father", "wife", "husband", "widow", "as heir", ""):
@@ -680,4 +685,3 @@ def extract_citation_fields(citation: str) -> Dict[str, str]:
     elif "issue_date" in fields and "scrip_issue_date" not in fields:
         fields["scrip_issue_date"] = fields["issue_date"]
     return fields
-

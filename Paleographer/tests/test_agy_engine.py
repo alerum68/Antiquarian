@@ -23,7 +23,7 @@ def _make_result(structured_output=None):
     return agy_client.AgyStructuredResult(
         structured_output=structured_output or {"sheets": []},
         usage=agy_client.AgyUsage(input_tokens=100, output_tokens=20, thinking_tokens=5,
-                                   cache_read_tokens=3, total_tokens=128),
+                                  cache_read_tokens=3, total_tokens=128),
     )
 
 
@@ -152,7 +152,7 @@ def test_run_with_agy_retries_fails_fast_on_missing_binary(monkeypatch):
 # ==========================================
 def test_adapt_agy_usage_to_call_cost_maps_fields_and_zeroes_cost():
     usage = agy_client.AgyUsage(input_tokens=111, output_tokens=22, thinking_tokens=33,
-                                 cache_read_tokens=44, total_tokens=210)
+                                cache_read_tokens=44, total_tokens=210)
     cost = agy_engine.adapt_agy_usage_to_call_cost(usage)
     assert cost.in_tokens == 111
     assert cost.out_tokens == 22

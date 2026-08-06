@@ -44,7 +44,10 @@ def _titlecase_callback(word: str, **kwargs) -> str | None:
     if "-" in word:
         parts = word.split("-")
         return "-".join(
-            (p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS else titlecase(p, callback=_titlecase_callback).capitalize())
+            (
+                p.upper() if re.sub(r'^[^\w]+|[^\w]+$', '', p).upper() in PRESERVED_ACRONYMS
+                else titlecase(p, callback=_titlecase_callback).capitalize()
+            )
             for p in parts
         )
     return None
@@ -57,6 +60,7 @@ def cap_case(text: str) -> str:
     if not val:
         return ""
     return titlecase(val, callback=_titlecase_callback)
+
 
 FIELD_MAPS_DIR = Path(__file__).resolve().parent / "field_maps"
 
@@ -158,7 +162,10 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
     for raw_key, target in field_map["participant_fields"].items():
         if raw_key in columns:
             val = columns[raw_key]
-            if target in ("role_name", "race", "birth_place", "death_place", "residence", "occupation", "religion") and isinstance(val, str):
+            if (
+                target in ("role_name", "race", "birth_place", "death_place", "residence", "occupation", "religion")
+                and isinstance(val, str)
+            ):
                 val = cap_case(val)
             if target.startswith("type_specific_fields."):
                 participant["type_specific_fields"][target.split(".", 1)[1]] = val
@@ -169,7 +176,11 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
     for raw_key, fact_type in field_map["participant_facts"].items():
         if raw_key in columns and str(columns[raw_key]).strip():
             raw_v = str(columns[raw_key]).strip()
-            val = cap_case(raw_v) if fact_type in ("Occupation", "Education", "Military", "Property", "Miscellaneous") else raw_v
+            val = (
+                cap_case(raw_v)
+                if fact_type in ("Occupation", "Education", "Military", "Property", "Miscellaneous")
+                else raw_v
+            )
             participant["facts"].append({"fact_type": fact_type, "value": val})
             consumed.add(raw_key)
 

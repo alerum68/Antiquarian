@@ -43,7 +43,7 @@ DEFAULT_BACKOFF_SECONDS = 5.0
 # PDF RASTERIZATION
 # ==========================================
 def rasterize_pdf_to_images(pdf_path: Path, max_dimension: int = 2048,
-                             resolution: int = 200) -> List[Image.Image]:
+                            resolution: int = 200) -> List[Image.Image]:
     """One PIL Image per page, via pdfplumber's page.to_image() (pdfplumber is already
     a dependency of engine.py - no new library needed), each then downscaled the same
     way engine.optimize_image downscales a direct image file.
@@ -69,10 +69,10 @@ def rasterize_pdf_to_images(pdf_path: Path, max_dimension: int = 2048,
 # EXTRACTION CALL
 # ==========================================
 def call_agy_extract(images: List[Image.Image], schema: Dict[str, Any], prompt_text: str,
-                      model: str = DEFAULT_MODEL,
-                      cli_bin: str = agy_client.DEFAULT_CLI_BIN,
-                      timeout_seconds: int = agy_client.DEFAULT_TIMEOUT_SECONDS
-                      ) -> agy_client.AgyStructuredResult:
+                     model: str = DEFAULT_MODEL,
+                     cli_bin: str = agy_client.DEFAULT_CLI_BIN,
+                     timeout_seconds: int = agy_client.DEFAULT_TIMEOUT_SECONDS
+                     ) -> agy_client.AgyStructuredResult:
     """Provisions a fresh scratch dir, saves each image in `images` into it
     (page_001.jpg, page_002.jpg, ... - a single-image call is just a length-1 list),
     calls agy_client.call_agy_structured with a prompt that names every staged file,
@@ -310,7 +310,7 @@ def call_agy_extract_chunked(images: List[Image.Image], schema: Dict[str, Any], 
 # RETRY POLICY
 # ==========================================
 def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_MAX_RETRIES,
-                          backoff_seconds: float = DEFAULT_BACKOFF_SECONDS) -> Any:
+                         backoff_seconds: float = DEFAULT_BACKOFF_SECONDS) -> Any:
     """Retries agy_client.AgyCallError with linear backoff, and automatically pauses
     execution when quota or rate limit reset times are encountered, restarting gracefully
     at the exact same spot once the reset time arrives. Fails fast on AgyBinaryNotFoundError."""
@@ -339,7 +339,6 @@ def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_
                       f"Retrying in {wait:.0f}s...", flush=True)
                 time.sleep(wait)
     raise RuntimeError(f"agy call failed after {max_retries} attempts: {last_error}") from last_error
-
 
 
 # ==========================================

@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 import Commissioner.record_registry as record_registry
 from Commissioner.record_registry import (
@@ -8,6 +9,7 @@ from Commissioner.record_registry import (
     _build_registry,
     get_document_types,
     get_valid_roles,
+    parse_collection,
     validate_participant_extra_fields,
     validate_record_extra_fields,
     validate_role_name,
@@ -213,12 +215,6 @@ def test_dict_field_type_accepts_a_nested_dict_value(tmp_path):
         notes={"Race": "W", "Column_9": "Yes"}
     )
     assert extra.notes == {"Race": "W", "Column_9": "Yes"}
-
-
-import pytest
-from pydantic import ValidationError
-
-from Commissioner.record_registry import InvalidRoleError, parse_collection
 
 
 SAMPLE_SCRIP_PAYLOAD = {

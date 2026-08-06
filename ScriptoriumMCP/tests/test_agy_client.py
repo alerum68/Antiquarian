@@ -107,7 +107,9 @@ def test_check_or_prompt_auth_returns_false_on_failure(monkeypatch):
 # ==========================================
 def test_is_quota_or_rate_limit():
     assert agy_client.is_quota_or_rate_limit("ResourceExhausted: 429 Resource has been exhausted (e.g. check quota).")
-    assert agy_client.is_quota_or_rate_limit("Rate limit exceeded for model gemini-3.1-pro-high. Please try again later.")
+    assert agy_client.is_quota_or_rate_limit(
+        "Rate limit exceeded for model gemini-3.1-pro-high. Please try again later."
+    )
     assert agy_client.is_quota_or_rate_limit("Quota limit reached: reset at 2026-08-02T14:00:00Z")
     assert agy_client.is_quota_or_rate_limit("Too many requests (429)")
     assert not agy_client.is_quota_or_rate_limit("File not found: test.pdf")
@@ -131,4 +133,3 @@ def test_parse_quota_reset_wait_seconds():
 
     # Non-quota message returns None
     assert agy_client.parse_quota_reset_wait_seconds("Unknown server error 500") is None
-

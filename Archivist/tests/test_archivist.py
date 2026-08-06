@@ -865,7 +865,10 @@ def test_build_general_citation_scrip_cites_the_matching_template_source_with_fi
         assert "2 SOUR @S20001@" in joined
         assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
         assert "LAC Digital Record" in joined
-        assert "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber=1506170" in joined
+        assert (
+            "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber=1506170"
+            in joined
+        )
     finally:
         arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
 
@@ -935,7 +938,7 @@ def test_build_individual_researcher_citation_has_both_name_and_titl():
     citation to merge it across multiple people's citations in its own UI - confirmed
     live by the user; _TITL alone displays but doesn't merge."""
     rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1",
-          "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
+           "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
     primary = rec["participants"][0]
     lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
@@ -1055,7 +1058,12 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
                                 "affidavit_number": "5473"
                             },
                             "participants": [
-                                {"role_number": "0", "role_semantic": "primary", "std_given": "William", "std_surname": "Anderson"}
+                                {
+                                    "role_number": "0",
+                                    "role_semantic": "primary",
+                                    "std_given": "William",
+                                    "std_surname": "Anderson",
+                                }
                             ]
                         }
                     ]
@@ -1068,5 +1076,3 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
         assert "0 @I1506170@ INDI" in ged_text
     finally:
         arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
-
-

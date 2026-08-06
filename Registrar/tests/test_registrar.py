@@ -195,10 +195,17 @@ def test_find_fuzzy_duplicates_empty_dataframe_returns_empty():
 
 
 def test_find_fuzzy_duplicates_pass_one_matches_similar_names_within_age_gap():
-    """Pass 1 should match candidates with token_set_ratio >= FUZZY_THRESHOLD (82) and age difference <= MAX_AGE_GAP (5)."""
+    """Pass 1 should match candidates with token_set_ratio >= FUZZY_THRESHOLD (82)
+    and age difference <= MAX_AGE_GAP (5)."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": []},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Hougton", "FullName": "Joseph Hougton", "BirthYear": 1817, "RelativesList": []},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Hougton",
+            "FullName": "Joseph Hougton", "BirthYear": 1817, "RelativesList": [],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)
@@ -215,8 +222,14 @@ def test_find_fuzzy_duplicates_pass_one_ignores_beyond_max_age_gap():
     """Pass 1 must ignore pairs whose birth years differ by more than MAX_AGE_GAP (default 5 years),
     even if their full names match 100%."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": []},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1830, "RelativesList": []},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1830, "RelativesList": [],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)
@@ -226,8 +239,14 @@ def test_find_fuzzy_duplicates_pass_one_ignores_beyond_max_age_gap():
 def test_find_fuzzy_duplicates_skips_pass_two_by_default():
     """When run_pass_two=False, individuals with unknown birth years (BirthYear=0) must be skipped."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 0, "RelativesList": []},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": []},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 0, "RelativesList": [],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)
@@ -235,10 +254,17 @@ def test_find_fuzzy_duplicates_skips_pass_two_by_default():
 
 
 def test_find_fuzzy_duplicates_pass_two_matches_unknown_birth_year_with_strict_threshold():
-    """When run_pass_two=True, records with unknown birth years (BirthYear=0) are matched using FUZZY_THRESHOLD_STRICT (95)."""
+    """When run_pass_two=True, records with unknown birth years (BirthYear=0)
+    are matched using FUZZY_THRESHOLD_STRICT (95)."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 0, "RelativesList": []},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": []},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 0, "RelativesList": [],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=True)
@@ -255,8 +281,14 @@ def test_find_fuzzy_duplicates_filters_out_family_conflicts():
     """If name similarity is high but both candidates have non-matching relatives, family_conflict
     causes the pair to be excluded from potential duplicate matches."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": ["Mary Smith"]},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1816, "RelativesList": ["Sarah Johnson"]},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": ["Mary Smith"],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1816, "RelativesList": ["Sarah Johnson"],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)
@@ -266,8 +298,15 @@ def test_find_fuzzy_duplicates_filters_out_family_conflicts():
 def test_find_fuzzy_duplicates_verifies_family_matches():
     """If candidates share at least one relative, Family_Verified should be set to True in the match record."""
     records = [
-        {"PersonID": 1, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": ["Mary Smith"]},
-        {"PersonID": 2, "Given": "Joseph", "Surname": "Houghton", "FullName": "Joseph Houghton", "BirthYear": 1816, "RelativesList": ["Mary Smith", "John Houghton"]},
+        {
+            "PersonID": 1, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1815, "RelativesList": ["Mary Smith"],
+        },
+        {
+            "PersonID": 2, "Given": "Joseph", "Surname": "Houghton",
+            "FullName": "Joseph Houghton", "BirthYear": 1816,
+            "RelativesList": ["Mary Smith", "John Houghton"],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)
@@ -279,7 +318,14 @@ def test_find_fuzzy_duplicates_verifies_family_matches():
 def test_find_fuzzy_duplicates_respects_test_limit():
     """Specifying test_limit caps the number of known-age records processed in Pass 1 and skips Pass 2."""
     records = [
-        {"PersonID": i, "Given": "Joseph", "Surname": f"Houghton{i}", "FullName": f"Joseph Houghton{i}", "BirthYear": 1815 + (i % 2), "RelativesList": []}
+        {
+            "PersonID": i,
+            "Given": "Joseph",
+            "Surname": f"Houghton{i}",
+            "FullName": f"Joseph Houghton{i}",
+            "BirthYear": 1815 + (i % 2),
+            "RelativesList": [],
+        }
         for i in range(1, 20)
     ]
     df = pd.DataFrame(records)
@@ -290,12 +336,18 @@ def test_find_fuzzy_duplicates_respects_test_limit():
     assert set(matches_df["ID_1"]).issubset(sorted_known_ids)
 
 
-
 def test_find_fuzzy_duplicates_handles_missing_or_malformed_columns():
-    """DataFrame missing expected non-essential values or having NaN birth years should handle coercion without crashing."""
+    """DataFrame missing expected non-essential values or having NaN birth years
+    should handle coercion without crashing."""
     records = [
-        {"PersonID": 1, "Given": None, "Surname": "Houghton", "FullName": "Houghton", "BirthYear": 1815, "RelativesList": []},
-        {"PersonID": 2, "Given": None, "Surname": "Houghton", "FullName": "Houghton", "BirthYear": 1815, "RelativesList": []},
+        {
+            "PersonID": 1, "Given": None, "Surname": "Houghton",
+            "FullName": "Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
+        {
+            "PersonID": 2, "Given": None, "Surname": "Houghton",
+            "FullName": "Houghton", "BirthYear": 1815, "RelativesList": [],
+        },
     ]
     df = pd.DataFrame(records)
     matches_df = reg.find_fuzzy_duplicates(df, run_pass_two=False)

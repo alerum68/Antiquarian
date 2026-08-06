@@ -79,28 +79,111 @@ EXPECTED_FIELDS = {
 # replacement for schema.json - a missing or paraphrased description is a real regression
 # that a field-names-only comparison cannot see.
 EXPECTED_DESCRIPTIONS = {
-    ('DocumentMetadata', 'source_name'): "The name of the institution this document is from, if this sheet states it (e.g. a parish/church's own printed heading or running title), read exactly as written. Null if this sheet never states it.",
-    ('Participant', 'age_unit'): 'Unit for the age field. Infant baptism/burial ages are often given in months or days rather than years - set this explicitly whenever age is present; leave both null if no age is stated.',
-    ('Participant', 'alternate_names'): "A later annotator's marginal note suggesting a different spelling of this person's name (not the priest's own original entry, and not a disagreement to resolve - both readings are kept). Leave empty/null if the margin has no such note. Do not use this for your own uncertainty about the body text's own reading - that's std_given/std_surname plus review/review_reason.",
-    ('Participant', 'birth_date'): 'Your best English-language reading of the date exactly as it appears. Final ISO formatting is handled downstream, not by you.',
-    ('Participant', 'death_date'): 'Your best English-language reading of the date exactly as it appears. Final ISO formatting is handled downstream, not by you.',
-    ('Participant', 'facts'): "Any fact about this participant beyond the fields above, named from this record type's valid event vocabulary (the same vocabulary event_type is drawn from) - e.g. an immigration year, a naturalization status. Leave empty/null when nothing beyond the fields above applies; do not duplicate a fact already covered by a named field (occupation, birth_date, etc.) here.",
-    ('Participant', 'review'): "True if THIS participant's own data (name reading, dates, role assignment, etc.) is uncertain, guessed, illegible, or otherwise needs a human to double-check it.",
-    ('Participant', 'review_reason'): 'Short plain-English note (under 15 words) explaining why this participant needs review. Null if review is false.',
-    ('Participant', 'role_name'): 'Choose exactly one value from this record type\'s valid role vocabulary, given in the system instructions. Null only when the source itself provides no relationship/role data at all for this person (e.g. a pre-1880 US census record) - never leave null merely because a role is unclear; use "Other" for that instead.',
-    ('Participant', 'role_number'): 'Leave null. The numeric role code is derived downstream from role_name, not chosen by you.',
-    ('Participant', 'sex'): 'Infer from role/given name if not explicitly stated. Use "U" only when genuinely indeterminate (e.g. an unfamiliar name with no role or contextual clue) - never leave this unset.',
-    ('Participant', 'std_given'): 'Your best linguistic standardization of the given name, diacritics included. Diacritic stripping is handled downstream, not by you.',
-    ('Participant', 'std_surname'): 'Your best linguistic standardization of the surname, diacritics included. Diacritic stripping is handled downstream, not by you.',
-    ('Participant', 'type_specific_fields'): "Additional fields specific to this record type, defined by its .pmt file's front matter.",
-    ('Record', 'continues_from_previous_image'): "True ONLY if a 'CONTINUATION FROM PREVIOUS IMAGE' context block was given to you AND this record's content is what completes it - in that case this must be the FIRST record you output, containing the FULL merged content (the given prior content plus what you read here), and record_number/year copied from the given context. False in every other case, including when no such context was given at all.",
-    ('Record', 'continues_on_next_image'): 'True ONLY for the LAST record on this image, when its content appears to end abruptly at the very bottom of the visible page - cut off mid-sentence, no natural closing or signature - suggesting it continues onto content you cannot see. False for every other record, and false for the last record too if it has a normal, complete ending. See UNIVERSAL OUTPUT RULES for how this is used.',
-    ('Record', 'event_date'): "Your best English-language reading of the date exactly as it appears (e.g. 'December 12, 1850'). Final ISO formatting is handled downstream, not by you.",
-    ('Record', 'event_type'): "Choose exactly one value from this record type's valid event vocabulary, given in the system instructions.",
+    ('DocumentMetadata', 'source_name'): (
+        "The name of the institution this document is from, if this sheet states it "
+        "(e.g. a parish/church's own printed heading or running title), read exactly as written. "
+        "Null if this sheet never states it."
+    ),
+    ('Participant', 'age_unit'): (
+        "Unit for the age field. Infant baptism/burial ages are often given in months or days "
+        "rather than years - set this explicitly whenever age is present; leave both null if "
+        "no age is stated."
+    ),
+    ('Participant', 'alternate_names'): (
+        "A later annotator's marginal note suggesting a different spelling of this person's "
+        "name (not the priest's own original entry, and not a disagreement to resolve - both "
+        "readings are kept). Leave empty/null if the margin has no such note. Do not use this "
+        "for your own uncertainty about the body text's own reading - that's "
+        "std_given/std_surname plus review/review_reason."
+    ),
+    ('Participant', 'birth_date'): (
+        "Your best English-language reading of the date exactly as it appears. Final ISO "
+        "formatting is handled downstream, not by you."
+    ),
+    ('Participant', 'death_date'): (
+        "Your best English-language reading of the date exactly as it appears. Final ISO "
+        "formatting is handled downstream, not by you."
+    ),
+    ('Participant', 'facts'): (
+        "Any fact about this participant beyond the fields above, named from this record "
+        "type's valid event vocabulary (the same vocabulary event_type is drawn from) - e.g. "
+        "an immigration year, a naturalization status. Leave empty/null when nothing beyond "
+        "the fields above applies; do not duplicate a fact already covered by a named field "
+        "(occupation, birth_date, etc.) here."
+    ),
+    ('Participant', 'review'): (
+        "True if THIS participant's own data (name reading, dates, role assignment, etc.) is "
+        "uncertain, guessed, illegible, or otherwise needs a human to double-check it."
+    ),
+    ('Participant', 'review_reason'): (
+        "Short plain-English note (under 15 words) explaining why this participant needs "
+        "review. Null if review is false."
+    ),
+    ('Participant', 'role_name'): (
+        "Choose exactly one value from this record type's valid role vocabulary, given in "
+        "the system instructions. Null only when the source itself provides no "
+        'relationship/role data at all for this person (e.g. a pre-1880 US census record) - '
+        'never leave null merely because a role is unclear; use "Other" for that instead.'
+    ),
+    ('Participant', 'role_number'): (
+        "Leave null. The numeric role code is derived downstream from role_name, "
+        "not chosen by you."
+    ),
+    ('Participant', 'sex'): (
+        'Infer from role/given name if not explicitly stated. Use "U" only when genuinely '
+        "indeterminate (e.g. an unfamiliar name with no role or contextual clue) - never "
+        "leave this unset."
+    ),
+    ('Participant', 'std_given'): (
+        "Your best linguistic standardization of the given name, diacritics included. "
+        "Diacritic stripping is handled downstream, not by you."
+    ),
+    ('Participant', 'std_surname'): (
+        "Your best linguistic standardization of the surname, diacritics included. "
+        "Diacritic stripping is handled downstream, not by you."
+    ),
+    ('Participant', 'type_specific_fields'): (
+        "Additional fields specific to this record type, defined by its .pmt file's front "
+        "matter."
+    ),
+    ('Record', 'continues_from_previous_image'): (
+        "True ONLY if a 'CONTINUATION FROM PREVIOUS IMAGE' context block was given to you AND "
+        "this record's content is what completes it - in that case this must be the FIRST "
+        "record you output, containing the FULL merged content (the given prior content plus "
+        "what you read here), and record_number/year copied from the given context. False in "
+        "every other case, including when no such context was given at all."
+    ),
+    ('Record', 'continues_on_next_image'): (
+        "True ONLY for the LAST record on this image, when its content appears to end "
+        "abruptly at the very bottom of the visible page - cut off mid-sentence, no natural "
+        "closing or signature - suggesting it continues onto content you cannot see. False "
+        "for every other record, and false for the last record too if it has a normal, "
+        "complete ending. See UNIVERSAL OUTPUT RULES for how this is used."
+    ),
+    ('Record', 'event_date'): (
+        "Your best English-language reading of the date exactly as it appears (e.g. "
+        "'December 12, 1850'). Final ISO formatting is handled downstream, not by you."
+    ),
+    ('Record', 'event_type'): (
+        "Choose exactly one value from this record type's valid event vocabulary, given in "
+        "the system instructions."
+    ),
     ('Record', 'record_id'): 'Leave null. Derived downstream from event_type and record_number, not chosen by you.',
-    ('Record', 'review'): 'True if any part of this record (dates, place, transcription, translation, or any participant) is uncertain, guessed, illegible, or otherwise needs a human to double-check it.',
-    ('Record', 'review_reason'): 'Short plain-English note (under 15 words) explaining why this record needs review. Null if review is false.',
-    ('Record', 'type_specific_fields'): "Additional fields specific to this record type, defined by its .pmt file's front matter. For a pre-1850 US census record with only a named head of household, this is also where an unnamed household_tally (age/sex/race bracket counts) belongs - not fabricated participant entries.",
+    ('Record', 'review'): (
+        "True if any part of this record (dates, place, transcription, translation, or any "
+        "participant) is uncertain, guessed, illegible, or otherwise needs a human to "
+        "double-check it."
+    ),
+    ('Record', 'review_reason'): (
+        "Short plain-English note (under 15 words) explaining why this record needs review. "
+        "Null if review is false."
+    ),
+    ('Record', 'type_specific_fields'): (
+        "Additional fields specific to this record type, defined by its .pmt file's front "
+        "matter. For a pre-1850 US census record with only a named head of household, this is "
+        "also where an unnamed household_tally (age/sex/race bracket counts) belongs - not "
+        "fabricated participant entries."
+    ),
 }
 
 

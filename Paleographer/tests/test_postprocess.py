@@ -213,7 +213,8 @@ def test_merge_record_into_builds_source_documents_from_scratch():
     # incoming's own type_specific_fields fold into base without overwriting existing keys
     assert base["type_specific_fields"]["scrip_number"] == "12751"
     assert base["type_specific_fields"]["claim_number"] == "3126"
-    assert "document_type" not in base["type_specific_fields"] or base["type_specific_fields"]["document_type"] == "Witness Affidavit"
+    assert ("document_type" not in base["type_specific_fields"] or
+            base["type_specific_fields"]["document_type"] == "Witness Affidavit")
 
 
 def test_merge_record_into_appends_third_document_without_duplicating_base_entry():

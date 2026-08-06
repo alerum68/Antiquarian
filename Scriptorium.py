@@ -188,9 +188,13 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "LAC_HARVEST_VOLUME": "Volume number at Library and Archives Canada to harvest (e.g. '1320' or '1325-1330').",
     "LAC_HARVEST_ARCHIVAL_NUMBER": "Archival series prefix used when harvesting an LAC volume (default 'RG15').",
     "LAC_COOKIE_FILE": "Fallback text file for LAC search session cookies.",
-    "SCRIP_DELAY_SECONDS": "Pacing delay in seconds between LAC API requests during metadata enrichment (default: 0.4s).",
+    "SCRIP_DELAY_SECONDS": (
+        "Pacing delay in seconds between LAC API requests during metadata enrichment (default: 0.4s)."
+    ),
     "SCRIP_ENRICH_LIMIT": "Optional maximum number of records to process during enrichment (blank for all).",
-    "SCRIP_PARTITION_OUTPUT_DIR": "Directory where partitioned collection JSON files are saved (default: 'partitioned' subfolder).",
+    "SCRIP_PARTITION_OUTPUT_DIR": (
+        "Directory where partitioned collection JSON files are saved (default: 'partitioned' subfolder)."
+    ),
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
     "API_BUDGET": "A safety limit for your AI costs (e.g., '20' means $20). The script stops if it spends this much.",
     "MODEL_NAME": "The AI model version you want to use (usually gemini-3.1-pro-preview or gemini-2.5-pro).",
@@ -1846,7 +1850,9 @@ class Scriptorium(ctk.CTk):
                     if limit_val:
                         args.extend(["--limit", limit_val])
                 elif mode == "partition":
-                    out_dir_val = self.string_vars.get("SCRIP_PARTITION_OUTPUT_DIR", ctk.StringVar(value="")).get().strip()
+                    out_dir_val = self.string_vars.get(
+                        "SCRIP_PARTITION_OUTPUT_DIR", ctk.StringVar(value="")
+                    ).get().strip()
                     if out_dir_val:
                         args.extend(["--output-dir", out_dir_val])
         elif script_key == "VOYAGEUR_SCRIPT":

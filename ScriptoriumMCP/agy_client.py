@@ -141,7 +141,7 @@ def _run_agy(args: List[str], cwd: Path, cli_bin: str, timeout_seconds: int,
     )
     try:
         proc = subprocess.Popen([resolved_bin] + args, cwd=str(cwd), text=True,
-                                 encoding="utf-8", errors="replace", **stdio_kwargs)
+                                encoding="utf-8", errors="replace", **stdio_kwargs)
     except OSError as e:
         raise AgyCallError(f"Failed to launch '{resolved_bin}': {e}") from e
 
@@ -163,8 +163,8 @@ def _run_agy(args: List[str], cwd: Path, cli_bin: str, timeout_seconds: int,
 # STEADY-STATE EXTRACTION CALL (headless, always)
 # ==========================================
 def call_agy_structured(*, workspace_dir: Path, model: str, prompt: str,
-                         schema: Dict[str, Any], cli_bin: str = DEFAULT_CLI_BIN,
-                         timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> AgyStructuredResult:
+                        schema: Dict[str, Any], cli_bin: str = DEFAULT_CLI_BIN,
+                        timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> AgyStructuredResult:
     """One synchronous, fully headless agy call. workspace_dir must already contain
     whatever file(s) `prompt` references (an already-staged image, etc.) - this function
     only adds schema.json to it and invokes:
@@ -233,7 +233,7 @@ def call_agy_structured(*, workspace_dir: Path, model: str, prompt: str,
 # AUTH BOOTSTRAP (the only interactive path)
 # ==========================================
 def check_or_prompt_auth(model: str, cli_bin: str = DEFAULT_CLI_BIN,
-                          timeout_seconds: int = AUTH_TIMEOUT_SECONDS) -> bool:
+                         timeout_seconds: int = AUTH_TIMEOUT_SECONDS) -> bool:
     """Runs a minimal `agy --model <model> -p "reply OK"` call WITHOUT stdin=DEVNULL
     (stdio inherited from the parent, so any printed sign-in URL/instructions are
     visible) and with a generous timeout (default 10 minutes) rather than the short
@@ -252,7 +252,7 @@ def check_or_prompt_auth(model: str, cli_bin: str = DEFAULT_CLI_BIN,
     call succeeded. Revisit this once the real unauthenticated behavior has been
     observed (see plan's verification step for check_or_prompt_auth)."""
     result = _run_agy(["--model", model, "-p", "reply OK"], cwd=Path.cwd(),
-                       cli_bin=cli_bin, timeout_seconds=timeout_seconds, interactive=True)
+                      cli_bin=cli_bin, timeout_seconds=timeout_seconds, interactive=True)
     return result.returncode == 0
 
 
@@ -355,4 +355,3 @@ def pause_for_quota_reset(wait_seconds: float, reason: str = "") -> None:
           f"Pausing execution for {wait_int}s...", flush=True)
     time.sleep(wait_seconds)
     print("   [RESUME] Quota reset period elapsed. Resuming execution at current position.\n", flush=True)
-

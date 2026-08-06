@@ -307,8 +307,8 @@ def _worker_download_loop(worker_id: int, task_queue: mp.Queue, result_queue: mp
 
 
 def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoint_path: str,
-                                      max_workers: int = 4, base_delay: float = 0.3,
-                                      timeout_seconds: int = 45) -> Dict[str, Any]:
+                                       max_workers: int = 4, base_delay: float = 0.3,
+                                       timeout_seconds: int = 45) -> Dict[str, Any]:
     """Concurrent multi-worker PID downloading with watchdog timeout."""
     checkpoint = load_checkpoint(checkpoint_path)
     downloaded = set(checkpoint.get("downloaded_pids", []))

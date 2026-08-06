@@ -329,7 +329,8 @@ MONTHS_REGEX = (
     r'jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)'
 )
 DATE_PATTERN = re.compile(
-    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
+    rf'\b(?:(?:\d{{1,2}}(?:st|nd|rd|th)?\s+)?{MONTHS_REGEX}\.?\s+'
+    rf'\d{{1,2}}(?:st|nd|rd|th)?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
     rf'\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)?|'
     rf'{MONTHS_REGEX}\.?,?\s*(?:17\d\d|18\d\d|19\d\d)|(?:17\d\d|18\d\d|19\d\d)(?:/(?:17\d\d|18\d\d|19\d\d))?)\b',
     re.I)
@@ -384,7 +385,9 @@ def clean_race(val: Any) -> str:
     if not text:
         return ""
     cleaned = re.sub(r'^(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\s*(?:and|&)?\s*', '', text, flags=re.I)
-    cleaned = re.sub(r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$', '', cleaned, flags=re.I)
+    cleaned = re.sub(
+        r'[,;]?\s*(?:(?:and|&|an)\s+)?(?:the\s+)?(?:present\s+)?d(?:e)?pon(?:ent|end)\b.*$',
+        '', cleaned, flags=re.I)
     cleaned = re.sub(r'[,;&\s]+$', '', cleaned).strip()
     cleaned = re.sub(r'^[,;&\s]+', '', cleaned).strip()
     if cleaned.lower() in ("deponent", "the deponent", "mother", "father", "wife", "husband", "widow", "as heir", ""):
@@ -1509,7 +1512,11 @@ SOURCE_DIR: str = str(PROGRAM_DIR / resolve_setting("IMAGE_DIR"))
 MODEL_ID: str = os.getenv("MODEL_NAME") or ""
 if not MODEL_ID:
     raise RuntimeError("MODEL_NAME is not set. Check your .env configuration.")
-DEBUG_FILE: Union[str, None] = sys.argv[1] if (len(sys.argv) > 1 and sys.argv[1] not in ("extract", "enrich", "crosscheck", "partition", "resolve-names") and not sys.argv[1].startswith("-")) else None
+DEBUG_FILE: Union[str, None] = sys.argv[1] if (
+    len(sys.argv) > 1
+    and sys.argv[1] not in ("extract", "enrich", "crosscheck", "partition", "resolve-names")
+    and not sys.argv[1].startswith("-")
+) else None
 
 # agy-engine-only settings. AGY_MODEL_ID is always passed explicitly to every agy call,
 # never left to agy's own default.
@@ -2128,7 +2135,9 @@ def enrich_json_data(data: Dict[str, Any], checkpoint_path: Optional[str] = None
                      delay_seconds: float = 0.4, limit: Optional[int] = None,
                      checkpoint_every: int = 50) -> Dict[str, Any]:
     """Iterates through all records in a JSON dataset, fetching live LAC metadata for each PID."""
-    checkpoint = voyageur_lac.load_checkpoint(checkpoint_path) if checkpoint_path else {"done_pids": [], "failed_pids": {}}
+    checkpoint = voyageur_lac.load_checkpoint(checkpoint_path) if checkpoint_path else {
+        "done_pids": [], "failed_pids": {}
+    }
     done = set(checkpoint.get("done_pids", []))
     failed = checkpoint.get("failed_pids", {})
 
@@ -2295,4 +2304,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

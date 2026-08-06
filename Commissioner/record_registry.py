@@ -5,6 +5,8 @@ from typing import Any, Dict, FrozenSet, List, Optional, Type
 import yaml
 from pydantic import BaseModel, ConfigDict, create_model
 
+from Commissioner.models import Collection
+
 PMT_DIR = Path(__file__).resolve().parent.parent / "Paleographer" / "prompts"
 
 _PRIMITIVE_TYPE_MAP: Dict[str, type] = {
@@ -140,9 +142,6 @@ def validate_role_name(document_type: str, role_name: Optional[str]) -> None:
             f"{role_name!r} is not a valid role for document_type {document_type!r} "
             f"(valid roles: {sorted(schema.valid_roles)})"
         )
-
-
-from Commissioner.models import Collection
 
 
 def parse_collection(raw_json: dict, document_type: str) -> Collection:

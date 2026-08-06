@@ -598,7 +598,7 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
         return agy_client.AgyStructuredResult(
             structured_output=json.loads(json.dumps(fake_structured_output)),
             usage=agy_client.AgyUsage(input_tokens=1000, output_tokens=500, thinking_tokens=100,
-                                       cache_read_tokens=0, total_tokens=1600),
+                                      cache_read_tokens=0, total_tokens=1600),
         )
 
     monkeypatch.setattr(module, "call_agy_extract", fake_call_agy_extract)
