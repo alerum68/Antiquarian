@@ -55,8 +55,8 @@ def test_scrip_participant_extra_fields():
 
 
 def test_unknown_document_type_raises():
-    with pytest.raises(UnknownDocumentTypeError, match="Wills"):
-        validate_record_extra_fields("Wills", {})
+    with pytest.raises(UnknownDocumentTypeError, match="NotARecordType"):
+        validate_record_extra_fields("NotARecordType", {})
 
 
 def test_valid_roles_differ_by_document_type():
