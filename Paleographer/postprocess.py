@@ -214,8 +214,8 @@ def _source_document_entry(record: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "document_type": _label_for(record),
         "page": record.get("page"),
-        "original_transcription": record.get("original_transcription"),
-        "english_translation": record.get("english_translation"),
+        "citation_text": record.get("citation_text"),
+        "citation_details": record.get("citation_details"),
     }
 
 
@@ -223,7 +223,7 @@ def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
     """Merges `incoming` into `base` in place - `base` is what survives, `incoming` is
     discarded by the caller afterward. See merge_same_claim_records for when this runs.
 
-    base's own top-level original_transcription/english_translation are left untouched
+    base's own top-level citation_text/citation_details are left untouched
     (still just base's own text, unlabeled) - every document's text, including base's,
     instead lands in base["source_documents"], one entry per physical document. This
     keeps every other record type (anything that never goes through this merge step)

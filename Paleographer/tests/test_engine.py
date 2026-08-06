@@ -384,8 +384,8 @@ def test_build_continuation_context_empty_when_nothing_pending():
 def test_build_continuation_context_includes_key_fields():
     pending = {
         "record_number": "44", "year": "1850", "event_type": "Baptism",
-        "original_transcription": "Le 12 decembre, j'ai baptise",
-        "english_translation": "On December 12, I baptized",
+        "citation_text": "Le 12 decembre, j'ai baptise",
+        "citation_details": "On December 12, I baptized",
         "participants": [{"role_name": "Primary", "std_given": "Jean", "std_surname": "Gagne"}],
     }
     text = engine.build_continuation_context(pending)

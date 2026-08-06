@@ -141,8 +141,8 @@ PARISH_FAKE_RESPONSE = {
             "year": "1850",
             "event_date": "December 12, 1850",
             "event_place": None,
-            "english_translation": "On December 12, 1850, I baptized Jean, son of Jean Gagne and Marie Notre-Dame.",
-            "original_transcription": "Le 12 decembre 1850, j'ai baptise Jean, fils de Jean Gagne et Marie Notre-Dame.",
+            "citation_details": "On December 12, 1850, I baptized Jean, son of Jean Gagne and Marie Notre-Dame.",
+            "citation_text": "Le 12 decembre 1850, j'ai baptise Jean, fils de Jean Gagne et Marie Notre-Dame.",
             "review": False,
             "review_reason": None,
             "type_specific_fields": {},
@@ -266,8 +266,8 @@ SCRIP_FAKE_RESPONSE = {
             "year": "1876",
             "event_date": "March 3, 1876",
             "event_place": "Manitoba",
-            "english_translation": "Scrip application of Louis Riel.",
-            "original_transcription": "Scrip application of Louis Riel.",
+            "citation_details": "Scrip application of Louis Riel.",
+            "citation_text": "Scrip application of Louis Riel.",
             "review": False,
             "review_reason": None,
             "type_specific_fields": {
@@ -343,8 +343,8 @@ def _minimal_record(**overrides):
     base = {
         "record_id": None, "page": "1", "record_number": "1",
         "event_type": "Baptism", "year": "1850", "event_date": "December 12, 1850", "event_place": None,
-        "english_translation": "On December 12, 1850, I baptized Jean.",
-        "original_transcription": "Le 12 decembre 1850, j'ai baptise Jean.",
+        "citation_details": "On December 12, 1850, I baptized Jean.",
+        "citation_text": "Le 12 decembre 1850, j'ai baptise Jean.",
         "review": False, "review_reason": None, "continues_on_next_image": False,
         "continues_from_previous_image": False, "type_specific_fields": {},
         "participants": [{
@@ -367,7 +367,7 @@ def test_page_continuation_merges_across_images_without_duplication(tmp_path, mo
     page_1_response = {
         "collection_title": "Test Baptisms",
         "sheets": [{"page_id": "p1", "document_metadata": {}, "records": [
-            _minimal_record(record_number="44", original_transcription="Le 12 decembre, j'ai baptise",
+            _minimal_record(record_number="44", citation_text="Le 12 decembre, j'ai baptise",
                             continues_on_next_image=True, review=True, review_reason="Cut off at page end"),
         ]}],
     }
@@ -375,7 +375,7 @@ def test_page_continuation_merges_across_images_without_duplication(tmp_path, mo
         "collection_title": "Test Baptisms",
         "sheets": [{"page_id": "p2", "document_metadata": {}, "records": [
             _minimal_record(record_number="44",
-                            original_transcription="Le 12 decembre, j'ai baptise Jean, fils de...",
+                            citation_text="Le 12 decembre, j'ai baptise Jean, fils de...",
                             continues_from_previous_image=True),
             _minimal_record(record_number="45"),
         ]}],
@@ -399,7 +399,7 @@ def test_page_continuation_merges_across_images_without_duplication(tmp_path, mo
 
     assert len(all_records) == 2, f"expected 2 records total (one merged, one new), got {len(all_records)}"
     record_44 = next(r for r in all_records if r["record_number"] == "44")
-    assert record_44["original_transcription"] == "Le 12 decembre, j'ai baptise Jean, fils de..."
+    assert record_44["citation_text"] == "Le 12 decembre, j'ai baptise Jean, fils de..."
     assert record_44["continues_from_previous_image"] is True
 
 

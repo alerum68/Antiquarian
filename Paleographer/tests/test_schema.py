@@ -34,8 +34,8 @@ def test_parish_fixture_validates_against_merged_schema():
             "records": [{
                 "record_id": "B-14", "page": "3", "record_number": "14",
                 "event_type": "Baptism", "year": "1850", "event_date": "1850-12-12",
-                "event_place": "Pembina", "english_translation": "On December 12, 1850...",
-                "original_transcription": "Le 12 decembre 1850...", "review": False, "review_reason": "",
+                "event_place": "Pembina", "citation_details": "On December 12, 1850...",
+                "citation_text": "Le 12 decembre 1850...", "review": False, "review_reason": "",
                 "type_specific_fields": {},
                 "participants": [
                     {"role_number": "1", "role_name": "Primary", "std_given": "Jean", "std_surname": "Gagnon",
@@ -63,8 +63,8 @@ def test_scrip_fixture_validates_against_merged_schema():
             "records": [{
                 "record_id": "SCRIP-1042", "page": "1", "record_number": "1042",
                 "event_type": "Scrip Application", "year": "1876", "event_date": "1876-03-03",
-                "event_place": "Manitoba", "english_translation": "Application of Baptiste Ledoux...",
-                "original_transcription": "Application of Baptiste Ledoux...", "review": False,
+                "event_place": "Manitoba", "citation_details": "Application of Baptiste Ledoux...",
+                "citation_text": "Application of Baptiste Ledoux...", "review": False,
                 "review_reason": "", "type_specific_fields": {"scrip_number": "1042"},
                 "participants": [
                     {"role_number": "1", "role_name": "Claimant", "std_given": "Baptiste", "std_surname": "Ledoux",
@@ -90,7 +90,7 @@ def test_facts_and_age_unit_validate_against_merged_schema():
             "records": [{
                 "record_id": "CENS-1", "page": "1", "record_number": "1",
                 "event_type": "Census (family)", "year": "1900", "event_date": "1900-06-01",
-                "event_place": "", "english_translation": "", "original_transcription": "",
+                "event_place": "", "citation_details": "", "citation_text": "",
                 "review": False, "review_reason": "",
                 "type_specific_fields": {"family_number": "12"},
                 "participants": [
@@ -119,7 +119,7 @@ def test_household_tally_convention_validates_against_merged_schema():
             "records": [{
                 "record_id": "CENS-1", "page": "1", "record_number": "1",
                 "event_type": "Census (family)", "year": "1800", "event_date": "1800-08-04",
-                "event_place": "", "english_translation": "", "original_transcription": "",
+                "event_place": "", "citation_details": "", "citation_text": "",
                 "review": False, "review_reason": "",
                 "type_specific_fields": {
                     "household_tally": [{"category": "free_white_male_under_16", "count": 3}]
