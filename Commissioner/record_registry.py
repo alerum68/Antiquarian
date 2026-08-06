@@ -13,6 +13,7 @@ _PRIMITIVE_TYPE_MAP: Dict[str, type] = {
     "float": float,
     "bool": bool,
     "date": date,
+    "dict": Dict[str, Any],
 }
 
 
@@ -34,10 +35,12 @@ class _DocumentTypeSchema:
         record_extra_model: Type[BaseModel],
         participant_extra_model: Type[BaseModel],
         valid_roles: FrozenSet[str],
+        role_validation_mode: str,
     ):
         self.record_extra_model = record_extra_model
         self.participant_extra_model = participant_extra_model
         self.valid_roles = valid_roles
+        self.role_validation_mode = role_validation_mode
 
 
 def _load_pmt_front_matter(path: Path) -> dict:
@@ -90,7 +93,11 @@ def _build_registry(pmt_dir: Path = PMT_DIR) -> Dict[str, _DocumentTypeSchema]:
         roles = front_matter.get("roles") or {}
         valid_roles = frozenset(role["name"] for role in roles.values())
 
-        registry[document_type] = _DocumentTypeSchema(record_extra_model, participant_extra_model, valid_roles)
+        role_validation_mode = front_matter.get("role_validation", "closed")
+
+        registry[document_type] = _DocumentTypeSchema(
+            record_extra_model, participant_extra_model, valid_roles, role_validation_mode
+        )
     return registry
 
 
@@ -125,11 +132,13 @@ def validate_participant_extra_fields(document_type: str, raw: dict) -> BaseMode
 def validate_role_name(document_type: str, role_name: Optional[str]) -> None:
     if role_name is None:
         return
-    valid_roles = get_valid_roles(document_type)
-    if role_name not in valid_roles:
+    schema = _get_schema(document_type)
+    if schema.role_validation_mode == "open":
+        return
+    if role_name not in schema.valid_roles:
         raise InvalidRoleError(
             f"{role_name!r} is not a valid role for document_type {document_type!r} "
-            f"(valid roles: {sorted(valid_roles)})"
+            f"(valid roles: {sorted(schema.valid_roles)})"
         )
 
 

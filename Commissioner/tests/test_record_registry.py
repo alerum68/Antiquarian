@@ -152,6 +152,66 @@ def test_build_registry_accepts_a_valid_fixture_dir(tmp_path):
     assert registry["Fixture"].valid_roles == frozenset({"Claimant"})
 
 
+import Commissioner.record_registry as record_registry
+
+
+OPEN_ROLE_PMT = """---
+roles:
+  "1": {name: "Head", semantic: primary}
+role_validation: open
+extra_fields:
+  participant:
+    - {name: notes, type: dict}
+---
+Fixture prompt body.
+"""
+
+
+def test_open_role_validation_mode_is_read_from_front_matter(tmp_path):
+    (tmp_path / "OpenFixture.pmt").write_text(OPEN_ROLE_PMT, encoding="utf-8")
+    registry = _build_registry(tmp_path)
+    assert registry["OpenFixture"].role_validation_mode == "open"
+
+
+def test_closed_is_the_default_role_validation_mode_when_key_absent(tmp_path):
+    (tmp_path / "Fixture.pmt").write_text(
+        UNKNOWN_TYPE_PMT.replace("type: nonsense", "type: string"), encoding="utf-8"
+    )
+    registry = _build_registry(tmp_path)
+    assert registry["Fixture"].role_validation_mode == "closed"
+
+
+def test_validate_role_name_is_a_noop_for_open_mode_document_types(tmp_path, monkeypatch):
+    (tmp_path / "OpenFixture.pmt").write_text(OPEN_ROLE_PMT, encoding="utf-8")
+    fixture_registry = _build_registry(tmp_path)
+    monkeypatch.setattr(record_registry, "_REGISTRY", fixture_registry)
+
+    validate_role_name("OpenFixture", "TotallyUnknownRole")
+    validate_role_name("OpenFixture", "Head")
+
+
+def test_validate_role_name_still_rejects_unknown_role_for_closed_mode_document_types(
+    tmp_path, monkeypatch
+):
+    (tmp_path / "Fixture.pmt").write_text(
+        UNKNOWN_TYPE_PMT.replace("type: nonsense", "type: string"), encoding="utf-8"
+    )
+    fixture_registry = _build_registry(tmp_path)
+    monkeypatch.setattr(record_registry, "_REGISTRY", fixture_registry)
+
+    with pytest.raises(InvalidRoleError, match="Coordinator"):
+        validate_role_name("Fixture", "Coordinator")
+
+
+def test_dict_field_type_accepts_a_nested_dict_value(tmp_path):
+    (tmp_path / "OpenFixture.pmt").write_text(OPEN_ROLE_PMT, encoding="utf-8")
+    registry = _build_registry(tmp_path)
+    extra = registry["OpenFixture"].participant_extra_model(
+        notes={"Race": "W", "Column_9": "Yes"}
+    )
+    assert extra.notes == {"Race": "W", "Column_9": "Yes"}
+
+
 import pytest
 from pydantic import ValidationError
 
