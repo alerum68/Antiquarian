@@ -55,8 +55,8 @@ def test_scrip_participant_extra_fields():
 
 
 def test_unknown_document_type_raises():
-    with pytest.raises(UnknownDocumentTypeError, match="Census"):
-        validate_record_extra_fields("Census", {})
+    with pytest.raises(UnknownDocumentTypeError, match="Wills"):
+        validate_record_extra_fields("Wills", {})
 
 
 def test_valid_roles_differ_by_document_type():
@@ -65,6 +65,41 @@ def test_valid_roles_differ_by_document_type():
     assert "Officiant" in parish_roles
     assert "Claimant" in scrip_roles
     assert "Claimant" not in parish_roles
+
+
+def test_discovers_census_pmt_file():
+    assert "Census" in get_document_types()
+
+
+def test_census_record_extra_fields_validate():
+    extra = validate_record_extra_fields(
+        "Census",
+        {
+            "family_number": "12",
+            "enumeration_district": "0042",
+            "state": "Minnesota",
+        },
+    )
+    assert extra.family_number == "12"
+    assert extra.enumeration_district == "0042"
+    assert extra.state == "Minnesota"
+
+
+def test_census_participant_extra_fields_validate():
+    extra = validate_participant_extra_fields(
+        "Census", {"line_number": "7", "pid": "MXHY-ABC"}
+    )
+    assert extra.line_number == "7"
+    assert extra.pid == "MXHY-ABC"
+
+
+def test_census_roles_cover_standard_household_relationships():
+    roles = get_valid_roles("Census")
+    assert "Head" in roles
+    assert "Wife" in roles
+    assert "Son" in roles
+    assert "Boarder" in roles
+    assert "Coordinator" not in roles
 
 
 def test_validate_role_name_accepts_known_role():
