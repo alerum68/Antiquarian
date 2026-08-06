@@ -33,7 +33,7 @@
 - Consumes: nothing new.
 - Produces: `Record.citation_text`, `Record.citation_details` (Commissioner's public field names, replacing `Record.original_transcription`/`Record.english_translation`). Every later task's code that constructs a record dict must use `"citation_text"`/`"citation_details"` as the keys.
 
-- [ ] **Step 1: Update the failing guardrail test's expectations first**
+- [x] **Step 1: Update the failing guardrail test's expectations first**
 
 In `Commissioner/tests/test_models.py`, in `EXPECTED_FIELDS["Record"]`, replace:
 ```python
@@ -54,12 +54,12 @@ with:
     },
 ```
 
-- [ ] **Step 2: Run the guardrail test to verify it now fails against the unchanged code**
+- [x] **Step 2: Run the guardrail test to verify it now fails against the unchanged code**
 
 Run: `python -m pytest Commissioner/tests/test_models.py::test_models_match_schema_json_field_names -v`
 Expected: FAIL - `Record: expected {..., 'citation_text', 'citation_details', ...}, got {..., 'english_translation', 'original_transcription', ...}`
 
-- [ ] **Step 3: Rename the two properties in schema.json**
+- [x] **Step 3: Rename the two properties in schema.json**
 
 In `Paleographer/schema.json`, replace:
 ```json
@@ -76,7 +76,7 @@ with:
                 "review": {
 ```
 
-- [ ] **Step 4: Rename the two fields in Commissioner/models.py**
+- [x] **Step 4: Rename the two fields in Commissioner/models.py**
 
 In `Commissioner/models.py`, in the `Record` class, replace:
 ```python
@@ -93,12 +93,12 @@ with:
     review: bool = Field(
 ```
 
-- [ ] **Step 5: Run the guardrail test to verify it passes**
+- [x] **Step 5: Run the guardrail test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_models.py -v`
 Expected: PASS (all tests, including the round-trip test - it never referenced these two fields directly, so it's unaffected)
 
-- [ ] **Step 6: Rename the field references in Parish.pmt's prose**
+- [x] **Step 6: Rename the field references in Parish.pmt's prose**
 
 In `Paleographer/prompts/Parish.pmt`, replace:
 ```
@@ -115,7 +115,7 @@ with:
 - Use English when filling in all structured fact fields. Use citation_text just in the citation block.
 ```
 
-- [ ] **Step 7: Rename the field references in Scrip.pmt's prose**
+- [x] **Step 7: Rename the field references in Scrip.pmt's prose**
 
 In `Paleographer/prompts/Scrip.pmt`, replace:
 ```
@@ -156,12 +156,12 @@ COMMISSIONER'S REVIEW (citation_details field):
 Populate citation_details with the "Commissioner's Review" — a comprehensive, clear AI summary
 ```
 
-- [ ] **Step 8: Run the full test suite**
+- [x] **Step 8: Run the full test suite**
 
 Run: `python -m pytest --tb=short -q`
 Expected: PASS, same count as before this task (schema.json and the .pmt prose aren't read by any test other than Commissioner's own guardrails, which already passed in Step 5)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add Paleographer/schema.json Paleographer/prompts/Parish.pmt Paleographer/prompts/Scrip.pmt Commissioner/models.py Commissioner/tests/test_models.py
@@ -188,7 +188,7 @@ git commit -m "Rename original_transcription/english_translation to citation_tex
 
 Archivist.py's citation-building code already checks `citation_text`/`citation_details` before falling back to the old names (its own pre-existing partial fix), so this task is safe on its own: nothing downstream breaks by Paleographer starting to produce the new names sooner.
 
-- [ ] **Step 1: Rename in engine.py's continuation-prompt template**
+- [x] **Step 1: Rename in engine.py's continuation-prompt template**
 
 In `Paleographer/engine.py`, replace:
 ```python
@@ -201,7 +201,7 @@ with:
         translation so far: {pending_record.get("citation_details")}
 ```
 
-- [ ] **Step 2: Rename in test_engine.py's fixture**
+- [x] **Step 2: Rename in test_engine.py's fixture**
 
 In `Paleographer/tests/test_engine.py`, replace:
 ```python
@@ -222,12 +222,12 @@ with:
     }
 ```
 
-- [ ] **Step 3: Run the engine test file**
+- [x] **Step 3: Run the engine test file**
 
 Run: `python -m pytest Paleographer/tests/test_engine.py -v`
 Expected: PASS
 
-- [ ] **Step 4: Rename in Paleographer.py's dict-builder and continuation-prompt template**
+- [x] **Step 4: Rename in Paleographer.py's dict-builder and continuation-prompt template**
 
 In `Paleographer/Paleographer.py`, replace:
 ```python
@@ -259,7 +259,7 @@ with:
         participants captured so far: {json.dumps(participants_summary, ensure_ascii=False)}
 ```
 
-- [ ] **Step 5: Rename in postprocess.py's source-document builder and its docstring**
+- [x] **Step 5: Rename in postprocess.py's source-document builder and its docstring**
 
 In `Paleographer/postprocess.py`, replace:
 ```python
@@ -306,35 +306,35 @@ def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
     (still just base's own text, unlabeled) - every document's text, including base's,
 ```
 
-- [ ] **Step 6: Rename every occurrence in test_postprocess.py**
+- [x] **Step 6: Rename every occurrence in test_postprocess.py**
 
 In `Paleographer/tests/test_postprocess.py`, there are 14 occurrences of `"original_transcription"` and 14 of `"english_translation"` (all as dict keys or dict-value assertions in test fixtures, e.g. `base["original_transcription"]`, `{"original_transcription": "witness text", ...}`). Replace every occurrence of the literal string `original_transcription` with `citation_text`, and every occurrence of the literal string `english_translation` with `citation_details`, throughout this file. This is a pure find-and-replace - the surrounding test logic, assertions, and structure are unchanged, only the key name changes.
 
 Verify the count after: `grep -c "citation_text\|citation_details" Paleographer/tests/test_postprocess.py` should report at least 14 combined occurrences, and `grep -c "original_transcription\|english_translation" Paleographer/tests/test_postprocess.py` should report 0.
 
-- [ ] **Step 7: Rename every occurrence in test_paleographer_pipeline.py**
+- [x] **Step 7: Rename every occurrence in test_paleographer_pipeline.py**
 
 In `Paleographer/tests/test_paleographer_pipeline.py`, replace every occurrence of `original_transcription` with `citation_text` and `english_translation` with `citation_details` (6 occurrences of each, in test fixture dicts and one keyword-argument call to a `_minimal_record(...)` helper, and one dict-key assertion `record_44["original_transcription"]`). Same pure find-and-replace as Step 6.
 
 Verify: `grep -c "original_transcription\|english_translation" Paleographer/tests/test_paleographer_pipeline.py` should report 0 after.
 
-- [ ] **Step 8: Rename every occurrence in test_schema.py**
+- [x] **Step 8: Rename every occurrence in test_schema.py**
 
 In `Paleographer/tests/test_schema.py`, replace every occurrence of `english_translation` with `citation_details` and `original_transcription` with `citation_text` (4 occurrences of each, in fixture dicts used to test schema merging). Same pure find-and-replace.
 
 Verify: `grep -c "original_transcription\|english_translation" Paleographer/tests/test_schema.py` should report 0 after.
 
-- [ ] **Step 9: Run the full Paleographer test suite**
+- [x] **Step 9: Run the full Paleographer test suite**
 
 Run: `python -m pytest Paleographer/tests/ -v`
 Expected: PASS (all tests)
 
-- [ ] **Step 10: Run the full project test suite**
+- [x] **Step 10: Run the full project test suite**
 
 Run: `python -m pytest --tb=short -q`
 Expected: PASS, same total count as before this task
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add Paleographer/engine.py Paleographer/Paleographer.py Paleographer/postprocess.py Paleographer/tests/test_paleographer_pipeline.py Paleographer/tests/test_postprocess.py Paleographer/tests/test_engine.py Paleographer/tests/test_schema.py
@@ -356,7 +356,7 @@ git commit -m "Rename original_transcription/english_translation to citation_tex
 
 No test files in `Voyageur/` reference these two fields (confirmed by search), so this task only touches the three source files.
 
-- [ ] **Step 1: Rename in census_schema.py**
+- [x] **Step 1: Rename in census_schema.py**
 
 In `Voyageur/census_schema.py`, replace:
 ```python
@@ -367,7 +367,7 @@ with:
                 "event_place": place, "citation_details": "", "citation_text": "",
 ```
 
-- [ ] **Step 2: Rename both occurrences in Voyageur.py**
+- [x] **Step 2: Rename both occurrences in Voyageur.py**
 
 In `Voyageur/Voyageur.py`, there are two occurrences of the exact same line, in two different builder functions. Replace each occurrence of:
 ```python
@@ -387,7 +387,7 @@ with:
 ```
 (One occurrence matches the first pattern at ~line 228 inside a household-record loop; the other matches the second pattern at ~line 815 inside a different per-row builder. Confirm both are changed - `grep -c "original_transcription\|english_translation" Voyageur/Voyageur.py` should report 0 after.)
 
-- [ ] **Step 3: Rename in FS.py**
+- [x] **Step 3: Rename in FS.py**
 
 In `Voyageur/FS.py`, replace:
 ```python
@@ -400,12 +400,12 @@ with:
         "citation_text": "",
 ```
 
-- [ ] **Step 4: Run the full project test suite**
+- [x] **Step 4: Run the full project test suite**
 
 Run: `python -m pytest --tb=short -q`
 Expected: PASS, same total count as before this task (no existing test covers these three exact lines directly, since Census tests construct their own fixtures independently - this step exists to catch anything unexpected, not because a specific test targets this change)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Voyageur/census_schema.py Voyageur/Voyageur.py Voyageur/FS.py
@@ -427,7 +427,7 @@ git commit -m "Rename original_transcription/english_translation to citation_tex
 
 This is the only task that removes code rather than purely renaming it: `_build_citation_block` currently accepts both old and new parameter names with the new ones taking priority (the pre-existing partial fix). This task deletes the old ones.
 
-- [ ] **Step 1: Remove the old-name parameters and their docstring reference**
+- [x] **Step 1: Remove the old-name parameters and their docstring reference**
 
 In `Archivist/Archivist.py`, replace:
 ```python
@@ -458,7 +458,7 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     exactly as it always worked."""
 ```
 
-- [ ] **Step 2: Collapse the fallback chain to a single name each**
+- [x] **Step 2: Collapse the fallback chain to a single name each**
 
 In `Archivist/Archivist.py`, replace:
 ```python
@@ -479,7 +479,7 @@ with:
     raw_trans = citation_details if citation_details is not None else rec.get('citation_details')
 ```
 
-- [ ] **Step 3: Update the call site in build_general_citation**
+- [x] **Step 3: Update the call site in build_general_citation**
 
 In `Archivist/Archivist.py`, replace:
 ```python
@@ -502,18 +502,18 @@ with:
         ))
 ```
 
-- [ ] **Step 4: Run test_archivist.py to see it now fail**
+- [x] **Step 4: Run test_archivist.py to see it now fail**
 
 Run: `python -m pytest Archivist/tests/test_archivist.py -v`
 Expected: FAIL - multiple tests construct `rec` fixtures using `"original_transcription"`/`"english_translation"` keys, which `_build_citation_block` no longer reads at all (no fallback left), so citation text/translation will come out empty in the generated GEDCOM blocks and assertions on that text will fail.
 
-- [ ] **Step 5: Rename every occurrence in test_archivist.py**
+- [x] **Step 5: Rename every occurrence in test_archivist.py**
 
 In `Archivist/tests/test_archivist.py`, replace every occurrence of the literal string `original_transcription` with `citation_text`, and every occurrence of `english_translation` with `citation_details` (20 occurrences of each, across test fixture dicts for `build_general_citation` and `_merge_record_into`-style tests). Pure find-and-replace - the test logic, assertions, and docstrings describing behavior are unchanged; only the fixture key names change. Note: one test docstring (around the "collapses_identical_original_and_translation" test) already references the words "English Translation:"/"Original Transcription:" as GEDCOM header labels being duplicated - those are prose describing the *header text* Archivist emits (a separate, pre-existing `GENERAL_CONFIG` default unrelated to this field rename) and should NOT be changed; only the dict *keys* `original_transcription`/`english_translation` change.
 
 Verify: `grep -c "original_transcription\|english_translation" Archivist/tests/test_archivist.py` should report 0 after (aside from any occurrence inside a string literal describing header text, if present - check manually if the count seems off from 40).
 
-- [ ] **Step 6: Rename in test_census_ingestion.py**
+- [x] **Step 6: Rename in test_census_ingestion.py**
 
 In `Archivist/tests/test_census_ingestion.py`, replace:
 ```python
@@ -526,22 +526,22 @@ with:
             "citation_text": "", "review": False, "review_reason": None,
 ```
 
-- [ ] **Step 7: Run Archivist's full test suite**
+- [x] **Step 7: Run Archivist's full test suite**
 
 Run: `python -m pytest Archivist/tests/ -v`
 Expected: PASS (all tests)
 
-- [ ] **Step 8: Run the full project test suite**
+- [x] **Step 8: Run the full project test suite**
 
 Run: `python -m pytest --tb=short -q`
 Expected: PASS, same total count as the very first run before Task 1 - this rename is complete project-wide.
 
-- [ ] **Step 9: Verify no occurrences remain anywhere**
+- [x] **Step 9: Verify no occurrences remain anywhere**
 
 Run: `grep -rn "original_transcription\|english_translation" --include=*.py --include=*.pmt --include=*.json .`
 Expected: no output (aside from this plan file and the design spec, which are historical records of the change and are not live code - if the grep is run without excluding `docs/`, filter those out manually).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add Archivist/Archivist.py Archivist/tests/test_archivist.py Archivist/tests/test_census_ingestion.py

@@ -32,13 +32,13 @@
 
 `Commissioner/.env` and the empty `Commissioner/tests/` directory are leftovers from the old scrip-enrichment pipeline stage, which was already folded into `Paleographer`/`Voyageur` in a prior commit. Confirmed via repo-wide search that nothing reads `Commissioner/.env` or any `COMMISSIONER_*` variable anymore — safe to remove.
 
-- [ ] **Step 1: Confirm the old Commissioner/.env is genuinely unused**
+- [x] **Step 1: Confirm the old Commissioner/.env is genuinely unused**
 
 Run: `grep -rn "COMMISSIONER_" --include=*.py .`
 
 Expected: no output (no `.py` file references any `COMMISSIONER_*` variable).
 
-- [ ] **Step 2: Remove the leftover .env and add pydantic to requirements.txt**
+- [x] **Step 2: Remove the leftover .env and add pydantic to requirements.txt**
 
 Delete `Commissioner/.env`.
 
@@ -66,7 +66,7 @@ websocket-client==1.9.0
 titlecase==2.4.1
 ```
 
-- [ ] **Step 3: Create the package files**
+- [x] **Step 3: Create the package files**
 
 `Commissioner/__init__.py`:
 
@@ -91,7 +91,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 ```
 
-- [ ] **Step 4: Write the test**
+- [x] **Step 4: Write the test**
 
 `Commissioner/tests/test_package.py`:
 
@@ -106,12 +106,12 @@ def test_commissioner_package_imports():
     assert pydantic.VERSION.startswith("2.")
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [x] **Step 5: Run the test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_package.py -v`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Commissioner/__init__.py Commissioner/tests/__init__.py Commissioner/tests/conftest.py Commissioner/tests/test_package.py requirements.txt
@@ -133,7 +133,7 @@ git commit -m "Scaffold Commissioner package, add pydantic dependency, remove le
 
 This is a direct, complete transcription of the real `FactTypes.json` at the repo root — every person and family fact type in that file, transcribed exactly (name, GEDCOM tag, the three `use_*` flags, `custom`, and `code`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `Commissioner/tests/test_models.py`:
 
@@ -175,12 +175,12 @@ def test_unknown_fact_name_raises():
         get_fact_definition("Coordinator")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest Commissioner/tests/test_models.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'Commissioner.models'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `Commissioner/models.py`:
 
@@ -288,12 +288,12 @@ def get_fact_definition(name: str) -> FactDefinition:
         raise KeyError(f"Unknown fact_type {name!r}; not present in FACT_DEFINITIONS") from None
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_models.py -v`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Commissioner/models.py Commissioner/tests/test_models.py
@@ -312,7 +312,7 @@ git commit -m "Add fact vocabulary (FactDefinition, FACT_DEFINITIONS) to Commiss
 - Consumes: `Commissioner.models.FACT_DEFINITIONS`, `FactScope`, `get_fact_definition` (Task 2).
 - Produces: `is_family_fact(name: str) -> bool`, `export_fact_types_json() -> dict`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `Commissioner/tests/test_fact_registry.py`:
 
@@ -339,12 +339,12 @@ def test_export_fact_types_json_matches_real_file_on_disk():
     assert export_fact_types_json() == real
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest Commissioner/tests/test_fact_registry.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'Commissioner.fact_registry'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `Commissioner/fact_registry.py`:
 
@@ -377,12 +377,12 @@ def export_fact_types_json() -> Dict[str, Dict[str, dict]]:
     return result
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_fact_registry.py -v`
 Expected: PASS (2 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Commissioner/fact_registry.py Commissioner/tests/test_fact_registry.py
@@ -403,7 +403,7 @@ git commit -m "Add fact_registry lookup/export layer with FactTypes.json guardra
 
 Field requiredness follows `Paleographer/schema.json` precisely where it declares an explicit `required` list (only `Participant`'s nested item schema does: `role_name`, `std_given`, `is_priest`, `sex`); every other field is modeled as optional with a sensible default, since `schema.json` itself does not constrain them further.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Append to `Commissioner/tests/test_models.py`:
 
@@ -526,12 +526,12 @@ def test_full_collection_round_trips_minimal_payload():
     assert collection.sheets[0].records[0].participants[0].facts[0].fact_type == "Birth"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest Commissioner/tests/test_models.py -v`
 Expected: FAIL with `ImportError: cannot import name 'Collection' from 'Commissioner.models'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Append to `Commissioner/models.py`:
 
@@ -626,12 +626,12 @@ class Collection(BaseModel):
     sheets: List[Sheet] = Field(default_factory=list)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_models.py -v`
 Expected: PASS (all tests, including the 5 from Task 2)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Commissioner/models.py Commissioner/tests/test_models.py
@@ -652,7 +652,7 @@ git commit -m "Add Collection/Sheet/Record/Participant/Fact models with schema.j
 
 The type map supports `string`, `int`, `float`, `bool`, `date`, and `enum` (with a `choices` list). An unrecognized `type:` token in any `.pmt` raises `UnknownFieldTypeError` at import time — before any ingestion run touches that document type.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 `Commissioner/tests/test_record_registry.py`:
 
@@ -734,12 +734,12 @@ def test_validate_role_name_rejects_unknown_role():
         validate_role_name("Scrip", "Coordinator")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'Commissioner.record_registry'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 `Commissioner/record_registry.py`:
 
@@ -874,7 +874,7 @@ def validate_role_name(document_type: str, role_name: Optional[str]) -> None:
         )
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v`
 Expected: FAIL on `test_scrip_record_extra_fields_validate_and_coerce_types` and the enum-rejection test — `Scrip.pmt` doesn't have `scrip_type` yet. This is expected; Task 6 edits `Scrip.pmt` to add it. Confirm every other test in this file passes first.
@@ -882,7 +882,7 @@ Expected: FAIL on `test_scrip_record_extra_fields_validate_and_coerce_types` and
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v -k "not scrip_type and not scrip_record_extra_fields_validate_and_coerce"`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Commissioner/record_registry.py Commissioner/tests/test_record_registry.py
@@ -903,7 +903,7 @@ git commit -m "Add record_registry: dynamic .pmt scanning for extra fields and r
 - Consumes: `Collection.model_validate` (Task 4), `validate_record_extra_fields`/`validate_participant_extra_fields`/`validate_role_name` (Task 5).
 - Produces: `parse_collection(raw_json: dict, document_type: str) -> Collection`.
 
-- [ ] **Step 1: Edit Scrip.pmt to split scrip_amount into scrip_amount + scrip_type**
+- [x] **Step 1: Edit Scrip.pmt to split scrip_amount into scrip_amount + scrip_type**
 
 In `Paleographer/prompts/Scrip.pmt`, in the `extra_fields.record` list, replace:
 
@@ -931,12 +931,12 @@ with:
 - scrip_type: Whether the grant was "Cash" or "Land" - choose exactly one.
 ```
 
-- [ ] **Step 2: Re-run the tests that were expected to fail in Task 5**
+- [x] **Step 2: Re-run the tests that were expected to fail in Task 5**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v`
 Expected: PASS (all tests now pass, including the two `scrip_type` ones)
 
-- [ ] **Step 3: Write the failing test for parse_collection**
+- [x] **Step 3: Write the failing test for parse_collection**
 
 Append to `Commissioner/tests/test_record_registry.py`:
 
@@ -1038,12 +1038,12 @@ def test_parse_collection_rejects_invalid_role_for_document_type():
         parse_collection(bad_payload, document_type="Scrip")
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [x] **Step 4: Run test to verify it fails**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v -k parse_collection`
 Expected: FAIL with `ImportError: cannot import name 'parse_collection'`
 
-- [ ] **Step 5: Implement parse_collection**
+- [x] **Step 5: Implement parse_collection**
 
 Append to `Commissioner/record_registry.py`:
 
@@ -1071,12 +1071,12 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
     return collection
 ```
 
-- [ ] **Step 6: Run test to verify it passes**
+- [x] **Step 6: Run test to verify it passes**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -v`
 Expected: PASS (all tests)
 
-- [ ] **Step 7: Finalize the public API**
+- [x] **Step 7: Finalize the public API**
 
 `Commissioner/__init__.py`:
 
@@ -1135,12 +1135,12 @@ __all__ = [
 ]
 ```
 
-- [ ] **Step 8: Run the full Commissioner test suite**
+- [x] **Step 8: Run the full Commissioner test suite**
 
 Run: `python -m pytest Commissioner/tests/ -v`
 Expected: PASS (every test across all six tasks)
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add Paleographer/prompts/Scrip.pmt Commissioner/record_registry.py Commissioner/__init__.py Commissioner/tests/test_record_registry.py
