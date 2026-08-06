@@ -2098,7 +2098,29 @@ def main() -> None:
         parser.add_argument("--delay", type=float, default=0.4, help="Delay in seconds between requests (for enrich)")
         parser.add_argument("--limit", type=int, default=None, help="Limit number of records to process (for enrich)")
         parser.add_argument("--output-dir", default=None, help="Output directory for partitioned datasets")
+        parser.add_argument("--cookie-file", default=voyageur_lac.COOKIE_FILE,
+                            help="Path to browser cookies file for LAC search (for crosscheck)")
         args, _ = parser.parse_known_args()
+
+        if args.mode == "crosscheck":
+            target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
+                                        os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
+            print(f"Cross-checking claims in dataset: {target}...")
+            try:
+                cookies = voyageur_lac.load_cookies(args.cookie_file)
+            except (FileNotFoundError, ValueError) as e:
+                print(f"[FATAL ERROR] {e} Search LAC once in a real browser, then paste its Cookie header "
+                      f"into that file.")
+                return
+            with open(target, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for sheet in data.get("sheets", []):
+                for record in sheet.get("records", []):
+                    cross_check_claim_record(record, cookies, voyageur_lac.MEDIA_DIR)
+            with open(target, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            print(f"Cross-check complete: {target}")
+            return
 
         if args.mode == "enrich":
             target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
