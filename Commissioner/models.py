@@ -124,59 +124,207 @@ class DocumentMetadata(BaseModel):
     file_type: Optional[str] = None
     volume: Optional[str] = None
     pages: Optional[str] = None
-    source_name: Optional[str] = None
+    source_name: Optional[str] = Field(
+        default=None,
+        description=(
+            "The name of the institution this document is from, if this sheet states it "
+            "(e.g. a parish/church's own printed heading or running title), read exactly as "
+            "written. Null if this sheet never states it."
+        ),
+    )
     source_location: Optional[str] = None
 
 
 class Participant(BaseModel):
-    role_number: Optional[str] = None
-    role_name: Optional[str]
-    std_given: str
-    std_surname: Optional[str] = None
+    role_number: Optional[str] = Field(
+        default=None,
+        description=(
+            "Leave null. The numeric role code is derived downstream from role_name, "
+            "not chosen by you."
+        ),
+    )
+    role_name: Optional[str] = Field(
+        description=(
+            "Choose exactly one value from this record type's valid role vocabulary, given in "
+            "the system instructions. Null only when the source itself provides no "
+            "relationship/role data at all for this person (e.g. a pre-1880 US census record) - "
+            "never leave null merely because a role is unclear; use \"Other\" for that instead."
+        ),
+    )
+    std_given: str = Field(
+        description=(
+            "Your best linguistic standardization of the given name, diacritics included. "
+            "Diacritic stripping is handled downstream, not by you."
+        ),
+    )
+    std_surname: Optional[str] = Field(
+        default=None,
+        description=(
+            "Your best linguistic standardization of the surname, diacritics included. "
+            "Diacritic stripping is handled downstream, not by you."
+        ),
+    )
     raw_given: Optional[str] = None
     raw_surname: Optional[str] = None
     dit_name: Optional[str] = None
-    alternate_names: Optional[List[AlternateName]] = None
+    alternate_names: Optional[List[AlternateName]] = Field(
+        default=None,
+        description=(
+            "A later annotator's marginal note suggesting a different spelling of this person's "
+            "name (not the priest's own original entry, and not a disagreement to resolve - both "
+            "readings are kept). Leave empty/null if the margin has no such note. Do not use this "
+            "for your own uncertainty about the body text's own reading - that's "
+            "std_given/std_surname plus review/review_reason."
+        ),
+    )
     prefix: Optional[str] = None
     suffix: Optional[str] = None
-    sex: Literal["M", "F", "U"]
+    sex: Literal["M", "F", "U"] = Field(
+        description=(
+            "Infer from role/given name if not explicitly stated. Use \"U\" only when genuinely "
+            "indeterminate (e.g. an unfamiliar name with no role or contextual clue) - never "
+            "leave this unset."
+        ),
+    )
     is_priest: bool
     age: Optional[str] = None
-    age_unit: Optional[Literal["years", "months", "days"]] = None
+    age_unit: Optional[Literal["years", "months", "days"]] = Field(
+        default=None,
+        description=(
+            "Unit for the age field. Infant baptism/burial ages are often given in months or days "
+            "rather than years - set this explicitly whenever age is present; leave both null if "
+            "no age is stated."
+        ),
+    )
     occupation: Optional[str] = None
     race: Optional[str] = None
     religion: Optional[str] = None
     residence: Optional[str] = None
-    birth_date: Optional[str] = None
+    birth_date: Optional[str] = Field(
+        default=None,
+        description=(
+            "Your best English-language reading of the date exactly as it appears. Final ISO "
+            "formatting is handled downstream, not by you."
+        ),
+    )
     birth_place: Optional[str] = None
-    death_date: Optional[str] = None
+    death_date: Optional[str] = Field(
+        default=None,
+        description=(
+            "Your best English-language reading of the date exactly as it appears. Final ISO "
+            "formatting is handled downstream, not by you."
+        ),
+    )
     death_place: Optional[str] = None
-    review: bool = False
-    review_reason: Optional[str] = None
-    facts: Optional[List[Fact]] = None
-    type_specific_fields: Dict[str, Any] = Field(default_factory=dict)
+    review: bool = Field(
+        default=False,
+        description=(
+            "True if THIS participant's own data (name reading, dates, role assignment, etc.) is "
+            "uncertain, guessed, illegible, or otherwise needs a human to double-check it."
+        ),
+    )
+    review_reason: Optional[str] = Field(
+        default=None,
+        description=(
+            "Short plain-English note (under 15 words) explaining why this participant needs "
+            "review. Null if review is false."
+        ),
+    )
+    facts: Optional[List[Fact]] = Field(
+        default=None,
+        description=(
+            "Any fact about this participant beyond the fields above, named from this record "
+            "type's valid event vocabulary (the same vocabulary event_type is drawn from) - e.g. "
+            "an immigration year, a naturalization status. Leave empty/null when nothing beyond "
+            "the fields above applies; do not duplicate a fact already covered by a named field "
+            "(occupation, birth_date, etc.) here."
+        ),
+    )
+    type_specific_fields: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Additional fields specific to this record type, defined by its .pmt file's front "
+            "matter."
+        ),
+    )
 
 
 class Record(BaseModel):
-    record_id: Optional[str] = None
-    page: str
-    record_number: str
-    event_type: str
+    record_id: Optional[str] = Field(
+        default=None,
+        description=(
+            "Leave null. Derived downstream from event_type and record_number, not chosen by you."
+        ),
+    )
+    page: Optional[str] = None
+    record_number: Optional[str] = None
+    event_type: Optional[str] = Field(
+        default=None,
+        description=(
+            "Choose exactly one value from this record type's valid event vocabulary, given in "
+            "the system instructions."
+        ),
+    )
     year: Optional[str] = None
-    event_date: Optional[str] = None
+    event_date: Optional[str] = Field(
+        default=None,
+        description=(
+            "Your best English-language reading of the date exactly as it appears (e.g. "
+            "'December 12, 1850'). Final ISO formatting is handled downstream, not by you."
+        ),
+    )
     event_place: Optional[str] = None
     english_translation: Optional[str] = None
     original_transcription: Optional[str] = None
-    review: bool = False
-    review_reason: Optional[str] = None
-    continues_on_next_image: bool = False
-    continues_from_previous_image: bool = False
-    type_specific_fields: Dict[str, Any] = Field(default_factory=dict)
+    review: bool = Field(
+        default=False,
+        description=(
+            "True if any part of this record (dates, place, transcription, translation, or any "
+            "participant) is uncertain, guessed, illegible, or otherwise needs a human to "
+            "double-check it."
+        ),
+    )
+    review_reason: Optional[str] = Field(
+        default=None,
+        description=(
+            "Short plain-English note (under 15 words) explaining why this record needs review. "
+            "Null if review is false."
+        ),
+    )
+    continues_on_next_image: bool = Field(
+        default=False,
+        description=(
+            "True ONLY for the LAST record on this image, when its content appears to end "
+            "abruptly at the very bottom of the visible page - cut off mid-sentence, no natural "
+            "closing or signature - suggesting it continues onto content you cannot see. False "
+            "for every other record, and false for the last record too if it has a normal, "
+            "complete ending. See UNIVERSAL OUTPUT RULES for how this is used."
+        ),
+    )
+    continues_from_previous_image: bool = Field(
+        default=False,
+        description=(
+            "True ONLY if a 'CONTINUATION FROM PREVIOUS IMAGE' context block was given to you AND "
+            "this record's content is what completes it - in that case this must be the FIRST "
+            "record you output, containing the FULL merged content (the given prior content plus "
+            "what you read here), and record_number/year copied from the given context. False in "
+            "every other case, including when no such context was given at all."
+        ),
+    )
+    type_specific_fields: Dict[str, Any] = Field(
+        default_factory=dict,
+        description=(
+            "Additional fields specific to this record type, defined by its .pmt file's front "
+            "matter. For a pre-1850 US census record with only a named head of household, this is "
+            "also where an unnamed household_tally (age/sex/race bracket counts) belongs - not "
+            "fabricated participant entries."
+        ),
+    )
     participants: List[Participant] = Field(default_factory=list)
 
 
 class Sheet(BaseModel):
-    page_id: str
+    page_id: Optional[str] = None
     document_metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
     records: List[Record] = Field(default_factory=list)
 

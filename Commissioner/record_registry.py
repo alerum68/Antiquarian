@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Optional, Type
 
 import yaml
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, ConfigDict, create_model
 
 PMT_DIR = Path(__file__).resolve().parent.parent / "Paleographer" / "prompts"
 
@@ -61,15 +61,20 @@ def _field_type_for(document_type: str, field: dict) -> Any:
 
 
 def _build_extra_model(model_name: str, document_type: str, fields: List[dict]) -> Type[BaseModel]:
+    """Builds the validation-only model for a document type's extra fields.
+
+    `extra="forbid"` is deliberate: this model is never used to *replace* the caller's
+    type_specific_fields dict, only to check it, so an undeclared key must fail loudly
+    rather than be silently ignored (and thereby silently dropped)."""
     field_definitions = {
         field["name"]: (Optional[_field_type_for(document_type, field)], None) for field in fields
     }
-    return create_model(model_name, **field_definitions)
+    return create_model(model_name, __config__=ConfigDict(extra="forbid"), **field_definitions)
 
 
-def _build_registry() -> Dict[str, _DocumentTypeSchema]:
+def _build_registry(pmt_dir: Path = PMT_DIR) -> Dict[str, _DocumentTypeSchema]:
     registry: Dict[str, _DocumentTypeSchema] = {}
-    for pmt_path in sorted(PMT_DIR.glob("*.pmt")):
+    for pmt_path in sorted(pmt_dir.glob("*.pmt")):
         document_type = pmt_path.stem
         front_matter = _load_pmt_front_matter(pmt_path)
 
@@ -138,14 +143,13 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
 
     for sheet in collection.sheets:
         for record in sheet.records:
-            validated_record_extra = validate_record_extra_fields(document_type, record.type_specific_fields)
-            record.type_specific_fields = validated_record_extra.model_dump()
+            # Validation only - the caller's dict is deliberately left untouched. Replacing
+            # it with the model's dump would inject None for every declared-but-absent field
+            # and drop anything the document type doesn't declare.
+            validate_record_extra_fields(document_type, record.type_specific_fields)
 
             for participant in record.participants:
-                validated_participant_extra = validate_participant_extra_fields(
-                    document_type, participant.type_specific_fields
-                )
-                participant.type_specific_fields = validated_participant_extra.model_dump()
+                validate_participant_extra_fields(document_type, participant.type_specific_fields)
                 validate_role_name(document_type, participant.role_name)
 
     return collection
