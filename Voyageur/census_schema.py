@@ -237,7 +237,7 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
                 "record_id": None, "page": str(page.get("page_number", "")),
                 "record_number": household_key or "", "event_type": "Census (family)",
                 "year": str(census_year) if census_year else "", "event_date": "",
-                "event_place": place, "english_translation": "", "original_transcription": "",
+                "event_place": place, "citation_details": "", "citation_text": "",
                 "review": record_review,
                 "review_reason": "One or more participants have unmapped columns." if record_review else None,
                 "continues_on_next_image": False, "continues_from_previous_image": False,
