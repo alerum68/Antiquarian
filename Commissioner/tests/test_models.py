@@ -59,7 +59,7 @@ EXPECTED_FIELDS = {
     "DocumentMetadata": {"file_name", "file_type", "volume", "pages", "source_name", "source_location"},
     "Record": {
         "record_id", "page", "record_number", "event_type", "year", "event_date",
-        "event_place", "english_translation", "original_transcription", "review",
+        "event_place", "citation_text", "citation_details", "review",
         "review_reason", "continues_on_next_image", "continues_from_previous_image",
         "type_specific_fields", "participants",
     },

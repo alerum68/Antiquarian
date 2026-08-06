@@ -44,8 +44,8 @@
                   "description": "Your best English-language reading of the date exactly as it appears (e.g. 'December 12, 1850'). Final ISO formatting is handled downstream, not by you."
                 },
                 "event_place": { "type": "string", "nullable": true },
-                "english_translation": { "type": "string" },
-                "original_transcription": { "type": "string" },
+                "citation_details": { "type": "string" },
+                "citation_text": { "type": "string" },
                 "review": {
                   "type": "boolean",
                   "description": "True if any part of this record (dates, place, transcription, translation, or any participant) is uncertain, guessed, illegible, or otherwise needs a human to double-check it."

@@ -136,9 +136,9 @@ Before generating JSON, you must process the record in this exact order:
 - record_number: Integer portion of margin number only.
 
 9. TRANSCRIPTION & TRANSLATION
-- english_translation = full English translation.
-- original_transcription = exact original French/Latin.
-- Use English when filling in all structured fact fields. Use original_transcription just in the citation block.
+- citation_details = full English translation.
+- citation_text = exact original French/Latin.
+- Use English when filling in all structured fact fields. Use citation_text just in the citation block.
 
 10. STRICT VISUAL FIDELITY
 - Read exactly what is written. Pay attention to standard abbreviations ("Chs" for Charles).

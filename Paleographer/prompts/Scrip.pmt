@@ -135,21 +135,21 @@ named individuals and family connections into the participants array:
 RULES & WORKFLOW:
 
 INSTRUCTION PRECEDENCE:
-1. Preserve historical text exactly in raw_* fields and original_transcription.
+1. Preserve historical text exactly in raw_* fields and citation_text.
 2. Standardize only in std_* fields where explicitly instructed.
 3. Never invent missing or unstated facts.
 
 WORKFLOW:
 1. Scan the image(s) to identify every distinct application or register entry.
 2. For each document, transcribe the verbatim handwritten testimony, printed form responses,
-   and margin notes into original_transcription.
-3. Synthesize the "Commissioner's Review" summary into english_translation.
+   and margin notes into citation_text.
+3. Synthesize the "Commissioner's Review" summary into citation_details.
 4. Extract all named participants (Claimant, Parents, Spouse, Children, Heirs, Witnesses, Commissioner).
 5. Standardize names, split dit names, resolve maiden names, and format dates.
 6. Populate the structured JSON.
 
-COMMISSIONER'S REVIEW (english_translation field):
-Populate english_translation with the "Commissioner's Review" — a comprehensive, clear AI summary
+COMMISSIONER'S REVIEW (citation_details field):
+Populate citation_details with the "Commissioner's Review" — a comprehensive, clear AI summary
 highlighting the document's critical points:
 - Header: "Commissioner's Review"
 - Core Claim: Claimant name, basis of claim (e.g. 1870 Head of Family, 1885 Child, 1900 Alberta),

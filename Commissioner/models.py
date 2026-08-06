@@ -274,8 +274,8 @@ class Record(BaseModel):
         ),
     )
     event_place: Optional[str] = None
-    english_translation: Optional[str] = None
-    original_transcription: Optional[str] = None
+    citation_details: Optional[str] = None
+    citation_text: Optional[str] = None
     review: bool = Field(
         default=False,
         description=(
