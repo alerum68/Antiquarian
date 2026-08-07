@@ -372,19 +372,35 @@ def retrieve_volume_pids(vol: str, cookies: Dict[str, str], checkpoint_path: str
     return pids
 
 
-def download_volume_assets(pids: List[str], media_dir: str, checkpoint_path: str) -> Dict[str, Any]:
-    """Sequential bulk download for a list of PIDs with checkpointing."""
+def download_volume_assets(pids: List[str], media_dir: str, checkpoint_path: str,
+                           master_db_path: str, document_type: str, collection_title: str) -> Dict[str, Any]:
+    """Sequential bulk download for a list of PIDs with checkpointing. Also seeds
+    Paleographer's own MASTER_DB with one Commissioner-shaped scaffold sheet per
+    downloaded asset, incrementally - see the Voyageur-Parish-Scrip-scaffold design spec."""
+    from Commissioner.record_registry import build_empty_sheet
+
     checkpoint = load_checkpoint(checkpoint_path)
     downloaded = set(checkpoint.get("downloaded_pids", []))
     failed = checkpoint.get("failed_pids", {})
+    master_data = load_master_db(master_db_path, collection_title, document_type)
 
     for pid in pids:
         if pid in downloaded:
             continue
         try:
-            download_pid_bundle(pid, media_dir)
+            bundle = download_pid_bundle(pid, media_dir)
             downloaded.add(pid)
             failed.pop(pid, None)
+
+            new_sheets = [
+                build_empty_sheet(Path(entry["media_path"]).name,
+                                  Path(entry["media_path"]).suffix.lstrip("."),
+                                  page_id=entry.get("lac_asset_id"))
+                for entry in bundle.get("source_documents", [])
+            ]
+            append_scaffold_sheets(master_data, new_sheets)
+            validate_master_db_against_commissioner(master_data, document_type, collection_title)
+            save_master_db(master_db_path, master_data)
         except lac_client.LacCallError as e:
             failed[pid] = str(e)
 
@@ -426,12 +442,19 @@ def _worker_download_loop(worker_id: int, task_queue: mp.Queue, result_queue: mp
 
 
 def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoint_path: str,
+                                       master_db_path: str, document_type: str, collection_title: str,
                                        max_workers: int = 4, base_delay: float = 0.3,
                                        timeout_seconds: int = 45) -> Dict[str, Any]:
-    """Concurrent multi-worker PID downloading with watchdog timeout."""
+    """Concurrent multi-worker PID downloading with watchdog timeout. Scaffold-sheet writes
+    happen only in this controller loop (never inside a worker subprocess) after a SUCCESS
+    message, mirroring the existing single-writer checkpoint pattern - see the
+    Voyageur-Parish-Scrip-scaffold design spec."""
+    from Commissioner.record_registry import build_empty_sheet
+
     checkpoint = load_checkpoint(checkpoint_path)
     downloaded = set(checkpoint.get("downloaded_pids", []))
     failed = checkpoint.get("failed_pids", {})
+    master_data = load_master_db(master_db_path, collection_title, document_type)
 
     pids_to_process = [p for p in pids if p not in downloaded]
     if not pids_to_process:
@@ -491,6 +514,16 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
             downloaded.add(pid)
             failed.pop(pid, None)
             processed_count += 1
+            bundle = msg[3]
+            new_sheets = [
+                build_empty_sheet(Path(entry["media_path"]).name,
+                                  Path(entry["media_path"]).suffix.lstrip("."),
+                                  page_id=entry.get("lac_asset_id"))
+                for entry in bundle.get("source_documents", [])
+            ]
+            append_scaffold_sheets(master_data, new_sheets)
+            validate_master_db_against_commissioner(master_data, document_type, collection_title)
+            save_master_db(master_db_path, master_data)
             checkpoint["downloaded_pids"] = sorted(downloaded)
             checkpoint["failed_pids"] = failed
             save_checkpoint(checkpoint_path, checkpoint)
@@ -512,12 +545,14 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
 
 
 def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoint_path: str,
+                    master_db_path: str, document_type: str, collection_title: str,
                     archival_number: str = DEFAULT_ARCHIVAL_NUMBER, max_workers: int = 1) -> Dict[str, Any]:
     """High-level volume retrieval: gathers PIDs and downloads all associated assets."""
     pids = retrieve_volume_pids(vol, cookies, checkpoint_path, archival_number=archival_number)
     if max_workers > 1:
-        return download_volume_assets_multiworker(pids, media_dir, checkpoint_path, max_workers=max_workers)
-    return download_volume_assets(pids, media_dir, checkpoint_path)
+        return download_volume_assets_multiworker(pids, media_dir, checkpoint_path, master_db_path,
+                                                   document_type, collection_title, max_workers=max_workers)
+    return download_volume_assets(pids, media_dir, checkpoint_path, master_db_path, document_type, collection_title)
 
 
 # ==========================================
@@ -525,6 +560,10 @@ def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoin
 # ==========================================
 def _run_volume(args: argparse.Namespace) -> None:
     print(f"[System] Starting LAC Volume retrieval for Volume {args.volume}...")
+    document_type = _resolve_record_type(args.record_type)
+    master_db_path = resolve_master_db_path(document_type, PROGRAM_DIR)
+    collection_title = os.environ.get("VOLUME_TITLE") or f"LAC Volume {args.volume}"
+
     try:
         cookies = load_cookies(args.cookie_file)
     except (FileNotFoundError, ValueError) as e:
@@ -536,6 +575,7 @@ def _run_volume(args: argparse.Namespace) -> None:
     checkpoint_path = str(Path(CHECKPOINT_DIR) / f"volume_{args.volume}.json")
     try:
         result = retrieve_volume(args.volume, cookies, args.media_dir, checkpoint_path,
+                                 master_db_path, document_type, collection_title,
                                  archival_number=args.archival_number, max_workers=args.workers)
     except lac_client.LacSearchAuthError as e:
         print(f"[FATAL ERROR] {e} Opening the search page now.")

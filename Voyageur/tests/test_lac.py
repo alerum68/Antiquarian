@@ -85,3 +85,86 @@ def test_resolve_record_type_exits_on_empty(capsys):
     with pytest.raises(SystemExit):
         LAC._resolve_record_type("")
     assert "[ERROR]" in capsys.readouterr().out
+
+
+import lac_client
+
+
+def test_download_volume_assets_writes_one_scaffold_sheet_per_asset(monkeypatch, tmp_path):
+    def fake_download_pid_bundle(pid, media_dir):
+        return {
+            "pid": pid, "lac_catalog_title": "Test", "reel_numbers": [], "series_code": "RG15-D-II-8-b",
+            "source_documents": [
+                {"document_type": "Affidavit", "media_path": str(tmp_path / pid / "asset1.jpg"),
+                 "lac_pid": pid, "lac_asset_id": "asset1", "source": "LAC"},
+            ],
+        }
+    monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
+
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    result = LAC.download_volume_assets(["pid1"], str(tmp_path), checkpoint_path,
+                                        master_db_path, "Scrip", "Test Collection")
+
+    assert result["downloaded_pids"] == ["pid1"]
+    master_data = LAC.load_master_db(master_db_path, "Test Collection", "Scrip")
+    assert len(master_data["sheets"]) == 1
+    assert master_data["sheets"][0]["document_metadata"]["file_name"] == "asset1.jpg"
+    assert master_data["sheets"][0]["records"][0]["participants"] == []
+
+
+def test_download_volume_assets_skips_already_downloaded_pid(monkeypatch, tmp_path):
+    calls = []
+    def fake_download_pid_bundle(pid, media_dir):
+        calls.append(pid)
+        return {"source_documents": []}
+    monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
+
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    LAC.save_checkpoint(checkpoint_path, {"pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {}})
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    LAC.download_volume_assets(["pid1"], str(tmp_path), checkpoint_path, master_db_path, "Scrip", "Test")
+
+    assert calls == []
+
+
+def test_download_volume_assets_records_failure_without_writing_scaffold(monkeypatch, tmp_path):
+    def fake_download_pid_bundle(pid, media_dir):
+        raise lac_client.LacCallError("boom")
+    monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
+
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    result = LAC.download_volume_assets(["pid1"], str(tmp_path), checkpoint_path, master_db_path, "Scrip", "Test")
+
+    assert result["failed_pids"] == {"pid1": "boom"}
+    assert not os.path.exists(master_db_path)
+
+
+def test_download_volume_assets_multiworker_no_op_when_all_downloaded(tmp_path):
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    LAC.save_checkpoint(checkpoint_path, {"pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {}})
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
+                                                     master_db_path, "Scrip", "Test", max_workers=2)
+
+    assert result["downloaded_pids"] == ["pid1"]
+
+
+def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch, tmp_path):
+    monkeypatch.setattr(LAC, "retrieve_volume_pids",
+                        lambda vol, cookies, checkpoint_path, archival_number: ["pid1"])
+    monkeypatch.setattr(LAC, "download_pid_bundle", lambda pid, media_dir: {
+        "source_documents": [{"media_path": str(tmp_path / "asset1.jpg"), "lac_asset_id": "asset1"}],
+    })
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    LAC.retrieve_volume("1325", {}, str(tmp_path), checkpoint_path, master_db_path, "Scrip", "Test Collection")
+
+    master_data = LAC.load_master_db(master_db_path, "Test Collection", "Scrip")
+    assert len(master_data["sheets"]) == 1
