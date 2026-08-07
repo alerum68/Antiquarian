@@ -174,15 +174,16 @@ policy above, never propagated to crash the gather or reach the caller.
 ## What comes after this sub-project (not part of it)
 
 - Sub-project 3: Voyageur building the Commissioner-shaped scaffold (images +
-  empty-content records) for Parish and Scrip.
-- Sub-project 4: reworking Paleographer to consume that scaffold as pure
-  analysis, never constructing the base JSON structure itself.
-- Sub-project 5: wiring Commissioner validation at both the Voyageur and
+  empty-content records) for Parish and Scrip. Done.
+- Sub-project 4: wiring Commissioner validation at both the Voyageur and
   Paleographer boundaries — this is where a hard-fail/blocking mode for Census
   (and everything else) gets decided, once this sub-project's soft-fail rollout
   has surfaced any real-world shape gaps.
-- Sub-project 6: cross-script invocation (Paleographer/Voyageur calling into
+- Sub-project 5: cross-script invocation (Paleographer/Voyageur calling into
   each other's real functions when one needs what the other gathers).
+- Sub-project 6: reworking Paleographer to consume the Sub-project 3 scaffold
+  as pure analysis, never constructing the base JSON structure itself. Moved
+  to last in the sequence (was Sub-project 4) per explicit reprioritization.
 - Census family-linking: a `role_name` → `role_semantic` derivation path for
   Voyageur-sourced data, and/or extending Archivist's `FAMILY_SEMANTICS`
   vocabulary to cover extended-family relationships (grandchild, sibling,
