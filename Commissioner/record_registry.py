@@ -161,3 +161,51 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
                 validate_role_name(document_type, participant.role_name)
 
     return collection
+
+
+def build_empty_sheet(file_name: str, file_type: str, page_id: Optional[str] = None) -> dict:
+    """Builds a Commissioner-shaped placeholder sheet dict: a real document_metadata (the
+    image reference) wrapping exactly one empty-content Record (participants: [], every
+    other field its model default). Paleographer's own get_processed_files treats a sheet
+    with no record carrying non-empty participants as unprocessed, so this placeholder gets
+    picked up and replaced by a real AI pass rather than silently skipped forever."""
+    return {
+        "page_id": page_id if page_id is not None else file_name,
+        "document_metadata": {
+            "file_name": file_name,
+            "file_type": file_type,
+            "volume": None,
+            "pages": None,
+            "source_name": None,
+            "source_location": None,
+        },
+        "records": [{
+            "record_id": None,
+            "page": None,
+            "record_number": None,
+            "event_type": None,
+            "year": None,
+            "event_date": None,
+            "event_place": None,
+            "citation_details": None,
+            "citation_text": None,
+            "review": False,
+            "review_reason": None,
+            "continues_on_next_image": False,
+            "continues_from_previous_image": False,
+            "type_specific_fields": {},
+            "participants": [],
+        }],
+    }
+
+
+def get_field_remap(document_type: str) -> Dict[str, str]:
+    """Returns document_type's own .pmt front matter field_remap table (e.g.
+    {"CHURCH_MASTER_DB_NAME": "MASTER_DB_NAME", ...}). Reuses the same lightweight
+    _load_pmt_front_matter() the rest of this module already uses, rather than
+    Paleographer/engine.py's own TYPE_CFG - engine.py transitively imports google.genai,
+    pdfplumber, PIL, PDFix, and ScriptoriumMCP.agy_client, a dependency chain LAC.py (a
+    standalone, light-dependency script) must not be forced to pull in."""
+    _get_schema(document_type)  # raises UnknownDocumentTypeError early if unrecognized
+    front_matter = _load_pmt_front_matter(PMT_DIR / f"{document_type}.pmt")
+    return front_matter.get("field_remap") or {}

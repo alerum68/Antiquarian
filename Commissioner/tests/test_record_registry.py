@@ -520,3 +520,58 @@ def test_parse_collection_validates_census_unmapped_dict_field():
     collection = parse_collection(payload, document_type="Census")
     participant = collection.sheets[0].records[0].participants[0]
     assert participant.type_specific_fields["unmapped"] == {"Race": "W", "Column_9": "Yes"}
+
+
+def test_build_empty_sheet_shape():
+    sheet = record_registry.build_empty_sheet("abc123.jpg", "jpg")
+    assert sheet["page_id"] == "abc123.jpg"
+    assert sheet["document_metadata"] == {
+        "file_name": "abc123.jpg", "file_type": "jpg", "volume": None,
+        "pages": None, "source_name": None, "source_location": None,
+    }
+    assert len(sheet["records"]) == 1
+    assert sheet["records"][0]["participants"] == []
+    assert sheet["records"][0]["event_type"] is None
+
+
+def test_build_empty_sheet_explicit_page_id():
+    sheet = record_registry.build_empty_sheet("abc123.jpg", "jpg", page_id="p1")
+    assert sheet["page_id"] == "p1"
+
+
+def test_build_empty_sheet_defaults_page_id_to_file_name():
+    sheet = record_registry.build_empty_sheet("abc123.jpg", "jpg")
+    assert sheet["page_id"] == "abc123.jpg"
+
+
+def test_build_empty_sheet_round_trips_through_sheet_validation():
+    from Commissioner.models import Sheet
+    sheet = Sheet.model_validate(record_registry.build_empty_sheet("abc123.jpg", "jpg"))
+    assert sheet.document_metadata.file_name == "abc123.jpg"
+    assert sheet.records[0].participants == []
+
+
+def test_build_empty_sheet_validates_against_commissioner_schema():
+    collection = {
+        "collection_title": "Test",
+        "sheets": [record_registry.build_empty_sheet("abc123.jpg", "jpg")],
+    }
+    result = parse_collection(collection, "Parish")
+    assert result.sheets[0].records[0].participants == []
+
+
+def test_get_field_remap_parish():
+    remap = record_registry.get_field_remap("Parish")
+    assert remap["CHURCH_MASTER_DB_NAME"] == "MASTER_DB_NAME"
+    assert remap["CHURCH_IMAGE_DIR"] == "IMAGE_DIR"
+
+
+def test_get_field_remap_scrip():
+    remap = record_registry.get_field_remap("Scrip")
+    assert remap["SCRIP_MASTER_DB_NAME"] == "MASTER_DB_NAME"
+    assert remap["SCRIP_IMAGE_DIR"] == "IMAGE_DIR"
+
+
+def test_get_field_remap_unknown_document_type_raises():
+    with pytest.raises(UnknownDocumentTypeError, match="NotARecordType"):
+        record_registry.get_field_remap("NotARecordType")
