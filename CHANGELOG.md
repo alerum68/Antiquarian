@@ -8,10 +8,15 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
-- **Unified Pipeline Architecture**: `Voyageur.py`, `Paleographer.py`, and `Archivist.py`
+- **Unified Pipeline Architecture**: `Paleographer.py` and `Archivist.py`
   are unified as self-contained standalone execution entrypoints with folded sub-modules
   and embedded source templates, ensuring zero runtime sibling-import failure while keeping
   individual subfiles for modularity and test isolation.
+- **Voyageur Dispatcher Consolidation**: `Voyageur.py` rewritten as a thin dispatcher to
+  `A.py`, `FS.py`, and `LAC.py`'s real `main()` functions. `_retry_utils.py` renamed to
+  `_gather_helpers.py` with shared gather-boilerplate now used by both `A.py` and `FS.py`.
+  Fixed `Scriptorium.py`'s LAC dispatch to pass the `volume`/`reel` subcommand token
+  `LAC.py`'s argparse requires.
 - **Commissioner Integration**: folded `Commissioner` into `Voyageur` (for LAC gathering,
   volume harvesting, and search scraping) and `Paleographer` (for Scrip metadata enrichment,
   name resolution, citation cleaning, and archival collection partitioning), streamlining
