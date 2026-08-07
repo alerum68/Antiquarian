@@ -246,6 +246,23 @@ running `LAC.py` directly.
 
 ## What comes after this sub-project (not part of it)
 
+- A.py record-type generalization: `A.py` currently only gathers Census
+  records (`CENSUS_URL` env var, unconditional `census_schema.normalize_census_pages`
+  call) even though nothing about Ancestry itself limits it to Census.
+  Unlike `FS.py` — whose browser-side scraper already collects generic
+  `items` and branches in Python (`detect_record_family_from_raw`/
+  `build_universal_json`) between census and universal handling — Ancestry's
+  browser-side scraper (`Voyageur.js`'s `runAncestryGather`) is hardcoded to
+  census-index scraping (`{census_year, location, pages}`), with no generic
+  scraping path for other Ancestry record layouts. Generalizing `A.py` the
+  way `FS.py` already works means designing new Tampermonkey/JS scraping
+  logic for other Ancestry collection types first — undesigned work, and a
+  different kind of task (browser automation) than this sub-project's Python
+  consolidation. The `CENSUS_URL` → `A_URL` env-var rename (raised during
+  this sub-project's design, matching the `FS_URL`/`LAC_URL` pattern) belongs
+  with this future sub-project rather than as a standalone rename, since
+  renaming it alone without generalizing the code it names would be
+  cosmetic only.
 - Sub-project 6: reworking Paleographer to consume the Sub-project 3
   scaffold as pure analysis, plus the broader structural rebuild
   `Paleographer.py` needs (still four historically separate files stitched
