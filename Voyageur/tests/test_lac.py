@@ -6,6 +6,7 @@ import os
 import pytest
 
 import LAC
+import lac_client
 
 
 def test_resolve_generic_setting_prefers_prefixed_key(monkeypatch):
@@ -87,9 +88,6 @@ def test_resolve_record_type_exits_on_empty(capsys):
     assert "[ERROR]" in capsys.readouterr().out
 
 
-import lac_client
-
-
 def test_download_volume_assets_writes_one_scaffold_sheet_per_asset(monkeypatch, tmp_path):
     def fake_download_pid_bundle(pid, media_dir):
         return {
@@ -153,6 +151,47 @@ def test_download_volume_assets_multiworker_no_op_when_all_downloaded(tmp_path):
                                                      master_db_path, "Scrip", "Test", max_workers=2)
 
     assert result["downloaded_pids"] == ["pid1"]
+
+
+def test_download_volume_assets_multiworker_writes_scaffold_sheet_on_success(monkeypatch, tmp_path):
+    # Replace mp.Process with a synchronous stand-in that runs the worker entrypoint
+    # in-process instead of spawning a real subprocess. This drives a real SUCCESS
+    # message through the controller loop's queue-consuming logic (the code under
+    # test) without the pickling/spawn complications of an actual child process.
+    class FakeProcess:
+        def __init__(self, target=None, args=()):
+            self._target = target
+            self._args = args
+
+        def start(self):
+            self._target(*self._args)
+
+        def join(self):
+            pass
+
+        def terminate(self):
+            pass
+
+    monkeypatch.setattr(LAC.mp, "Process", FakeProcess)
+
+    def fake_download_pid_bundle(pid, media_dir):
+        return {
+            "source_documents": [
+                {"media_path": str(tmp_path / pid / "asset1.jpg"), "lac_asset_id": "asset1"},
+            ],
+        }
+    monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
+
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
+                                                     master_db_path, "Scrip", "Test", max_workers=1)
+
+    assert result["downloaded_pids"] == ["pid1"]
+    master_data = LAC.load_master_db(master_db_path, "Test", "Scrip")
+    assert len(master_data["sheets"]) == 1
+    assert master_data["sheets"][0]["document_metadata"]["file_name"] == "asset1.jpg"
 
 
 def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch, tmp_path):
