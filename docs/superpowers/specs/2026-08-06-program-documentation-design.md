@@ -56,7 +56,7 @@ The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Do
 
 4. **`Configuration-&-Settings.md`**:
    - Using the Global Settings tab in the application.
-   - API key management (OpenAI, Anthropic, Gemini, local LLM servers).
+   - API key management (Google Gemini API key).
    - Working directories, raw download folders, and output destinations.
    - The `.env` file configuration reference.
 

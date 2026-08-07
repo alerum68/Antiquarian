@@ -108,7 +108,7 @@ It manages repetitive archival tasks:
 - **Operating System**: Windows 10 or Windows 11 (64-bit).
 - **Python**: Python 3.12 or newer.
 - **Browser**: Google Chrome, Microsoft Edge, or Mozilla Firefox with the TamperMonkey extension (required for Ancestry and FamilySearch gathers).
-- **AI Access**: An API key from OpenAI, Anthropic, or Google Gemini, or a locally running OpenAI-compatible model server (e.g., Ollama or LM Studio).
+- **AI Access**: A Google Gemini API key.
 
 ---
 
@@ -146,7 +146,7 @@ It manages repetitive archival tasks:
 ## First-Run Setup
 
 When Scriptorium opens, navigate to the **Global Settings** tab:
-1. Enter your AI API key (OpenAI, Anthropic, or Gemini).
+1. Enter your Google Gemini API key.
 2. Configure your working directories:
    - **Root Project Directory**: Where your project data and master databases live.
    - **Raw Downloads Directory**: Where Voyageur places downloaded images.
@@ -166,12 +166,8 @@ Scriptorium persists settings in a `.env` file located in the application root d
 
 | Variable | Description | Default / Example |
 | :--- | :--- | :--- |
-| `OPENAI_API_KEY` | OpenAI API key for transcription passes | `sk-...` |
-| `ANTHROPIC_API_KEY` | Anthropic API key (optional alternative) | `sk-ant-...` |
-| `GEMINI_API_KEY` | Google Gemini API key (optional alternative) | `AIza...` |
-| `LLM_PROVIDER` | Active AI provider (`openai`, `anthropic`, `gemini`, `local`) | `openai` |
-| `LLM_MODEL` | Specific model identifier | `gpt-4o`, `claude-3-5-sonnet-latest` |
-| `LOCAL_LLM_BASE_URL` | Base URL if using a local OpenAI-compatible endpoint | `http://localhost:11434/v1` |
+| `GEMINI_API_KEY` | Google Gemini API key for document transcription | `AIza...` |
+| `LLM_MODEL` | Specific Gemini model identifier | `gemini-1.5-pro`, `gemini-2.0-flash` |
 | `PROJECT_DIR` | Main directory for active project files | `C:\Genealogy\Projects` |
 | `DOWNLOADS_DIR` | Staging folder for downloaded raw image files | `C:\Genealogy\Downloads` |
 | `OUTPUT_DIR` | Target folder for exported GEDCOM files | `C:\Genealogy\Exports` |
