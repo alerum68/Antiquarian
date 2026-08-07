@@ -93,11 +93,8 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
     }
 
     params = COMPRESSION_PARAMS.get(compression_level, COMPRESSION_PARAMS[1])
-
-    # Track processed files to handle potential file system race conditions
     processed_files = set()
 
-    # Iterate through the directory and its subdirectories
     for root, _, files in os.walk(directory):
         for file in files:
             if not file.lower().endswith('.pdf'):
@@ -105,7 +102,8 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
 
             pdf_path = os.path.join(root, file)
 
-            # Skip if already processed or temporary file
+            # A file already optimized this run, or a leftover temp file from a prior
+            # interrupted run, must not be re-processed.
             if pdf_path in processed_files or ".temp_optimized.pdf" in pdf_path:
                 continue
 
@@ -113,13 +111,11 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
             stats["total_files"] += 1
 
             try:
-                # Check if file exists and is accessible
                 if not os.path.exists(pdf_path) or not os.access(pdf_path, os.R_OK):
                     print(f'Cannot access file: {pdf_path}')
                     stats["failed_files"] += 1
                     continue
 
-                # Get file size
                 try:
                     file_size = os.path.getsize(pdf_path)
                     file_size_mb = file_size / (1024 * 1024)
@@ -129,17 +125,15 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                     stats["failed_files"] += 1
                     continue
 
-                # Check file size if threshold is set
                 if size_threshold_mb and file_size_mb < size_threshold_mb:
                     print(f'Skipping {pdf_path} (size: {file_size_mb:.2f} MB, below threshold)')
                     stats["skipped_files"] += 1
                     stats["optimized_size_bytes"] += file_size  # No change for skipped files
                     continue
 
-                # Check available disk space
                 try:
                     disk_usage = shutil.disk_usage(os.path.dirname(pdf_path))
-                    if disk_usage.free < file_size * 2:  # Need at least 2x file size
+                    if disk_usage.free < file_size * 2:  # optimize_pdf writes a full temp copy alongside the original
                         print(f'Skipping {pdf_path}: Not enough disk space')
                         stats["skipped_files"] += 1
                         stats["optimized_size_bytes"] += file_size
@@ -147,7 +141,6 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                 except Exception as e:
                     print(f'Warning: Could not check disk space for {pdf_path}: {str(e)}')
 
-                # Create backup if requested
                 if backup:
                     backup_path = pdf_path + '.backup'
                     try:
@@ -155,13 +148,11 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                     except Exception as e:
                         print(f'Warning: Could not create backup of {pdf_path}: {str(e)}')
 
-                # Optimize the PDF
                 result = optimize_pdf(pdf_path, params, repair_mode)
                 if result["success"]:
                     stats["optimized_files"] += 1
                     stats["optimized_size_bytes"] += result["new_size"]
 
-                    # Calculate and display size reduction
                     original_size = result["original_size"]
                     new_size = result["new_size"]
                     reduction_percent = ((original_size - new_size) / original_size * 100) if original_size > 0 else 0
@@ -173,14 +164,13 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
 
                     if result.get("repaired", False):
                         stats["repaired_files"] += 1
-                        print(f'  Note: Repaired PDF structure before optimization')
+                        print('  Note: Repaired PDF structure before optimization')
                 else:
                     stats["failed_files"] += 1
                     stats["optimized_size_bytes"] += result["original_size"]  # No change in size for failed files
             except Exception as e:
                 print(f'Unexpected error processing {pdf_path}: {str(e)}')
                 stats["failed_files"] += 1
-                # Try to add the file size to stats if possible
                 try:
                     if os.path.exists(pdf_path):
                         file_size = os.path.getsize(pdf_path)
@@ -188,7 +178,6 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                 except Exception:
                     pass
 
-    # Calculate overall statistics
     stats["end_time"] = datetime.now()
     stats["duration"] = stats["end_time"] - stats["start_time"]
     if stats["original_size_bytes"] > 0:
@@ -221,39 +210,33 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
         "repaired": False
     }
 
-    # Generate a unique filename for the temporary file
     temp_dir = os.path.dirname(pdf_path)
     temp_filename = f".temp_opt_{os.path.basename(pdf_path)}_{os.getpid()}_{int(time.time())}.pdf"
     temp_optimized_pdf_path = os.path.join(temp_dir, temp_filename)
 
     try:
-        # Try to open the PDF using PyMuPDF
         try:
             pdf_document = fitz.open(pdf_path)
         except Exception as e:
             if not repair_mode:
                 raise e
 
-            # Special handling for damaged PDFs
             print(f'Attempting to repair damaged PDF: {pdf_path}')
             result["repaired"] = True
             pdf_document = page_by_page_recovery(pdf_path)
             if not pdf_document:
                 raise Exception("PDF repair failed")
 
-        # Skip password-protected documents
         if pdf_document.is_encrypted:
             print(f'Skipping encrypted PDF: {pdf_path}')
             pdf_document.close()
             result["error"] = "PDF is encrypted"
             return result
 
-        # Check if document can be modified
         if not pdf_document.can_save_incrementally():
             print(f'Warning: {pdf_path} may not support all optimizations')
 
         try:
-            # Try standard optimization
             pdf_document.save(
                 temp_optimized_pdf_path,
                 incremental=False,
@@ -265,67 +248,58 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
             if not repair_mode:
                 raise save_error
 
-            # Try with special parameters for problematic PDFs
+            # The standard save failed - retry with the least aggressive settings that
+            # still compress at all, before falling back to page-by-page reconstruction.
             print(f'Using safe mode to optimize problematic PDF: {pdf_path}')
             try:
-                # Use more conservative parameters
                 pdf_document.save(
                     temp_optimized_pdf_path,
-                    incremental=True,  # Less aggressive
-                    garbage=1,  # Minimal garbage collection
-                    deflate=True,  # Still compress
-                    clean=False  # Skip cleaning step
+                    incremental=True,
+                    garbage=1,
+                    deflate=True,
+                    clean=False
                 )
                 result["repaired"] = True
             except Exception:
-                # Last resort: try copying page by page to a new document
                 print(f'Attempting page-by-page reconstruction for: {pdf_path}')
-                pdf_document.close()  # Close document before trying page-by-page recovery
+                pdf_document.close()
                 if page_by_page_recovery(pdf_path, temp_optimized_pdf_path):
                     result["repaired"] = True
                 else:
                     raise Exception("Could not repair PDF even with page-by-page method")
 
-        # Make sure the document is closed
         try:
             pdf_document.close()
         except Exception:
             pass
 
-        # Verify the temporary file exists before proceeding
         if not os.path.exists(temp_optimized_pdf_path):
             raise Exception(f"Temporary optimized file was not created: {temp_optimized_pdf_path}")
 
-        # Check if optimization actually reduced the size
         new_size = os.path.getsize(temp_optimized_pdf_path)
 
         if new_size < original_size:
-            # Replace the original PDF with the optimized one
             try:
-                # Use safer approach to replace the file
                 shutil.move(temp_optimized_pdf_path, pdf_path)
                 result["success"] = True
                 result["new_size"] = new_size
             except Exception as e:
                 raise Exception(f"Failed to replace original file: {str(e)}")
         else:
-            # If no size reduction, remove the temporary file and keep original
             os.remove(temp_optimized_pdf_path)
             print(f'  No size reduction for {pdf_path}, keeping original')
-            result["success"] = True  # Still mark as success since processing completed
+            result["success"] = True  # Processing completed cleanly even though nothing changed
 
     except Exception as e:
         error_msg = str(e)
         print(f'Error optimizing {pdf_path}: {error_msg}')
         result["error"] = error_msg
 
-        # Provide guidance for specific error messages
         if "cannot find object in xref" in error_msg:
-            print(f'  → This PDF has structural issues. Try using repair mode (-r flag)')
+            print('  → This PDF has structural issues. Try using repair mode (-r flag)')
         elif "malformed or missing" in error_msg:
-            print(f'  → This PDF may be damaged. Try using repair mode (-r flag)')
+            print('  → This PDF may be damaged. Try using repair mode (-r flag)')
 
-        # Cleanup temp file if it exists
         try:
             if os.path.exists(temp_optimized_pdf_path):
                 os.remove(temp_optimized_pdf_path)
@@ -333,61 +307,6 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
             print(f'  Warning: Could not remove temporary file: {str(cleanup_error)}')
 
     return result
-
-
-def attempt_pdf_repair(pdf_path):
-    """
-    Attempt to repair a damaged PDF file.
-
-    Args:
-        pdf_path: Path to the PDF file
-
-    Returns:
-        fitz.Document or None: Repaired document or None if repair failed
-    """
-    try:
-        # First try opening normally
-        pdf_document = fitz.open(pdf_path)
-        if pdf_document.is_pdf and pdf_document.page_count > 0:
-            return pdf_document
-        pdf_document.close()
-    except Exception:
-        pass
-
-    # If that fails, try a more aggressive approach
-    try:
-        # Create a temporary file for the repaired PDF
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-        temp_file.close()
-
-        # Try to use a basic approach without special parameters
-        pdf_document = fitz.open()
-        source_doc = fitz.open(pdf_path)  # No repair parameter
-        pdf_document.insert_pdf(source_doc)  # No garbage parameter
-        source_doc.close()
-
-        pdf_document.save(temp_file.name)
-        pdf_document.close()
-
-        # Try to open the repaired PDF
-        repaired_doc = fitz.open(temp_file.name)
-        if repaired_doc.page_count > 0:
-            # Copy the repaired file back to original path
-            temp_repaired = pdf_path + '.repaired.pdf'
-            shutil.copy2(temp_file.name, temp_repaired)
-            os.replace(temp_repaired, pdf_path)
-            os.unlink(temp_file.name)
-            # Re-open the repaired file
-            return fitz.open(pdf_path)
-    except Exception:
-        # Clean up temp file if it exists
-        if os.path.exists(temp_file.name):
-            try:
-                os.unlink(temp_file.name)
-            except Exception:
-                pass
-
-    return None
 
 
 def page_by_page_recovery(pdf_path, output_path=None):
@@ -407,7 +326,6 @@ def page_by_page_recovery(pdf_path, output_path=None):
         bool: when output_path is given (True on success, None on failure).
     """
     try:
-        # First try opening normally
         pdf_document = fitz.open(pdf_path)
         if pdf_document.is_pdf and pdf_document.page_count > 0:
             if output_path is None:
@@ -418,24 +336,18 @@ def page_by_page_recovery(pdf_path, output_path=None):
         pdf_document.close()
     except Exception as e:
         print(f"Initial open failed: {e}")
-        pass
 
-    # If that fails, try a more aggressive approach
+    # A normal open failed - rebuild the document page by page into a fresh one,
+    # skipping any individual page that can't be copied, rather than giving up entirely.
     try:
-        # Create a temporary file for the repaired PDF
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         temp_file.close()
 
-        # Try to use a simpler approach - just copy pages one by one
         src_doc = None
         try:
-            # Try to open the source document
             src_doc = fitz.open(pdf_path)
-
-            # Create a new document
             new_doc = fitz.open()
 
-            # Copy pages one by one, skipping problematic ones
             for page_num in range(src_doc.page_count):
                 try:
                     new_doc.insert_pdf(src_doc, from_page=page_num, to_page=page_num)
@@ -443,7 +355,6 @@ def page_by_page_recovery(pdf_path, output_path=None):
                     print(f"Skipping problematic page {page_num}")
                     continue
 
-            # Save the repaired document
             new_doc.save(temp_file.name)
             new_doc.close()
 
@@ -456,18 +367,15 @@ def page_by_page_recovery(pdf_path, output_path=None):
             if src_doc:
                 src_doc.close()
 
-        # Try to open the repaired PDF
         repaired_doc = fitz.open(temp_file.name)
         if repaired_doc.page_count > 0:
             repaired_doc.close()
             if output_path is not None:
                 shutil.copy2(temp_file.name, output_path)
                 return True
-            # Copy the repaired file back to original path
             temp_repaired = pdf_path + '.repaired.pdf'
             shutil.copy2(temp_file.name, temp_repaired)
             os.replace(temp_repaired, pdf_path)
-            # Re-open the repaired file
             return fitz.open(pdf_path)
         else:
             repaired_doc.close()
@@ -475,7 +383,6 @@ def page_by_page_recovery(pdf_path, output_path=None):
     except Exception as e:
         print(f"Recovery attempt failed: {e}")
     finally:
-        # Clean up temp file if it exists
         if os.path.exists(temp_file.name):
             try:
                 os.unlink(temp_file.name)
@@ -496,7 +403,6 @@ def print_summary(stats):
     print(f"Skipped: {stats['skipped_files']}")
     print(f"Failed: {stats['failed_files']}")
 
-    # Size statistics
     original_size_mb = stats["original_size_bytes"] / (1024 * 1024)
     optimized_size_mb = stats["optimized_size_bytes"] / (1024 * 1024)
     saved_mb = original_size_mb - optimized_size_mb

@@ -143,19 +143,6 @@ def main() -> Path:
     # Gather's job stops here - it stages the JSON (already normalized into the shared
     # sheets[].records[].participants[] schema above) and images and hands off, rather
     # than launching GEDCOM generation itself.
-    #
-    # NOTE: as of the field-map normalization work, this JSON's shape is the unified
-    # schema, not the old {census_year, location, pages: [...]} shape. Archivist's own
-    # census-ingestion path has not been updated to read this shape yet (tracked
-    # separately) - until that lands, this normalized output is not yet consumable by
-    # Archivist. This is expected, sequenced work, not a bug.
-    #
-    # Archivist's build_gedcom_from_census/APID_DB/CENSUS_YEAR fallbacks already derive
-    # everything they need from the JSON's own
-    # 'census_year'/'location' fields and each page's own scraped columns, so nothing here
-    # needs to be persisted for Archivist to find later - see run_census_flavor's
-    # get_json_fallback calls and its own image-folder reconstruction from census_year/location.
-
     return final_json
 
 

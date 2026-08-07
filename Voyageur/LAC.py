@@ -1,11 +1,11 @@
 import argparse
 import json
+import multiprocessing as mp
 import os
+import queue
 import re
 import sys
 import time
-import multiprocessing as mp
-import queue
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 

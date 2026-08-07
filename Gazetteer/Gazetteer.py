@@ -35,39 +35,22 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 # ==========================================
 PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
 
-# Resolve database path
-_rm_db = os.getenv(
-    "GAZETTEER_RM_DATABASE",
-    "Roots Magic 11/Your Tree.rmtree"
-)
+_rm_db = os.getenv("GAZETTEER_RM_DATABASE", "Roots Magic 11/Your Tree.rmtree")
 RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(PROGRAM_DIR, _rm_db)
 
-# Resolve shapefile path
 _shape = os.getenv(
     "GAZETTEER_SHAPEFILE",
-    "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/"
-    "US_HistCounties.shp"
-)
+    "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
 SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
 
-# Resolve the Canadian boundary directory (one shapefile per census year - see that
-# folder's own LICENSE_AND_ATTRIBUTION.txt). Optional: if the folder isn't present,
-# Gazetteer simply runs US-only, exactly as it did before this existed.
-_ca_shape_dir = os.getenv(
-    "GAZETTEER_CA_SHAPEFILE_DIR",
-    "Scriptorium/Gazetteer/CA_UNICEN_Counties"
-)
-CA_SHAPEFILE_DIR = (
-    _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
-)
+# Optional: if the folder isn't present, Gazetteer simply runs US-only, exactly as it did
+# before this existed (one shapefile per census year - see that folder's own
+# LICENSE_AND_ATTRIBUTION.txt).
+_ca_shape_dir = os.getenv("GAZETTEER_CA_SHAPEFILE_DIR", "Scriptorium/Gazetteer/CA_UNICEN_Counties")
+CA_SHAPEFILE_DIR = _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
 
-# Boolean configuration flags
-DEBUG_MODE = str(
-    os.getenv("GAZETTEER_DEBUG_MODE", "True")
-).lower() in ('true', '1', 'yes')
-CREATE_BACKUP = str(
-    os.getenv("GAZETTEER_CREATE_BACKUP", "False")
-).lower() in ('true', '1', 'yes')
+DEBUG_MODE = str(os.getenv("GAZETTEER_DEBUG_MODE", "True")).lower() in ('true', '1', 'yes')
+CREATE_BACKUP = str(os.getenv("GAZETTEER_CREATE_BACKUP", "False")).lower() in ('true', '1', 'yes')
 
 
 # ==========================================
@@ -370,10 +353,7 @@ def _clone_place_row(
     """Insert a new PlaceTable row cloned from original_place_id, with the given
     column values overridden (all other columns, like coordinates and UUIDs,
     carried over unchanged)."""
-    cursor.execute(
-        "SELECT * FROM PlaceTable WHERE PlaceID = ?",
-        (original_place_id,)
-    )
+    cursor.execute("SELECT * FROM PlaceTable WHERE PlaceID = ?", (original_place_id,))
     original_data = cursor.fetchone()
 
     insert_cols = []
@@ -403,22 +383,15 @@ def clone_historical_place(
     columns: List[str]
 ) -> int:
     """Clone a place record, maintaining coordinates and UUIDs, with a new name."""
-    cursor.execute(
-        "SELECT PlaceID FROM PlaceTable WHERE Name = ?",
-        (new_place_name,)
-    )
+    cursor.execute("SELECT PlaceID FROM PlaceTable WHERE Name = ?", (new_place_name,))
     result = cursor.fetchone()
     if result:
-        debug_print(
-            f"Place '{new_place_name}' exists (ID: {result[0]}). Reusing."
-        )
+        debug_print(f"Place '{new_place_name}' exists (ID: {result[0]}). Reusing.")
         return result[0]
 
     new_reverse_name = create_reverse_place(new_place_name)
-    return _clone_place_row(
-        cursor, original_place_id, columns,
-        {'Name': new_place_name, 'Reverse': new_reverse_name}
-    )
+    return _clone_place_row(cursor, original_place_id, columns,
+                            {'Name': new_place_name, 'Reverse': new_reverse_name})
 
 
 def get_or_create_place_detail(
@@ -441,9 +414,7 @@ def get_or_create_place_detail(
     if result:
         return result[0]
 
-    return _clone_place_row(
-        cursor, original_site_id, columns, {'MasterID': new_place_id}
-    )
+    return _clone_place_row(cursor, original_site_id, columns, {'MasterID': new_place_id})
 
 
 # ==========================================
@@ -463,8 +434,7 @@ def main() -> None:
     if ca_shapefiles:
         print(f"Loaded Canadian boundaries for {len(ca_shapefiles)} census year(s).\n")
     else:
-        print("No Canadian boundary data found - running US-only "
-              f"(expected at: {CA_SHAPEFILE_DIR}).\n")
+        print(f"No Canadian boundary data found - running US-only (expected at: {CA_SHAPEFILE_DIR}).\n")
 
     if not os.path.exists(RM_DATABASE):
         print(f"Error: Database file not found at {RM_DATABASE}")
@@ -573,16 +543,11 @@ def main() -> None:
                 new_place_name = build_us_place_name(current_name, matched.iloc[0])
 
             if new_place_name != current_name:
-                new_place_id = clone_historical_place(
-                    cursor, place_id, new_place_name, place_table_columns
-                )
+                new_place_id = clone_historical_place(cursor, place_id, new_place_name, place_table_columns)
 
-                # Fetch or use site ID
                 if site_id and site_id > 0 and detail_name:
                     new_site_id = get_or_create_place_detail(
-                        cursor, new_place_id, detail_name, site_id,
-                        place_table_columns
-                    )
+                        cursor, new_place_id, detail_name, site_id, place_table_columns)
                 else:
                     new_site_id = site_id
 
@@ -595,11 +560,8 @@ def main() -> None:
                 _updated_count += 1
                 update_ui()
 
-                bar.write(
-                    f"\033[92m[FORKED]\033[0m Event {event_id} "
-                    f"[{target_date}] | \033[91m{current_name}\033[0m -> "
-                    f"\033[92m{new_place_name}\033[0m"
-                )
+                bar.write(f"\033[92m[FORKED]\033[0m Event {event_id} [{target_date}] | "
+                          f"\033[91m{current_name}\033[0m -> \033[92m{new_place_name}\033[0m")
             else:
                 debug_print(f"[{current_name}] Name already matches.")
 
@@ -608,10 +570,7 @@ def main() -> None:
     conn.close()
 
     print("-" * 50)
-    print(
-        f"\nCompleted! Adjusted {_updated_count} display values "
-        f"without losing FamilySearch data fields."
-    )
+    print(f"\nCompleted! Adjusted {_updated_count} display values without losing FamilySearch data fields.")
 
 
 if __name__ == "__main__":
