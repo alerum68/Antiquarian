@@ -386,36 +386,45 @@ def download_volume_assets(pids: List[str], media_dir: str, checkpoint_path: str
                            master_db_path: str, document_type: str, collection_title: str) -> Dict[str, Any]:
     """Sequential bulk download for a list of PIDs with checkpointing. Also seeds
     Paleographer's own MASTER_DB with one Commissioner-shaped scaffold sheet per
-    downloaded asset, incrementally - see the Voyageur-Parish-Scrip-scaffold design spec."""
+    downloaded asset, incrementally - see the Voyageur-Parish-Scrip-scaffold design spec.
+    Each PID's source_documents are persisted into the checkpoint so a MASTER_DB
+    reset can re-seed scaffolds for already-downloaded PIDs without re-fetching."""
     from Commissioner.record_registry import build_empty_sheet
 
     checkpoint = load_checkpoint(checkpoint_path)
     downloaded = set(checkpoint.get("downloaded_pids", []))
     failed = checkpoint.get("failed_pids", {})
+    pid_documents = checkpoint.get("pid_documents", {})
     master_data = load_master_db(master_db_path, collection_title, document_type)
+
+    def write_scaffold(source_documents):
+        new_sheets = [
+            build_empty_sheet(Path(entry["media_path"]).name,
+                              Path(entry["media_path"]).suffix.lstrip("."),
+                              page_id=entry.get("lac_asset_id"))
+            for entry in source_documents
+        ]
+        append_scaffold_sheets(master_data, new_sheets)
+        validate_master_db_against_commissioner(master_data, document_type, collection_title)
+        save_master_db(master_db_path, master_data)
 
     for pid in pids:
         if pid in downloaded:
+            write_scaffold(pid_documents.get(pid, []))
             continue
         try:
             bundle = download_pid_bundle(pid, media_dir)
             downloaded.add(pid)
             failed.pop(pid, None)
-
-            new_sheets = [
-                build_empty_sheet(Path(entry["media_path"]).name,
-                                  Path(entry["media_path"]).suffix.lstrip("."),
-                                  page_id=entry.get("lac_asset_id"))
-                for entry in bundle.get("source_documents", [])
-            ]
-            append_scaffold_sheets(master_data, new_sheets)
-            validate_master_db_against_commissioner(master_data, document_type, collection_title)
-            save_master_db(master_db_path, master_data)
+            source_documents = bundle.get("source_documents", [])
+            pid_documents[pid] = source_documents
+            write_scaffold(source_documents)
         except lac_client.LacCallError as e:
             failed[pid] = str(e)
 
         checkpoint["downloaded_pids"] = sorted(downloaded)
         checkpoint["failed_pids"] = failed
+        checkpoint["pid_documents"] = pid_documents
         save_checkpoint(checkpoint_path, checkpoint)
 
     return checkpoint
@@ -465,6 +474,22 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
     downloaded = set(checkpoint.get("downloaded_pids", []))
     failed = checkpoint.get("failed_pids", {})
     master_data = load_master_db(master_db_path, collection_title, document_type)
+
+    def write_scaffold(source_documents):
+        new_sheets = [
+            build_empty_sheet(Path(entry["media_path"]).name,
+                              Path(entry["media_path"]).suffix.lstrip("."),
+                              page_id=entry.get("lac_asset_id"))
+            for entry in source_documents
+        ]
+        append_scaffold_sheets(master_data, new_sheets)
+        validate_master_db_against_commissioner(master_data, document_type, collection_title)
+        save_master_db(master_db_path, master_data)
+
+    pid_documents = checkpoint.get("pid_documents", {})
+    for pid in pids:
+        if pid in downloaded:
+            write_scaffold(pid_documents.get(pid, []))
 
     pids_to_process = [p for p in pids if p not in downloaded]
     if not pids_to_process:
@@ -525,17 +550,12 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
             failed.pop(pid, None)
             processed_count += 1
             bundle = msg[3]
-            new_sheets = [
-                build_empty_sheet(Path(entry["media_path"]).name,
-                                  Path(entry["media_path"]).suffix.lstrip("."),
-                                  page_id=entry.get("lac_asset_id"))
-                for entry in bundle.get("source_documents", [])
-            ]
-            append_scaffold_sheets(master_data, new_sheets)
-            validate_master_db_against_commissioner(master_data, document_type, collection_title)
-            save_master_db(master_db_path, master_data)
+            source_documents = bundle.get("source_documents", [])
+            pid_documents[pid] = source_documents
+            write_scaffold(source_documents)
             checkpoint["downloaded_pids"] = sorted(downloaded)
             checkpoint["failed_pids"] = failed
+            checkpoint["pid_documents"] = pid_documents
             save_checkpoint(checkpoint_path, checkpoint)
             print(f"\rDownloaded PID {pid} [{processed_count}/{total_target}]", end="", flush=True)
         elif msg_type == "403_ERROR":

@@ -142,6 +142,44 @@ def test_download_volume_assets_records_failure_without_writing_scaffold(monkeyp
     assert not os.path.exists(master_db_path)
 
 
+def test_download_volume_assets_persists_source_documents_in_checkpoint(monkeypatch, tmp_path):
+    def fake_download_pid_bundle(pid, media_dir):
+        return {
+            "source_documents": [
+                {"media_path": str(tmp_path / pid / "asset1.jpg"), "lac_asset_id": "asset1"},
+            ],
+        }
+    monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
+
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    LAC.download_volume_assets(["pid1"], str(tmp_path), checkpoint_path, master_db_path, "Scrip", "Test")
+
+    checkpoint = LAC.load_checkpoint(checkpoint_path)
+    assert checkpoint["pid_documents"]["pid1"][0]["lac_asset_id"] == "asset1"
+
+
+def test_download_volume_assets_reseeds_scaffold_for_already_downloaded_pid_without_refetch(monkeypatch, tmp_path):
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    LAC.save_checkpoint(checkpoint_path, {
+        "pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {},
+        "pid_documents": {"pid1": [{"media_path": str(tmp_path / "pid1" / "asset1.jpg"), "lac_asset_id": "asset1"}]},
+    })
+
+    def fail_if_called(pid, media_dir):
+        raise AssertionError("should not re-fetch an already-downloaded pid")
+    monkeypatch.setattr(LAC, "download_pid_bundle", fail_if_called)
+
+    master_db_path = str(tmp_path / "scrip_records.json")  # simulates a MASTER_DB reset - file doesn't exist yet
+
+    LAC.download_volume_assets(["pid1"], str(tmp_path), checkpoint_path, master_db_path, "Scrip", "Test")
+
+    master_data = LAC.load_master_db(master_db_path, "Test", "Scrip")
+    assert len(master_data["sheets"]) == 1
+    assert master_data["sheets"][0]["document_metadata"]["file_name"] == "asset1.jpg"
+
+
 def test_download_volume_assets_multiworker_no_op_when_all_downloaded(tmp_path):
     checkpoint_path = str(tmp_path / "checkpoint.json")
     LAC.save_checkpoint(checkpoint_path, {"pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {}})
@@ -151,6 +189,22 @@ def test_download_volume_assets_multiworker_no_op_when_all_downloaded(tmp_path):
                                                      master_db_path, "Scrip", "Test", max_workers=2)
 
     assert result["downloaded_pids"] == ["pid1"]
+
+
+def test_download_volume_assets_multiworker_reseeds_scaffold_for_already_downloaded_pid(tmp_path):
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    LAC.save_checkpoint(checkpoint_path, {
+        "pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {},
+        "pid_documents": {"pid1": [{"media_path": str(tmp_path / "pid1" / "asset1.jpg"), "lac_asset_id": "asset1"}]},
+    })
+    master_db_path = str(tmp_path / "scrip_records.json")
+
+    result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
+                                                     master_db_path, "Scrip", "Test", max_workers=2)
+
+    assert result["downloaded_pids"] == ["pid1"]
+    master_data = LAC.load_master_db(master_db_path, "Test", "Scrip")
+    assert len(master_data["sheets"]) == 1
 
 
 def test_download_volume_assets_multiworker_writes_scaffold_sheet_on_success(monkeypatch, tmp_path):
