@@ -418,6 +418,34 @@ def detect_record_family_from_raw(raw: dict, catalog_items: Dict[str, dict]) -> 
 # ==========================================
 # ASSEMBLY
 # ==========================================
+def sanitize_item_id_filename(item_id: str) -> str:
+    """Mirrors Voyageur.js's own image-filename sanitization (line 93:
+    itemId.replace(/[^a-zA-Z0-9_-]/g, '_') + '.jpg') so document_metadata.file_name always
+    matches the real filename main()'s image-move loop already produces for this item -
+    both are derived independently from the same item_id rather than one scanning the
+    filesystem to match the other."""
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', item_id) + ".jpg" if item_id else ""
+
+
+RECORD_FAMILY_TO_DOCUMENT_TYPE = {"church": "Parish", "scrip": "Scrip"}
+
+
+def validate_against_commissioner(final_data: dict, record_family: str, collection_title: str) -> None:
+    """Non-blocking Commissioner schema check for Parish/Scrip gathers, mirroring
+    census_schema.py's validate_against_commissioner() (Sub-project 2) - a failure here is
+    logged and swallowed, never raised. record_family values with no matching Commissioner
+    document type (e.g. "wills", "other") are silently skipped - only "church" (-> Parish)
+    and "scrip" (-> Scrip) are currently recognized document types."""
+    document_type = RECORD_FAMILY_TO_DOCUMENT_TYPE.get(record_family)
+    if document_type is None:
+        return
+    try:
+        from Commissioner.record_registry import parse_collection
+        parse_collection(final_data, document_type)
+    except Exception as e:
+        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+
+
 def build_universal_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str, dict],
                          record_family: str) -> dict:
     event_types_table = load_event_types()
@@ -447,8 +475,8 @@ def build_universal_json(raw: dict, items_raw: List[dict], catalog_items: Dict[s
         sheets.append({
             "page_id": item_id,
             "document_metadata": {
-                "file_name": "", "file_type": "", "volume": "", "pages": "",
-                "source_name": "", "source_location": "",
+                "file_name": sanitize_item_id_filename(item_id), "file_type": "jpg" if item_id else "",
+                "volume": "", "pages": "", "source_name": "", "source_location": "",
             },
             "records": records,
         })
@@ -773,6 +801,7 @@ def main() -> None:
     else:
         print("\n[System] Converting raw scrape into the universal Gather JSON...")
         final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
+        validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))
 
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)
