@@ -11,6 +11,7 @@ venv/
 /.idea/
 /.claude/
 /CLAUDE.md
+/.mcp.json
 
 # OS junk
 .DS_Store
