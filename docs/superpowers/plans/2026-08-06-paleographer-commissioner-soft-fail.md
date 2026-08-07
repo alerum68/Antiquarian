@@ -30,7 +30,7 @@
 - Consumes: existing `parse_collection(raw_json: dict, document_type: str) -> Collection` (already defined at `Commissioner/record_registry.py:147`).
 - Produces: `validate_soft(data: dict, document_type: str, label: str) -> None` — every later task in this plan imports and calls this exact function.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Open `Commissioner/tests/test_record_registry.py`. Find this existing test (it ends at line 284):
 
@@ -99,12 +99,12 @@ from Commissioner.record_registry import (
 )
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -k validate_soft -v`
 Expected: FAIL with `ImportError: cannot import name 'validate_soft'`
 
-- [ ] **Step 3: Implement `validate_soft`**
+- [x] **Step 3: Implement `validate_soft`**
 
 In `Commissioner/record_registry.py`, immediately after `parse_collection`'s closing `return collection` (line 163), insert:
 
@@ -123,12 +123,12 @@ def validate_soft(data: dict, document_type: str, label: str) -> None:
         print(f"[WARN] Commissioner validation failed for {label!r}: {e}")
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v`
 Expected: PASS (all tests, including the 3 new ones and every pre-existing test in the file)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Commissioner/record_registry.py Commissioner/tests/test_record_registry.py

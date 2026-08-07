@@ -163,6 +163,18 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
     return collection
 
 
+def validate_soft(data: dict, document_type: str, label: str) -> None:
+    """Runs parse_collection() as a visibility check, never a gate: a validation failure is
+    logged and swallowed here so a Commissioner-side schema gap can never block a real
+    Voyageur gather or a Paleographer MASTER_DB write. Shared by every soft-fail call site -
+    see the sub-project 4 design spec
+    (docs/superpowers/specs/2026-08-06-paleographer-commissioner-soft-fail-design.md)."""
+    try:
+        parse_collection(data, document_type)
+    except Exception as e:
+        print(f"[WARN] Commissioner validation failed for {label!r}: {e}")
+
+
 def build_empty_sheet(file_name: str, file_type: str, page_id: Optional[str] = None) -> dict:
     """Builds a Commissioner-shaped placeholder sheet dict: a real document_metadata (the
     image reference) wrapping exactly one empty-content Record (participants: [], every

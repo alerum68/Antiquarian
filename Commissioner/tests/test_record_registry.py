@@ -13,6 +13,7 @@ from Commissioner.record_registry import (
     validate_participant_extra_fields,
     validate_record_extra_fields,
     validate_role_name,
+    validate_soft,
 )
 
 
@@ -282,6 +283,30 @@ def test_parse_collection_rejects_bad_extra_field_type():
     }
     with pytest.raises(ValidationError, match="Land"):
         parse_collection(bad_payload, document_type="Scrip")
+
+
+def test_validate_soft_accepts_a_valid_collection_and_prints_nothing(capsys):
+    validate_soft(SAMPLE_SCRIP_PAYLOAD, "Scrip", "Test Scrip Collection")
+
+    captured = capsys.readouterr()
+    assert "[WARN]" not in captured.out
+
+
+def test_validate_soft_logs_and_does_not_raise_on_bad_shape(capsys):
+    bad_payload = {"collection_title": "Bad Collection", "sheets": [{"records": "not-a-list"}]}
+
+    validate_soft(bad_payload, "Scrip", "Bad Collection")
+
+    captured = capsys.readouterr()
+    assert "[WARN] Commissioner validation failed for 'Bad Collection'" in captured.out
+
+
+def test_validate_soft_logs_and_does_not_raise_on_unknown_document_type(capsys):
+    validate_soft({"collection_title": "X", "sheets": []}, "NotARecordType", "X Collection")
+
+    captured = capsys.readouterr()
+    assert "[WARN] Commissioner validation failed for 'X Collection'" in captured.out
+    assert "NotARecordType" in captured.out
 
 
 def test_parse_collection_leaves_type_specific_fields_exactly_as_given():
