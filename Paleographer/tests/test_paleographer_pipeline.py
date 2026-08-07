@@ -19,6 +19,9 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
+import agy_engine
+import engine
+
 
 class FakeCaches:
     def create(self, **_kwargs):
@@ -123,8 +126,8 @@ def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_d
     FakeClient.pending_page_data = fake_page_data
     monkeypatch.setattr("google.genai.Client", FakeClient)
 
-    sys.modules.pop("Paleographer", None)
-    module = importlib.import_module("Paleographer")
+    sys.modules.pop("Extract", None)
+    module = importlib.import_module("Extract")
     return module, program_dir / json_dir_name / "master.json"
 
 
@@ -347,7 +350,7 @@ def test_build_merged_schema_maps_dict_field_type_to_json_schema_object(tmp_path
     }
     extra_fields = {"participant": [{"name": "unmapped", "type": "dict"}]}
 
-    merged = module.build_merged_schema(core, extra_fields)
+    merged = engine.build_merged_schema(core, extra_fields)
 
     rec_props = merged["properties"]["sheets"]["items"]["properties"]["records"]["items"]["properties"]
     part_props = rec_props["participants"]["items"]["properties"]
@@ -367,10 +370,10 @@ def test_build_vocabulary_summary_closed_mode_matches_parish_pmt(tmp_path, monke
         fake_page_data=PARISH_FAKE_RESPONSE,
     )
 
-    cfg = module.parse_type_config(module.resolve_prompt_path("Parish.pmt"))
+    cfg = engine.parse_type_config(engine.resolve_prompt_path("Parish.pmt"))
     assert cfg.role_validation == "closed"
 
-    summary = module.build_vocabulary_summary(cfg)
+    summary = engine.build_vocabulary_summary(cfg)
 
     assert "role_name (choose exactly one per participant - where a role's own meaning" in summary
     assert "use one of these when it applies" not in summary
@@ -390,10 +393,10 @@ def test_build_vocabulary_summary_open_mode_matches_census_pmt(tmp_path, monkeyp
         fake_page_data=PARISH_FAKE_RESPONSE,
     )
 
-    cfg = module.parse_type_config(module.resolve_prompt_path("Census.pmt"))
+    cfg = engine.parse_type_config(engine.resolve_prompt_path("Census.pmt"))
     assert cfg.role_validation == "open"
 
-    summary = module.build_vocabulary_summary(cfg)
+    summary = engine.build_vocabulary_summary(cfg)
 
     assert "role_name: use one of these when it applies" in summary
     assert "treated as an association, not a family link." in summary
@@ -570,8 +573,8 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
     monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: None)
     monkeypatch.setattr(sys, "argv", ["Paleographer.py"])
 
-    sys.modules.pop("Paleographer", None)
-    module = importlib.import_module("Paleographer")
+    sys.modules.pop("Extract", None)
+    module = importlib.import_module("Extract")
 
     from ScriptoriumMCP import agy_client
 
@@ -581,11 +584,10 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
     # rasterize_pdf_to_images would otherwise really try to open the fake PDF bytes
     # above via pdfplumber - returning a single blank image is enough for this
     # orchestration-level test (rasterization itself is unit-tested separately).
-    # Both functions are now inlined into Paleographer.py, so we patch directly on
-    # the module: Python resolves module globals at call time, so any function defined
-    # in Paleographer.py that calls rasterize_pdf_to_images/call_agy_extract by name
-    # will pick up the replacement automatically.
-    monkeypatch.setattr(module, "rasterize_pdf_to_images",
+    # Extract.py imports agy_engine as a real sibling module and calls it as
+    # agy_engine.rasterize_pdf_to_images(...)/agy_engine.call_agy_extract_chunked(...),
+    # so the fakes are patched directly on agy_engine, not on the Extract module.
+    monkeypatch.setattr(agy_engine, "rasterize_pdf_to_images",
                         lambda pdf_path, **k: [Image.new("RGB", (10, 10), color="white")])
 
     call_log = []
@@ -601,7 +603,7 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
                                       cache_read_tokens=0, total_tokens=1600),
         )
 
-    monkeypatch.setattr(module, "call_agy_extract", fake_call_agy_extract)
+    monkeypatch.setattr(agy_engine, "call_agy_extract_chunked", fake_call_agy_extract)
 
     return module, program_dir / json_dir_name / "master.json", call_log
 
@@ -656,7 +658,7 @@ def test_agy_engine_stages_multiple_rasterized_pages_for_pdf(tmp_path, monkeypat
         pdf_filenames=("CaseFile_001.pdf",),
     )
 
-    monkeypatch.setattr(module, "rasterize_pdf_to_images",
+    monkeypatch.setattr(agy_engine, "rasterize_pdf_to_images",
                         lambda pdf_path, **k: [Image.new("RGB", (10, 10), color=c) for c in ("white", "gray", "black")])
 
     module.main()

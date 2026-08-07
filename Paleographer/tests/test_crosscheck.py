@@ -41,17 +41,17 @@ def paleographer_module(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["Paleographer.py"])
     monkeypatch.setattr("google.genai.Client", lambda *a, **k: object())
 
-    sys.modules.pop("Paleographer", None)
-    return importlib.import_module("Paleographer")
+    sys.modules.pop("ScripTools", None)
+    return importlib.import_module("ScripTools")
 
 
-def _record(file_name="", **overrides):
+def _record(file_name="", **type_fields):
+    claim_number = type_fields.pop("claim_number", "1234")
     record = {
         "document_metadata": {"file_name": file_name},
-        "claim_number": "1234",
+        "type_specific_fields": {"claim_number": claim_number, **type_fields},
         "participants": [],
     }
-    record.update(overrides)
     return record
 
 

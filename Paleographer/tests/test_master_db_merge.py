@@ -43,8 +43,8 @@ def minimal_paleographer_env(monkeypatch, tmp_path):
     monkeypatch.setattr(sys, "argv", ["Paleographer.py"])
     monkeypatch.setattr("google.genai.Client", lambda *a, **k: object())
 
-    sys.modules.pop("Paleographer", None)
-    return importlib.import_module("Paleographer")
+    sys.modules.pop("Extract", None)
+    return importlib.import_module("Extract")
 
 
 def _placeholder_sheet(file_name):
