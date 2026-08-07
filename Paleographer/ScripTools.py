@@ -442,17 +442,26 @@ def expand_scrip_number_range(scrip_number: Optional[str]) -> List[str]:
 
 
 def build_claim_search_queries(record: Dict[str, Any]) -> List[str]:
+    """Builds search queries to find a claim's related documents from LAC."""
     fields = record.get("type_specific_fields", {})
     claim_number = fields.get("claim_number")
-    if claim_number:
-        return [claim_number.strip()]
-    queries = []
-    for num in expand_scrip_number_range(fields.get("scrip_number")):
-        queries.append(num)
     affidavit_number = fields.get("affidavit_number")
-    if affidavit_number:
-        queries.append(affidavit_number.strip())
-    return queries
+    scrip_numbers = expand_scrip_number_range(fields.get("scrip_number"))
+
+    primary = claim_number or affidavit_number
+    if primary and scrip_numbers:
+        return [f"claim: {primary} Scrip: {n}" for n in scrip_numbers]
+    if primary:
+        return [f"claim: {primary}"]
+    if scrip_numbers:
+        return [f"Scrip: {n}" for n in scrip_numbers]
+
+    file_name = (record.get("document_metadata") or {}).get("file_name", "")
+    e_number_match = re.search(r"(e\d{6,})", file_name, re.IGNORECASE)
+    if e_number_match:
+        return [e_number_match.group(1)]
+
+    return []
 
 
 def build_claim_search_query(record: Dict[str, Any]) -> Optional[str]:
