@@ -9,7 +9,7 @@
 **Archivist** — missing from UI entirely:
 - `TRANSCRIPTION_HEADER`, `TRANSLATION_HEADER`, `ROLE_CLERGY`, `CLERGY_HONORIFIC`, `ROLE_DEFAULT_WITNESS` (read by `General.py`)
 - `ENUMERATION_DISTRICT`, `FILM_NUMBER`, `ROLL_NUMBER` (sit alongside `STATE`/`COUNTY`/`TOWNSHIP` in code, absent from the "Location Overrides" UI section)
-- Also structurally behind Paleographer/Voyageur: has no Record-Type/profile dropdown or per-profile filtered settings, despite the Archivist structural-split plan (`2026-08-07-archivist-structural-split.md`) introducing `PROFILE_REGISTRY`/`resolve_profile`.
+- No dropdown-driven filtering is needed or possible: unlike Paleographer/Voyageur, `Archivist.py`'s `resolve_profile(record_type_name)` reads `record_type_name` directly from the input JSON's own data (`loaded_data.get("record_type_name", "")`, per the structural-split plan), not from a user selection. There is no single "current record type" for a settings dropdown to filter against. Archivist keeps a flat form, same as Registrar/Gazetteer/PDFix.
 
 **Paleographer** — missing `AGY_CLI_BIN`, `AGY_TIMEOUT_SECONDS` (read by `Extract.py`). Everything else confirmed matching. Help text is also stale: mentions "Enrich Metadata"/"Partition Collections" but not the `crosscheck`/`resolve-names` modes `Paleographer.py`'s `ENRICHMENT_MODES` already dispatches.
 
@@ -79,11 +79,9 @@ Every widget/picker key from today's `FIELD_WIDGETS`/`PATH_PICKER_FIELDS` carrie
 
 **Why YAML over a relocated Python module:** matches the `.pmt` front-matter precedent already in the codebase (Paleographer/Archivist profile files), and directly serves the actual goal (easy hand-editing) better than Python dict literals. The one YAML footgun — implicit typing turning an unquoted `0.4`/`true`/`off` into a non-string — is fully closed by having the loader `str()` every loaded value immediately regardless of YAML's inferred type, so no field needs to be quoted defensively.
 
-### 2. Generic loader + Archivist integration
+### 2. Generic loader
 
-`Scriptorium.py` gains one function, `_load_tool_schema(tool_dir: Path) -> dict`, returning the same shape `_build_form_ui` already consumes today. `_build_form_ui`, `_build_segmented_field`, `_build_slider_field`, `_browse_for_path` are unchanged — only where their input data comes from changes. `ENV_TARGETS` is now built by the loader (each schema's target subfolder is the tool folder it loaded from) instead of six hand-maintained tuples.
-
-Archivist gets the Record-Type dropdown + filtered-form treatment Paleographer/Voyageur already have (`_on_record_type_change`/`_on_voyageur_source_change`), but driven by `PROFILE_REGISTRY` rather than `.pmt` files: `Scriptorium.py` imports Archivist's profile module directly and reads `PROFILE_REGISTRY.keys()` for the dropdown values. Each `PROFILE_REGISTRY` entry gains an optional `settings_sections: list[str]` attribute (same meaning as `.pmt`'s `settings_sections`) — the Archivist structural-split plan (Task A, not yet implemented) needs this attribute added before this project's Archivist work begins.
+`Scriptorium.py` gains one function, `_load_tool_schema(tool_dir: Path) -> dict`, returning the same shape `_build_form_ui` already consumes today. `_build_form_ui`, `_build_segmented_field`, `_build_slider_field`, `_browse_for_path` are unchanged — only where their input data comes from changes. `ENV_TARGETS` is now built by the loader (each schema's target subfolder is the tool folder it loaded from) instead of six hand-maintained tuples. Archivist has no dropdown or dynamic filtering (see audit finding above) — it's rendered exactly like Registrar/Gazetteer/PDFix, one flat schema file. This project has no dependency on the unimplemented Archivist structural-split plan.
 
 ### 3. Migration + error handling
 
@@ -101,6 +99,6 @@ No GUI-automated tests (CustomTkinter widget rendering isn't practically testabl
 
 ## Out of scope
 
-- Sidebar/tab grouping changes beyond the Archivist dropdown addition — the current pipeline-then-Utilities grouping already matches the actual workflow.
+- Sidebar/tab grouping changes — the current pipeline-then-Utilities grouping already matches the actual workflow, and no tab needs new dropdown-driven filtering beyond what Paleographer/Voyageur already have.
 - Moving help text, tab titles/descriptions, or action-button definitions into the schema files (considered and rejected — see Migration scope above).
 - Any change to Commissioner (no UI needed).
