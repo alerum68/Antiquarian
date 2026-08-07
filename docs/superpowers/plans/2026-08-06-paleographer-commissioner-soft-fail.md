@@ -147,12 +147,12 @@ git commit -m "Add validate_soft() soft-fail wrapper to Commissioner record_regi
 - Consumes: `validate_soft(data: dict, document_type: str, label: str) -> None` from Task 1.
 - Produces: no change to `census_schema.validate_against_commissioner(normalized: dict, collection_title: str) -> None`'s signature or external behavior — later tasks and existing callers are unaffected.
 
-- [ ] **Step 1: Run the existing tests as a baseline**
+- [x] **Step 1: Run the existing tests as a baseline**
 
 Run: `pytest Voyageur/tests/test_census_schema.py -k commissioner -v`
 Expected: PASS (3 tests: `test_validate_against_commissioner_accepts_valid_normalized_output`, `test_validate_against_commissioner_logs_and_does_not_raise_on_bad_shape`, `test_validate_against_commissioner_survives_broken_commissioner_import`)
 
-- [ ] **Step 2: Replace the internal parse_collection call with validate_soft**
+- [x] **Step 2: Replace the internal parse_collection call with validate_soft**
 
 In `Voyageur/census_schema.py`, find:
 
@@ -174,7 +174,7 @@ Replace with:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
-- [ ] **Step 3: Run the existing tests to confirm they still pass unmodified**
+- [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
 
 Run: `pytest Voyageur/tests/test_census_schema.py -k commissioner -v`
 Expected: PASS (same 3 tests, proving the delegation is behavior-neutral — including
@@ -183,7 +183,7 @@ Expected: PASS (same 3 tests, proving the delegation is behavior-neutral — inc
 import validate_soft` line itself raises `ImportError`, caught by this function's own
 outer `except`)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Voyageur/census_schema.py
