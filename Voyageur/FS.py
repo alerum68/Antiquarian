@@ -26,17 +26,24 @@ import os
 import re
 import sys
 import time
-import webbrowser
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import yaml
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 from thefuzz import fuzz
 
 import census_schema
-from _gather_helpers import cleanup_checkpoint_files, move_with_retry
+from _gather_helpers import (
+    cleanup_checkpoint_files,
+    launch_gather_browser,
+    move_downloaded_images,
+    move_with_retry,
+    resolve_census_image_dir,
+    wait_for_downloaded_json,
+    write_archivist_json_file,
+)
 
 # Commissioner lives in a sibling tool folder, not an installed package - add the repo
 # root to sys.path so it can be imported by absolute path, matching census_schema.py's own
@@ -732,12 +739,7 @@ def main() -> None:
         print("[ERROR] Please enter a FamilySearch record URL in the Toolbox settings first.")
         sys.exit(1)
 
-    start_time = time.time()
-    auto_url = url + ("&mgs_auto=1" if "?" in url else "?mgs_auto=1")
-    print("[System] Launching browser...")
-    webbrowser.open(auto_url)
-
-    print("\n[System] Waiting for Tampermonkey downloads (Auto-Batch will start automatically)...")
+    start_time = launch_gather_browser(url)
 
     # Voyageur.js used GM_download to land these in their own Downloads subfolder, but
     # confirmed live this was unreliable - GM_download's own "downloads" permission grant
@@ -753,31 +755,7 @@ def main() -> None:
     downloads_dir = Path.home() / "Downloads"
     json_prefix = "TMP_FS_"
     image_prefix = "TMP_FS_Images_"
-    raw_json_file = None
-
-    try:
-        while True:
-            # noinspection broad-exception
-            try:
-                candidates = [
-                    p for p in downloads_dir.iterdir()
-                    if p.is_file() and p.suffix.lower() == '.json'
-                    and p.name.startswith(json_prefix)
-                    and p.stat().st_mtime >= start_time
-                    and '[checkpoint' not in p.name
-                ]
-                if candidates:
-                    raw_json_file = max(candidates, key=lambda p: p.stat().st_mtime)
-                    print(f"[System] Detected raw gather JSON: {raw_json_file.name}")
-            except OSError:
-                pass
-
-            if raw_json_file:
-                break
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\n[System] Operation cancelled by user.")
-        sys.exit(0)
+    raw_json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "raw gather JSON")
 
     raw_data = json.loads(_read_text_with_retry(raw_json_file))
     items_raw = raw_data.get("items", [])
@@ -837,31 +815,9 @@ def main() -> None:
     # every other tool in this project. An already-absolute CENSUS_IMAGE_DIR (whether
     # GUI-resolved or set directly by the user) is used as-is, never re-nested.
     base_img_setting = os.getenv("CENSUS_IMAGE_DIR", "Census")
-    if os.path.isabs(base_img_setting):
-        base_img_dir = Path(base_img_setting)
-    else:
-        media_setting = os.getenv("MEDIA_DIR", "Media")
-        base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
-            Path(program_dir) / media_setting if program_dir else Path(media_setting))
-        base_img_dir = base_media_dir / base_img_setting
-    img_target_dir = base_img_dir / census_folder / location_folder
-    img_target_dir.mkdir(parents=True, exist_ok=True)
+    img_target_dir = resolve_census_image_dir(base_img_setting, program_dir, census_folder, location_folder)
 
-    img_count = 0
-    image_candidates = [
-        p for p in downloads_dir.iterdir()
-        if p.is_file() and p.suffix.lower() == '.jpg'
-        and p.name.startswith(image_prefix) and p.stat().st_mtime >= start_time
-    ]
-    for file_path in image_candidates:
-        # noinspection broad-exception
-        try:
-            final_img = img_target_dir / file_path.name[len(image_prefix):]
-            move_with_retry(file_path, final_img)
-            img_count += 1
-        except Exception as e:
-            print(f"[ERROR] Could not move image {file_path.name}: {e}")
-
+    img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)
     print(f"[System] Moved {img_count} image(s) to Project folder.")
 
     # JSON_FILE is read by Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py),
@@ -869,7 +825,7 @@ def main() -> None:
     # confirmed live this was the actual bug behind Archivist immediately failing with
     # FileNotFoundError right after a real gather succeeded: this used to write to
     # Voyageur/.env, a file Archivist never reads at all.
-    set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json.name)
+    write_archivist_json_file(final_json.name)
 
     # Both branches now produce the same sheets[].records[].participants[] shape (the
     # census path is normalized above via census_schema, same as A.py) - one summary
