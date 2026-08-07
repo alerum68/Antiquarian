@@ -196,8 +196,15 @@ def download_manifest(manifest_url: str) -> Dict[str, Any]:
         sys.exit(1)
 
 
-def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str) -> None:
-    """Loops through the manifest canvases and downloads max-resolution files."""
+def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
+                    master_db_path: str, document_type: str, collection_title: str) -> None:
+    """Loops through the manifest canvases, downloads max-resolution files, and seeds
+    Paleographer's own MASTER_DB with one Commissioner-shaped scaffold sheet per canvas -
+    for both a freshly downloaded image and one already on disk from a prior run, so a
+    MASTER_DB reset/first-time run still ends up fully seeded. See the
+    Voyageur-Parish-Scrip-scaffold design spec."""
+    from Commissioner.record_registry import build_empty_sheet
+
     if "sequences" in manifest_data and manifest_data["sequences"]:
         canvases = manifest_data["sequences"][0].get("canvases", [])
     elif "items" in manifest_data:
@@ -214,6 +221,7 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str) 
 
     print(f"[Info] Found {total} images to download.")
     session = requests.Session()
+    master_data = load_master_db(master_db_path, collection_title, document_type)
 
     for i, canvas in enumerate(canvases, 1):
         try:
@@ -240,18 +248,20 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str) 
 
             filename = f"{roll_num}_{i:04d}.jpg"
             filepath = os.path.join(out_dir, filename)
-
-            if os.path.exists(filepath):
-                print(f"\rDownloading [{i}/{total}]...", end="", flush=True)
-                continue
+            page_id = f"{roll_num}_{i:04d}"
 
             print(f"\rDownloading [{i}/{total}]...", end="", flush=True)
 
-            img_resp = session.get(img_id, timeout=20)
-            img_resp.raise_for_status()
+            if not os.path.exists(filepath):
+                img_resp = session.get(img_id, timeout=20)
+                img_resp.raise_for_status()
+                with open(filepath, 'wb') as f:
+                    f.write(img_resp.content)
 
-            with open(filepath, 'wb') as f:
-                f.write(img_resp.content)
+            new_sheet = build_empty_sheet(filename, "jpg", page_id=page_id)
+            append_scaffold_sheets(master_data, [new_sheet])
+            validate_master_db_against_commissioner(master_data, document_type, collection_title)
+            save_master_db(master_db_path, master_data)
 
         except Exception as e:
             print(f"\n[Warning] Failed to download image {i}: {e}")
@@ -592,11 +602,15 @@ def _run_reel(args: argparse.Namespace) -> None:
         print("[Error] --url is required for the reel subcommand.")
         sys.exit(1)
 
+    document_type = _resolve_record_type(args.record_type)
     program_dir = os.environ.get("PROGRAM_DIR", "").strip()
+    master_db_path = resolve_master_db_path(document_type, PROGRAM_DIR)
+
     roll, manifest = parse_url(args.url)
+    collection_title = os.environ.get("VOLUME_TITLE") or f"LAC Reel {roll}"
     output_directory = setup_directories(program_dir, args.media_dir, roll)
     manifest_json = download_manifest(manifest)
-    download_images(manifest_json, output_directory, roll)
+    download_images(manifest_json, output_directory, roll, master_db_path, document_type, collection_title)
 
 
 def main() -> None:

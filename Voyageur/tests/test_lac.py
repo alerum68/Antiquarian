@@ -207,3 +207,58 @@ def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch
 
     master_data = LAC.load_master_db(master_db_path, "Test Collection", "Scrip")
     assert len(master_data["sheets"]) == 1
+
+
+from pathlib import Path
+
+
+def test_download_images_writes_scaffold_sheet_per_canvas(monkeypatch, tmp_path):
+    manifest_data = {
+        "sequences": [{"canvases": [
+            {"images": [{"resource": {"@id": "https://example.com/img1.jpg"}}]},
+        ]}],
+    }
+
+    class FakeResponse:
+        content = b"fake-image-bytes"
+        def raise_for_status(self):
+            pass
+
+    class FakeSession:
+        def get(self, url, timeout=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
+
+    out_dir = str(tmp_path / "images")
+    os.makedirs(out_dir, exist_ok=True)
+    master_db_path = str(tmp_path / "parish_register.json")
+
+    LAC.download_images(manifest_data, out_dir, "roll1", master_db_path, "Parish", "Test Collection")
+
+    master_data = LAC.load_master_db(master_db_path, "Test Collection", "Parish")
+    assert len(master_data["sheets"]) == 1
+    assert master_data["sheets"][0]["document_metadata"]["file_name"] == "roll1_0001.jpg"
+    assert master_data["sheets"][0]["page_id"] == "roll1_0001"
+
+
+def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch, tmp_path):
+    manifest_data = {
+        "sequences": [{"canvases": [
+            {"images": [{"resource": {"@id": "https://example.com/img1.jpg"}}]},
+        ]}],
+    }
+    out_dir = str(tmp_path / "images")
+    os.makedirs(out_dir, exist_ok=True)
+    (Path(out_dir) / "roll1_0001.jpg").write_bytes(b"already-downloaded")
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("should not re-download an existing image")
+    monkeypatch.setattr(LAC.requests, "Session", lambda: type("FakeSession", (), {"get": fail_if_called})())
+
+    master_db_path = str(tmp_path / "parish_register.json")
+
+    LAC.download_images(manifest_data, out_dir, "roll1", master_db_path, "Parish", "Test Collection")
+
+    master_data = LAC.load_master_db(master_db_path, "Test Collection", "Parish")
+    assert len(master_data["sheets"]) == 1
