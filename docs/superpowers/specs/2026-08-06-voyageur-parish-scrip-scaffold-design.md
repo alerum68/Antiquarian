@@ -251,6 +251,28 @@ introduced.
   `chunk_size`-page windows instead of rasterizing an entire PDF into memory
   before chunked processing begins. Unrelated to Voyageur ingestion; grouped
   here only because it surfaced during this brainstorm.
+- **New sub-project, unverified severity (surfaced by this sub-project's final
+  review):** `LAC.py` writes downloaded images to `MEDIA_DIR/LAC/<roll>/` (reel
+  path) or `MEDIA_DIR/<pid>/` (volume path) — both distinct from, and one level
+  deeper than, `CHURCH_IMAGE_DIR`/`SCRIP_IMAGE_DIR`
+  (`MEDIA_DIR/Parish`, `MEDIA_DIR/Scrip`), which is where Paleographer's
+  `list_source_files()` actually scans (a flat, non-recursive `os.listdir`).
+  This sub-project's design assumed "no change there" for that scan, but as
+  far as static inspection shows, nothing routes LAC-downloaded images into
+  `SOURCE_DIR`, and the scan can't see into subfolders even if it did — so
+  every scaffold sheet this sub-project writes may stay permanently
+  unprocessed until someone manually relocates the files. **Needs a real
+  end-to-end verification run (harvest a small volume/reel, then run
+  Paleographer with no manual file move) before this is treated as more than
+  a hypothesis.** If confirmed, the user's preferred fix direction: restructure
+  `MEDIA_DIR` as `MEDIA_DIR/<record-type-dir>/<Collection Name>/...` (e.g.
+  `Media/Scrip/RG15 Scrip Records/...`, `Media/Parish/1850 US Census/...`) —
+  i.e. `LAC.py` (and `FS.py`) route output under the record-type-resolved
+  image dir *and* a collection-name subfolder — combined with making
+  `list_source_files()` recursive so any depth of nesting under a collection's
+  directory is still found. The recursive-scan half also requires updating the
+  ~3 call sites in `Paleographer.py` that currently reconstruct
+  `Path(SOURCE_DIR) / filename` assuming a bare, subdirectory-free filename.
 - Sub-project 4: reworking Paleographer to consume the scaffold as pure
   analysis — including actually using whatever partial data Voyageur's index
   path already gathered as AI context, and handling one scaffold image
