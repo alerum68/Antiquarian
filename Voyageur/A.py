@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv, set_key
 
 import census_schema
-from _retry_utils import cleanup_checkpoint_files, move_with_retry
+from _gather_helpers import cleanup_checkpoint_files, move_with_retry
 
 
 # ==========================================
