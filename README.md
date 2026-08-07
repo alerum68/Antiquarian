@@ -70,9 +70,28 @@ Some features may require additional software or accounts. These are documented 
 
 ## Documentation
 
-The README is intended as an introduction to the project.
+### User Guides
 
-Detailed documentation, installation guides, tutorials, supported record types, configuration, and troubleshooting are maintained in the Wiki.
+Comprehensive guides for setup, configuration, and module workflows are available on the project Wiki:
+
+* [Getting Started](https://github.com/alerum68/Scriptorium/wiki/Getting-Started)
+* [Configuration & Settings](https://github.com/alerum68/Scriptorium/wiki/Configuration-&-Settings)
+* [Voyageur User Guide](https://github.com/alerum68/Scriptorium/wiki/Voyageur-User-Guide)
+* [Paleographer User Guide](https://github.com/alerum68/Scriptorium/wiki/Paleographer-User-Guide)
+* [Archivist User Guide](https://github.com/alerum68/Scriptorium/wiki/Archivist-User-Guide)
+* [Registrar & Gazetteer](https://github.com/alerum68/Scriptorium/wiki/Registrar-&-Gazetteer)
+* [PDFix Utility](https://github.com/alerum68/Scriptorium/wiki/PDFix-Utility)
+* [Troubleshooting & FAQ](https://github.com/alerum68/Scriptorium/wiki/Troubleshooting-&-FAQ)
+
+### Developer Documentation
+
+Technical specifications and architecture guides are maintained in the `docs/developer/` directory:
+
+* [Architecture Overview](docs/developer/architecture-overview.md)
+* [Commissioner Domain Models](docs/developer/commissioner-domain-models.md)
+* [Prompt Template Specification](docs/developer/pmt-specification.md)
+* [Scaffold Data Contract](docs/developer/scaffold-data-contract.md)
+* [Developer Workflow](docs/developer/development-workflow.md)
 
 ---
 
