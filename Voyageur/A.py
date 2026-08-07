@@ -2,15 +2,21 @@ import json
 import os
 import re
 import sys
-import time
 import urllib.parse
-import webbrowser
 from pathlib import Path
 
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
 import census_schema
-from _gather_helpers import cleanup_checkpoint_files, move_with_retry
+from _gather_helpers import (
+    cleanup_checkpoint_files,
+    launch_gather_browser,
+    move_downloaded_images,
+    move_with_retry,
+    resolve_census_image_dir,
+    wait_for_downloaded_json,
+    write_archivist_json_file,
+)
 
 
 # ==========================================
@@ -67,12 +73,7 @@ def main() -> Path:
 
     print(f"[System] Extracted -> DBID: {dbid} | Start ID: {start_id}")
 
-    start_time = time.time()
-    auto_url = url + ("&mgs_auto=1" if "?" in url else "?mgs_auto=1")
-    print("[System] Launching browser...")
-    webbrowser.open(auto_url)
-
-    print("\n[System] Waiting for Tampermonkey downloads (Auto-Batch will start automatically)...")
+    start_time = launch_gather_browser(url)
 
     # Voyageur.js downloads via plain <a download> rather than GM_download (see CHANGELOG -
     # GM_download's permission grant proved unreliable). Chrome replaces "/" in a download
@@ -83,33 +84,7 @@ def main() -> Path:
     downloads_dir = Path.home() / "Downloads"
     json_prefix = "TMP_A_"
     image_prefix = "TMP_A_Images_"
-    json_file = None
-
-    try:
-        while True:
-            # noinspection broad-exception
-            try:
-                # image_prefix files are always .jpg (never .json), so the suffix check
-                # above already excludes them - no separate "not an image" check needed.
-                candidates = [
-                    p for p in downloads_dir.iterdir()
-                    if p.is_file() and p.suffix.lower() == '.json'
-                    and p.name.startswith(json_prefix)
-                    and p.stat().st_mtime >= start_time
-                    and '[checkpoint' not in p.name
-                ]
-                if candidates:
-                    json_file = max(candidates, key=lambda p: p.stat().st_mtime)
-                    print(f"[System] Detected Final JSON: {json_file.name}")
-            except OSError:
-                pass
-
-            if json_file:
-                break
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\n[System] Operation cancelled by user.")
-        sys.exit(0)
+    json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "Final JSON")
 
     print("\n[System] Processing extracted files...")
 
@@ -143,7 +118,7 @@ def main() -> Path:
     # the actual bug behind Archivist immediately failing with FileNotFoundError right
     # after a real gather succeeded: this used to write to Voyageur/.env, a file Archivist
     # never reads at all.
-    set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json.name)
+    write_archivist_json_file(final_json.name)
 
     stem_parts = final_json.stem.split(' - ', 1)
     census_year = stem_parts[0].strip() if len(stem_parts) > 0 else "Unknown_Year"
@@ -158,31 +133,9 @@ def main() -> Path:
     # as a subprocess) so this script produces correct output standalone, with nothing
     # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
     # directly by the user) is used as-is, never re-nested.
-    if os.path.isabs(base_img_setting):
-        base_img_dir = Path(base_img_setting)
-    else:
-        media_setting = os.getenv("MEDIA_DIR", "Media")
-        base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
-            Path(program_dir) / media_setting if program_dir else Path(media_setting))
-        base_img_dir = base_media_dir / base_img_setting
-    img_target_dir = base_img_dir / census_folder / location_folder
-    img_target_dir.mkdir(parents=True, exist_ok=True)
+    img_target_dir = resolve_census_image_dir(base_img_setting, program_dir, census_folder, location_folder)
 
-    img_count = 0
-    image_candidates = [
-        p for p in downloads_dir.iterdir()
-        if p.is_file() and p.suffix.lower() == '.jpg'
-        and p.name.startswith(image_prefix) and p.stat().st_mtime >= start_time
-    ]
-    for file_path in image_candidates:
-        # noinspection broad-exception
-        try:
-            final_img = img_target_dir / file_path.name[len(image_prefix):]
-            move_with_retry(file_path, final_img)
-            img_count += 1
-        except Exception as e:
-            print(f"[ERROR] Could not move image {file_path.name}: {e}")
-
+    img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)
     print(f"[System] Moved JSON and {img_count} images to Project folders.")
     print(f"[System] Gather complete. Run Archivist's \"Generate GEDCOM\" when you're ready to "
           f"build the GEDCOM ({final_json.name}).")
