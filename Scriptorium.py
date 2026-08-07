@@ -1860,8 +1860,11 @@ class Scriptorium(ctk.CTk):
             args.append(mode)
             if mode == "LAC":
                 vol = self.string_vars.get("LAC_HARVEST_VOLUME", ctk.StringVar(value="")).get().strip()
+                url = self.string_vars.get("LAC_URL", ctk.StringVar(value="")).get().strip()
                 if vol:
-                    args.extend(["--volume", vol])
+                    args.extend(["volume", "--volume", vol])
+                elif url:
+                    args.extend(["reel", "--url", url])
 
         target_cwd = os.path.dirname(target_script_path) if os.path.exists(target_script_path) else None
 
