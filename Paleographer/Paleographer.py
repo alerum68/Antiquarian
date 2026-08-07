@@ -1425,21 +1425,43 @@ def save_master_db(master_data: Dict[str, Any]) -> None:
         json.dump(master_data, f, indent=2, ensure_ascii=False)
 
 
+def _sheet_is_placeholder(sheet: Dict[str, Any]) -> bool:
+    """A sheet counts as a real, already-processed sheet only if at least one of its
+    records has a non-empty participants list - a scaffold sheet Voyageur wrote
+    (Commissioner.record_registry.build_empty_sheet) has no such record, and must be
+    reprocessed rather than skipped forever."""
+    return not any(record.get("participants") for record in sheet.get("records", []))
+
+
 def get_processed_files(master_data: Dict[str, Any]) -> set:
     processed = set()
     for sheet in master_data.get("sheets", []):
         metadata = sheet.get("document_metadata", {})
-        if isinstance(metadata, dict) and "file_name" in metadata:
+        if not isinstance(metadata, dict) or "file_name" not in metadata:
+            continue
+        if not _sheet_is_placeholder(sheet):
             processed.add(metadata["file_name"])
     return processed
 
 
 def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None:
     master_sheets = master_data.get("sheets")
-    if isinstance(master_sheets, list):
-        master_sheets.extend(new_sheets)
-    else:
+    if not isinstance(master_sheets, list):
         master_data["sheets"] = new_sheets
+        return
+
+    by_file_name = {
+        sheet.get("document_metadata", {}).get("file_name"): idx
+        for idx, sheet in enumerate(master_sheets)
+    }
+
+    for new_sheet in new_sheets:
+        file_name = new_sheet.get("document_metadata", {}).get("file_name")
+        existing_idx = by_file_name.get(file_name) if file_name is not None else None
+        if existing_idx is not None and _sheet_is_placeholder(master_sheets[existing_idx]):
+            master_sheets[existing_idx] = new_sheet
+            continue
+        master_sheets.append(new_sheet)
 
 
 def record_cost(master_data: Dict[str, Any], usage_metadata: Any) -> CallCost:
