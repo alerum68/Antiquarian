@@ -259,12 +259,12 @@ git commit -m "Delegate FS validate_against_commissioner to shared validate_soft
 - Consumes: `validate_soft(data: dict, document_type: str, label: str) -> None` from Task 1.
 - Produces: no change to `LAC.validate_master_db_against_commissioner(master_data: Dict[str, Any], document_type: str, collection_title: str) -> None`'s signature or external behavior.
 
-- [ ] **Step 1: Run the existing tests as a baseline**
+- [x] **Step 1: Run the existing tests as a baseline**
 
 Run: `pytest Voyageur/tests/test_lac.py -k commissioner -v`
 Expected: PASS (`test_validate_master_db_against_commissioner_warns_and_does_not_raise`)
 
-- [ ] **Step 2: Replace the internal parse_collection call with validate_soft**
+- [x] **Step 2: Replace the internal parse_collection call with validate_soft**
 
 In `Voyageur/LAC.py`, find:
 
@@ -286,12 +286,12 @@ Replace with:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
-- [ ] **Step 3: Run the existing tests to confirm they still pass unmodified**
+- [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
 
 Run: `pytest Voyageur/tests/test_lac.py -k commissioner -v`
 Expected: PASS (same test, proving the delegation is behavior-neutral)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Voyageur/LAC.py

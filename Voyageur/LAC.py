@@ -121,8 +121,8 @@ def validate_master_db_against_commissioner(master_data: Dict[str, Any], documen
     census_schema.py's validate_against_commissioner() (Sub-project 2) - a failure here is
     logged and swallowed, never raised, and the MASTER_DB write proceeds regardless."""
     try:
-        from Commissioner.record_registry import parse_collection
-        parse_collection(master_data, document_type)
+        from Commissioner.record_registry import validate_soft
+        validate_soft(master_data, document_type, collection_title)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 
@@ -581,7 +581,7 @@ def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoin
     pids = retrieve_volume_pids(vol, cookies, checkpoint_path, archival_number=archival_number)
     if max_workers > 1:
         return download_volume_assets_multiworker(pids, media_dir, checkpoint_path, master_db_path,
-                                                   document_type, collection_title, max_workers=max_workers)
+                                                  document_type, collection_title, max_workers=max_workers)
     return download_volume_assets(pids, media_dir, checkpoint_path, master_db_path, document_type, collection_title)
 
 
