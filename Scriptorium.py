@@ -1523,8 +1523,18 @@ class Scriptorium(ctk.CTk):
     def _on_record_type_change(self, _value: Optional[str] = None):
         """Rebuilds the settings form to only show the fields the selected .pmt's own
         settings_sections declares as relevant, instead of every Paleographer field for
-        every record type."""
+        every record type. Also gates the Scrip-only enrichment buttons - Enrich Metadata,
+        Partition Collections, and Resolve Names have no meaning for non-Scrip record
+        types and silently no-op if clicked (classify_sheet_collection has no Scrip-shaped
+        fields to key off of), so disable rather than hide them to keep the button row's
+        layout stable across Record Type switches."""
         record_type = self.string_vars["PALEOGRAPHER_RECORD_TYPE"].get()
+
+        if hasattr(self, "paleographer_enrich_btn"):
+            scrip_state = "normal" if record_type == "Scrip.pmt" else "disabled"
+            self.paleographer_enrich_btn.configure(state=scrip_state)
+            self.paleographer_partition_btn.configure(state=scrip_state)
+            self.paleographer_resolve_names_btn.configure(state=scrip_state)
 
         if hasattr(self, "paleographer_form_container"):
             for child in self.paleographer_form_container.winfo_children():
@@ -1563,15 +1573,18 @@ class Scriptorium(ctk.CTk):
                       text_color=C_TEXT,
                       command=lambda: self.execute_script("ANALYSIS_SCRIPT", "paleographer_api")
                       ).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Enrich Metadata", fg_color="#2b7a4b", hover_color="#1e5935",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "enrich")).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Partition Collections", fg_color="#7A5B2B", hover_color="#5B431E",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "partition")).pack(side="left", padx=5)
-        ctk.CTkButton(btn_box, text="Resolve Names", fg_color="#4A5568", hover_color="#2D3748",
-                      text_color=C_TEXT,
-                      command=lambda: self.execute_script("ANALYSIS_SCRIPT", "resolve-names")).pack(side="left", padx=5)
+        self.paleographer_enrich_btn = ctk.CTkButton(
+            btn_box, text="Enrich Metadata", fg_color="#2b7a4b", hover_color="#1e5935",
+            text_color=C_TEXT, command=lambda: self.execute_script("ANALYSIS_SCRIPT", "enrich"))
+        self.paleographer_enrich_btn.pack(side="left", padx=5)
+        self.paleographer_partition_btn = ctk.CTkButton(
+            btn_box, text="Partition Collections", fg_color="#7A5B2B", hover_color="#5B431E",
+            text_color=C_TEXT, command=lambda: self.execute_script("ANALYSIS_SCRIPT", "partition"))
+        self.paleographer_partition_btn.pack(side="left", padx=5)
+        self.paleographer_resolve_names_btn = ctk.CTkButton(
+            btn_box, text="Resolve Names", fg_color="#4A5568", hover_color="#2D3748",
+            text_color=C_TEXT, command=lambda: self.execute_script("ANALYSIS_SCRIPT", "resolve-names"))
+        self.paleographer_resolve_names_btn.pack(side="left", padx=5)
         ctk.CTkButton(btn_box, text="Clear Cache", fg_color="#991b1b", hover_color="#7f1d1d",
                       text_color=C_TEXT,
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
