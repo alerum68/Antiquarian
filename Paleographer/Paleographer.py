@@ -1420,6 +1420,12 @@ def load_master_db() -> Dict[str, Any]:
 
 
 def save_master_db(master_data: Dict[str, Any]) -> None:
+    try:
+        from Commissioner.record_registry import validate_soft
+        validate_soft(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)
+    except Exception as e:
+        print(f"[WARN] Commissioner validation failed for {COLLECTION_TITLE!r}: {e}")
+
     os.makedirs(os.path.dirname(MASTER_DB), exist_ok=True)
     with open(MASTER_DB, "w", encoding="utf-8") as f:
         json.dump(master_data, f, indent=2, ensure_ascii=False)

@@ -6,6 +6,7 @@ the same file_name in place, instead of appending a duplicate - see the
 Voyageur-Parish-Scrip-scaffold design spec's Architecture section (Fix 1a/1b).
 """
 import importlib
+import os
 import sys
 
 import pytest
@@ -114,3 +115,59 @@ def test_merge_sheets_appends_when_master_sheets_missing(minimal_paleographer_en
     module.merge_sheets(master_data, [new_sheet])
 
     assert master_data["sheets"] == [new_sheet]
+
+
+def _valid_parish_master_db():
+    return {
+        "collection_title": "Test Volume",
+        "record_type_name": "Parish",
+        "sheets": [
+            {
+                "page_id": "abc123.jpg",
+                "document_metadata": {"file_name": "abc123.jpg", "file_type": "jpg"},
+                "records": [
+                    {
+                        "event_type": "Baptism",
+                        "participants": [
+                            {
+                                "role_name": "Primary",
+                                "std_given": "Jean",
+                                "std_surname": "Gagnon",
+                                "sex": "M",
+                                "is_priest": False,
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    }
+
+
+def test_save_master_db_valid_shape_writes_file_and_prints_no_warning(minimal_paleographer_env, capsys):
+    module = minimal_paleographer_env
+    master_data = _valid_parish_master_db()
+
+    module.save_master_db(master_data)
+
+    captured = capsys.readouterr()
+    assert "[WARN]" not in captured.out
+    assert os.path.exists(module.MASTER_DB)
+
+
+def test_save_master_db_bad_shape_still_writes_file_and_logs_warning(minimal_paleographer_env, capsys):
+    module = minimal_paleographer_env
+    master_data = {
+        "collection_title": "Bad",
+        "record_type_name": "Parish",
+        "sheets": [{"records": "not-a-list"}],
+    }
+
+    module.save_master_db(master_data)
+
+    captured = capsys.readouterr()
+    # The warning label is save_master_db's own COLLECTION_TITLE global (derived from the
+    # VOLUME_TITLE env var the minimal_paleographer_env fixture sets to "Test Volume"), not
+    # master_data's own "collection_title" key - the two are independent.
+    assert "[WARN] Commissioner validation failed for 'Test Volume'" in captured.out
+    assert os.path.exists(module.MASTER_DB)

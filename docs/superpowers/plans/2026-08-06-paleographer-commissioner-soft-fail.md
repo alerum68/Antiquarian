@@ -310,7 +310,7 @@ git commit -m "Delegate LAC validate_master_db_against_commissioner to shared va
 - Consumes: `validate_soft(data: dict, document_type: str, label: str) -> None` from Task 1. Also consumes module globals already defined earlier in `Paleographer.py`: `TYPE_CFG` (a `parse_type_config(...)` result with a `.name` attribute, `Paleographer/Paleographer.py:1312`), `COLLECTION_TITLE` (`Paleographer/Paleographer.py:1309`), and `MASTER_DB` (`Paleographer/Paleographer.py:1340`).
 - Produces: `save_master_db(master_data: Dict[str, Any]) -> None` keeps its exact existing signature; every existing call site (live-extraction loop, batch-job merge loop, quota-exhaustion fallback, batch-job submission) is covered with zero changes to those call sites.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Open `Paleographer/tests/test_master_db_merge.py`. Add `import os` to the top imports (currently just `import importlib` / `import sys` / `import pytest`):
 
@@ -381,7 +381,7 @@ def test_save_master_db_bad_shape_still_writes_file_and_logs_warning(minimal_pal
     assert os.path.exists(module.MASTER_DB)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Paleographer/tests/test_master_db_merge.py -k save_master_db -v`
 Expected: FAIL — `test_save_master_db_bad_shape_still_writes_file_and_logs_warning` fails because
@@ -389,7 +389,7 @@ no `[WARN]` is printed yet; `test_save_master_db_valid_shape_writes_file_and_pri
 may pass by coincidence (nothing to warn about yet) but must be re-checked in Step 4 once the
 call actually runs.
 
-- [ ] **Step 3: Implement the wiring**
+- [x] **Step 3: Implement the wiring**
 
 In `Paleographer/Paleographer.py`, find:
 
@@ -415,17 +415,17 @@ def save_master_db(master_data: Dict[str, Any]) -> None:
         json.dump(master_data, f, indent=2, ensure_ascii=False)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Paleographer/tests/test_master_db_merge.py -v`
 Expected: PASS (all tests, including the 2 new ones and every pre-existing test in the file)
 
-- [ ] **Step 5: Run the full Paleographer and Commissioner test suites**
+- [x] **Step 5: Run the full Paleographer and Commissioner test suites**
 
 Run: `pytest Paleographer/tests Commissioner/tests Voyageur/tests -v`
 Expected: PASS (confirms Task 5's change hasn't broken anything Tasks 1-4 already touched)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add Paleographer/Paleographer.py Paleographer/tests/test_master_db_merge.py
