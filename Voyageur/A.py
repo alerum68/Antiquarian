@@ -55,7 +55,7 @@ def main() -> Path:
     load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
     program_dir = os.getenv("PROGRAM_DIR", "")
-    url = os.getenv("CENSUS_URL", "").strip()
+    url = os.getenv("A_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
     # Matches Scriptorium.py's own CENSUS_IMAGE_DIR default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs) - only used at all when running this

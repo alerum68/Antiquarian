@@ -103,7 +103,7 @@ ARCHIVIST_VARS = {"Which JSON to Build From": {"JSON_FILE": ""},
 VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
 
 VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
-                 "Ancestry": {"CENSUS_URL": ""},
+                 "Ancestry": {"A_URL": ""},
                  "FamilySearch": {"FS_URL": ""},
                  "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC",
                          "LAC_HARVEST_VOLUME": "", "LAC_HARVEST_ARCHIVAL_NUMBER": "RG15",
@@ -232,7 +232,7 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     # Voyageur (Gather step)
     "VOYAGEUR_SOURCE": "Which repository to gather from. Adding a new one is a new Voyageur sub-script, nothing "
                        "else changes here.",
-    "CENSUS_URL": "The web address (URL) of the specific Ancestry.com census page you want to gather.",
+    "A_URL": "The web address (URL) of the specific Ancestry.com census page you want to gather.",
     "FS_URL": "The web address (URL) of the specific FamilySearch record page you want to gather.",
     "LAC_URL": "Paste the complete Heritage Canadiana link (e.g., "
                 "https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/).",
@@ -328,7 +328,7 @@ CUSTOM_LABELS = {
     "JSON_DIR": "JSON Download Folder",
     "REGISTRAR_RM_DATABASE": "RootsMagic Database Path",
     "GAZETTEER_RM_DATABASE": "RootsMagic Database Path",
-    "CENSUS_URL": "Ancestry Census URL",
+    "A_URL": "Ancestry Census URL",
     "CENSUS_IMAGE_DIR": "Census Image Save Folder",
     "JSON_FILE": "Downloaded JSON File Name",
     "LAC_URL": "Heritage Canadiana URL",
