@@ -17,6 +17,13 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
+# Commissioner lives in a sibling tool folder, not an installed package - add the repo root
+# to sys.path so it can be imported by absolute path, matching census_schema.py's own
+# precedent for cross-package imports (Voyageur/census_schema.py:28-35).
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 try:
     from . import lac_client
 except (ImportError, ValueError):
@@ -42,6 +49,93 @@ CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("LAC_CHECKPOINT_DIR", "W
 COOKIE_FILE = _safe_path(PROGRAM_DIR, os.environ.get("LAC_COOKIE_FILE", "Working/LAC/lac_cookies.txt"))
 DEFAULT_ARCHIVAL_NUMBER = os.environ.get("LAC_ARCHIVAL_NUMBER", "RG15")
 CDP_PORT = int(os.environ.get("LAC_CDP_PORT", str(lac_client.DEFAULT_CDP_PORT)))
+
+
+def resolve_generic_setting(document_type: str, generic_key: str, default: str = "") -> str:
+    """Mirrors Paleographer.py's own resolve_setting(): resolves a generic runtime setting
+    (e.g. "MASTER_DB_NAME") via document_type's own field_remap table (e.g. Parish.pmt's
+    CHURCH_MASTER_DB_NAME -> MASTER_DB_NAME), falling back to reading generic_key directly.
+    Uses Commissioner.record_registry.get_field_remap() rather than Paleographer/engine.py's
+    own TYPE_CFG - see this plan's Global Constraints on LAC.py's dependency footprint."""
+    from Commissioner.record_registry import get_field_remap
+    field_remap = get_field_remap(document_type)
+    for prefixed_key, target in field_remap.items():
+        if target == generic_key:
+            val = os.environ.get(prefixed_key, "")
+            if val:
+                return val
+    return os.environ.get(generic_key, default)
+
+
+def resolve_master_db_path(document_type: str, program_dir: str) -> str:
+    """Resolves the absolute path to Paleographer's own MASTER_DB for document_type,
+    matching Paleographer.py's own MASTER_DB derivation (PROGRAM_DIR / JSON_DIR /
+    MASTER_DB_NAME) exactly, so scaffold sheets Voyageur writes land in the same file
+    Paleographer itself reads/writes."""
+    master_db_name = resolve_generic_setting(document_type, "MASTER_DB_NAME")
+    if not master_db_name:
+        raise RuntimeError(
+            f"MASTER_DB_NAME resolved to an empty value for document_type {document_type!r} "
+            f"(check the active record type's own MASTER_DB_NAME setting, e.g. "
+            f"CHURCH_MASTER_DB_NAME for Parish).")
+    json_dir = os.environ.get("JSON_DIR", "")
+    return str(Path(program_dir) / json_dir / master_db_name)
+
+
+def load_master_db(master_db_path: str, collection_title: str, record_type_name: str) -> Dict[str, Any]:
+    if os.path.exists(master_db_path):
+        with open(master_db_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {
+        "collection_title": collection_title, "record_type_name": record_type_name, "sheets": [],
+        "total_spent": 0.0, "total_pages_processed": 0, "pending_batch_jobs": [],
+    }
+
+
+def save_master_db(master_db_path: str, master_data: Dict[str, Any]) -> None:
+    os.makedirs(os.path.dirname(master_db_path) or ".", exist_ok=True)
+    with open(master_db_path, "w", encoding="utf-8") as f:
+        json.dump(master_data, f, indent=2, ensure_ascii=False)
+
+
+def append_scaffold_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None:
+    """Appends Voyageur-built placeholder sheets into master_data["sheets"], deduplicating
+    by document_metadata.file_name against sheets already present. Guards a crash-and-resume
+    scenario: download_pid_bundle skips the actual file download when it already exists on
+    disk, but is not itself responsible for skipping the caller's own scaffold-sheet append,
+    so a resumed run that re-touches an already-checkpointed PID must not write a duplicate
+    placeholder for the same file_name."""
+    master_sheets = master_data.setdefault("sheets", [])
+    existing_file_names = {sheet.get("document_metadata", {}).get("file_name") for sheet in master_sheets}
+    for sheet in new_sheets:
+        file_name = sheet.get("document_metadata", {}).get("file_name")
+        if file_name is not None and file_name in existing_file_names:
+            continue
+        master_sheets.append(sheet)
+        existing_file_names.add(file_name)
+
+
+def validate_master_db_against_commissioner(master_data: Dict[str, Any], document_type: str,
+                                            collection_title: str) -> None:
+    """Non-blocking Commissioner schema check, identical in shape to
+    census_schema.py's validate_against_commissioner() (Sub-project 2) - a failure here is
+    logged and swallowed, never raised, and the MASTER_DB write proceeds regardless."""
+    try:
+        from Commissioner.record_registry import parse_collection
+        parse_collection(master_data, document_type)
+    except Exception as e:
+        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+
+
+RECORD_TYPE_ARG_TO_DOCUMENT_TYPE = {"parish": "Parish", "scrip": "Scrip"}
+
+
+def _resolve_record_type(record_type_arg: str) -> str:
+    document_type = RECORD_TYPE_ARG_TO_DOCUMENT_TYPE.get(record_type_arg)
+    if document_type is None:
+        print("[ERROR] --record-type is required (parish or scrip) - or set LAC_RECORD_TYPE in .env.")
+        sys.exit(1)
+    return document_type
 
 
 def load_cookies(cookie_file: str = COOKIE_FILE, cdp_port: int = CDP_PORT) -> Dict[str, str]:
@@ -480,6 +574,8 @@ def main() -> None:
                                help="Base output media directory.")
     volume_parser.add_argument("--workers", type=int, default=int(os.environ.get("LAC_MAX_WORKERS", "1")),
                                help="Number of concurrent workers for volume downloading (default 1).")
+    volume_parser.add_argument("--record-type", default=os.environ.get("LAC_RECORD_TYPE", ""),
+                               help="Commissioner record type this volume harvest is for: parish or scrip.")
     volume_parser.set_defaults(func=_run_volume)
 
     reel_parser = subparsers.add_parser("reel", help="Download a Canadiana IIIF reel by URL.")
@@ -488,6 +584,8 @@ def main() -> None:
         help="Canadiana IIIF URL (e.g., https://heritage.canadiana.ca/view/oocihm.lac_reel_c2170).")
     reel_parser.add_argument("--media-dir", default=MEDIA_DIR,
                              help="Base output media directory.")
+    reel_parser.add_argument("--record-type", default=os.environ.get("LAC_RECORD_TYPE", ""),
+                             help="Commissioner record type this reel harvest is for: parish or scrip.")
     reel_parser.set_defaults(func=_run_reel)
 
     args = parser.parse_args()
