@@ -202,12 +202,12 @@ git commit -m "Delegate census_schema validate_against_commissioner to shared va
 - Consumes: `validate_soft(data: dict, document_type: str, label: str) -> None` from Task 1.
 - Produces: no change to `FS.validate_against_commissioner(final_data: dict, record_family: str, collection_title: str) -> None`'s signature, its `RECORD_FAMILY_TO_DOCUMENT_TYPE` lookup, or its early-return for unmapped families.
 
-- [ ] **Step 1: Run the existing tests as a baseline**
+- [x] **Step 1: Run the existing tests as a baseline**
 
 Run: `pytest Voyageur/tests/test_fs.py -k commissioner -v`
 Expected: PASS
 
-- [ ] **Step 2: Replace the internal parse_collection call with validate_soft**
+- [x] **Step 2: Replace the internal parse_collection call with validate_soft**
 
 In `Voyageur/FS.py`, find:
 
@@ -235,12 +235,12 @@ Replace with:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
-- [ ] **Step 3: Run the existing tests to confirm they still pass unmodified**
+- [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
 
 Run: `pytest Voyageur/tests/test_fs.py -k commissioner -v`
 Expected: PASS (same tests, proving the delegation is behavior-neutral)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add Voyageur/FS.py

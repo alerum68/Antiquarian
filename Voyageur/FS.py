@@ -440,8 +440,8 @@ def validate_against_commissioner(final_data: dict, record_family: str, collecti
     if document_type is None:
         return
     try:
-        from Commissioner.record_registry import parse_collection
-        parse_collection(final_data, document_type)
+        from Commissioner.record_registry import validate_soft
+        validate_soft(final_data, document_type, collection_title)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 
