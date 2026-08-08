@@ -10,24 +10,25 @@ import yaml
 import Utils
 
 GENERAL_CONFIG = {
-    'volume_num': '',
-    'register_source_id': '1',
-    'register_name': '',
-    'parish_name': '',
-    'parish_name_short': '',
-    'parish_location': '',
-    'volume_title': '',
+    'volume_num': os.getenv('VOLUME_NUM', ''),
+    'register_source_id': os.getenv('REGISTER_SOURCE_ID', '1'),
+    'register_name': os.getenv('REGISTER_NAME', ''),
+    'parish_name': os.getenv('PARISH_NAME', 'Parish Name'),
+    'parish_name_short': os.getenv('PARISH_NAME_SHORT', 'Parish'),
+    'parish_location': (f"{os.getenv('PARISH_CITY', 'City')}, "
+                         f"{os.getenv('PARISH_STATE', 'State')}").strip(", "),
+    'volume_title': os.getenv('VOLUME_TITLE', ''),
     'date_range_str': '',
     'diocese': '',
-    'collection_url': '',
-    'collection_name': '',
-    'parish_file_name': '',
-    'default_location': '',
-    'translation_header': "Citation Details:",
-    'transcription_header': "Citation Text:",
-    'role_clergy': 'Priest',
-    'role_default_witness': 'Witness',
-    'clergy_honorific': 'Father',
+    'collection_url': os.getenv('COLLECTION_URL', ''),
+    'collection_name': os.getenv('COLLECTION_NAME', ''),
+    'parish_file_name': os.getenv('PARISH_FILE_NAME', 'Parish_Export'),
+    'default_location': os.getenv('DEFAULT_EVENT_LOCATION', ''),
+    'translation_header': os.getenv('TRANSLATION_HEADER', "Citation Details:"),
+    'transcription_header': os.getenv('TRANSCRIPTION_HEADER', "Citation Text:"),
+    'role_clergy': os.getenv('ROLE_CLERGY', 'Priest'),
+    'role_default_witness': os.getenv('ROLE_DEFAULT_WITNESS', 'Witness'),
+    'clergy_honorific': os.getenv('CLERGY_HONORIFIC', 'Father'),
 }
 
 CALL_NUMBER = os.getenv("CALL_NUMBER", "")
