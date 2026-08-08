@@ -11,7 +11,7 @@ venv/
 /.idea/
 /.claude/
 /CLAUDE.md
-/ScriptoriumMCP/.mcp.json
+/.mcp.json
 
 # OS junk
 .DS_Store
