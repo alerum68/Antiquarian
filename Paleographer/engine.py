@@ -41,7 +41,7 @@ from ScriptoriumMCP import agy_client  # noqa: E402
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_TYPE = "Parish.pmt"
-FACT_TYPES_PATH = Path(__file__).resolve().parent.parent / "FactTypes.json"
+FACT_TYPES_PATH = Path(__file__).resolve().parent.parent / "Commissioner" / "FactTypes.json"
 
 # A PDF with more pages than this routes through the Batch API instead of the
 # synchronous path; a single-page image never crosses it.

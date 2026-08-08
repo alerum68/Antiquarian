@@ -53,7 +53,7 @@ if str(_REPO_ROOT) not in sys.path:
 from Commissioner import normalization  # noqa: E402
 
 SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
-FACT_TYPES_PATH = SCRIPTORIUM_DIR / "FactTypes.json"
+FACT_TYPES_PATH = SCRIPTORIUM_DIR / "Commissioner" / "FactTypes.json"
 PARISH_PMT_PATH = SCRIPTORIUM_DIR / "Paleographer" / "prompts" / "Parish.pmt"
 
 # ==========================================

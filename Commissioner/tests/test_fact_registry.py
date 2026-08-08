@@ -3,7 +3,7 @@ from pathlib import Path
 
 from Commissioner.fact_registry import export_fact_types_json, is_family_fact
 
-FACT_TYPES_JSON_PATH = Path(__file__).resolve().parent.parent.parent / "FactTypes.json"
+FACT_TYPES_JSON_PATH = Path(__file__).resolve().parent.parent / "FactTypes.json"
 
 
 def test_is_family_fact_distinguishes_scope():

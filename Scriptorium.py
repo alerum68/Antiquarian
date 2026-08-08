@@ -43,7 +43,7 @@ def env_path_for(subfolder: Optional[str]) -> Path:
 # ==========================================
 # COLOR PALETTE
 # ==========================================
-# Dark-mode values from assets/theme.json's own token set (the app forces
+# Dark-mode values from Commissioner/assets/theme.json's own token set (the app forces
 # ctk.set_appearance_mode("Dark"), so only these matter visually) - for the handful of
 # widgets below that pass their own explicit color kwargs instead of riding the CTk theme.
 C_SURFACE = "#202329"
@@ -465,7 +465,7 @@ class ConsoleRedirector:
 
 
 # App window/taskbar icon (a stylized pen nib), embedded as base64 PNG data rather than a
-# file under assets/ - tkinter's iconphoto() takes PhotoImage objects built straight from
+# file under Commissioner/assets/ - tkinter's iconphoto() takes PhotoImage objects built straight from
 # in-memory data, so the icon has no external file to go missing or need bundling. Two
 # sizes are supplied; Tk picks whichever fits a given context (taskbar, alt-tab, title bar).
 _APP_ICON_PNG_32 = (
@@ -594,7 +594,7 @@ class Scriptorium(ctk.CTk):
         self.minsize(1000, 600)  # Prevents scrollbars from squishing to 0 height and crashing
 
         ctk.set_appearance_mode("Dark")
-        ctk.set_default_color_theme(str(BASE_DIR / "assets" / "theme.json"))
+        ctk.set_default_color_theme(str(BASE_DIR / "Commissioner" / "assets" / "theme.json"))
 
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
 

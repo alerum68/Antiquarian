@@ -115,7 +115,7 @@ def resolve_source_id(record_type_name: str, collection_name: str = "") -> int:
 # ==========================================
 # FACT TYPES
 # ==========================================
-with open(Path(__file__).resolve().parent.parent / "FactTypes.json", "r", encoding="utf-8") as _fact_types_file:
+with open(Path(__file__).resolve().parent.parent / "Commissioner" / "FactTypes.json", "r", encoding="utf-8") as _fact_types_file:
     FACT_TYPES = json.load(_fact_types_file)
 
 
