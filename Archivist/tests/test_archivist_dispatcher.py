@@ -26,8 +26,8 @@ DEFAULT_GENERAL_CONFIG = {
     'collection_name': '',
     'parish_file_name': '',
     'default_location': '',
-    'translation_header': "Citation Details:",
-    'transcription_header': "Citation Text:",
+    'citation_detail': '',
+    'citation_text': '',
     'role_clergy': 'Priest',
     'role_default_witness': 'Witness',
     'clergy_honorific': 'Father',
@@ -49,15 +49,15 @@ def _regenerate(fixture: dict, target_software: str, profile) -> str:
 
 
 def test_scrip_rm_matches_golden():
-    import ScripProfile
-    actual = _regenerate(SCRIP_FIXTURE, "RM", ScripProfile.ScripProfile())
+    import Scrip
+    actual = _regenerate(SCRIP_FIXTURE, "RM", Scrip.ScripProfile())
     expected = (GOLDEN_DIR / "scrip_rm.ged").read_text(encoding="utf-8")
     assert actual == expected
 
 
 def test_scrip_ftm_matches_golden():
-    import ScripProfile
-    actual = _regenerate(SCRIP_FIXTURE, "FTM", ScripProfile.ScripProfile())
+    import Scrip
+    actual = _regenerate(SCRIP_FIXTURE, "FTM", Scrip.ScripProfile())
     expected = (GOLDEN_DIR / "scrip_ftm.ged").read_text(encoding="utf-8")
     assert actual == expected
 

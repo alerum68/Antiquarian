@@ -6,7 +6,7 @@ and routes to Census.py (flat per-page census rows, needs household grouping) or
 General.py (explicit per-participant roles, church-register/Scrip-shaped) based on the
 document's own record_type_name. General.py's behavior for a given record type is
 selected via a Profile instance looked up in PROFILE_REGISTRY - GeneralProfile for
-every record type except Scrip, which gets ScripProfile.
+every record type except Scrip, which gets Scrip.ScripProfile.
 """
 import json
 import os
@@ -15,14 +15,14 @@ from typing import Callable, Dict
 
 import Census
 import General
-import ScripProfile
+import Scrip
 import Utils
 
 JSON_DIR = os.getenv("JSON_DIR", str(Path(__file__).resolve().parent))
 JSON_FILE = os.getenv("JSON_FILE", "")
 
 PROFILE_REGISTRY: Dict[str, Callable[[], "General.Profile"]] = {
-    "Scrip": ScripProfile.ScripProfile,
+    "Scrip": Scrip.ScripProfile,
 }
 
 

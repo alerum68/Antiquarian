@@ -3,10 +3,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import General
-import ScripProfile
+import Scrip
 
 GENERAL = General.GeneralProfile()
-SCRIP = ScripProfile.ScripProfile()
+SCRIP = Scrip.ScripProfile()
 
 REC = {"page": "1", "record_id": "SCRIP-5473", "year": "1880",
        "type_specific_fields": {"claim_number": "3126", "affidavit_number": "5473",

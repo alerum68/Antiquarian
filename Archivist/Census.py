@@ -2,8 +2,6 @@
 Census.py - Household-grouping and CSV-shaped GEDCOM pipeline for Archivist.
 """
 
-import calendar
-import datetime
 import json
 import os
 import re

@@ -103,12 +103,12 @@ sections:
       max: 70
       step: 1
   Citation & Role Vocabulary:
-    TRANSCRIPTION_HEADER:
-      default: "Citation Text:"
-      tooltip: "The label prefixed to the transcribed original-language text inside generated source citations."
-    TRANSLATION_HEADER:
-      default: "Citation Details:"
-      tooltip: "The label prefixed to the English translation/details text inside generated source citations."
+    CITATION_TEXT:
+      default: ""
+      tooltip: "Optional header prefixed to transcribed original-language text inside generated source citations (leave blank for no header)."
+    CITATION_DETAIL:
+      default: ""
+      tooltip: "Optional header prefixed to English translation/details text inside generated source citations (leave blank for no header)."
     ROLE_CLERGY:
       default: "Priest"
       tooltip: "The role label used for the officiating clergy member in generated records."

@@ -5,11 +5,13 @@ Task 6's regression test rebuilds the same fixtures through the post-split
 modules and diffs byte-for-byte against these files - run this script again,
 by hand, ONLY if a real (intentional) behavior change is made after the split;
 never re-run it to make a failing regression test pass."""
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import Archivist as arc
+import General as arc
+import Scrip
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 
@@ -70,18 +72,55 @@ PARISH_FIXTURE = {
 }
 
 
-def main() -> None:
-    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
-    (GOLDEN_DIR / "scrip_rm.ged").write_text(
-        arc.build_gedcom_from_general(SCRIP_FIXTURE, "RM"), encoding="utf-8")
-    (GOLDEN_DIR / "scrip_ftm.ged").write_text(
-        arc.build_gedcom_from_general(SCRIP_FIXTURE, "FTM"), encoding="utf-8")
+def _normalize(text: str) -> str:
+    return re.sub(r"1 DATE .*\r?\n2 TIME .*", "1 DATE 07 AUG 2026\n2 TIME 14:11:32", text)
 
-    arc.GENERAL_CONFIG['omit_source_id_prefix'] = False
+
+DEFAULT_GENERAL_CONFIG = {
+    'volume_num': '',
+    'register_source_id': '1',
+    'register_name': '',
+    'parish_name': '',
+    'parish_name_short': '',
+    'parish_location': '',
+    'volume_title': '',
+    'date_range_str': '',
+    'diocese': '',
+    'collection_url': '',
+    'collection_name': '',
+    'parish_file_name': '',
+    'default_location': '',
+    'citation_detail': '',
+    'citation_text': '',
+    'role_clergy': 'Priest',
+    'role_default_witness': 'Witness',
+    'clergy_honorific': 'Father',
+}
+
+
+def _regenerate(fixture: dict, target_software: str, profile) -> str:
+    arc.set_active_profile(profile)
+    arc.CALL_NUMBER = ""
+    arc.COLLECTION_URL = ""
+    arc.COLLECTION_NAME = ""
+    arc.REPOSITORY = ""
+    arc.REPOSITORY_LOC = ""
+    arc.GENERAL_CONFIG.clear()
+    arc.GENERAL_CONFIG.update(DEFAULT_GENERAL_CONFIG)
+    raw = arc.build_gedcom_from_general(fixture, target_software)
+    return _normalize(raw)
+
+
+def main() -> None:
+    (GOLDEN_DIR / "scrip_rm.ged").write_text(
+        _regenerate(SCRIP_FIXTURE, "RM", Scrip.ScripProfile()), encoding="utf-8")
+    (GOLDEN_DIR / "scrip_ftm.ged").write_text(
+        _regenerate(SCRIP_FIXTURE, "FTM", Scrip.ScripProfile()), encoding="utf-8")
+
     (GOLDEN_DIR / "parish_rm.ged").write_text(
-        arc.build_gedcom_from_general(PARISH_FIXTURE, "RM"), encoding="utf-8")
+        _regenerate(PARISH_FIXTURE, "RM", arc.GeneralProfile()), encoding="utf-8")
     (GOLDEN_DIR / "parish_ftm.ged").write_text(
-        arc.build_gedcom_from_general(PARISH_FIXTURE, "FTM"), encoding="utf-8")
+        _regenerate(PARISH_FIXTURE, "FTM", arc.GeneralProfile()), encoding="utf-8")
     print(f"Wrote 4 golden files to {GOLDEN_DIR}")
 
 

@@ -8,6 +8,17 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
+- **Archivist Structural Split**: `Archivist.py` (3,691 lines) split into a thin
+  dispatcher plus `Utils.py`, `Census.py`, `General.py`, and `Scrip.py`, replacing
+  the file's `is_scrip` boolean-flag branching with a `Profile` strategy-pattern
+  polymorphism (`GeneralProfile`/`ScripProfile`), mirroring the dispatcher shape
+  already established by `Voyageur.py`/`Paleographer.py`. No GEDCOM output change
+  from the split itself, verified by golden-file regression fixtures.
+- **Archivist (citation headers)**: the labels prefixed to translated/transcribed
+  citation text (`CITATION_DETAIL`/`CITATION_TEXT`, formerly hardcoded
+  `TRANSLATION_HEADER`/`TRANSCRIPTION_HEADER`) are now optional and blank by
+  default — when unset, the text renders without a label line instead of always
+  showing "Citation Details:"/"Citation Text:".
 - **Unified Pipeline Architecture**: `Paleographer.py` and `Archivist.py`
   are unified as self-contained standalone execution entrypoints with folded sub-modules
   and embedded source templates, ensuring zero runtime sibling-import failure while keeping

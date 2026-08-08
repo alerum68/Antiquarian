@@ -24,8 +24,8 @@ GENERAL_CONFIG = {
     'collection_name': os.getenv('COLLECTION_NAME', ''),
     'parish_file_name': os.getenv('PARISH_FILE_NAME', 'Parish_Export'),
     'default_location': os.getenv('DEFAULT_EVENT_LOCATION', ''),
-    'translation_header': os.getenv('TRANSLATION_HEADER', "Citation Details:"),
-    'transcription_header': os.getenv('TRANSCRIPTION_HEADER', "Citation Text:"),
+    'citation_detail': os.getenv('CITATION_DETAIL', ''),
+    'citation_text': os.getenv('CITATION_TEXT', ''),
     'role_clergy': os.getenv('ROLE_CLERGY', 'Priest'),
     'role_default_witness': os.getenv('ROLE_DEFAULT_WITNESS', 'Witness'),
     'clergy_honorific': os.getenv('CLERGY_HONORIFIC', 'Father'),
@@ -69,7 +69,7 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
                                         alt_names: list, raw_event_date: str, age: str) -> List[str]:
     """The non-Scrip primary-event GEDCOM block (today's `Archivist.py:3138-3158`
     else-branch). Exposed as a module function, not only a GeneralProfile method,
-    because ScripProfile.build_primary_event_lines also needs it verbatim for the
+    because Scrip.ScripProfile.build_primary_event_lines also needs it verbatim for the
     non-EVEN case (today's `if is_scrip and event_tag == 'EVEN':` only special-cased
     EVEN - every other event_tag fell through to this same generic block even when
     is_scrip was True)."""
@@ -180,12 +180,21 @@ class GeneralProfile:
             if single_text:
                 lines.append(single_text)
         else:
-            lines.append(f"4 TEXT {GENERAL_CONFIG['translation_header']}")
-            trans_text = Utils.wrap_text(trans_val, '5 CONT')
+            citation_detail_header = GENERAL_CONFIG.get('citation_detail', '')
+            if citation_detail_header:
+                lines.append(f"4 TEXT {citation_detail_header}")
+                trans_text = Utils.wrap_text(trans_val, '5 CONT')
+            else:
+                trans_text = Utils.wrap_text(trans_val, '4 TEXT')
             if trans_text:
                 lines.append(trans_text)
-            lines.append(f"3 NOTE {GENERAL_CONFIG['transcription_header']}")
-            orig_text = Utils.wrap_text(orig_val, '4 CONT')
+
+            citation_text_header = GENERAL_CONFIG.get('citation_text', '')
+            if citation_text_header:
+                lines.append(f"3 NOTE {citation_text_header}")
+                orig_text = Utils.wrap_text(orig_val, '4 CONT')
+            else:
+                orig_text = Utils.wrap_text(orig_val, '3 NOTE')
             if orig_text:
                 lines.append(orig_text)
         return lines
@@ -507,9 +516,6 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
                            page: Optional[str] = None, citation_text: Optional[str] = None,
                            citation_details: Optional[str] = None,
                            doc_media_uid: Optional[str] = None) -> str:
-    """One SOUR citation block."""
-    std_g = Utils.clean_val(part.get('std_given'))
-    std_s = Utils.clean_val(part.get('std_surname'))
     page = Utils.clean_val(page if page is not None else rec.get('page')) or 'X'
     rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
     year = Utils.clean_val(rec.get('year')) or 'Unknown'
@@ -789,7 +795,7 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
 
     address = Utils.clean_val(part.get('address'))
     if resi or address:
-        resi_lines = [f"1 RESI"]
+        resi_lines = ["1 RESI"]
         if scrip_fact_date:
             resi_lines.append(f"2 DATE {scrip_fact_date}")
         if resi:

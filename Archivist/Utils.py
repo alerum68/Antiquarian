@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 import pandas as pd
-import yaml
 from dotenv import load_dotenv
 from titlecase import titlecase
 

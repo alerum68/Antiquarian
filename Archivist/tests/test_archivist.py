@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import Census
 import General
-import ScripProfile
+import Scrip
 import Utils
 
 
@@ -50,8 +50,7 @@ def test_generate_uid_prefers_lac_pid_over_record_id():
 
 
 def test_get_dynamic_source_id_omits_prefix_for_scrip():
-    import ScripProfile
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         assert General.get_dynamic_source_id("3") == "@S003@"
     finally:
@@ -74,7 +73,7 @@ def test_get_dynamic_source_id_keeps_prefix_by_default_for_parish():
 def test_run_general_flavor_sets_profile_from_record_type():
     import Archivist
     profile = Archivist.resolve_profile("Scrip")
-    assert isinstance(profile, ScripProfile.ScripProfile)
+    assert isinstance(profile, Scrip.ScripProfile)
     profile = Archivist.resolve_profile("Parish")
     assert isinstance(profile, General.GeneralProfile)
 
@@ -162,8 +161,8 @@ def test_build_general_citation_normalization_is_whitespace_only_not_fuzzy():
     blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
-    assert "Citation Details:" in blocks[0]
-    assert "Citation Text:" in blocks[0]
+    assert "Form A. (2)." in blocks[0]
+    assert "NORTH-WEST HALFBREED CLAIMS COMMISSION" in blocks[0]
 
 
 def test_build_general_citation_collapses_whitespace_only_reflow():
@@ -203,8 +202,6 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
     blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
-    assert "Citation Details:" in blocks[0]
-    assert "Citation Text:" in blocks[0]
     assert "Je soussigné" in blocks[0]
     assert "I, the undersigned" in blocks[0]
     assert "-- " not in blocks[0]  # no document_type suffix when there's nothing to distinguish
@@ -324,7 +321,7 @@ def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
 
 
 def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
                "type_specific_fields": {
@@ -344,7 +341,7 @@ def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together(
 def test_build_individual_scrip_desc_line_without_claim_or_affidavit_still_shows_scrip_number():
     """No claim_number/affidavit_number present (e.g. an older extraction) - the fact's own
     value line still shows whatever Scrip-specific fields it does have."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "12761", "scrip_amount": "$160"},
@@ -364,7 +361,7 @@ def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
     whole merged claim - showing it in the fact's own value line was misleading (per the
     user, the note appeared to cite only the witness affidavit). Still available per
     citation via _TITL's own "-- {document_type}" suffix, just not here."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
                "type_specific_fields": {
@@ -385,7 +382,7 @@ def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
 
 def test_build_individual_scrip_desc_line_excludes_document_type_without_claim():
     """Same exclusion in the no-claim/affidavit path."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "12761", "document_type": "Register Entry"},
@@ -637,7 +634,7 @@ def test_build_individual_scrip_event_gets_type_line_and_value_from_extra_fields
     """Scrip's own event_type resolves to gedcom_tag 'EVEN' - it's built as a dedicated
     "Scrip" custom fact (FactTypes.json code 10004), needing a '2 TYPE Scrip' line for
     RootsMagic to recognize it, with its own Date/Place/Desc all filled in."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
@@ -653,7 +650,7 @@ def test_build_individual_scrip_event_gets_type_line_and_value_from_extra_fields
 
 
 def test_build_individual_scrip_fact_gets_document_year_as_date_and_media_attached():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
                "type_specific_fields": {"scrip_number": "1234"},
@@ -670,7 +667,7 @@ def test_build_individual_scrip_fact_gets_document_year_as_date_and_media_attach
 def test_build_individual_scrip_race_fact_gets_no_document_year_date():
     """Per the user: everything but Race should carry the document year as its DATE -
     Race describes an ongoing characteristic, not something dated to one document."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
                "type_specific_fields": {}, "participants": [make_participant("primary")]}
@@ -690,7 +687,7 @@ def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
     old filter (just excluding 'primary') used to sweep them in too. Uses FTM output,
     where witnesses render as plain names in a NOTE line - RM's own _SHAR form only ever
     carries a UID + role text, not a name, so it can't distinguish this directly."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1",
                "type_specific_fields": {"scrip_number": "1"},
@@ -771,59 +768,59 @@ def test_build_individual_alternate_name_renders_as_proposed_name_fact_with_even
 # Scrip custom RootsMagic source templates (Metis Scrip.rmst, Ids 20001-20005)
 # ==========================================
 def test_select_scrip_template_id_manitoba_from_commission_reference():
-    assert ScripProfile.select_scrip_template_id("Affidavit under Manitoba Act, 33 Vic. Cap 3", "Witness Affidavit") == 20001
+    assert Scrip.select_scrip_template_id("Affidavit under Manitoba Act, 33 Vic. Cap 3", "Witness Affidavit") == 20001
 
 
 def test_select_scrip_template_id_north_west_from_commission_reference():
     ref = "Form A - North-West Half-Breed Claims Commission under Order in Council of 30th March, 1885"
-    assert ScripProfile.select_scrip_template_id(ref, "Claimant's Own Affidavit") == 20002
+    assert Scrip.select_scrip_template_id(ref, "Claimant's Own Affidavit") == 20002
 
 
 def test_select_scrip_template_id_treaty_8_from_commission_reference():
-    assert ScripProfile.select_scrip_template_id("Form C - Treaty No. 8", "Witness Affidavit") == 20003
+    assert Scrip.select_scrip_template_id("Form C - Treaty No. 8", "Witness Affidavit") == 20003
 
 
 def test_select_scrip_template_id_certificate_from_document_type_regardless_of_commission():
     """document_type wins over commission_reference - a Certificate is a structurally
     different document from an affidavit no matter which commission issued it."""
-    assert ScripProfile.select_scrip_template_id("Manitoba Act, 33 Vic. Cap 3", "Scrip Certificate") == 20004
+    assert Scrip.select_scrip_template_id("Manitoba Act, 33 Vic. Cap 3", "Scrip Certificate") == 20004
 
 
 def test_select_scrip_template_id_prefers_series_code_over_commission_reference_text():
     """series_code is LAC's own catalog classification (Commissioner-fetched) - more
     authoritative than the printed commission_reference text, so it wins when present,
     even when commission_reference text alone would have matched a different template."""
-    assert ScripProfile.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
+    assert Scrip.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
                                         series_code="RG15-D-II-8-c") == 20002
 
 
 def test_select_scrip_template_id_returns_none_when_unrecognized():
     """No guessing - an unresolved record must fall back to the plain freeform source,
     not get mis-templated."""
-    assert ScripProfile.select_scrip_template_id("", "") is None
-    assert ScripProfile.select_scrip_template_id("some unrelated header text", "Register Entry") is None
+    assert Scrip.select_scrip_template_id("", "") is None
+    assert Scrip.select_scrip_template_id("some unrelated header text", "Register Entry") is None
 
 
 def test_scrip_template_field_value_microfilm_from_commissioner_reel_numbers():
     rec = {"type_specific_fields": {"reel_numbers": "C-14929, C-14930"}}
     part = {}
-    assert ScripProfile._scrip_template_field_value("Microfilm", rec, part, "1320") == "C-14929, C-14930"
+    assert Scrip._scrip_template_field_value("Microfilm", rec, part, "1320") == "C-14929, C-14930"
 
 
 def test_scrip_template_field_value_issue_date_prefers_dedicated_field_over_application_date():
     rec = {"type_specific_fields": {"issue_date": "5 May 1886", "application_date": "1 Jan 1886"}}
-    assert ScripProfile._scrip_template_field_value("IssueDate", rec, {}, "1320") == "5 May 1886"
+    assert Scrip._scrip_template_field_value("IssueDate", rec, {}, "1320") == "5 May 1886"
 
 
 def test_scrip_template_field_value_issue_date_falls_back_to_application_date():
     rec = {"type_specific_fields": {"application_date": "1 Jan 1886"}}
-    assert ScripProfile._scrip_template_field_value("IssueDate", rec, {}, "1320") == "1 Jan 1886"
+    assert Scrip._scrip_template_field_value("IssueDate", rec, {}, "1320") == "1 Jan 1886"
 
 
 def test_scrip_template_field_value_treaty_8_delivery_fields():
     rec = {"type_specific_fields": {"delivery_date": "3 Aug 1900", "delivery_place": "Fort Vermilion"}}
-    assert ScripProfile._scrip_template_field_value("DeliveryDate", rec, {}, "1") == "3 Aug 1900"
-    assert ScripProfile._scrip_template_field_value("DeliveryPlace", rec, {}, "1") == "Fort Vermilion"
+    assert Scrip._scrip_template_field_value("DeliveryDate", rec, {}, "1") == "3 Aug 1900"
+    assert Scrip._scrip_template_field_value("DeliveryPlace", rec, {}, "1") == "Fort Vermilion"
 
 
 def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
@@ -831,13 +828,13 @@ def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
     Dominion Lands Office patent record Commissioner doesn't fetch yet."""
     rec = {"type_specific_fields": {}}
     for field in ("OriginalClaimant", "LandDescription", "Liber", "Folio"):
-        assert ScripProfile._scrip_template_field_value(field, rec, {}, "1") == ""
+        assert Scrip._scrip_template_field_value(field, rec, {}, "1") == ""
 
 
 def test_get_scrip_citation_fields_skips_empty_values():
     rec = {"type_specific_fields": {"affidavit_number": "5473"}, "lac_pid": ""}
     part = make_participant("primary", given="Roger", surname="Letendre")
-    lines = ScripProfile.get_scrip_citation_fields(20001, rec, part, "1320")
+    lines = Scrip.get_scrip_citation_fields(20001, rec, part, "1320")
     joined = "\n".join(lines)
     assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
     assert "4 NAME ClaimantName" in joined and "4 VALUE Roger Letendre" in joined
@@ -847,7 +844,7 @@ def test_get_scrip_citation_fields_skips_empty_values():
 
 
 def test_build_general_citation_scrip_cites_the_matching_template_source_with_field_block():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"page": "1", "record_id": "SC-1", "record_number": "5473", "lac_pid": "1506170",
                "type_specific_fields": {"commission_reference": "Affidavit under Manitoba Act, 33 Vic. Cap 3",
@@ -869,7 +866,7 @@ def test_build_general_citation_scrip_cites_the_matching_template_source_with_fi
 def test_build_general_citation_scrip_forces_proven_even_when_date_is_estimated():
     """Every Scrip fact is read straight off a sworn primary source - get_proof_status'
     generic BEF/ABT/EST downgrade (still correct for Parish/Census) must not apply here."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
         part = make_participant("primary")
@@ -883,7 +880,7 @@ def test_build_general_citation_scrip_forces_proven_even_when_date_is_estimated(
 def test_build_general_citation_scrip_falls_back_to_freeform_when_template_unresolved():
     """An unrecognized commission_reference must not get mis-templated - it cites the
     existing per-volume freeform source instead, same @S{vol}@ id as before this change."""
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
         part = make_participant("primary")
@@ -894,7 +891,7 @@ def test_build_general_citation_scrip_falls_back_to_freeform_when_template_unres
 
 
 def test_get_volume_sources_omits_church_template_for_scrip():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     orig_config = dict(General.GENERAL_CONFIG)
     try:
         General.GENERAL_CONFIG['parish_name'] = "Library and Archives Canada"
@@ -956,7 +953,7 @@ def test_format_gedcom_date_handles_iso_and_natural_text():
 
 
 def test_build_general_citation_scrip_emits_commissioners_review_note():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {
             "page": "1", "record_id": "SCRIP-5473", "year": "1885",
@@ -1008,7 +1005,7 @@ def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
     orig_config = dict(General.GENERAL_CONFIG)
     try:
         Utils.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
-        General.run_general_flavor({"record_type_name": "Scrip", "sheets": []}, ScripProfile.ScripProfile())
+        General.run_general_flavor({"record_type_name": "Scrip", "sheets": []}, Scrip.ScripProfile())
         assert Utils.GEDCOM_OUTPUT_NAME == "Scrip.ged"
     finally:
         Utils.GEDCOM_OUTPUT_NAME = orig_output_name
@@ -1032,7 +1029,7 @@ def test_load_source_template_lines_from_rmst():
 
 
 def test_get_scrip_template_sources_simplified_citations_fields():
-    sources = ScripProfile.get_scrip_template_sources({20001}, "RM")
+    sources = Scrip.get_scrip_template_sources({20001}, "RM")
     joined = "\n".join(sources)
     assert "0 @S20001@ SOUR" in joined
     assert "2 TID 20001" in joined
@@ -1043,7 +1040,7 @@ def test_get_scrip_template_sources_simplified_citations_fields():
 
 
 def test_generate_uid_scrip_uses_pid_or_record_id_directly():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         rec = {"page": "1", "record_id": "SC-100", "lac_pid": "1502188", "participants": [
             {"role_number": "0", "std_given": "Jean", "std_surname": "Riel"},
@@ -1061,7 +1058,7 @@ def test_generate_uid_scrip_uses_pid_or_record_id_directly():
 
 
 def test_build_gedcom_from_general_emits_srctemplates_for_rm():
-    General.set_active_profile(ScripProfile.ScripProfile())
+    General.set_active_profile(Scrip.ScripProfile())
     try:
         json_data = {
             "record_type_name": "Scrip",
