@@ -73,6 +73,9 @@ sections:
     HBCA_DOWNLOAD_KEYSTONE_MEDIA:
       default: "true"
       tooltip: "When Keystone resolving is enabled, download any digitized microfilm copy media files found."
+    KEYSTONE_BASE_URL:
+      default: "https://pam.minisisinc.com/scripts/mwimain.dll"
+      tooltip: "Base URL for the Archives of Manitoba Keystone database search."
 label_overrides:
   VOYAGEUR_SOURCE: "Gather From"
   A_URL: "Ancestry Census URL"

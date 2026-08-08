@@ -1,14 +1,21 @@
+import importlib.util
 import json
-import pytest
 from pathlib import Path
-from HBCA import (
-    BioSheetEntry,
-    build_hbca_scaffold_sheet,
-    filter_entries_by_letter,
-    load_checkpoint,
-    parse_biographical_index_html,
-    save_checkpoint,
-)
+import pytest
+
+_hbca_path = Path(__file__).resolve().parents[1] / "HBCA.py"
+_spec = importlib.util.spec_from_file_location("voyageur_hbca", _hbca_path)
+_hbca_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_hbca_mod)
+
+
+BioSheetEntry = _hbca_mod.BioSheetEntry
+build_hbca_scaffold_sheet = _hbca_mod.build_hbca_scaffold_sheet
+filter_entries_by_letter = _hbca_mod.filter_entries_by_letter
+load_checkpoint = _hbca_mod.load_checkpoint
+parse_biographical_index_html = _hbca_mod.parse_biographical_index_html
+save_checkpoint = _hbca_mod.save_checkpoint
+
 
 SAMPLE_INDEX_HTML = """
 <!DOCTYPE html>

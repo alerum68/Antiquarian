@@ -15,6 +15,7 @@ from typing import Callable, Dict
 
 import Census
 import General
+import HBCA
 import Scrip
 import Utils
 
@@ -23,6 +24,9 @@ JSON_FILE = os.getenv("JSON_FILE", "")
 
 PROFILE_REGISTRY: Dict[str, Callable[[], "General.Profile"]] = {
     "Scrip": Scrip.ScripProfile,
+    "HBCA": HBCA.HBCAProfile,
+    "HBCA_Bio": HBCA.HBCAProfile,
+    "HBCA_Biographical_Sheets": HBCA.HBCAProfile,
 }
 
 

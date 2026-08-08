@@ -24,14 +24,8 @@ GENERAL_CONFIG = {
     'collection_name': os.getenv('COLLECTION_NAME', ''),
     'parish_file_name': os.getenv('PARISH_FILE_NAME', 'Parish_Export'),
     'default_location': os.getenv('DEFAULT_EVENT_LOCATION', ''),
-    # Falls back to the old TRANSLATION_HEADER/TRANSCRIPTION_HEADER env var names when the
-    # new ones are unset/blank - an existing .env with the old vars still populated (and the
-    # new ones present-but-blank, e.g. from a settings-schema migration that added the new
-    # keys without copying values over) must keep showing its configured header text, not
-    # silently drop it. `or` (not getenv's own default) is required here since the new var
-    # can be *set* to '' rather than merely absent.
-    'citation_detail': os.getenv('CITATION_DETAIL', '') or os.getenv('TRANSLATION_HEADER', ''),
-    'citation_text': os.getenv('CITATION_TEXT', '') or os.getenv('TRANSCRIPTION_HEADER', ''),
+    'citation_detail': os.getenv('CITATION_DETAIL', ''),
+    'citation_text': os.getenv('CITATION_TEXT', ''),
     'role_clergy': os.getenv('ROLE_CLERGY', 'Priest'),
     'role_default_witness': os.getenv('ROLE_DEFAULT_WITNESS', 'Witness'),
     'clergy_honorific': os.getenv('CLERGY_HONORIFIC', 'Father'),
@@ -53,7 +47,8 @@ class Profile(Protocol):
                         document_type: Optional[str]) -> str: ...
     def citation_page(self, rec: dict, part: dict, page: str) -> str: ...
     def citation_template_id(self, rec: dict, vol: str) -> Optional[int]: ...
-    def citation_proof_status(self, computed_status: str) -> str: ...
+    def citation_proof_status(self, computed_status: str, rec: Optional[dict] = None) -> str: ...
+    def citation_quality_fields(self, rec: dict, part: dict, target_software: str) -> List[str]: ...
     def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
                                 target_software: str) -> List[str]: ...
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]: ...
@@ -140,8 +135,19 @@ class GeneralProfile:
     def citation_template_id(self, rec: dict, vol: str) -> Optional[int]:
         return None
 
-    def citation_proof_status(self, computed_status: str) -> str:
+    def citation_proof_status(self, computed_status: str, rec: Optional[dict] = None) -> str:
         return computed_status
+
+    def citation_quality_fields(self, rec: dict, part: dict, target_software: str) -> List[str]:
+        rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
+        refn = Utils.clean_val(rec.get('record_number')) or rec_id
+        if target_software == "RM":
+            return [
+                f"3 REFN {refn}",
+                "3 QUAY 3", "3 _QUAL", "4 _SOUR O", "4 _INFO P",
+                "4 _EVID D"
+            ]
+        return [f"3 REFN {refn}", "3 QUAY 3"]
 
     def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
                                 target_software: str) -> List[str]:
@@ -533,7 +539,10 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     sour_id = f"@S{template_id}@" if template_id else get_dynamic_source_id(vol)
 
     computed_status = proof_status
-    proof_status = _ACTIVE_PROFILE.citation_proof_status(computed_status)
+    try:
+        proof_status = _ACTIVE_PROFILE.citation_proof_status(computed_status, rec=rec)
+    except TypeError:
+        proof_status = _ACTIVE_PROFILE.citation_proof_status(computed_status)
 
     block = [
         f"2 _PROOF {proof_status}",
@@ -548,15 +557,19 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     raw_trans = citation_details if citation_details is not None else rec.get('citation_details')
     block.extend(_ACTIVE_PROFILE.citation_text_block(rec, part, raw_orig, raw_trans))
 
-    refn = Utils.clean_val(rec.get('record_number')) or rec_id
-    if target_software == "RM":
-        block.extend([
-            f"3 REFN {refn}",
-            "3 QUAY 3", "3 _QUAL", "4 _SOUR O", "4 _INFO P",
-            "4 _EVID D"
-        ])
+    rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
+    if hasattr(_ACTIVE_PROFILE, "citation_quality_fields"):
+        block.extend(_ACTIVE_PROFILE.citation_quality_fields(rec, part, target_software))
     else:
-        block.extend([f"3 REFN {refn}", "3 QUAY 3"])
+        refn = Utils.clean_val(rec.get('record_number')) or rec_id
+        if target_software == "RM":
+            block.extend([
+                f"3 REFN {refn}",
+                "3 QUAY 3", "3 _QUAL", "4 _SOUR O", "4 _INFO P",
+                "4 _EVID D"
+            ])
+        else:
+            block.extend([f"3 REFN {refn}", "3 QUAY 3"])
 
     apid_record_id = Utils.clean_val((part.get('type_specific_fields') or {}).get('apid'))
     if apid_record_id and Utils.APID_DB:
@@ -577,6 +590,21 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
             block.extend(["3 _WEBTAG", "4 NAME LAC Digital Record", f"4 URL {lac_url}"])
         else:
             block.extend([f"3 _LINK {lac_url}", f"3 NOTE {lac_url}"])
+
+    pdf_url = Utils.clean_val((rec.get('type_specific_fields') or {}).get('pdf_url') or rec.get('pdf_url'))
+    if pdf_url:
+        if target_software == "RM":
+            block.extend(["3 _WEBTAG", "4 NAME HBCA Biographical Sheet PDF", f"4 URL {pdf_url}"])
+        else:
+            block.extend([f"3 _LINK {pdf_url}", f"3 NOTE {pdf_url}"])
+
+    keystone_urls = (rec.get('type_specific_fields') or {}).get('keystone_urls') or []
+    for k_url in keystone_urls:
+        if k_url:
+            if target_software == "RM":
+                block.extend(["3 _WEBTAG", "4 NAME Archives of Manitoba Keystone Record", f"4 URL {k_url}"])
+            else:
+                block.extend([f"3 _LINK {k_url}", f"3 NOTE {k_url}"])
 
     effective_media_uid = doc_media_uid or media_uid
     if effective_media_uid:

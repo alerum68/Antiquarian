@@ -1,9 +1,15 @@
-import pytest
-from HBCA import (
-    extract_hbca_location_codes,
-    parse_keystone_search_response,
-    build_keystone_search_url,
-)
+import importlib.util
+from pathlib import Path
+
+_hbca_path = Path(__file__).resolve().parents[1] / "HBCA.py"
+_spec = importlib.util.spec_from_file_location("voyageur_hbca", _hbca_path)
+_hbca_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_hbca_mod)
+
+build_keystone_search_url = _hbca_mod.build_keystone_search_url
+extract_hbca_location_codes = _hbca_mod.extract_hbca_location_codes
+parse_keystone_search_response = _hbca_mod.parse_keystone_search_response
+
 
 SAMPLE_BIO_TEXT = """
 NAME: ADAMS, George
