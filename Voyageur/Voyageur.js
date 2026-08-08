@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.5
+// @version      0.3.6
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1338,36 +1338,14 @@
             }, {timeoutMs: 15000});
             if (!namesWait.result || namesWait.result.empty) return [];
 
-            // Scope to the Names panel's own <aside> (identified by its own "Names" heading) -
-            // confirmed live that document-wide list queries pick up unrelated <ul>s (e.g. the
-            // "Manage Indexes" dropdown menu) ahead of the real household lists.
-            const panel = [...document.querySelectorAll('aside')]
-                .find(a => [...a.querySelectorAll('h1,h2,h3,h4,h5,h6')].some(h => h.textContent.trim() === 'Names'));
-            if (!panel) return [];
-
             // FamilySearch's own household heading level/tag isn't assumed stable (matches this
             // file's own "don't trust FamilySearch's markup" convention) - collect every heading
-            // and every list-like container in document order, then attribute each container to
-            // whichever heading precedes it, up to the next heading.
-            const headings = [...panel.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-                .filter(h => /\sHousehold$/.test(h.textContent.trim()));
-            const listContainers = [...panel.querySelectorAll('[role="list"], ul, ol')];
+            // in document order and hand each one to findHouseholdContainer() by position.
+            const headings = getHouseholdHeadings();
 
             const sections = [];
             for (let i = 0; i < headings.length; i++) {
-                const heading = headings[i];
-                const nextHeading = headings[i + 1] || null;
-                const inRange = (el) => {
-                    const afterThis = heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
-                    // Confirmed live: this must check that `el` PRECEDES nextHeading, not that it
-                    // FOLLOWS it - the two are easy to invert since both read as "& FOLLOWING" from
-                    // one comparison direction or the other. Getting this backwards makes every
-                    // heading grab the *next* household's list instead of its own.
-                    const beforeNext = !nextHeading
-                        || (nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING);
-                    return afterThis && beforeNext;
-                };
-                const container = listContainers.find(inRange);
+                const container = findHouseholdContainer(i);
                 if (!container) continue;
 
                 const items = [...container.querySelectorAll('[role="listitem"], li')];
@@ -1375,20 +1353,72 @@
                     // The list item's own visible text is "{Name}\n{Role}" (confirmed live: e.g.
                     // "Joseph Rolette\nPrimary | Spouse") - the accessible "Click to view {name}"
                     // button is a second, separately-labeled element inside the same item, not the
-                    // one carrying the name/role text itself.
+                    // one carrying the name/role text itself. Only name/roleHint are kept here -
+                    // NOT a reference to the button element itself. Confirmed live: FamilySearch
+                    // re-renders this list shortly after it first appears (still settling/loading),
+                    // which silently detaches any button reference captured this early - clicking a
+                    // detached button does nothing, no error, and every scrapePersonDetail() call
+                    // then times out waiting for a panel that never opens. Buttons are instead
+                    // re-located fresh at click time by locateMemberButton(), using this same
+                    // household-index + item-index addressing.
                     const lines = item.innerText.split('\n').map(s => s.trim()).filter(Boolean);
-                    const name = lines[0] || '';
-                    const roleHint = lines[1] || '';
-                    const viewButton = [...item.querySelectorAll('button')].find(b => {
-                        const label = b.getAttribute('aria-label') || b.textContent || '';
-                        return label.trim().startsWith('Click to view');
-                    });
-                    return viewButton ? {name, roleHint, viewButton} : null;
-                }).filter(Boolean);
+                    return {name: lines[0] || '', roleHint: lines[1] || ''};
+                });
 
-                sections.push({householdLabel: heading.textContent.trim(), members});
+                sections.push({householdLabel: headings[i].textContent.trim(), members});
             }
             return sections;
+        }
+
+        // Scope to the Names panel's own <aside> (identified by its own "Names" heading) -
+        // confirmed live that document-wide list queries pick up unrelated <ul>s (e.g. the
+        // "Manage Indexes" dropdown menu) ahead of the real household lists.
+        function getNamesPanel() {
+            return [...document.querySelectorAll('aside')]
+                .find(a => [...a.querySelectorAll('h1,h2,h3,h4,h5,h6')].some(h => h.textContent.trim() === 'Names'));
+        }
+
+        function getHouseholdHeadings() {
+            const panel = getNamesPanel();
+            if (!panel) return [];
+            return [...panel.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+                .filter(h => /\sHousehold$/.test(h.textContent.trim()));
+        }
+
+        // Re-run fresh every time a household's list container is needed (parsing AND clicking)
+        // rather than caching the result, since the panel keeps mutating after it first appears -
+        // see parseHouseholdSections()'s own note on why cached button references go stale.
+        function findHouseholdContainer(householdIndex) {
+            const panel = getNamesPanel();
+            if (!panel) return null;
+            const headings = getHouseholdHeadings();
+            const heading = headings[householdIndex];
+            if (!heading) return null;
+            const nextHeading = headings[householdIndex + 1] || null;
+            const listContainers = [...panel.querySelectorAll('[role="list"], ul, ol')];
+            const inRange = (el) => {
+                const afterThis = heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
+                // Confirmed live: this must check that `el` PRECEDES nextHeading, not that it
+                // FOLLOWS it - the two are easy to invert since both read as "& FOLLOWING" from
+                // one comparison direction or the other. Getting this backwards makes every
+                // heading grab the *next* household's list instead of its own.
+                const beforeNext = !nextHeading
+                    || (nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING);
+                return afterThis && beforeNext;
+            };
+            return listContainers.find(inRange) || null;
+        }
+
+        function locateMemberButton(householdIndex, memberIndex) {
+            const container = findHouseholdContainer(householdIndex);
+            if (!container) return null;
+            const items = [...container.querySelectorAll('[role="listitem"], li')];
+            const item = items[memberIndex];
+            if (!item) return null;
+            return [...item.querySelectorAll('button')].find(b => {
+                const label = b.getAttribute('aria-label') || b.textContent || '';
+                return label.trim().startsWith('Click to view');
+            }) || null;
         }
 
         function readRecordArkFromOpenPanel() {
@@ -1411,7 +1441,16 @@
         // panel showed their own mother AND sibling both as "No Relation"). The head's panel is
         // the only place this data is actually correct, so it's read once per household and
         // applied by position to every member - see scrapeNamesPanel().
-        async function scrapePersonDetail(viewButton, previousRecordArk, {includeHouseholdRelationships = false} = {}) {
+        async function scrapePersonDetail(householdIndex, memberIndex, previousRecordArk, {includeHouseholdRelationships = false} = {}) {
+            // Re-located fresh right here rather than accepting a button reference from the
+            // caller - see parseHouseholdSections()'s note on why a reference captured earlier
+            // goes stale.
+            const viewButton = locateMemberButton(householdIndex, memberIndex);
+            if (!viewButton) {
+                debugLog(`scrapePersonDetail: could not locate household ${householdIndex} member ${memberIndex}`);
+                return {recordArk: '', personArk: '', given: '', surname: '', gender: '', age: '',
+                        householdRelationships: []};
+            }
             viewButton.click();
 
             // Wait for the record ark to actually CHANGE, not for the target name to appear in
@@ -1496,7 +1535,7 @@
                 // live) - their own Household Details panel is the only reliable source for
                 // every other member's relationship-to-head (see scrapePersonDetail's own
                 // note), so it's read once per household and applied by position below.
-                const headDetail = await scrapePersonDetail(members[0].viewButton, lastRecordArk,
+                const headDetail = await scrapePersonDetail(familyNumber, 0, lastRecordArk,
                     {includeHouseholdRelationships: true});
                 lastRecordArk = headDetail.recordArk;
 
@@ -1526,7 +1565,7 @@
                     seen.add(key);
 
                     const detail = idx === 0 ? headDetail
-                        : await scrapePersonDetail(member.viewButton, lastRecordArk);
+                        : await scrapePersonDetail(familyNumber, idx, lastRecordArk);
                     lastRecordArk = detail.recordArk;
 
                     const columns = {
