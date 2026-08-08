@@ -19,7 +19,7 @@ import sys
 import time
 import unicodedata
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Union
 
 from dotenv import load_dotenv
 from google import genai

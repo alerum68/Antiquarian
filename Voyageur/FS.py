@@ -39,7 +39,6 @@ from _gather_helpers import (
     cleanup_checkpoint_files,
     launch_gather_browser,
     move_downloaded_images,
-    move_with_retry,
     resolve_census_image_dir,
     wait_for_downloaded_json,
     write_archivist_json_file,

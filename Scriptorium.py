@@ -1,5 +1,4 @@
 import io
-import json
 import os
 import queue
 import re
@@ -1855,7 +1854,7 @@ class Scriptorium(ctk.CTk):
                 # terminate() reports the same exit code (1 on Windows) as a genuine
                 # unhandled exception, so cancellation can only be told apart from a real
                 # crash via this flag, not the returncode itself.
-                self.console.put(f"\n[System] Task was cancelled by you.\n")
+                self.console.put("\n[System] Task was cancelled by you.\n")
                 status_msg = f"{script_name}: cancelled"
             else:
                 self.console.put(
