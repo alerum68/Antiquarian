@@ -12,6 +12,12 @@ venv/
 /.claude/
 /CLAUDE.md
 /.mcp.json
+/.agent/
+/.gemini/
+.agentsroom/handoff-transcript-*.txt
+.agentsroom/handoff-summary-*.md
+.agents/mcp_config.json
+/.agentsroom/
 
 # OS junk
 .DS_Store
@@ -30,4 +36,4 @@ Thumbs.db
 
 # Local dev scratch space (sample data, test files, etc.)
 /DEV/
-/.agent/
+
