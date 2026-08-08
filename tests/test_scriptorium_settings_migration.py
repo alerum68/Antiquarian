@@ -151,3 +151,21 @@ def test_pdfix_schema_matches_expected_shape():
         "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"},
     }
 
+
+def test_batch_set_env_updates_existing_and_preserves_comments(tmp_path):
+    from dotenv import dotenv_values
+    env_file = tmp_path / ".env"
+    env_file.write_text("# Initial comment\nFOO='old'\nBAR='keep'\n", encoding="utf-8")
+
+    Scriptorium.batch_set_env(env_file, {"FOO": "new", "BAZ": "created", "EMPTY": ""})
+
+    vals = dotenv_values(env_file)
+    assert vals == {"FOO": "new", "BAR": "keep", "BAZ": "created", "EMPTY": ""}
+    lines = env_file.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "# Initial comment"
+    assert "FOO='new'" in lines
+    assert "BAR='keep'" in lines
+    assert "BAZ='created'" in lines
+    assert "EMPTY=''" in lines
+
+

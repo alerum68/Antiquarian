@@ -15,7 +15,7 @@ from typing import Union, Dict, Callable, List, Optional
 
 import customtkinter as ctk
 import yaml
-from dotenv import set_key, dotenv_values
+from dotenv import dotenv_values
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -38,6 +38,52 @@ def env_path_for(subfolder: Optional[str]) -> Path:
     """Resolves the .env path for a settings group: the project root if subfolder is None,
     otherwise that tool's own subfolder, so each tool's config stays self-contained."""
     return BASE_DIR / subfolder / ".env" if subfolder else BASE_DIR / ".env"
+
+
+def batch_set_env(env_path: Path, updates: Dict[str, str]) -> None:
+    """Saves a batch of key-value pairs to a .env file in a single write operation,
+    preserving comments and existing keys without triggering Windows file-lock errors."""
+    env_path = Path(env_path)
+    env_path.parent.mkdir(parents=True, exist_ok=True)
+    lines: List[str] = []
+    if env_path.exists():
+        try:
+            lines = env_path.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            lines = []
+
+    updated_keys = set()
+    new_lines: List[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            new_lines.append(line)
+            continue
+        if "=" in line:
+            key, _ = line.split("=", 1)
+            key = key.strip()
+            if key in updates:
+                val = updates[key]
+                new_lines.append(f"{key}='{val}'")
+                updated_keys.add(key)
+            else:
+                new_lines.append(line)
+        else:
+            new_lines.append(line)
+
+    for key, val in updates.items():
+        if key not in updated_keys:
+            new_lines.append(f"{key}='{val}'")
+
+    content = "\n".join(new_lines) + "\n"
+    for attempt in range(5):
+        try:
+            env_path.write_text(content, encoding="utf-8")
+            break
+        except PermissionError:
+            if attempt == 4:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 # ==========================================
@@ -1035,11 +1081,11 @@ class Scriptorium(ctk.CTk):
     def _save_env(self):
         for category_dict, subfolder in ENV_TARGETS:
             env_path = env_path_for(subfolder)
-            env_path.parent.mkdir(parents=True, exist_ok=True)
+            updates: Dict[str, str] = {}
             for fields in category_dict.values():
                 for key in fields.keys():
-                    clean_val = self.string_vars[key].get().replace('\\', '/')
-                    set_key(str(env_path), key, clean_val)
+                    updates[key] = self.string_vars[key].get().replace('\\', '/')
+            batch_set_env(env_path, updates)
         self.console.put("\n[System] Environment variables saved (global settings to the root .env, "
                          "each tool's settings to its own subfolder).\n")
 
