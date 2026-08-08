@@ -18,7 +18,12 @@ cleanup with no new functionality.
   citation text (`CITATION_DETAIL`/`CITATION_TEXT`, formerly hardcoded
   `TRANSLATION_HEADER`/`TRANSCRIPTION_HEADER`) are now optional and blank by
   default — when unset, the text renders without a label line instead of always
-  showing "Citation Details:"/"Citation Text:".
+  showing "Citation Details:"/"Citation Text:". An existing `.env` with the old
+  `TRANSLATION_HEADER`/`TRANSCRIPTION_HEADER` vars still set keeps working as-is
+  (read as a fallback when the new vars are blank/unset) — no action needed, but
+  re-entering the same text under `CITATION_DETAIL`/`CITATION_TEXT` in
+  Scriptorium's settings is recommended so the old var names can eventually be
+  removed from your `.env`.
 - **Unified Pipeline Architecture**: `Paleographer.py` and `Archivist.py`
   are unified as self-contained standalone execution entrypoints with folded sub-modules
   and embedded source templates, ensuring zero runtime sibling-import failure while keeping

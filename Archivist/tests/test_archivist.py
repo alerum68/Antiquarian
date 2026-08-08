@@ -207,6 +207,31 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
     assert "-- " not in blocks[0]  # no document_type suffix when there's nothing to distinguish
 
 
+def test_build_general_citation_shows_configured_header_labels_when_set():
+    """CITATION_DETAIL/CITATION_TEXT are blank by default (no label line) but a user who
+    configures them must still see their chosen label prefixed - the "header present" branch
+    of General.citation_text_block, uncovered by every other test in this file (which all run
+    against the blank-default GENERAL_CONFIG)."""
+    orig_config = dict(General.GENERAL_CONFIG)
+    try:
+        General.GENERAL_CONFIG['citation_detail'] = "Citation Details:"
+        General.GENERAL_CONFIG['citation_text'] = "Citation Text:"
+        rec = {"page": "1", "record_id": "B-1", "year": "1876",
+               "citation_text": "Je soussigné jure solennellement...",
+               "citation_details": "I, the undersigned, do solemnly swear..."}
+        part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
+        blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+
+        assert len(blocks) == 1
+        assert "Citation Details:" in blocks[0]
+        assert "Citation Text:" in blocks[0]
+        assert "Je soussigné" in blocks[0]
+        assert "I, the undersigned" in blocks[0]
+    finally:
+        General.GENERAL_CONFIG.clear()
+        General.GENERAL_CONFIG.update(orig_config)
+
+
 def test_build_general_citation_one_block_per_source_document():
     rec = {"page": "1", "record_id": "SCRIP-5473", "year": "1880", "source_documents": [
         {"document_type": "Witness Affidavit", "page": "page_001",

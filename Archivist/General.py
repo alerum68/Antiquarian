@@ -24,8 +24,14 @@ GENERAL_CONFIG = {
     'collection_name': os.getenv('COLLECTION_NAME', ''),
     'parish_file_name': os.getenv('PARISH_FILE_NAME', 'Parish_Export'),
     'default_location': os.getenv('DEFAULT_EVENT_LOCATION', ''),
-    'citation_detail': os.getenv('CITATION_DETAIL', ''),
-    'citation_text': os.getenv('CITATION_TEXT', ''),
+    # Falls back to the old TRANSLATION_HEADER/TRANSCRIPTION_HEADER env var names when the
+    # new ones are unset/blank - an existing .env with the old vars still populated (and the
+    # new ones present-but-blank, e.g. from a settings-schema migration that added the new
+    # keys without copying values over) must keep showing its configured header text, not
+    # silently drop it. `or` (not getenv's own default) is required here since the new var
+    # can be *set* to '' rather than merely absent.
+    'citation_detail': os.getenv('CITATION_DETAIL', '') or os.getenv('TRANSLATION_HEADER', ''),
+    'citation_text': os.getenv('CITATION_TEXT', '') or os.getenv('TRANSCRIPTION_HEADER', ''),
     'role_clergy': os.getenv('ROLE_CLERGY', 'Priest'),
     'role_default_witness': os.getenv('ROLE_DEFAULT_WITNESS', 'Witness'),
     'clergy_honorific': os.getenv('CLERGY_HONORIFIC', 'Father'),
