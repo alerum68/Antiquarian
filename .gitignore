@@ -36,4 +36,6 @@ Thumbs.db
 
 # Local dev scratch space (sample data, test files, etc.)
 /DEV/
+.worktrees/
+worktrees/
 
