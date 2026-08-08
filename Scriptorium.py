@@ -1803,6 +1803,7 @@ class Scriptorium(ctk.CTk):
         # Pre-resolve these specific nested directory variables
         nested_dir_keys = [("CHURCH_IMAGE_DIR", full_media_dir), ("SCRIP_IMAGE_DIR", full_media_dir),
                            ("CENSUS_IMAGE_DIR", full_media_dir), ("LAC_IMAGE_DIR", full_media_dir),
+                           ("HBCA_IMAGE_DIR", full_media_dir),
                            ("REGISTRAR_RM_DATABASE", full_rm_dir), ("GAZETTEER_RM_DATABASE", full_rm_dir),
                            ("PDFIX_TARGET_DIR", full_media_dir)]
         for key, base_dir in nested_dir_keys:

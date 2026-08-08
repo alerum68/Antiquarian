@@ -391,7 +391,7 @@ def gather_hbca_sheets(
     max_workers: int = HBCA_MAX_WORKERS,
 ) -> int:
     """Headless gatherer: fetches index, downloads PDFs, prefetches text, resolves Keystone links, builds scaffold sheets."""
-    image_dir = image_dir or (Path(PROGRAM_DIR) / HBCA_IMAGE_DIR)
+    image_dir = image_dir or Path(_safe_path(str(media_dir or MEDIA_DIR), HBCA_IMAGE_DIR))
     master_db_path = master_db_path or (
         Path(PROGRAM_DIR) / os.environ.get("JSON_DIR", "JSON") / HBCA_MASTER_DB_NAME
     )
