@@ -1,6 +1,6 @@
 # HBCA Biographical Sheets Integration Implementation Plan
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode. Follow gemini.md for rules regarding subagents during execution of this plan.
 
 **Goal:** Implement full pipeline integration for Hudson's Bay Company Archives (HBCA / Archives of Manitoba) Biographical Sheets in Scriptorium, replacing the standalone `HBCRecords.py` with `HBCA.pmt`, `Voyageur/HBCA.py`, Keystone media gatherer, and Archivist Simplified Citations export with proof quality ratings.
 
