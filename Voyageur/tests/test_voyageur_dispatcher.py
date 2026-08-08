@@ -11,7 +11,7 @@ Voyageur = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(Voyageur)
 
 
-@pytest.mark.parametrize("source, module_name", [("A", "A"), ("FS", "FS"), ("LAC", "LAC")])
+@pytest.mark.parametrize("source, module_name", [("A", "A"), ("FS", "FS"), ("LAC", "LAC"), ("HBCA", "HBCA")])
 def test_main_dispatches_to_correct_provider_and_strips_mode_token(source, module_name, monkeypatch):
     calls = []
     fake_module = types.ModuleType(module_name)

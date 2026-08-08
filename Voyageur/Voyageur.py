@@ -8,7 +8,7 @@ provider's own main() sees exactly the CLI arguments Scriptorium.py meant for it
 
 import sys
 
-SOURCES = ("A", "FS", "LAC")
+SOURCES = ("A", "FS", "LAC", "HBCA")
 
 
 def main() -> None:
@@ -27,6 +27,9 @@ def main() -> None:
     elif source == "LAC":
         import LAC
         LAC.main()
+    elif source == "HBCA":
+        import HBCA
+        HBCA.main()
 
 
 if __name__ == "__main__":
