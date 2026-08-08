@@ -1391,6 +1391,97 @@
             return sections;
         }
 
+        function readRecordArkFromOpenPanel() {
+            const aside = document.querySelector('aside');
+            const headingEl = aside && [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
+                .find(h => h.textContent.trim() === 'View Name');
+            if (!headingEl) return null;
+            const links = [...aside.querySelectorAll('a[href]')]
+                .filter(a => headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+            const recordArkLink = links.find(a => /ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/.test(a.getAttribute('href')));
+            return recordArkLink
+                ? recordArkLink.getAttribute('href').match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/)[1]
+                : null;
+        }
+
+        // includeHouseholdRelationships is only meaningful (and only reliable) when called for
+        // a household's own head/primary member (raw index 0) - confirmed live that FamilySearch's
+        // Household Details, viewed from a NON-head member's own panel, defaults every other
+        // member's relationship to "No Relation" instead of computing it (e.g. viewing a child's
+        // panel showed their own mother AND sibling both as "No Relation"). The head's panel is
+        // the only place this data is actually correct, so it's read once per household and
+        // applied by position to every member - see scrapeNamesPanel().
+        async function scrapePersonDetail(viewButton, previousRecordArk, {includeHouseholdRelationships = false} = {}) {
+            viewButton.click();
+
+            // Wait for the record ark to actually CHANGE, not for the target name to appear in
+            // the panel - two people in the same household can share a name (confirmed live:
+            // this design's own reference record has a "Joseph Rolette" head and a "Joseph
+            // Rolette" child), so waiting on name text can resolve instantly against the
+            // still-open PREVIOUS person's panel before it re-renders.
+            const arkWait = await waitForCondition(() => {
+                const ark = readRecordArkFromOpenPanel();
+                return (ark && ark !== previousRecordArk) ? ark : null;
+            }, {timeoutMs: 10000});
+            if (!arkWait.result) {
+                debugLog(`scrapePersonDetail: record ark never changed from "${previousRecordArk}"`);
+                return {recordArk: '', personArk: '', given: '', surname: '', gender: '', age: '',
+                        householdRelationships: []};
+            }
+
+            const aside = document.querySelector('aside');
+            const headingEl = [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
+                .find(h => h.textContent.trim() === 'View Name');
+            const fullText = aside.innerText;
+            const viewIdx = fullText.indexOf('View Name');
+            const panelText = fullText.slice(viewIdx);
+
+            // "VIEW RECORD" always points at this specific indexed entry (record_ark, already
+            // captured above via readRecordArkFromOpenPanel) - the Tree Attachment section, when
+            // present, points at the real Family Tree person (person_ark == PID) via a DIFFERENT
+            // href shape than the old UI used ("/en/tree/person/{PID}", no "/details/" segment -
+            // confirmed live, the old "/tree/person/details/{PID}" regex no longer matches
+            // anything on this page). Scoped to links after the "View Name" heading so the
+            // still-present household list above it can't contribute a stray match.
+            const links = [...aside.querySelectorAll('a[href]')]
+                .filter(a => headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+            const personArkLink = links.find(a => /\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})(?:$|[/?])/.test(a.getAttribute('href')));
+            const personArkMatch = personArkLink
+                && personArkLink.getAttribute('href').match(/\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
+            const personArk = personArkMatch ? personArkMatch[1] : '';
+
+            // Essential Information/Additional Facts render as "Heading\nLabel: Value\n..." blocks
+            // in the panel's own innerText (confirmed live) - parsed the same way
+            // scrapeCitationAndCatalog already parses the Citation panel's prose.
+            const givenMatch = panelText.match(/Given Name:\s*(.+)/);
+            const surnameMatch = panelText.match(/Surname:\s*(.+)/);
+            const sexMatch = panelText.match(/Sex:\s*(\w+)/);
+            const ageMatch = panelText.match(/Age:\s*(\d+)/);
+
+            let householdRelationships = [];
+            if (includeHouseholdRelationships) {
+                const householdMatch = panelText.match(/Household Details([\s\S]*?)(?:\n\n|Events\n|$)/);
+                if (householdMatch) {
+                    // Confirmed live shape: "{Relationship}\n{Name}" pairs, one per household
+                    // member INCLUDING the head themselves, whose own pair reads
+                    // "Household • Census\n{HeadName}" rather than a real relationship label.
+                    const relPairs = [...householdMatch[1].matchAll(
+                        /(Household\s*•\s*Census|Spouse|Child|Father|Mother|No Relation)\n(.+)/g)];
+                    householdRelationships = relPairs.map(([, label]) =>
+                        label.startsWith('Household') ? 'Head' : label);
+                }
+            }
+
+            return {
+                recordArk: arkWait.result, personArk,
+                given: givenMatch ? givenMatch[1].trim() : '',
+                surname: surnameMatch ? surnameMatch[1].trim() : '',
+                gender: sexMatch ? sexMatch[1].trim().toUpperCase() : '',
+                age: ageMatch ? ageMatch[1].trim() : '',
+                householdRelationships,
+            };
+        }
+
         async function scrapeIndexRows() {
             const ok = await clickTab('Image Index');
             if (!ok) return [];
