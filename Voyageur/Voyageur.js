@@ -1482,93 +1482,67 @@
             };
         }
 
-        async function scrapeIndexRows() {
-            const ok = await clickTab('Image Index');
-            if (!ok) return [];
-
-            // Same race as the citation panel: a table with >1 <tr> can exist before FamilySearch
-            // has filled in its header cells for the new image (a loading skeleton renders empty
-            // headers), which then makes every column look skippable and produces all-blank rows.
-            // Require at least one non-empty header before accepting the table as ready.
-            // Event-driven (see waitForCondition) rather than polling every 200ms for up to 15s -
-            // a blank/title page (common throughout a census book - cover pages, blank versos)
-            // shows a literal "No indexes are available" message instead of ever rendering a
-            // table, so that's checked on every mutation too rather than only at the end of a
-            // fixed retry budget.
-            const tableWait = await waitForCondition(() => {
-                if (document.body.innerText.includes('No indexes are available for this image')) {
-                    return {blank: true};
-                }
-                const candidate = document.querySelector('table');
-                if (candidate) {
-                    const trs = candidate.querySelectorAll('tr');
-                    if (trs.length > 1) {
-                        const candidateHeaders = [...trs[0].querySelectorAll('th, td')].map(c => (c.innerText || '').trim());
-                        if (candidateHeaders.some(h => h.length > 0)) {
-                            return {table: candidate, headers: candidateHeaders};
-                        }
-                    }
-                }
-                return null;
-            }, {timeoutMs: 15000});
-            if (!tableWait.result || tableWait.result.blank) return [];
-            const table = tableWait.result.table;
-            const headerCells = tableWait.result.headers;
-
-            const allRows = [...table.querySelectorAll('tr')];
-
-            // Utility columns ("" for the row-expand toggle, "Attach to Tree" for the Tree-link
-            // button) carry no genealogical data of their own and aren't part of every record
-            // type's column set, so skip them by header text rather than by fixed position.
-            const skipHeaders = new Set(['', 'Attach to Tree']);
-            const dataColumns = headerCells
-                .map((h, i) => ({header: h, index: i}))
-                .filter(c => !skipHeaders.has(c.header));
-            const attachColIndex = headerCells.indexOf('Attach to Tree');
+        async function scrapeNamesPanel() {
+            const sections = await parseHouseholdSections();
+            if (sections.length === 0) return [];
 
             const rows = [];
-            for (const row of allRows.slice(1)) {
-                const cells = [...row.querySelectorAll('th, td')];
-                if (cells.length === 0) continue;
+            let lastRecordArk = null;
+            for (let familyNumber = 0; familyNumber < sections.length; familyNumber++) {
+                const {members} = sections[familyNumber];
+                if (members.length === 0) continue;
 
-                const columns = {};
-                for (const col of dataColumns) {
-                    const cell = cells[col.index];
-                    columns[col.header] = cell ? (cell.innerText || '').trim() : '';
-                }
+                // The head/primary is always the household's first-listed member (confirmed
+                // live) - their own Household Details panel is the only reliable source for
+                // every other member's relationship-to-head (see scrapePersonDetail's own
+                // note), so it's read once per household and applied by position below.
+                const headDetail = await scrapePersonDetail(members[0].viewButton, lastRecordArk,
+                    {includeHouseholdRelationships: true});
+                lastRecordArk = headDetail.recordArk;
 
-                // The "Attach to Tree" cell actually holds TWO separate links: a "View record
-                // for <name>" link (always present, an ark:/61903/1:1:XXXX-XXXX pointing at
-                // this specific index entry - NOT a person identifier despite looking like
-                // one) and an "Attach <name> to Family Tree" action. querySelector('a[href]')
-                // used to grab whichever came first (always the view-record link), so the
-                // scraped "fsftid" was actually just that ark regardless of whether the row
-                // was really attached to anything - confirmed live: FamilySearch only shows a
-                // genuine attached Family Tree person via a distinct
-                // /tree/person/details/XXXX-XXXX link (verified on a real attached row, e.g.
-                // "Attached in Tree to Robert Wilson Irwin ... LZG1-MSB" - a completely
-                // different ID from that row's own view-record ark). Person_ark is the
-                // record's own ark (always present, safe for a citation web link); fsftid is
-                // only set when a genuine tree/person/details link is actually present.
-                let personArk = '';
-                let attachedFsftid = '';
-                if (attachColIndex !== -1 && cells[attachColIndex]) {
-                    for (const link of cells[attachColIndex].querySelectorAll('a[href]')) {
-                        const href = link.getAttribute('href') || '';
-                        if (!personArk) {
-                            const arkMatch = href.match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
-                            if (arkMatch) personArk = arkMatch[1];
-                        }
-                        if (!attachedFsftid) {
-                            const treeMatch = href.match(/tree\/person\/details\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
-                            if (treeMatch) attachedFsftid = treeMatch[1];
-                        }
+                // Confirmed live: a household where FamilySearch never indexed real
+                // relationships (every Names-list role reads bare "Primary") reports every
+                // member as "No Relation" rather than leaving the field blank - fabricating
+                // that as real data would be worse than omitting the column entirely, so the
+                // column is only populated when at least one member has an actual
+                // Spouse/Child/Father/Mother relationship recorded.
+                const rawRelationships = headDetail.householdRelationships;
+                const hasRealRelationshipData = rawRelationships.some(r => r !== 'Head' && r !== 'No Relation');
+                const relationships = hasRealRelationshipData ? rawRelationships : [];
+
+                // FamilySearch's own index can surface the same person twice within one
+                // household (confirmed live: "Josette Cardinal" and "J Baptiste Cardinal" both
+                // appeared twice under "J Baptiste Cardinal Household") - build_census_json()
+                // has no row-level dedup of its own, so a duplicate scraped here is a duplicate
+                // person in the final GEDCOM. Skip a repeat of the same name+role within the
+                // same household rather than scraping it a second time - relationship lookup
+                // still uses `idx`, the member's ORIGINAL position, since that's what stays
+                // aligned with `relationships`.
+                const seen = new Set();
+                for (let idx = 0; idx < members.length; idx++) {
+                    const member = members[idx];
+                    const key = `${member.name}|${member.roleHint}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+
+                    const detail = idx === 0 ? headDetail
+                        : await scrapePersonDetail(member.viewButton, lastRecordArk);
+                    lastRecordArk = detail.recordArk;
+
+                    const columns = {
+                        'Given Name': detail.given || member.name.split(' ').slice(0, -1).join(' '),
+                        'Surname': detail.surname || member.name.split(' ').slice(-1).join(' '),
+                        'Gender': detail.gender,
+                        'Age': detail.age,
+                        'Family Number': String(familyNumber + 1),
+                    };
+                    if (relationships[idx]) {
+                        columns['Relationship to Head'] = relationships[idx];
                     }
+
+                    rows.push({columns, person_ark: detail.recordArk, attached_fsftid: detail.personArk});
                 }
-
-                rows.push({columns, person_ark: personArk, attached_fsftid: attachedFsftid});
             }
-
             return rows;
         }
 
@@ -1576,7 +1550,7 @@
             const itemId = getItemId();
             if (!itemId || seenItemIds.has(itemId)) return;
 
-            const rows = await scrapeIndexRows();
+            const rows = await scrapeNamesPanel();
             const {citationText, catalogItems} = await scrapeCitationAndCatalog();
             // Awaited before moving on to the next image, same convention as Ancestry's
             // own per-page image download.
@@ -1614,7 +1588,7 @@
                     const prevUrl = window.location.href;
                     nextBtn.click();
                     // No post-nav settle delay needed - scrapeCurrentImage's own downstream
-                    // waits (scrapeIndexRows/scrapeCitationAndCatalog) already handle "has the
+                    // waits (scrapeNamesPanel/scrapeCitationAndCatalog) already handle "has the
                     // new page's content rendered yet" on their own terms.
                     const navWait = await waitForCondition(() => window.location.href !== prevUrl,
                         {timeoutMs: 10000});
