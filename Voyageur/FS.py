@@ -720,6 +720,15 @@ def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[st
     return None
 
 
+def normalize_familysearch_census_gather(raw_census: dict, collection_title: str) -> dict:
+    """Translates a raw FamilySearch census gather (already grouped into Voyageur's own
+    {census_year, pages: [...]} shape by build_census_json) into the shared record schema -
+    the exact translation main() applies at gather time, pulled out here so it's testable
+    without a browser session."""
+    return census_schema.normalize_and_validate_census(
+        raw_census, "familysearch_census", collection_title, f"Census_{raw_census.get('census_year', '')}")
+
+
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
@@ -766,15 +775,7 @@ def main() -> None:
     if record_family == "census":
         print("\n[System] Converting raw scrape into census Gather JSON...")
         raw_census = build_census_json(raw_data, items_raw, catalog_items)
-        # Normalize at gather time: translate FamilySearch's own raw column header text
-        # into the shared record schema's field names via the declarative field map, the
-        # same as A.py does for Ancestry - so Archivist reads one shape regardless of
-        # source, and never has to guess among several possible header spellings.
-        collection_title = raw_data.get("collection_title", "")
-        final_data = census_schema.normalize_census_pages(
-            raw_census, "familysearch_census", collection_title,
-            f"Census_{raw_census.get('census_year', '')}")
-        census_schema.validate_against_commissioner(final_data, collection_title)
+        final_data = normalize_familysearch_census_gather(raw_census, raw_data.get("collection_title", ""))
         clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
     else:
         print("\n[System] Converting raw scrape into the universal Gather JSON...")

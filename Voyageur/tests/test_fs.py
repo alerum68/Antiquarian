@@ -53,3 +53,25 @@ def test_validate_against_commissioner_warns_and_does_not_raise_on_bad_shape(cap
     captured = capsys.readouterr()
     assert "[WARN]" in captured.out
     assert "Bad Collection" in captured.out
+
+
+def test_normalize_familysearch_census_gather_derives_record_type():
+    raw_census = {
+        "census_year": "1900",
+        "pages": [{
+            "page_number": 3, "state": "Ohio", "county": "Lucas", "city": "", "country": "USA",
+            "repository": "FamilySearch",
+            "people": [
+                {"columns": {"Given Name": "Marie", "Surname": "Boucher", "Gender": "F",
+                            "Age": "35", "Relationship to Head": "Head", "Family Number": "2"},
+                 "pid": "p2"},
+            ],
+        }],
+    }
+
+    normalized = FS.normalize_familysearch_census_gather(raw_census, "1900 US Census - Ohio")
+
+    assert normalized["record_type_name"] == "Census_1900"
+    assert normalized["collection_title"] == "1900 US Census - Ohio"
+    assert len(normalized["sheets"]) == 1
+

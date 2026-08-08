@@ -1,0 +1,55 @@
+sections:
+  Gather Settings:
+    VOYAGEUR_SOURCE:
+      default: ""
+      tooltip: "Which repository to gather from. Adding a new one is a new Voyageur sub-script, nothing else changes here."
+  Ancestry:
+    A_URL:
+      default: ""
+      tooltip: "The web address (URL) of the specific Ancestry.com census page you want to gather."
+  FamilySearch:
+    FS_URL:
+      default: ""
+      tooltip: "The web address (URL) of the specific FamilySearch record page you want to gather."
+  LAC:
+    LAC_URL:
+      default: ""
+      tooltip: "Paste the complete Heritage Canadiana link (e.g., https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/)."
+    LAC_IMAGE_DIR:
+      default: "LAC"
+      tooltip: "The subfolder name (e.g., 'LAC') inside your Base Media Directory. A subfolder per roll number is created automatically inside it. Can also be an absolute path."
+      picker:
+        kind: directory
+        base_dir_key: "MEDIA_DIR"
+    LAC_HARVEST_VOLUME:
+      default: ""
+      tooltip: "Volume number at Library and Archives Canada to harvest (e.g. '1320' or '1325-1330')."
+    LAC_ARCHIVAL_NUMBER:
+      default: "RG15"
+      tooltip: "Archival series prefix used when harvesting an LAC volume (default 'RG15')."
+    LAC_COOKIE_FILE:
+      default: "Working/LAC/lac_cookies.txt"
+      tooltip: "Fallback text file for LAC search session cookies."
+    LAC_CHECKPOINT_DIR:
+      default: "Working/LAC"
+      tooltip: "Folder where LAC harvest progress checkpoints are saved, so an interrupted harvest can resume without re-downloading."
+    LAC_CDP_PORT:
+      default: "9222"
+      tooltip: "Chrome DevTools Protocol port LAC connects to when loading browser session cookies (default 9222)."
+    LAC_MAX_WORKERS:
+      default: "1"
+      tooltip: "Number of concurrent download workers used when harvesting an LAC volume (default 1)."
+    LAC_RECORD_TYPE:
+      default: ""
+      tooltip: "Record type identifier for LAC volume harvesting (e.g. 'Scrip')."
+    LAC_VOLUME:
+      default: ""
+      tooltip: "Volume number alias for LAC harvesting."
+    VOLUME_TITLE:
+      default: ""
+      tooltip: "Title description of the volume being harvested."
+label_overrides:
+  VOYAGEUR_SOURCE: "Gather From"
+  A_URL: "Ancestry Census URL"
+  LAC_URL: "Heritage Canadiana URL"
+  FS_URL: "FamilySearch Record URL"

@@ -312,3 +312,14 @@ def validate_against_commissioner(normalized: dict, collection_title: str) -> No
         validate_soft(normalized, "Census", collection_title)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+
+
+def normalize_and_validate_census(raw: dict, field_map_name: str, collection_title: str,
+                                  record_type_name: str) -> dict:
+    """Normalizes then validates in one call - the exact pair both A.py and FS.py apply at
+    census gather time. Pulled out as its own function so each call site is one line and
+    testable without duplicating the normalize+validate pairing."""
+    normalized = normalize_census_pages(raw, field_map_name, collection_title, record_type_name)
+    validate_against_commissioner(normalized, collection_title)
+    return normalized
+

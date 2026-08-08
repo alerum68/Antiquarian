@@ -7,9 +7,15 @@ get_census_era, etc.) are deliberately NOT changed by this rework - only what fe
 changed - so these tests confirm the adapter's column-naming/grouping produces input
 those functions still handle correctly, not that the functions themselves changed.
 """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 import pandas as pd
 
-import Archivist as arc
+import Census as arc
+import Utils
 
 
 def _unified_doc(record_type_name, sheets):
@@ -180,7 +186,7 @@ def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extensio
 
     monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
     monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
-    monkeypatch.setattr(arc, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
     monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
 
     arc.build_gedcom_from_census(df, "RM")
@@ -203,7 +209,7 @@ def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extensio
     # The shared "1 SOUR @S1@" researcher reference on each individual needs BOTH "2 NAME"
     # and "2 _TITL" - confirmed live by the user - to merge across every person's citation
     # of it in RootsMagic's own UI.
-    root_sour_idxs = [i for i, ln in enumerate(lines) if ln == f"1 SOUR {arc.ROOT_SOURCE_ID}"]
+    root_sour_idxs = [i for i, ln in enumerate(lines) if ln == f"1 SOUR {Utils.ROOT_SOURCE_ID}"]
     assert root_sour_idxs
     for i in root_sour_idxs:
         assert lines[i + 1].startswith("2 NAME Researcher:")

@@ -192,3 +192,19 @@ def test_familysearch_census_field_map_loads_and_normalizes():
     participant = doc["sheets"][0]["records"][0]["participants"][0]
     assert participant["std_given"] == "Jean"
     assert participant["type_specific_fields"]["fsftid"] == "ABCD-123"
+
+
+def test_normalize_and_validate_census_returns_normalized_doc():
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Relationship to Head": "Head", "Family Number": "5"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_and_validate_census(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    assert doc["record_type_name"] == "Census_1900"
+    assert doc["collection_title"] == "1900 US Census"
+    assert len(doc["sheets"]) == 1
+

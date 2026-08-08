@@ -8,14 +8,22 @@ participant, the same way for any record type.
 
 import pandas as pd
 
-import Archivist as arc
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import Census
+import General
+import ScripProfile
+import Utils
 
 
 def test_generate_uid_same_person_same_page_matches():
     """Baseline: identical record_id/role/page must always collide onto one UID."""
     rec = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [{"role_number": "1"}]}
     part = rec["participants"][0]
-    assert arc.generate_uid(rec, part, "1") == arc.generate_uid(dict(rec), part, "1")
+    assert General.generate_uid(rec, part, "1") == General.generate_uid(dict(rec), part, "1")
 
 
 def test_generate_uid_same_record_id_different_page_still_matches():
@@ -27,7 +35,7 @@ def test_generate_uid_same_record_id_different_page_still_matches():
     rec_page_1 = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [part]}
     rec_page_2 = {"page": "page_002", "record_id": "SCRIP-5473", "participants": [part]}
 
-    assert arc.generate_uid(rec_page_1, part, "1") == arc.generate_uid(rec_page_2, part, "1")
+    assert General.generate_uid(rec_page_1, part, "1") == General.generate_uid(rec_page_2, part, "1")
 
 
 def test_generate_uid_prefers_lac_pid_over_record_id():
@@ -38,43 +46,37 @@ def test_generate_uid_prefers_lac_pid_over_record_id():
     rec_a = {"page": "page_001", "record_id": "SCRIP-5473", "lac_pid": "1502188", "participants": [part]}
     rec_b = {"page": "page_002", "record_id": "SCRIP-9999", "lac_pid": "1502188", "participants": [part]}
 
-    assert arc.generate_uid(rec_a, part, "1") == arc.generate_uid(rec_b, part, "1")
+    assert General.generate_uid(rec_a, part, "1") == General.generate_uid(rec_b, part, "1")
 
 
 def test_get_dynamic_source_id_omits_prefix_for_scrip():
-    """Per the user: LAC volume numbers are already globally unique on their own, unlike
-    Parish which needs register_source_id to disambiguate two parishes sharing a volume
-    number - "with Scrip it shouldn't have the @S1 just @S"."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    import ScripProfile
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
-        assert arc.get_dynamic_source_id("1324") == "@S1324@"
+        assert General.get_dynamic_source_id("3") == "@S003@"
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_get_dynamic_source_id_keeps_prefix_by_default_for_parish():
-    """Unchanged existing behavior for every record type other than Scrip - the flag
-    defaults to falsy/unset, so Parish's own register_source_id-based disambiguation
-    keeps working exactly as before."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(General.GeneralProfile())
+    orig = General.GENERAL_CONFIG.get('register_source_id')
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = False
-        assert arc.get_dynamic_source_id("1324") == "@S11324@"
+        General.GENERAL_CONFIG['register_source_id'] = '1042'
+        assert General.get_dynamic_source_id("3") == "@S1042003@"
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        if orig is not None:
+            General.GENERAL_CONFIG['register_source_id'] = orig
+        else:
+            General.GENERAL_CONFIG.pop('register_source_id', None)
 
 
-def test_run_general_flavor_sets_omit_prefix_flag_from_record_type(monkeypatch, tmp_path):
-    """run_general_flavor is the one place that decides the flag, from record_type_name -
-    confirms it actually gets set (True for Scrip, False otherwise) before any GEDCOM is
-    built, without needing to exercise the full file-writing path."""
-    monkeypatch.setattr(arc, "resolve_gedcom_output_targets", lambda: [])
-    arc.run_general_flavor({"record_type_name": "Scrip", "sheets": []})
-    assert arc.GENERAL_CONFIG['omit_source_id_prefix'] is True
-
-    arc.run_general_flavor({"record_type_name": "Parish", "sheets": []})
-    assert arc.GENERAL_CONFIG['omit_source_id_prefix'] is False
+def test_run_general_flavor_sets_profile_from_record_type():
+    import Archivist
+    profile = Archivist.resolve_profile("Scrip")
+    assert isinstance(profile, ScripProfile.ScripProfile)
+    profile = Archivist.resolve_profile("Parish")
+    assert isinstance(profile, General.GeneralProfile)
 
 
 def test_generate_uid_different_record_id_still_differs_without_lac_pid():
@@ -84,13 +86,13 @@ def test_generate_uid_different_record_id_still_differs_without_lac_pid():
     rec_a = {"page": "page_001", "record_id": "SCRIP-5473", "participants": [part]}
     rec_b = {"page": "page_001", "record_id": "SCRIP-9999", "participants": [part]}
 
-    assert arc.generate_uid(rec_a, part, "1") != arc.generate_uid(rec_b, part, "1")
+    assert General.generate_uid(rec_a, part, "1") != General.generate_uid(rec_b, part, "1")
 
 
 def test_generate_media_uid_for_path_deterministic_and_path_keyed():
-    a = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
-    b = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
-    c = arc.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355549.pdf")
+    a = General.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
+    b = General.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355548.pdf")
+    c = General.generate_media_uid_for_path("C:/Media/Commissioner/1502188/e011355549.pdf")
     assert a == b
     assert a != c
     assert a.startswith("M")
@@ -104,7 +106,7 @@ def test_build_general_citation_page_line_uses_claim_affdt_when_present():
            "type_specific_fields": {"claim_number": "1964", "affidavit_number": "850"},
            "citation_text": "text", "citation_details": "text"}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
     assert "3 PAGE Claim 1964; Affdt 850, Page 3" in blocks[0]
     assert "Record EVEN-1964" not in blocks[0]
 
@@ -113,7 +115,7 @@ def test_build_general_citation_page_line_falls_back_without_claim_affdt():
     rec = {"page": "3", "record_id": "B-1", "year": "1876",
            "citation_text": "text", "citation_details": "text"}
     part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
     assert "3 PAGE Page 3, Record B-1" in blocks[0]
 
 
@@ -124,7 +126,7 @@ def test_build_general_citation_single_block_without_source_documents():
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
            "citation_text": "orig text", "citation_details": "eng text"}
     part = {"std_given": "Jean", "std_surname": "Gagnon", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "BIRT", "1", "M0000000001")
     assert isinstance(blocks, list)
     assert len(blocks) == 1
     assert "orig text" in blocks[0]
@@ -140,7 +142,7 @@ def test_build_general_citation_collapses_identical_original_and_translation():
            "citation_text": "I, Roger Letendre, do solemnly swear...",
            "citation_details": "I, Roger Letendre, do solemnly swear..."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
     assert blocks[0].count("I, Roger Letendre, do solemnly swear") == 1
@@ -157,7 +159,7 @@ def test_build_general_citation_normalization_is_whitespace_only_not_fuzzy():
            "citation_text": "1964\nForm A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.",
            "citation_details": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. 1964"}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
     assert "Citation Details:" in blocks[0]
@@ -171,7 +173,7 @@ def test_build_general_citation_collapses_whitespace_only_reflow():
            "citation_text": "Form A. (2).\nNORTH-WEST HALFBREED CLAIMS COMMISSION.\nBefore me.",
            "citation_details": "Form A. (2). NORTH-WEST HALFBREED CLAIMS COMMISSION. Before me."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
     assert "Citation Details:" not in blocks[0]
@@ -183,7 +185,7 @@ def test_build_general_citation_collapses_when_only_one_side_populated():
     rec = {"page": "1", "record_id": "B-1", "year": "1876",
            "citation_text": "", "citation_details": "Only a translation exists here."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
     assert "Only a translation exists here." in blocks[0]
@@ -198,7 +200,7 @@ def test_build_general_citation_keeps_both_blocks_for_a_genuine_translation():
            "citation_text": "Je soussigné jure solennellement...",
            "citation_details": "I, the undersigned, do solemnly swear..."}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 1
     assert "Citation Details:" in blocks[0]
@@ -216,7 +218,7 @@ def test_build_general_citation_one_block_per_source_document():
          "citation_text": "claimant orig", "citation_details": "claimant eng"},
     ]}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
 
     assert len(blocks) == 2
     assert "-- Witness Affidavit" in blocks[0]
@@ -243,9 +245,9 @@ def test_build_general_citation_media_only_entry_uses_its_own_path_derived_uid()
         {"document_type": "Scrip Certificate", "media_path": media_path},
     ]}
     part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
 
-    expected_uid = arc.generate_media_uid_for_path(media_path)
+    expected_uid = General.generate_media_uid_for_path(media_path)
     assert f"3 OBJE @{expected_uid}@" in blocks[0]
     assert "M_SHEET_UID" not in blocks[0]
     assert "-- Scrip Certificate" in blocks[0]
@@ -266,9 +268,9 @@ def test_build_gedcom_from_general_creates_separate_objE_for_commissioner_media(
             }],
         }],
     }
-    ged = arc.build_gedcom_from_general(data, "RM")
+    ged = General.build_gedcom_from_general(data, "RM")
 
-    expected_uid = arc.generate_media_uid_for_path(media_path)
+    expected_uid = General.generate_media_uid_for_path(media_path)
     assert f"0 @{expected_uid}@ OBJE" in ged
     assert f"1 FILE {media_path}" in ged
     assert "2 TITL Scrip Certificate" in ged
@@ -281,7 +283,7 @@ def test_generate_media_uid_for_lac_asset_uses_the_e_number_directly():
     unique identifier, so they should be used directly rather than hashed. The leading
     "e" is stripped (not kept) - per the user, FTM import breaks on a non-numeric media
     object ID, so everything after the fixed "M" prefix must stay digits-only."""
-    assert arc.generate_media_uid_for_lac_asset("e011359206") == "M011359206"
+    assert General.generate_media_uid_for_lac_asset("e011359206") == "M011359206"
 
 
 def test_build_general_citation_prefers_lac_asset_id_over_hashed_path():
@@ -292,10 +294,10 @@ def test_build_general_citation_prefers_lac_asset_id_over_hashed_path():
         {"document_type": "Scrip Certificate", "media_path": media_path, "lac_asset_id": "e011359206"},
     ]}
     part = {"std_given": "Margaret", "std_surname": "Sabiston", "role_number": "1"}
-    blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
+    blocks = General.build_general_citation(rec, part, "EVEN", "1", "M_SHEET_UID")
 
     assert "3 OBJE @M011359206@" in blocks[0]
-    hashed_uid = arc.generate_media_uid_for_path(media_path)
+    hashed_uid = General.generate_media_uid_for_path(media_path)
     assert f"@{hashed_uid}@" not in blocks[0]
 
 
@@ -314,7 +316,7 @@ def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
             }],
         }],
     }
-    ged = arc.build_gedcom_from_general(data, "RM")
+    ged = General.build_gedcom_from_general(data, "RM")
 
     assert "0 @M011359206@ OBJE" in ged
     assert f"1 FILE {media_path}" in ged
@@ -322,9 +324,8 @@ def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
 
 
 def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
                "type_specific_fields": {
                    "claim_number": "3126", "affidavit_number": "5473",
@@ -332,31 +333,30 @@ def test_build_individual_scrip_desc_line_groups_claim_affidavit_scrip_together(
                },
                "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
 
         assert "1 EVEN Claim: 3126; Affidavit #: 5473; Scrip #: 12761 ($160); Claim Basis: Half-breed Head" in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_desc_line_without_claim_or_affidavit_still_shows_scrip_number():
     """No claim_number/affidavit_number present (e.g. an older extraction) - the fact's own
     value line still shows whatever Scrip-specific fields it does have."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "12761", "scrip_amount": "$160"},
                "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
 
         assert "1 EVEN Scrip #: 12761 ($160)" in joined
         assert "Claim:" not in joined and "Affidavit #:" not in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
@@ -364,9 +364,8 @@ def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
     whole merged claim - showing it in the fact's own value line was misleading (per the
     user, the note appeared to cite only the witness affidavit). Still available per
     citation via _TITL's own "-- {document_type}" suffix, just not here."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-5473", "event_place": "Winnipeg",
                "type_specific_fields": {
                    "claim_number": "3126", "affidavit_number": "5473",
@@ -374,32 +373,31 @@ def test_build_individual_scrip_desc_line_excludes_document_type_with_claim():
                },
                "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
 
         assert "Document Type" not in joined
         even_line = next(line for line in lines if line.startswith("1 EVEN"))
         assert "Witness Affidavit" not in even_line
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_desc_line_excludes_document_type_without_claim():
     """Same exclusion in the no-claim/affidavit path."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SCRIP-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "12761", "document_type": "Register Entry"},
                "participants": [make_participant("primary", given="Roger", surname="Letendre")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
 
         assert "Document Type" not in joined
         assert "Register Entry" not in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_parse_household_forms_second_family_unit_for_unrelated_boarder_household():
@@ -418,15 +416,15 @@ def test_parse_household_forms_second_family_unit_for_unrelated_boarder_househol
         {"Given Name": "Lucretia", "Surname": "Depar", "Gender": "Female", "Age": "12"},
     ]
     group = pd.DataFrame(rows)
-    units, unrelated, flags = arc.parse_household(group)
+    units, unrelated, flags = Census.parse_household(group)
 
     assert len(unrelated) == 0
     assert len(units) == 2
     depar_unit = next(u for u in units
-                      if (u["husband"] is not None and arc.clean_val(u["husband"].get("Surname")) == "Depar"))
-    assert arc.clean_val(depar_unit["husband"].get("Given Name")) == "James"
-    assert arc.clean_val(depar_unit["wife"].get("Given Name")) == "Vide"
-    assert [arc.clean_val(c.get("Given Name")) for c in depar_unit["children"]] == ["Lucretia"]
+                      if (u["husband"] is not None and Utils.clean_val(u["husband"].get("Surname")) == "Depar"))
+    assert Utils.clean_val(depar_unit["husband"].get("Given Name")) == "James"
+    assert Utils.clean_val(depar_unit["wife"].get("Given Name")) == "Vide"
+    assert [Utils.clean_val(c.get("Given Name")) for c in depar_unit["children"]] == ["Lucretia"]
 
 
 def make_participant(role_semantic=None, role_name="", sex="M", given="Jean", surname="Gagnon",
@@ -438,41 +436,41 @@ def make_participant(role_semantic=None, role_name="", sex="M", given="Jean", su
 
 
 def test_get_event_gedcom_tag_person_and_family_buckets():
-    assert arc.get_event_gedcom_tag("Baptism") == "BAPM"
-    assert arc.get_event_gedcom_tag("Christen") == "CHR"
-    assert arc.get_event_gedcom_tag("Burial") == "BURI"
-    assert arc.get_event_gedcom_tag("Marriage") == "MARR"
+    assert Utils.get_event_gedcom_tag("Baptism") == "BAPM"
+    assert Utils.get_event_gedcom_tag("Christen") == "CHR"
+    assert Utils.get_event_gedcom_tag("Burial") == "BURI"
+    assert Utils.get_event_gedcom_tag("Marriage") == "MARR"
 
 
 def test_get_event_gedcom_tag_unknown_falls_back_to_even():
-    assert arc.get_event_gedcom_tag("Some Future Fact Type") == "EVEN"
+    assert Utils.get_event_gedcom_tag("Some Future Fact Type") == "EVEN"
 
 
 def test_is_family_event_true_only_for_family_bucket():
-    assert arc.is_family_event("Marriage") is True
-    assert arc.is_family_event("Baptism") is False
-    assert arc.is_family_event("Scrip") is False
+    assert Utils.is_family_event("Marriage") is True
+    assert Utils.is_family_event("Baptism") is False
+    assert Utils.is_family_event("Scrip") is False
 
 
 def test_get_by_semantic_and_get_all_by_semantic():
     rec = {"participants": [
         make_participant("primary"), make_participant("father"), make_participant("mother"),
     ]}
-    assert arc.get_by_semantic(rec, "primary") is rec["participants"][0]
-    assert arc.get_by_semantic(rec, "spouse") is None
-    assert arc.get_all_by_semantic(rec, ("father", "mother")) == rec["participants"][1:]
+    assert General.get_by_semantic(rec, "primary") is rec["participants"][0]
+    assert General.get_by_semantic(rec, "spouse") is None
+    assert General.get_all_by_semantic(rec, ("father", "mother")) == rec["participants"][1:]
 
 
 def test_assign_spouses_by_sex():
     a = make_participant(sex="F")
     b = make_participant(sex="M")
-    husb, wife = arc.assign_spouses_by_sex(a, b)
+    husb, wife = General.assign_spouses_by_sex(a, b)
     assert husb is b and wife is a
 
 
 def test_assign_spouses_by_sex_single_parent_defaults_by_own_sex():
     mother = make_participant(sex="F")
-    husb, wife = arc.assign_spouses_by_sex(mother, None)
+    husb, wife = General.assign_spouses_by_sex(mother, None)
     assert husb is None and wife is mother
 
 
@@ -480,14 +478,14 @@ def test_resolve_family_links_baptism_shape_no_spouse_or_children():
     """Primary is purely a child in this record: their parents keep the unsuffixed FAM id,
     exactly as before child/spouse/in-law roles existed."""
     rec = {"participants": [make_participant("primary"), make_participant("father")]}
-    links = arc.resolve_family_links(rec)
+    links = General.resolve_family_links(rec)
     assert links["primary_forms_own_family"] is False
     assert links["primary_parents_suffix"] == ""
 
 
 def test_resolve_family_links_marriage_shape_with_spouse():
     rec = {"participants": [make_participant("primary"), make_participant("spouse")]}
-    links = arc.resolve_family_links(rec)
+    links = General.resolve_family_links(rec)
     assert links["primary_forms_own_family"] is True
     assert links["main_suffix"] == ""
     assert links["primary_parents_suffix"] == "G"
@@ -505,10 +503,10 @@ def test_build_individual_primary_with_no_parents_still_gets_famc():
         make_participant("primary", given="Baptiste", surname="Ledoux"),
     ]}
     primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "1 FAMC @F" in joined
-    fams = arc.build_family(rec, "12", "M0000000001", "RM")
+    fams = General.build_family(rec, "12", "M0000000001", "RM")
     assert len(fams) == 1
     famc_id = joined.split("1 FAMC @F")[1].split("@")[0]
     assert famc_id in fams[0]
@@ -526,13 +524,13 @@ def test_build_individual_fsftid_gets_companion_fs_tree_weblink():
     primary = dict(rec["participants"][0], type_specific_fields={"fsftid": "LZXY-ABC"})
     rec["participants"][0] = primary
 
-    rm_lines, _, _, _ = arc.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
+    rm_lines, _, _, _ = General.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
     joined_rm = "\n".join(rm_lines)
     assert "1 _FSFTID LZXY-ABC" in joined_rm
     assert "1 _WEBTAG" in joined_rm
     assert "2 URL https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_rm
 
-    ftm_lines, _, _, _ = arc.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "FTM")
+    ftm_lines, _, _, _ = General.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "FTM")
     joined_ftm = "\n".join(ftm_lines)
     assert "1 _LINK https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_ftm
 
@@ -543,7 +541,7 @@ def test_build_family_baptism_shape_single_famc_no_suffix():
         make_participant("father", given="Pierre", surname="Ledoux"),
         make_participant("mother", given="Marie", surname="Roy"),
     ]}
-    fams = arc.build_family(rec, "1", "M0000000001", "RM")
+    fams = General.build_family(rec, "1", "M0000000001", "RM")
     assert len(fams) == 1
     assert "1 HUSB" in fams[0] and "1 WIFE" in fams[0] and "1 CHIL" in fams[0]
     assert "@F" in fams[0].splitlines()[0] and not fams[0].splitlines()[0].split("@")[1].endswith(("G", "B"))
@@ -559,7 +557,7 @@ def test_build_family_marriage_shape_three_families_with_suffixes():
               make_participant("father_in_law", given="Louis", surname="Boucher"),
               make_participant("mother_in_law", given="Rose", surname="Dubois", sex="F"),
            ]}
-    fams = arc.build_family(rec, "5", "M0000000001", "RM")
+    fams = General.build_family(rec, "5", "M0000000001", "RM")
     assert len(fams) == 3
     main, g_fam, b_fam = fams
     assert "1 MARR" in main
@@ -576,7 +574,7 @@ def test_build_family_burial_with_surviving_spouse_forms_fams_without_marr_event
         make_participant("primary", given="Baptiste", surname="Ledoux"),
         make_participant("spouse", given="Marie", surname="Roy", sex="F"),
     ]}
-    fams = arc.build_family(rec, "9", "M0000000001", "RM")
+    fams = General.build_family(rec, "9", "M0000000001", "RM")
     assert len(fams) == 1
     assert "1 HUSB" in fams[0] and "1 WIFE" in fams[0]
     assert "MARR" not in fams[0]
@@ -589,7 +587,7 @@ def test_build_family_scrip_shape_claimant_spouse_and_children_share_one_family(
         make_participant("child", given="Louis", surname="Ledoux"),
         make_participant("child", given="Rose", surname="Ledoux", sex="F"),
     ]}
-    fams = arc.build_family(rec, "2", "M0000000001", "RM")
+    fams = General.build_family(rec, "2", "M0000000001", "RM")
     assert len(fams) == 1
     assert fams[0].count("1 CHIL") == 2
 
@@ -602,7 +600,7 @@ def test_build_individual_famc_and_fams_tags_use_semantic_not_digits():
               make_participant("father", given="Pierre", surname="Gagnon"),
            ]}
     primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "5", "M0000000001", "26 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "5", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "1 FAMS @F" in joined
     assert "1 FAMC @F" in joined and joined.count("@F") >= 2
@@ -611,7 +609,7 @@ def test_build_individual_famc_and_fams_tags_use_semantic_not_digits():
 def test_build_custom_fact_lines_renders_even_type_and_citation():
     rec = {"page": "1", "record_id": "B-1"}
     part = make_participant("primary")
-    lines = arc.build_custom_fact_lines("Race", "Metis", rec, part, "1", "M0000000001", "RM")
+    lines = General.build_custom_fact_lines("Race", "Metis", rec, part, "1", "M0000000001", "RM")
     assert lines[0] == "1 EVEN Metis"
     assert lines[1] == "2 TYPE Race"
     assert "2 SOUR" in "\n".join(lines)
@@ -620,7 +618,7 @@ def test_build_custom_fact_lines_renders_even_type_and_citation():
 def test_build_custom_fact_lines_empty_value_returns_nothing():
     rec = {"page": "1", "record_id": "B-1"}
     part = make_participant("primary")
-    assert arc.build_custom_fact_lines("Race", "", rec, part, "1", "M0000000001", "RM") == []
+    assert General.build_custom_fact_lines("Race", "", rec, part, "1", "M0000000001", "RM") == []
 
 
 def test_build_individual_race_uses_generic_custom_fact_not_bare_race_tag():
@@ -629,7 +627,7 @@ def test_build_individual_race_uses_generic_custom_fact_not_bare_race_tag():
     ]}
     primary = rec["participants"][0]
     primary["race"] = "Metis"
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "_RACE" not in joined
     assert "1 EVEN Metis" in joined and "2 TYPE Race" in joined
@@ -639,54 +637,51 @@ def test_build_individual_scrip_event_gets_type_line_and_value_from_extra_fields
     """Scrip's own event_type resolves to gedcom_tag 'EVEN' - it's built as a dedicated
     "Scrip" custom fact (FactTypes.json code 10004), needing a '2 TYPE Scrip' line for
     RootsMagic to recognize it, with its own Date/Place/Desc all filled in."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "event_place": "Winnipeg",
                "type_specific_fields": {"scrip_number": "1234", "scrip_amount": "$160"},
                "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
         assert "2 TYPE Scrip" in joined
         assert "1 EVEN Scrip #: 1234 ($160)" in joined
         assert "2 PLAC Winnipeg" in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_fact_gets_document_year_as_date_and_media_attached():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
                "type_specific_fields": {"scrip_number": "1234"},
                "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
         assert "2 DATE 1901" in joined
         assert "3 OBJE @M0000000001@" in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_race_fact_gets_no_document_year_date():
     """Per the user: everything but Race should carry the document year as its DATE -
     Race describes an ongoing characteristic, not something dated to one document."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
                "type_specific_fields": {}, "participants": [make_participant("primary")]}
         primary = rec["participants"][0]
         primary["race"] = "Metis"
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
         race_block = joined.split("2 TYPE Race")[1].split("2 SOUR")[0]
         assert "2 DATE" not in race_block
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
@@ -695,9 +690,8 @@ def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
     old filter (just excluding 'primary') used to sweep them in too. Uses FTM output,
     where witnesses render as plain names in a NOTE line - RM's own _SHAR form only ever
     carries a UID + role text, not a name, so it can't distinguish this directly."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1",
                "type_specific_fields": {"scrip_number": "1"},
                "participants": [
@@ -707,14 +701,14 @@ def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
                    make_participant(None, role_name="Witness", given="Louis", surname="Riel"),
                ]}
         primary = rec["participants"][0]
-        lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "FTM")
+        lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "FTM")
         joined = "\n".join(lines)
         witness_note = next(line for line in lines if line.startswith("2 NOTE Witnesses:"))
         assert "Louis" in witness_note and "Riel" in witness_note
         assert "Marie" not in witness_note
         assert "Jean" not in witness_note
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_gedcom_from_general_excludes_commissioner_from_indis():
@@ -735,7 +729,7 @@ def test_build_gedcom_from_general_excludes_commissioner_from_indis():
             }],
         }],
     }
-    ged = arc.build_gedcom_from_general(data, "RM")
+    ged = General.build_gedcom_from_general(data, "RM")
     # Pierre Falcon (claimant) and Louis Riel (witness) get INDIs; Roger Goulet (commissioner) must NOT
     assert "1 NAME Pierre /Falcon/" in ged
     assert "1 NAME Louis /Riel/" in ged
@@ -750,7 +744,7 @@ def test_build_individual_baptism_event_gets_no_type_line():
         make_participant("primary", given="Baptiste", surname="Ledoux"),
     ]}
     primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "1 BAPM" in joined
     assert "2 TYPE Baptism" not in joined
@@ -766,7 +760,7 @@ def test_build_individual_alternate_name_renders_as_proposed_name_fact_with_even
     ]}
     primary = rec["participants"][0]
     primary["alternate_names"] = [{"value": "Baptiste Ladoux"}]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "1 NAME Baptiste /Ladoux/" in joined
     assert "2 _PROOF proposed" in joined
@@ -777,59 +771,59 @@ def test_build_individual_alternate_name_renders_as_proposed_name_fact_with_even
 # Scrip custom RootsMagic source templates (Metis Scrip.rmst, Ids 20001-20005)
 # ==========================================
 def test_select_scrip_template_id_manitoba_from_commission_reference():
-    assert arc.select_scrip_template_id("Affidavit under Manitoba Act, 33 Vic. Cap 3", "Witness Affidavit") == 20001
+    assert ScripProfile.select_scrip_template_id("Affidavit under Manitoba Act, 33 Vic. Cap 3", "Witness Affidavit") == 20001
 
 
 def test_select_scrip_template_id_north_west_from_commission_reference():
     ref = "Form A - North-West Half-Breed Claims Commission under Order in Council of 30th March, 1885"
-    assert arc.select_scrip_template_id(ref, "Claimant's Own Affidavit") == 20002
+    assert ScripProfile.select_scrip_template_id(ref, "Claimant's Own Affidavit") == 20002
 
 
 def test_select_scrip_template_id_treaty_8_from_commission_reference():
-    assert arc.select_scrip_template_id("Form C - Treaty No. 8", "Witness Affidavit") == 20003
+    assert ScripProfile.select_scrip_template_id("Form C - Treaty No. 8", "Witness Affidavit") == 20003
 
 
 def test_select_scrip_template_id_certificate_from_document_type_regardless_of_commission():
     """document_type wins over commission_reference - a Certificate is a structurally
     different document from an affidavit no matter which commission issued it."""
-    assert arc.select_scrip_template_id("Manitoba Act, 33 Vic. Cap 3", "Scrip Certificate") == 20004
+    assert ScripProfile.select_scrip_template_id("Manitoba Act, 33 Vic. Cap 3", "Scrip Certificate") == 20004
 
 
 def test_select_scrip_template_id_prefers_series_code_over_commission_reference_text():
     """series_code is LAC's own catalog classification (Commissioner-fetched) - more
     authoritative than the printed commission_reference text, so it wins when present,
     even when commission_reference text alone would have matched a different template."""
-    assert arc.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
+    assert ScripProfile.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
                                         series_code="RG15-D-II-8-c") == 20002
 
 
 def test_select_scrip_template_id_returns_none_when_unrecognized():
     """No guessing - an unresolved record must fall back to the plain freeform source,
     not get mis-templated."""
-    assert arc.select_scrip_template_id("", "") is None
-    assert arc.select_scrip_template_id("some unrelated header text", "Register Entry") is None
+    assert ScripProfile.select_scrip_template_id("", "") is None
+    assert ScripProfile.select_scrip_template_id("some unrelated header text", "Register Entry") is None
 
 
 def test_scrip_template_field_value_microfilm_from_commissioner_reel_numbers():
     rec = {"type_specific_fields": {"reel_numbers": "C-14929, C-14930"}}
     part = {}
-    assert arc._scrip_template_field_value("Microfilm", rec, part, "1320") == "C-14929, C-14930"
+    assert ScripProfile._scrip_template_field_value("Microfilm", rec, part, "1320") == "C-14929, C-14930"
 
 
 def test_scrip_template_field_value_issue_date_prefers_dedicated_field_over_application_date():
     rec = {"type_specific_fields": {"issue_date": "5 May 1886", "application_date": "1 Jan 1886"}}
-    assert arc._scrip_template_field_value("IssueDate", rec, {}, "1320") == "5 May 1886"
+    assert ScripProfile._scrip_template_field_value("IssueDate", rec, {}, "1320") == "5 May 1886"
 
 
 def test_scrip_template_field_value_issue_date_falls_back_to_application_date():
     rec = {"type_specific_fields": {"application_date": "1 Jan 1886"}}
-    assert arc._scrip_template_field_value("IssueDate", rec, {}, "1320") == "1 Jan 1886"
+    assert ScripProfile._scrip_template_field_value("IssueDate", rec, {}, "1320") == "1 Jan 1886"
 
 
 def test_scrip_template_field_value_treaty_8_delivery_fields():
     rec = {"type_specific_fields": {"delivery_date": "3 Aug 1900", "delivery_place": "Fort Vermilion"}}
-    assert arc._scrip_template_field_value("DeliveryDate", rec, {}, "1") == "3 Aug 1900"
-    assert arc._scrip_template_field_value("DeliveryPlace", rec, {}, "1") == "Fort Vermilion"
+    assert ScripProfile._scrip_template_field_value("DeliveryDate", rec, {}, "1") == "3 Aug 1900"
+    assert ScripProfile._scrip_template_field_value("DeliveryPlace", rec, {}, "1") == "Fort Vermilion"
 
 
 def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
@@ -837,13 +831,13 @@ def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
     Dominion Lands Office patent record Commissioner doesn't fetch yet."""
     rec = {"type_specific_fields": {}}
     for field in ("OriginalClaimant", "LandDescription", "Liber", "Folio"):
-        assert arc._scrip_template_field_value(field, rec, {}, "1") == ""
+        assert ScripProfile._scrip_template_field_value(field, rec, {}, "1") == ""
 
 
 def test_get_scrip_citation_fields_skips_empty_values():
     rec = {"type_specific_fields": {"affidavit_number": "5473"}, "lac_pid": ""}
     part = make_participant("primary", given="Roger", surname="Letendre")
-    lines = arc.get_scrip_citation_fields(20001, rec, part, "1320")
+    lines = ScripProfile.get_scrip_citation_fields(20001, rec, part, "1320")
     joined = "\n".join(lines)
     assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
     assert "4 NAME ClaimantName" in joined and "4 VALUE Roger Letendre" in joined
@@ -853,14 +847,13 @@ def test_get_scrip_citation_fields_skips_empty_values():
 
 
 def test_build_general_citation_scrip_cites_the_matching_template_source_with_field_block():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"page": "1", "record_id": "SC-1", "record_number": "5473", "lac_pid": "1506170",
                "type_specific_fields": {"commission_reference": "Affidavit under Manitoba Act, 33 Vic. Cap 3",
                                         "affidavit_number": "5473"}}
         part = make_participant("primary", given="William", surname="Anderson")
-        blocks = arc.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
+        blocks = General.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
         joined = blocks[0]
         assert "2 SOUR @S20001@" in joined
         assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
@@ -870,67 +863,69 @@ def test_build_general_citation_scrip_cites_the_matching_template_source_with_fi
             in joined
         )
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_general_citation_scrip_forces_proven_even_when_date_is_estimated():
     """Every Scrip fact is read straight off a sworn primary source - get_proof_status'
     generic BEF/ABT/EST downgrade (still correct for Parish/Census) must not apply here."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
         part = make_participant("primary")
-        blocks = arc.build_general_citation(rec, part, "BIRT", "1324", "M0000000001",
+        blocks = General.build_general_citation(rec, part, "BIRT", "1324", "M0000000001",
                                             proof_status="proposed", target_software="RM")
         assert "2 _PROOF proven" in blocks[0]
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_general_citation_scrip_falls_back_to_freeform_when_template_unresolved():
     """An unrecognized commission_reference must not get mis-templated - it cites the
     existing per-volume freeform source instead, same @S{vol}@ id as before this change."""
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
         rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
         part = make_participant("primary")
-        blocks = arc.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
+        blocks = General.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
         assert "2 SOUR @S1324@" in blocks[0]
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_get_volume_sources_omits_church_template_for_scrip():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(ScripProfile.ScripProfile())
+    orig_config = dict(General.GENERAL_CONFIG)
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
-        arc.GENERAL_CONFIG['parish_name'] = "Library and Archives Canada"
-        arc.GENERAL_CONFIG['register_name'] = "Scrip Records"
-        arc.GENERAL_CONFIG['volume_title'] = "Scrip Records"
-        arc.GENERAL_CONFIG['parish_location'] = "Ottawa, ON"
-        lines = arc.get_volume_sources({"1324"}, "RM")
+        General.GENERAL_CONFIG['parish_name'] = "Library and Archives Canada"
+        General.GENERAL_CONFIG['register_name'] = "Scrip Records"
+        General.GENERAL_CONFIG['volume_title'] = "Scrip Records"
+        General.GENERAL_CONFIG['parish_location'] = "Ottawa, ON"
+        lines = General.get_volume_sources({"1324"}, "RM")
         joined = "\n".join(lines)
         assert "TID 355" not in joined
         assert "Church_Author" not in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.GENERAL_CONFIG.clear()
+        General.GENERAL_CONFIG.update(orig_config)
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_get_volume_sources_keeps_church_template_for_parish():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
+    General.set_active_profile(General.GeneralProfile())
+    orig_config = dict(General.GENERAL_CONFIG)
     try:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = False
-        arc.GENERAL_CONFIG['parish_name'] = "St. Boniface"
-        arc.GENERAL_CONFIG['register_name'] = "Baptisms"
-        arc.GENERAL_CONFIG['volume_title'] = "Baptisms"
-        arc.GENERAL_CONFIG['parish_location'] = "Manitoba"
-        lines = arc.get_volume_sources({"1"}, "RM")
+        General.GENERAL_CONFIG['parish_name'] = "St. Boniface"
+        General.GENERAL_CONFIG['register_name'] = "Baptisms"
+        General.GENERAL_CONFIG['volume_title'] = "Baptisms"
+        General.GENERAL_CONFIG['parish_location'] = "Manitoba"
+        lines = General.get_volume_sources({"1"}, "RM")
         joined = "\n".join(lines)
         assert "TID 10009" in joined
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.GENERAL_CONFIG.clear()
+        General.GENERAL_CONFIG.update(orig_config)
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_individual_researcher_citation_has_both_name_and_titl():
@@ -940,29 +935,28 @@ def test_build_individual_researcher_citation_has_both_name_and_titl():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1",
            "participants": [make_participant("primary", given="Baptiste", surname="Ledoux")]}
     primary = rec["participants"][0]
-    lines, _, _, _ = arc.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "2 NAME Researcher:" in joined
     assert "2 _TITL Researcher:" in joined
 
 
 def test_format_gedcom_date_handles_iso_and_natural_text():
-    assert arc.format_gedcom_date("1850-12-12") == "12 DEC 1850"
-    assert arc.format_gedcom_date("1850-06") == "JUN 1850"
-    assert arc.format_gedcom_date("1850") == "1850"
-    assert arc.format_gedcom_date("December 12, 1850") == "12 DEC 1850"
-    assert arc.format_gedcom_date("12 December 1850") == "12 DEC 1850"
-    assert arc.format_gedcom_date("15 Jun 1875") == "15 JUN 1875"
-    assert arc.format_gedcom_date("June 1875") == "JUN 1875"
-    assert arc.format_gedcom_date("ABT 1850-12-12") == "ABT 12 DEC 1850"
-    assert arc.format_gedcom_date("BEF December 12, 1850") == "BEF 12 DEC 1850"
-    assert arc.format_gedcom_date("BET 1850 AND 1855") == "BET 1850 AND 1855"
-    assert arc.format_gedcom_date("") == ""
+    assert Utils.format_gedcom_date("1850-12-12") == "12 DEC 1850"
+    assert Utils.format_gedcom_date("1850-06") == "JUN 1850"
+    assert Utils.format_gedcom_date("1850") == "1850"
+    assert Utils.format_gedcom_date("December 12, 1850") == "12 DEC 1850"
+    assert Utils.format_gedcom_date("12 December 1850") == "12 DEC 1850"
+    assert Utils.format_gedcom_date("15 Jun 1875") == "15 JUN 1875"
+    assert Utils.format_gedcom_date("June 1875") == "JUN 1875"
+    assert Utils.format_gedcom_date("ABT 1850-12-12") == "ABT 12 DEC 1850"
+    assert Utils.format_gedcom_date("BEF December 12, 1850") == "BEF 12 DEC 1850"
+    assert Utils.format_gedcom_date("BET 1850 AND 1855") == "BET 1850 AND 1855"
+    assert Utils.format_gedcom_date("") == ""
 
 
 def test_build_general_citation_scrip_emits_commissioners_review_note():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
-    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
         rec = {
             "page": "1", "record_id": "SCRIP-5473", "year": "1885",
@@ -971,32 +965,62 @@ def test_build_general_citation_scrip_emits_commissioners_review_note():
             "type_specific_fields": {"claim_number": "5473"}
         }
         part = {"std_given": "Roger", "std_surname": "Letendre", "role_number": "1"}
-        blocks = arc.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
+        blocks = General.build_general_citation(rec, part, "EVEN", "1", "M0000000001")
         assert len(blocks) == 1
         assert "4 TEXT Verbatim French / English affidavit text" in blocks[0]
         assert "3 NOTE Commissioner's Review:" in blocks[0]
         assert "Roger Letendre claims as Half-breed head of family" in blocks[0]
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_apply_record_type_field_remap_scrip_maps_scrip_gedcom_name(monkeypatch):
+    monkeypatch.delenv("GEDCOM_OUTPUT_NAME", raising=False)
     monkeypatch.setenv("SCRIP_GEDCOM_NAME", "Custom_Scrip.ged")
-    arc.apply_record_type_field_remap("Scrip")
-    assert arc.GEDCOM_OUTPUT_NAME == "Custom_Scrip.ged"
+    orig_call = General.CALL_NUMBER
+    orig_url = General.COLLECTION_URL
+    orig_name = General.COLLECTION_NAME
+    orig_repo = General.REPOSITORY
+    orig_repo_loc = General.REPOSITORY_LOC
+    orig_image_dir = General.IMAGE_DIR
+    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
+    try:
+        Utils.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
+        General.apply_record_type_field_remap("Scrip")
+        assert Utils.GEDCOM_OUTPUT_NAME == "Custom_Scrip.ged"
+    finally:
+        General.CALL_NUMBER = orig_call
+        General.COLLECTION_URL = orig_url
+        General.COLLECTION_NAME = orig_name
+        General.REPOSITORY = orig_repo
+        General.REPOSITORY_LOC = orig_repo_loc
+        General.IMAGE_DIR = orig_image_dir
+        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
 def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
-    monkeypatch.setattr(arc, "resolve_gedcom_output_targets", lambda: [])
+    monkeypatch.setattr(Utils, "resolve_gedcom_output_targets", lambda: [])
     monkeypatch.delenv("GEDCOM_OUTPUT_NAME", raising=False)
     monkeypatch.delenv("SCRIP_GEDCOM_NAME", raising=False)
-    arc.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
-    arc.run_general_flavor({"record_type_name": "Scrip", "sheets": []})
-    assert arc.GEDCOM_OUTPUT_NAME == "Scrip.ged"
+    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
+    orig_repo = General.REPOSITORY
+    orig_repo_loc = General.REPOSITORY_LOC
+    orig_config = dict(General.GENERAL_CONFIG)
+    try:
+        Utils.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
+        General.run_general_flavor({"record_type_name": "Scrip", "sheets": []}, ScripProfile.ScripProfile())
+        assert Utils.GEDCOM_OUTPUT_NAME == "Scrip.ged"
+    finally:
+        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
+        General.REPOSITORY = orig_repo
+        General.REPOSITORY_LOC = orig_repo_loc
+        General.GENERAL_CONFIG.clear()
+        General.GENERAL_CONFIG.update(orig_config)
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_load_source_template_lines_from_rmst():
-    lines = arc.load_source_template_lines(20001)
+    lines = General.load_source_template_lines(20001)
     joined = "\n".join(lines)
     assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
     assert "1 TID 20001" in joined
@@ -1008,7 +1032,7 @@ def test_load_source_template_lines_from_rmst():
 
 
 def test_get_scrip_template_sources_simplified_citations_fields():
-    sources = arc.get_scrip_template_sources({20001}, "RM")
+    sources = ScripProfile.get_scrip_template_sources({20001}, "RM")
     joined = "\n".join(sources)
     assert "0 @S20001@ SOUR" in joined
     assert "2 TID 20001" in joined
@@ -1019,27 +1043,25 @@ def test_get_scrip_template_sources_simplified_citations_fields():
 
 
 def test_generate_uid_scrip_uses_pid_or_record_id_directly():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
-    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
         rec = {"page": "1", "record_id": "SC-100", "lac_pid": "1502188", "participants": [
             {"role_number": "0", "std_given": "Jean", "std_surname": "Riel"},
             {"role_number": "1", "std_given": "Marie", "std_surname": "Lafreniere"}
         ]}
         # Primary participant role 0 -> returns PID directly
-        primary_uid = arc.generate_uid(rec, rec["participants"][0], "1")
+        primary_uid = General.generate_uid(rec, rec["participants"][0], "1")
         assert primary_uid == "1502188"
 
         # Secondary participant role 1 -> returns PID_role
-        spouse_uid = arc.generate_uid(rec, rec["participants"][1], "1")
+        spouse_uid = General.generate_uid(rec, rec["participants"][1], "1")
         assert spouse_uid == "1502188_1"
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
 
 
 def test_build_gedcom_from_general_emits_srctemplates_for_rm():
-    original = arc.GENERAL_CONFIG.get('omit_source_id_prefix')
-    arc.GENERAL_CONFIG['omit_source_id_prefix'] = True
+    General.set_active_profile(ScripProfile.ScripProfile())
     try:
         json_data = {
             "record_type_name": "Scrip",
@@ -1070,9 +1092,35 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
                 }
             ]
         }
-        ged_text = arc.build_gedcom_from_general(json_data, target_software="RM")
+        ged_text = General.build_gedcom_from_general(json_data, target_software="RM")
         assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
         assert "0 @S20001@ SOUR" in ged_text
         assert "0 @I1506170@ INDI" in ged_text
     finally:
-        arc.GENERAL_CONFIG['omit_source_id_prefix'] = original
+        General.set_active_profile(General.GeneralProfile())
+
+
+def test_build_individual_renders_generic_facts_via_fact_types():
+    rec = {"event_type": "Baptism", "page": "1", "record_id": "REC-1", "event_place": "Quebec",
+           "participants": [make_participant("primary", given="Jean", surname="Gagnon")]}
+    primary = rec["participants"][0]
+    primary["facts"] = [{"fact_type": "Occupation", "value": "Farmer"}]
+
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "1 EVEN Farmer" in joined
+    assert "2 TYPE Occupation" in joined
+
+
+def test_build_individual_skips_unknown_fact_type_gracefully():
+    rec = {"event_type": "Baptism", "page": "1", "record_id": "REC-2", "event_place": "Quebec",
+           "participants": [make_participant("primary", given="Marie", surname="Boucher")]}
+    primary = rec["participants"][0]
+    primary["facts"] = [{"fact_type": "", "value": "irrelevant"}]
+
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
+    joined = "\n".join(lines)
+
+    assert "irrelevant" not in joined
+

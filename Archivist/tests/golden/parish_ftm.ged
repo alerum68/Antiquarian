@@ -1,0 +1,103 @@
+0 HEAD
+1 FILE .ged
+1 SOUR RootsMagic
+2 VERS 11.0
+2 NAME RootsMagic
+2 CORP RootsMagic, Inc.
+1 DEST RootsMagic
+1 DATE 07 AUG 2026
+2 TIME 14:11:32
+1 SUBM @SUBM1@
+1 COPR Copyright (c) 2018-2026 Michif Genealogical Society. All rights reserved.
+1 NOTE This file contains original historical translations and research.
+2 CONC Please do not upload this raw GEDCOM to public, collaborative trees without permission and attribution.
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @SUBM1@ SUBM
+1 NAME Jason Cole
+2 ADDR https://www.facebook.com/groups/149982655772008
+1 NOTE Michif Genealogical Society
+0 @I10010508336570@ INDI
+1 REFN 10010508336570
+1 NAME Marie /Gagnon/
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX F
+1 BAPM
+2 PLAC St. Boniface, Manitoba
+2 NOTE Witnesses: Georges Dugas (Priest)
+2 _PROOF proven
+2 SOUR @S1001@
+3 _TITL Gagnon, Marie, BAPM, 1875
+3 PAGE Page 12, Record REC-1
+3 DATA
+4 TEXT Citation Details:
+5 CONT On the twelfth of March, eighteen seventy-five...
+3 NOTE Citation Text:
+4 CONT Le douze mars mil huit cent soixante-quinze...
+3 REFN REC-1
+3 QUAY 3
+3 OBJE @M3901152829@
+1 FAMC @F10019947126991@
+0 @I10015936102055@ INDI
+1 REFN 10015936102055
+1 NAME Jean /Gagnon/
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX M
+1 FAMS @F10019947126991@
+0 @I10016930643942@ INDI
+1 REFN 10016930643942
+1 NAME Josephte /Nolin/
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX F
+1 FAMS @F10019947126991@
+0 @ICLR5530540427@ INDI
+1 REFN CLR5530540427
+1 NAME Georges /Dugas/
+2 NPFX Father
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX M
+1 OCCU Priest
+2 _PROOF proven
+2 SOUR @S1001@
+3 _TITL Dugas, Georges, OCCU, 1875
+3 PAGE Page 12, Record REC-1
+3 DATA
+4 TEXT Citation Details:
+5 CONT On the twelfth of March, eighteen seventy-five...
+3 NOTE Citation Text:
+4 CONT Le douze mars mil huit cent soixante-quinze...
+3 REFN REC-1
+3 QUAY 3
+3 OBJE @M3901152829@
+0 @F10019947126991@ FAM
+1 HUSB @I10015936102055@
+1 WIFE @I10016930643942@
+1 CHIL @I10010508336570@
+0 @M3901152829@ OBJE
+1 FILE C:/Users/Jason Cole/Documents/Genealogy\Census\st_boniface_vol3_p12.pdf
+2 FORM pdf
+2 TITL  - Vol Unknown - Page 12
+0 @S1@ SOUR
+1 TITL Michif Genealogical Society
+1 AUTH
+1 PUBL Researcher: Jason Cole.
+1 _LINK https://www.facebook.com/groups/149982655772008
+1 NOTE https://www.facebook.com/groups/149982655772008
+1 _LINK https://www.ancestry.com/groups/85343
+1 NOTE https://www.ancestry.com/groups/85343
+0 @S1001@ SOUR
+1 TITL , 
+1 AUTH 
+1 PUBL : 
+1 REFN 1001
+0 TRLR

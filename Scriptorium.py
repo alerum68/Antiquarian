@@ -89,85 +89,11 @@ GLOBAL_VARS = {"API & Processing": {"EXTRACTION_ENGINE": "agy", "AGY_MODEL_NAME"
                                              "MGS_GROUP_URL": "https://www.example.com/groups/main",
                                              "ANCESTRY_GROUP_URL": "https://www.ancestry.com/groups/example"}}
 
-ARCHIVIST_VARS = {"Which JSON to Build From": {"JSON_FILE": ""},
-                  "Location Overrides": {"STATE": "", "COUNTY": "", "TOWNSHIP": ""},
-                  "Family Inference Tuning": {"MIN_MARRIAGE_AGE": "12", "MAX_SPOUSE_AGE_GAP": "25",
-                                              "HUSBAND_CHILD_AGE_GAP_MIN": "14", "HUSBAND_CHILD_AGE_GAP_MAX": "60",
-                                              "WIFE_CHILD_AGE_GAP_MIN": "12", "WIFE_CHILD_AGE_GAP_MAX": "50"}}
-
 # ==========================================
-# VOYAGEUR SOURCES
+# PATH & FILE PICKER FIELDS CONSTANTS
 # ==========================================
-# Each source is one Voyageur sub-script (Voyageur/<code>.py); adding a new Major Repository
-# is exactly this - a new sub-script plus one more entry here, nothing else touched.
-VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
-
-VOYAGEUR_VARS = {"Gather Settings": {"VOYAGEUR_SOURCE": ""},
-                 "Ancestry": {"A_URL": ""},
-                 "FamilySearch": {"FS_URL": ""},
-                 "LAC": {"LAC_URL": "", "LAC_IMAGE_DIR": "LAC",
-                         "LAC_HARVEST_VOLUME": "", "LAC_HARVEST_ARCHIVAL_NUMBER": "RG15",
-                         "LAC_COOKIE_FILE": "Working/LAC/lac_cookies.txt"}}
-
-PALEOGRAPHER_VARS = {"Data & Directories": {"PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
-                                            "CHURCH_GEDCOM_NAME": "Parish.ged",
-                                            "CHURCH_MASTER_DB_NAME": "parish_register.json",
-                                            "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2"},
-                     "Parish Information": {"PARISH_NAME": "St. Generic Catholic Church",
-                                            "PARISH_NAME_SHORT": "St. Generic Parish, Anytown, ST",
-                                            "PARISH_CITY": "Anytown", "PARISH_STATE": "State",
-                                            "PARISH_FILE_NAME": "Parish_Anytown",
-                                            "DEFAULT_EVENT_LOCATION": "Anytown, Any County, State, USA"},
-                     "Register Information": {"REGISTER_SOURCE_ID": "1",
-                                              "REGISTER_NAME": "Baptisms, marriages and burials, 1850-1900",
-                                              "VOLUME_TITLE": "Volume 1",
-                                              "VOLUME_NUM": "1"},
-                     "Church Citation (Source)": {"CHURCH_CALL_NUMBER": "Call #1234567",
-                                                  "CHURCH_COLLECTION_URL":
-                                                  "https://www.familysearch.org/search/collection",
-                                                  "CHURCH_COLLECTION_NAME": "Generic Historical Collection",
-                                                  "CHURCH_REPOSITORY": "FamilySearch.org",
-                                                  "CHURCH_REPOSITORY_LOC": "Granite Mountain, UT"},
-                     "Scrip Information": {"SCRIP_IMAGE_DIR": "Scrip", "SCRIP_MASTER_DB_NAME": "scrip_records.json",
-                                           "SCRIP_COLLECTION_NAME": "Library and Archives Canada, RG15 Scrip Records",
-                                           "SCRIP_DISTRICT": "", "SCRIP_DELAY_SECONDS": "0.4",
-                                           "SCRIP_ENRICH_LIMIT": "", "SCRIP_PARTITION_OUTPUT_DIR": ""}}
-
-REGISTRAR_VARS = {
-    "File Paths (Relative to RootsMagic Dir)": {
-        "REGISTRAR_RM_DATABASE": "Your Tree.rmtree"},
-    "Matching Thresholds": {
-            "REGISTRAR_FUZZY_THRESHOLD": "82",
-            "REGISTRAR_MAX_AGE_GAP": "5",
-            "REGISTRAR_FUZZY_THRESHOLD_STRICT": "95",
-            "REGISTRAR_FAMILY_MATCH_THRESHOLD": "75"},
-    "RootsMagic UI Settings": {
-                "REGISTRAR_FOLDER_NAME": "!Duplicate Review",
-                "REGISTRAR_COLOR_SET": "1",
-                "REGISTRAR_COLOR_VALUE": "27"}}
-
-GAZETTEER_VARS = {"File Paths": {"GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
-                                 "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
-                                 "US_HistCounties_Shapefile/US_HistCounties.shp"},
-                  "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"}}
-
-PDFIX_VARS = {"Scan Settings": {"PDFIX_TARGET_DIR": ".", "PDFIX_COMPRESSION_LEVEL": "2",
-                                "PDFIX_SIZE_THRESHOLD_MB": "0"},
-              "Safety": {"PDFIX_CREATE_BACKUP": "True", "PDFIX_REPAIR_MODE": "False"}}
-
-
-# ==========================================
-# ENV FILE TARGETS
-# ==========================================
-# Global settings persist to the project root's .env. Each tool's own settings persist to a
-# .env file inside that tool's own subfolder, so every tool stays runnable standalone.
-ENV_TARGETS = [(GLOBAL_VARS, None),
-               (ARCHIVIST_VARS, "Archivist"),
-               (PALEOGRAPHER_VARS, "Paleographer"),
-               (VOYAGEUR_VARS, "Voyageur"),
-               (REGISTRAR_VARS, "Registrar"),
-               (GAZETTEER_VARS, "Gazetteer"),
-               (PDFIX_VARS, "PDFix")]
+PROGRAM_DIR_SENTINEL = "__PROGRAM_DIR__"  # Distinct from the real "PROGRAM_DIR" settings key
+TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (BASE_DIR).
 
 # ==========================================
 # TOOLTIP DESCRIPTIONS
@@ -184,17 +110,6 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
     "GEMINI_API_KEY": "Your personal API key from Google AI Studio. Used to read and transcribe handwritten images.",
-    # LAC & Scrip Enrichment
-    "LAC_HARVEST_VOLUME": "Volume number at Library and Archives Canada to harvest (e.g. '1320' or '1325-1330').",
-    "LAC_HARVEST_ARCHIVAL_NUMBER": "Archival series prefix used when harvesting an LAC volume (default 'RG15').",
-    "LAC_COOKIE_FILE": "Fallback text file for LAC search session cookies.",
-    "SCRIP_DELAY_SECONDS": (
-        "Pacing delay in seconds between LAC API requests during metadata enrichment (default: 0.4s)."
-    ),
-    "SCRIP_ENRICH_LIMIT": "Optional maximum number of records to process during enrichment (blank for all).",
-    "SCRIP_PARTITION_OUTPUT_DIR": (
-        "Directory where partitioned collection JSON files are saved (default: 'partitioned' subfolder)."
-    ),
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
     "API_BUDGET": "A safety limit for your AI costs (e.g., '20' means $20). The script stops if it spends this much.",
     "MODEL_NAME": "The AI model version you want to use (usually gemini-3.1-pro-preview or gemini-2.5-pro).",
@@ -210,110 +125,10 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
     "REVIEW_COLOR": "The numeric RootsMagic color code to paint people who have been flagged for manual review.",
 
-    # Archivist (Create step - Census)
+    # Archivist (Create step - Census) - CENSUS_IMAGE_DIR is a GLOBAL_VARS key despite the
+    # grouping comment; it stays here forever, never migrates to Archivist/settings_schema.yaml.
     "CENSUS_IMAGE_DIR": "The subfolder name (e.g., 'Census') inside your Base Media Directory. Can also be an "
-                         "absolute path.",
-    "JSON_FILE": "Only needed to build from a specific JSON file Voyageur already gathered. Leave blank to "
-                 "automatically use the most recently created JSON file in your JSON folder.",
-    "STATE": "Leave blank to use the State Voyageur already gathered per-page from the JSON file. Only fill "
-             "this in to force the same State on every record.",
-    "COUNTY": "Leave blank to use the County Voyageur already gathered per-page from the JSON file. Only fill "
-              "this in to force the same County on every record.",
-    "TOWNSHIP": "Leave blank to use the Township/City Voyageur already gathered per-page from the JSON file. "
-                "Only fill this in to force the same Township on every record.",
-    "MIN_MARRIAGE_AGE": "The youngest plausible age someone could be married (used to group families correctly).",
-    "MAX_SPOUSE_AGE_GAP": "The largest age gap allowed between a husband and wife before the AI assumes they are not "
-                          "married.",
-    "HUSBAND_CHILD_AGE_GAP_MIN": "The minimum plausible age difference between a father and his child.",
-    "HUSBAND_CHILD_AGE_GAP_MAX": "The maximum plausible age difference between a father and his child.",
-    "WIFE_CHILD_AGE_GAP_MIN": "The minimum plausible age difference between a mother and her child.",
-    "WIFE_CHILD_AGE_GAP_MAX": "The maximum plausible age difference between a mother and her child.",
-
-    # Voyageur (Gather step)
-    "VOYAGEUR_SOURCE": "Which repository to gather from. Adding a new one is a new Voyageur sub-script, nothing "
-                       "else changes here.",
-    "A_URL": "The web address (URL) of the specific Ancestry.com census page you want to gather.",
-    "FS_URL": "The web address (URL) of the specific FamilySearch record page you want to gather.",
-    "LAC_URL": "Paste the complete Heritage Canadiana link (e.g., "
-                "https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/).",
-    "LAC_IMAGE_DIR": "The subfolder name (e.g., 'LAC') inside your Base Media Directory. A subfolder per roll number "
-                      "is created automatically inside it. Can also be an absolute path.",
-
-    # Paleographer
-    "PALEOGRAPHER_RECORD_TYPE": "Which record type (from Paleographer/prompts) to transcribe. Leave blank to use the "
-    "default, Parish.pmt.",
-    "CHURCH_IMAGE_DIR": "The subfolder name (e.g., 'Parish') inside your Base Media Directory. Can also be an "
-                         "absolute path.",
-    "CHURCH_GEDCOM_NAME": "The filename for the generated GEDCOM file.",
-    "CHURCH_MASTER_DB_NAME": "The filename for the JSON database storing the extracted records.",
-    "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "How aggressively PDFix's lossless structural optimization (garbage "
-                                          "collection + stream deflate) runs on a scanned PDF before it's uploaded "
-                                          "to the AI: 0=low, 1=medium, 2=high (recommended). This never touches "
-                                          "embedded image resolution/DPI, so transcription quality is unaffected "
-                                          "at any level.",
-    "PARISH_NAME": "The full historical name of the church (e.g., St. Joseph Catholic Church).",
-    "PARISH_NAME_SHORT": "A shortened name for the parish, used in file titles.",
-    "PARISH_CITY": "The city where the parish is located.",
-    "PARISH_STATE": "The state or province where the parish is located.",
-    "PARISH_FILE_NAME": "The base filename used for parish exports.",
-    "DEFAULT_EVENT_LOCATION": "The default location assigned to events if none is specified.",
-    "REGISTER_SOURCE_ID": "The source ID assigned to this specific register volume.",
-    "REGISTER_NAME": "What this register contains and covers (e.g., 'Baptisms, marriages and burials, "
-                     "1850-1900'). Used throughout the generated source citations, distinct from Volume Title.",
-    "VOLUME_TITLE": "This specific volume/book's own title or label (e.g., 'Volume 1'). Used alongside "
-                    "Register Name in the generated source citations.",
-    "VOLUME_NUM": "The volume number of the register.",
-    "CHURCH_CALL_NUMBER": "The call number for the church register collection.",
-    "CHURCH_COLLECTION_URL": "A link back to FamilySearch or Ancestry where you found these images.",
-    "CHURCH_COLLECTION_NAME": "The name of the specific collection these images belong to (e.g., 'Quebec, Catholic "
-                              "Parish Registers'). Do not include the repository/website name here, that's set "
-                              "separately below.",
-    "CHURCH_REPOSITORY": "The archive or website hosting this collection (e.g., FamilySearch.org, Library and "
-                         "Archives Canada, Ancestry.com).",
-    "CHURCH_REPOSITORY_LOC": "The physical location or address of that repository, used in the citation (e.g., "
-                             "'Granite Mountain, UT' for FamilySearch, 'Ottawa, ON' for LAC).",
-    "SCRIP_IMAGE_DIR": "The subfolder name (e.g., 'Scrip') inside your Base Media Directory. Can also be an "
-                       "absolute path.",
-    "SCRIP_MASTER_DB_NAME": "The filename for the JSON database storing the extracted scrip records.",
-    "SCRIP_COLLECTION_NAME": "The name of the archival collection these scrip files came from.",
-    "SCRIP_DISTRICT": "The scrip district or region this batch of applications belongs to, if known.",
-
-    # Registrar
-    "REGISTRAR_RM_DATABASE": "The filename of your RootsMagic tree (e.g., 'Your Tree.rmtree') located in your "
-                         "RootsMagic Folder.",
-    "REGISTRAR_FUZZY_THRESHOLD": "Score (0-100) for matching names when we KNOW their birth years. 82 is "
-                                 "recommended.",
-    "REGISTRAR_MAX_AGE_GAP": "The maximum number of years apart two records can be and still be flagged as a "
-                            "duplicate.",
-    "REGISTRAR_COLOR_VALUE": "The numeric RootsMagic color code to paint duplicate people (27 is Slate).",
-    "REGISTRAR_FUZZY_THRESHOLD_STRICT": "A stricter threshold (0-100) used only for records missing a birth year.",
-    "REGISTRAR_FAMILY_MATCH_THRESHOLD": "Score (0-100) used to verify if relatives (parents/spouses) match between two "
-    "suspected duplicates.",
-    "REGISTRAR_FOLDER_NAME": "The name of the Task Folder created in RootsMagic to hold duplicate review tasks.",
-    "REGISTRAR_COLOR_SET": "The Color Set in RootsMagic (0-indexed) to apply the color value to.",
-
-    # Gazetteer
-    "GAZETTEER_RM_DATABASE": "The filename of your RootsMagic tree (e.g., 'Your Tree.rmtree') located in your "
-                          "RootsMagic Folder.",
-    "GAZETTEER_SHAPEFILE": "The path to the Newberry Atlas '.shp' file containing historical county boundaries. "
-                         "Relative to your Program Dir (it ships alongside the Gazetteer tool), not the RootsMagic "
-                         "folder.",
-    "GAZETTEER_CREATE_BACKUP": "Set to 'True' to automatically create a backup of your RootsMagic file before "
-                             "fixing it (Highly Recommended!).",
-    "GAZETTEER_DEBUG_MODE": "Set to 'True' to print extra diagnostic information to the console while processing.",
-
-    # PDFix
-    "PDFIX_TARGET_DIR": "The folder PDFix scans recursively for .pdf files, relative to your Base Media Directory "
-                        "(or an absolute path elsewhere). Leave as '.' to optimize every PDF anywhere inside Media.",
-    "PDFIX_COMPRESSION_LEVEL": "How aggressively to garbage-collect and deflate-compress PDF structure: 0=low, "
-                               "1=medium, 2=high (recommended). This is lossless - it never touches image "
-                               "resolution/DPI.",
-    "PDFIX_SIZE_THRESHOLD_MB": "Only optimize PDFs larger than this size, in MB. Leave as 0 to optimize every PDF "
-                              "regardless of size.",
-    "PDFIX_CREATE_BACKUP": "Set to 'True' to save a '.pdf.backup' copy of each original before optimizing it in "
-                          "place (Highly Recommended!).",
-    "PDFIX_REPAIR_MODE": "Set to 'True' to attempt repairing structurally damaged/corrupted PDFs before "
-                        "optimizing them."}
+                         "absolute path."}
 
 # ==========================================
 # CUSTOM UI LABELS OVERRIDE
@@ -326,17 +141,7 @@ CUSTOM_LABELS = {
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
     "JSON_DIR": "JSON Download Folder",
-    "REGISTRAR_RM_DATABASE": "RootsMagic Database Path",
-    "GAZETTEER_RM_DATABASE": "RootsMagic Database Path",
-    "A_URL": "Ancestry Census URL",
-    "CENSUS_IMAGE_DIR": "Census Image Save Folder",
-    "JSON_FILE": "Downloaded JSON File Name",
-    "LAC_URL": "Heritage Canadiana URL",
-    "FS_URL": "FamilySearch Record URL",
-    "VOYAGEUR_SOURCE": "Gather From",
-    "CHURCH_REPOSITORY": "Repository Name",
-    "CHURCH_REPOSITORY_LOC": "Repository Location",
-    "PDFIX_TARGET_DIR": "PDF Scan Folder"}
+    "CENSUS_IMAGE_DIR": "Census Image Save Folder"}
 
 # ==========================================
 # PATH & FILE PICKER FIELDS
@@ -347,14 +152,6 @@ CUSTOM_LABELS = {
 # type a name that doesn't exist yet). "base_dir_key" says which folder the dialog should
 # start in: another field's key (resolved against PROGRAM_DIR, same as execute_script does),
 # or one of the two sentinels below.
-PROGRAM_DIR_SENTINEL = "__PROGRAM_DIR__"  # Distinct from the real "PROGRAM_DIR" settings key
-TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (BASE_DIR).
-
-RMTREE_FILETYPES = [("RootsMagic files", "*.rmtree"), ("All files", "*.*")]
-JSON_FILETYPES = [("JSON files", "*.json"), ("All files", "*.*")]
-GED_FILETYPES = [("GEDCOM files", "*.ged"), ("All files", "*.*")]
-SHP_FILETYPES = [("Shapefiles", "*.shp"), ("All files", "*.*")]
-
 PATH_PICKER_FIELDS = {
     # Global: Directories (folders, relative to PROGRAM_DIR unless absolute)
     "PROGRAM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL, "always_absolute": True},
@@ -366,33 +163,6 @@ PATH_PICKER_FIELDS = {
 
     # Archivist
     "CENSUS_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
-    "JSON_FILE": {"kind": "open", "base_dir_key": "JSON_DIR", "filetypes": JSON_FILETYPES},
-
-    # Voyageur
-    "LAC_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
-
-    # Paleographer
-    "CHURCH_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
-    "CHURCH_GEDCOM_NAME": {"kind": "save", "base_dir_key": "GEDCOM_OUTPUT_PATH", "filetypes": GED_FILETYPES,
-                           "defaultextension": ".ged"},
-    "CHURCH_MASTER_DB_NAME": {"kind": "save", "base_dir_key": "JSON_DIR", "filetypes": JSON_FILETYPES,
-                              "defaultextension": ".json"},
-    "SCRIP_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
-    "SCRIP_MASTER_DB_NAME": {"kind": "save", "base_dir_key": "JSON_DIR", "filetypes": JSON_FILETYPES,
-                             "defaultextension": ".json"},
-
-    # Registrar
-    "REGISTRAR_RM_DATABASE": {"kind": "open", "base_dir_key": "RM_DIR", "filetypes": RMTREE_FILETYPES},
-
-    # Gazetteer
-    "GAZETTEER_RM_DATABASE": {"kind": "open", "base_dir_key": "RM_DIR", "filetypes": RMTREE_FILETYPES},
-    "GAZETTEER_SHAPEFILE": {"kind": "open", "base_dir_key": PROGRAM_DIR_SENTINEL, "filetypes": SHP_FILETYPES},
-
-    # PDFix
-    "PDFIX_TARGET_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
-
-    # Scrip Partition Output
-    "SCRIP_PARTITION_OUTPUT_DIR": {"kind": "directory", "base_dir_key": "JSON_DIR"},
 }
 
 # ==========================================
@@ -400,16 +170,6 @@ PATH_PICKER_FIELDS = {
 # ==========================================
 # Keyed by settings key; any key not listed here keeps the default plain CTkEntry behavior.
 FIELD_WIDGETS = {
-    # Real booleans in the schema - a switch, not a "True"/"False" text box.
-    "GAZETTEER_DEBUG_MODE": {"type": "toggle"},
-    "GAZETTEER_CREATE_BACKUP": {"type": "toggle"},
-    "PDFIX_CREATE_BACKUP": {"type": "toggle"},
-    "PDFIX_REPAIR_MODE": {"type": "toggle"},
-
-    # Small fixed set of labeled options, stored as a numeric string.
-    "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": {"type": "segmented",
-                                           "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
-    "PDFIX_COMPRESSION_LEVEL": {"type": "segmented", "options": [("0", "Low"), ("1", "Medium"), ("2", "High")]},
     "EXTRACTION_ENGINE": {
         "type": "segmented",
         "options": [
@@ -419,20 +179,101 @@ FIELD_WIDGETS = {
     },
 
     # Bounded numeric tuning knobs.
-    "MIN_MARRIAGE_AGE": {"type": "slider", "min": 0, "max": 30, "step": 1},
-    "MAX_SPOUSE_AGE_GAP": {"type": "slider", "min": 0, "max": 50, "step": 1},
-    "HUSBAND_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 0, "max": 30, "step": 1},
-    "HUSBAND_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 30, "max": 90, "step": 1},
-    "WIFE_CHILD_AGE_GAP_MIN": {"type": "slider", "min": 0, "max": 30, "step": 1},
-    "WIFE_CHILD_AGE_GAP_MAX": {"type": "slider", "min": 20, "max": 70, "step": 1},
-    "REGISTRAR_FUZZY_THRESHOLD": {"type": "slider", "min": 0, "max": 100, "step": 1},
-    "REGISTRAR_MAX_AGE_GAP": {"type": "slider", "min": 0, "max": 20, "step": 1},
-    "REGISTRAR_FUZZY_THRESHOLD_STRICT": {"type": "slider", "min": 0, "max": 100, "step": 1},
-    "REGISTRAR_FAMILY_MATCH_THRESHOLD": {"type": "slider", "min": 0, "max": 100, "step": 1},
     "API_BUDGET": {"type": "slider", "min": 0, "max": 200, "step": 5, "suffix": "$"},
     "CACHE_DISCOUNT_MULTIPLIER": {"type": "slider", "min": 0, "max": 1, "step": 0.05},
-    "PDFIX_SIZE_THRESHOLD_MB": {"type": "slider", "min": 0, "max": 100, "step": 1, "suffix": "MB"},
 }
+
+
+# ==========================================
+# PER-TOOL SETTINGS SCHEMA LOADER
+# ==========================================
+def _load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
+    """Loads one tool's settings_schema.yaml, returning the same {section: {key: default}}
+    shape the hardcoded *_VARS dict literals used to provide directly. As a side effect,
+    merges this tool's tooltips/widgets/pickers/label-overrides into the shared
+    module-level dicts _build_form_ui already reads from - so nothing downstream of this
+    call needs to know settings moved from a Python literal to a YAML file. Fails loudly:
+    this is a single-user desktop tool, so a missing or malformed schema should stop
+    startup with a message naming the file, not silently render an empty or partial form."""
+    schema_path = tool_dir / "settings_schema.yaml"
+    if not schema_path.is_file():
+        raise FileNotFoundError(f"Missing settings schema: {schema_path}")
+
+    try:
+        raw = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as e:
+        raise RuntimeError(f"Malformed YAML in {schema_path}: {e}") from e
+
+    if not isinstance(raw, dict) or "sections" not in raw:
+        raise ValueError(f"{schema_path} is missing its top-level 'sections' key")
+
+    result: Dict[str, Dict[str, str]] = {}
+    for section, fields in raw["sections"].items():
+        if not isinstance(fields, dict):
+            raise ValueError(f"{schema_path}: section '{section}' is not a mapping")
+        result[section] = {}
+        for field, spec in fields.items():
+            if not isinstance(spec, dict) or "default" not in spec:
+                raise ValueError(f"{schema_path}: field '{section}.{field}' is missing a 'default'")
+            result[section][field] = str(spec["default"])
+
+            if "tooltip" in spec:
+                TOOLTIP_DESCRIPTIONS[field] = spec["tooltip"]
+
+            if "widget" in spec:
+                widget_spec = {"type": spec["widget"]}
+                if "options" in spec:
+                    widget_spec["options"] = [tuple(opt) for opt in spec["options"]]
+                for extra_key in ("min", "max", "step", "suffix"):
+                    if extra_key in spec:
+                        widget_spec[extra_key] = spec[extra_key]
+                FIELD_WIDGETS[field] = widget_spec
+
+            if "picker" in spec:
+                picker_spec = dict(spec["picker"])
+                if "filetypes" in picker_spec:
+                    picker_spec["filetypes"] = [tuple(ft) for ft in picker_spec["filetypes"]]
+                PATH_PICKER_FIELDS[field] = picker_spec
+
+    for field, label in (raw.get("label_overrides") or {}).items():
+        CUSTOM_LABELS[field] = label
+
+    return result
+
+
+ARCHIVIST_VARS = _load_tool_schema(BASE_DIR / "Archivist")
+
+# ==========================================
+# VOYAGEUR SOURCES
+# ==========================================
+# Each source is one Voyageur sub-script (Voyageur/<code>.py); adding a new Major Repository
+# is exactly this - a new sub-script plus one more entry here, nothing else touched.
+VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
+
+VOYAGEUR_VARS = _load_tool_schema(BASE_DIR / "Voyageur")
+
+PALEOGRAPHER_VARS = _load_tool_schema(BASE_DIR / "Paleographer")
+
+REGISTRAR_VARS = _load_tool_schema(BASE_DIR / "Registrar")
+
+
+GAZETTEER_VARS = _load_tool_schema(BASE_DIR / "Gazetteer")
+
+PDFIX_VARS = _load_tool_schema(BASE_DIR / "PDFix")
+
+
+# ==========================================
+# ENV FILE TARGETS
+# ==========================================
+# Global settings persist to the project root's .env. Each tool's own settings persist to a
+# .env file inside that tool's own subfolder, so every tool stays runnable standalone.
+ENV_TARGETS = [(GLOBAL_VARS, None),
+               (ARCHIVIST_VARS, "Archivist"),
+               (PALEOGRAPHER_VARS, "Paleographer"),
+               (VOYAGEUR_VARS, "Voyageur"),
+               (REGISTRAR_VARS, "Registrar"),
+               (GAZETTEER_VARS, "Gazetteer"),
+               (PDFIX_VARS, "PDFix")]
 
 
 # ==========================================
@@ -796,8 +637,9 @@ class Scriptorium(ctk.CTk):
                            "designated folder in your project.\n"
                            "3. Ensure you have your Gemini API key saved in the Global Settings.\n"
                            "4. Click 'Run Analysis (API)' to transcribe. For Scrip records, use 'Enrich Metadata' "
-                           "to fetch live LAC catalog metadata or 'Partition Collections' to split records into "
-                           "official LAC archival series files.\n\n"
+                           "to fetch live LAC catalog metadata, 'Partition Collections' to split records into "
+                           "official LAC archival series files, or 'Resolve Names' to cross-reference and "
+                           "deduplicate participant names across records.\n\n"
                            "When finished, head to Archivist to build your GEDCOM.\n\n"
                            "Note: If the AI gets stuck or runs out of memory, try clicking "
                            "'Clear Cache'.",

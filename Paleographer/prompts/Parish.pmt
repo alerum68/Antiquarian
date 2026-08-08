@@ -24,6 +24,7 @@ metadata_fields:
 # Which Paleographer settings-tab sections apply to this record type; the Toolbox uses
 # this to only show fields this type actually uses instead of every field for every type.
 settings_sections:
+  - "Antigravity CLI"
   - "Data & Directories"
   - "Parish Information"
   - "Register Information"

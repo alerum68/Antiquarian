@@ -1,9 +1,14 @@
+import importlib.util
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
-import Voyageur
+_VOYAGEUR_PY = Path(__file__).resolve().parent.parent / "Voyageur.py"
+_spec = importlib.util.spec_from_file_location("Voyageur_dispatcher", _VOYAGEUR_PY)
+Voyageur = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(Voyageur)
 
 
 @pytest.mark.parametrize("source, module_name", [("A", "A"), ("FS", "FS"), ("LAC", "LAC")])

@@ -1,0 +1,155 @@
+sections:
+  Which JSON to Build From:
+    JSON_FILE:
+      default: ""
+      tooltip: "Only needed to build from a specific JSON file Voyageur already gathered. Leave blank to automatically use the most recently created JSON file in your JSON folder."
+      picker:
+        kind: open
+        base_dir_key: "JSON_DIR"
+        filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
+    GEDCOM_OUTPUT_NAME:
+      default: "Family_Register.ged"
+      tooltip: "Name of generated GEDCOM file."
+    GEDCOM_OUTPUT_MODE:
+      default: "Both"
+      tooltip: "Output mode for generated GEDCOM records (e.g., Both)."
+    IMAGE_DIR:
+      default: ""
+      tooltip: "Folder path for census or parish record images."
+    APID_DB:
+      default: ""
+      tooltip: "Ancestry APID database identifier."
+    ANCESTRY_IMAGE_BASE_ID:
+      default: ""
+      tooltip: "Ancestry image base identifier."
+  Location Overrides:
+    STATE:
+      default: ""
+      tooltip: "Leave blank to use the State Voyageur already gathered per-page from the JSON file. Only fill this in to force the same State on every record."
+    COUNTY:
+      default: ""
+      tooltip: "Leave blank to use the County Voyageur already gathered per-page from the JSON file. Only fill this in to force the same County on every record."
+    TOWNSHIP:
+      default: ""
+      tooltip: "Leave blank to use the Township/City Voyageur already gathered per-page from the JSON file. Only fill this in to force the same Township on every record."
+    ENUMERATION_DISTRICT:
+      default: ""
+      tooltip: "Census-specific enumeration district identifier. Only fill this in to force the same district on every record; otherwise Archivist reads it per-record from the JSON."
+    FILM_NUMBER:
+      default: ""
+      tooltip: "Microfilm/FHL film number to force on every record's citation, overriding whatever the source data provides per-record."
+    ROLL_NUMBER:
+      default: ""
+      tooltip: "NARA roll number to force on every record's citation, overriding whatever the source data provides per-record."
+    DEFAULT_EVENT_LOCATION:
+      default: ""
+      tooltip: "Default location assigned to events if none specified."
+    PARISH_NAME:
+      default: "Parish Name"
+      tooltip: "Parish name override."
+    PARISH_NAME_SHORT:
+      default: "Parish"
+      tooltip: "Short parish name override."
+    PARISH_CITY:
+      default: "City"
+      tooltip: "Parish city override."
+    PARISH_STATE:
+      default: "State"
+      tooltip: "Parish state override."
+    PARISH_FILE_NAME:
+      default: "Parish_Export"
+      tooltip: "Parish base export filename."
+  Family Inference Tuning:
+    MIN_MARRIAGE_AGE:
+      default: "12"
+      tooltip: "The youngest plausible age someone could be married (used to group families correctly)."
+      widget: slider
+      min: 0
+      max: 30
+      step: 1
+    MAX_SPOUSE_AGE_GAP:
+      default: "25"
+      tooltip: "The largest age gap allowed between a husband and wife before the AI assumes they are not married."
+      widget: slider
+      min: 0
+      max: 50
+      step: 1
+    HUSBAND_CHILD_AGE_GAP_MIN:
+      default: "14"
+      tooltip: "The minimum plausible age difference between a father and his child."
+      widget: slider
+      min: 0
+      max: 30
+      step: 1
+    HUSBAND_CHILD_AGE_GAP_MAX:
+      default: "60"
+      tooltip: "The maximum plausible age difference between a father and his child."
+      widget: slider
+      min: 30
+      max: 90
+      step: 1
+    WIFE_CHILD_AGE_GAP_MIN:
+      default: "12"
+      tooltip: "The minimum plausible age difference between a mother and her child."
+      widget: slider
+      min: 0
+      max: 30
+      step: 1
+    WIFE_CHILD_AGE_GAP_MAX:
+      default: "50"
+      tooltip: "The maximum plausible age difference between a mother and her child."
+      widget: slider
+      min: 20
+      max: 70
+      step: 1
+  Citation & Role Vocabulary:
+    TRANSCRIPTION_HEADER:
+      default: "Citation Text:"
+      tooltip: "The label prefixed to the transcribed original-language text inside generated source citations."
+    TRANSLATION_HEADER:
+      default: "Citation Details:"
+      tooltip: "The label prefixed to the English translation/details text inside generated source citations."
+    ROLE_CLERGY:
+      default: "Priest"
+      tooltip: "The role label used for the officiating clergy member in generated records."
+    CLERGY_HONORIFIC:
+      default: "Father"
+      tooltip: "The honorific prefixed to a clergy member's name (e.g., 'Father')."
+    ROLE_DEFAULT_WITNESS:
+      default: "Witness"
+      tooltip: "The role label used for a witness when no more specific role is given."
+    CALL_NUMBER:
+      default: ""
+      tooltip: "Call number for church or archival register collection."
+    REPOSITORY:
+      default: ""
+      tooltip: "Archive or website hosting this collection."
+    REPOSITORY_LOC:
+      default: ""
+      tooltip: "Physical location or address of the repository."
+    COLLECTION_URL:
+      default: ""
+      tooltip: "URL link to the historical collection."
+    COLLECTION_NAME:
+      default: ""
+      tooltip: "Name of the archival collection."
+    PUBLISHER:
+      default: ""
+      tooltip: "Publisher of the collection or record series."
+    PUB_LOC:
+      default: ""
+      tooltip: "Publication location."
+    REGISTER_NAME:
+      default: ""
+      tooltip: "Contents and coverage description of the register."
+    REGISTER_SOURCE_ID:
+      default: "1"
+      tooltip: "Source ID assigned to the register volume."
+    VOLUME_TITLE:
+      default: ""
+      tooltip: "Title or label of the specific volume."
+    VOLUME_NUM:
+      default: ""
+      tooltip: "Volume number of the register."
+label_overrides:
+  JSON_FILE: "Downloaded JSON File Name"

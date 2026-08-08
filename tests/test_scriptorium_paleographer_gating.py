@@ -5,15 +5,14 @@ from Scriptorium import Scriptorium as ScriptoriumApp
 
 @pytest.fixture(scope="module")
 def app():
-    # Module-scoped: constructing a second Tk/CTk root after destroying the first
-    # in the same process is flaky on Windows (intermittent "Can't find a usable
-    # tk.tcl" from the second interpreter). One instance is reused across both
-    # tests below; each test fully overwrites the record-type var and re-runs
-    # _on_record_type_change() before asserting, so there's no state leakage.
-    root = ScriptoriumApp()
+    import tkinter
+    if getattr(tkinter, "_default_root", None) is not None and isinstance(tkinter._default_root, ScriptoriumApp):
+        root = tkinter._default_root
+    else:
+        root = ScriptoriumApp()
     root._switch_tab("Paleographer")
     yield root
-    root.destroy()
+    root.withdraw()
 
 
 def test_scrip_record_type_enables_enrichment_buttons(app):
