@@ -7,7 +7,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
-from urllib.parse import urljoin
+from urllib.parse import quote, urljoin
 
 import requests
 from bs4 import BeautifulSoup
@@ -64,6 +64,15 @@ INDEX_URL = os.environ.get("HBCA_INDEX_URL", DEFAULT_INDEX_URL).strip() or DEFAU
 HBCA_IMAGE_DIR = resolve_generic_setting("HBCA", "IMAGE_DIR", "Images/HBCA")
 HBCA_MASTER_DB_NAME = resolve_generic_setting("HBCA", "MASTER_DB_NAME", "MasterDB_HBCA.json")
 CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("HBCA_CHECKPOINT_DIR", "Working/HBCA"))
+MEDIA_DIR = _safe_path(PROGRAM_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
+
+KEYSTONE_BASE_URL = os.environ.get("KEYSTONE_BASE_URL", "https://pam.minisisinc.com/scripts/mwimain.dll").strip()
+HBCA_RESOLVE_KEYSTONE = (
+    os.environ.get("HBCA_RESOLVE_KEYSTONE", "false").lower() in ("true", "1", "yes")
+)
+HBCA_DOWNLOAD_KEYSTONE_MEDIA = (
+    os.environ.get("HBCA_DOWNLOAD_KEYSTONE_MEDIA", "true").lower() in ("true", "1", "yes")
+)
 
 
 # ==========================================
@@ -119,7 +128,7 @@ def filter_entries_by_letter(
 
 
 # ==========================================
-# TEXT PREFETCH & SCAFFOLD CREATION
+# TEXT PREFETCH & LOCATION CODE EXTRACTION
 # ==========================================
 def extract_text_from_pdf(pdf_path: Path) -> str:
     """Extracts text content from a downloaded PDF file using pypdf or pdfplumber."""
@@ -147,8 +156,134 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
     return "\n".join(text_chunks).strip()
 
 
-def build_hbca_scaffold_sheet(entry: BioSheetEntry, raw_text: str = "") -> dict:
+_CODE_REGEX = re.compile(
+    r"\b([A-G]\.\d+/[a-z]/\d+[a-z]?(?:\s*-\s*\d+)?(?:\s+fo\.\s*\d+)?|[A-G]\.\d+/\d+[a-z]?(?:\s+fo\.\s*\d+)?)\b",
+    re.IGNORECASE,
+)
+_SEARCH_FILE_REGEX = re.compile(r"(Search\s+File[:\s]+['\"]?[^'\"\n\r]+['\"]?)", re.IGNORECASE)
+
+
+def extract_hbca_location_codes(text: str) -> List[str]:
+    """Extracts HBCA archival reference location codes (e.g. B.239/g/1-4, A.32/21, E.4/1a) and Search Files."""
+    if not text:
+        return []
+    codes: List[str] = []
+    seen: Set[str] = set()
+
+    for match in _CODE_REGEX.finditer(text):
+        raw_code = match.group(1).strip()
+        if raw_code and raw_code not in seen:
+            seen.add(raw_code)
+            codes.append(raw_code)
+
+    for match in _SEARCH_FILE_REGEX.finditer(text):
+        raw_sf = match.group(1).strip()
+        if raw_sf and raw_sf not in seen:
+            seen.add(raw_sf)
+            codes.append(raw_sf)
+
+    return codes
+
+
+# ==========================================
+# KEYSTONE RESOLVER & MEDIA DOWNLOADER
+# ==========================================
+def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> str:
+    """Builds a direct search URL for Manitoba Archives Keystone database."""
+    cleaned_code = location_code.split(" fo.")[0].strip()
+    encoded = quote(cleaned_code)
+    return f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH&KEYWORD_CLUSTER={encoded}"
+
+
+def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, List[str]]:
+    """Parses Keystone HTML search results for finding aid URLs and digitized media links."""
+    soup = BeautifulSoup(html_text, "html.parser")
+    record_urls: List[str] = []
+    media_urls: List[str] = []
+    seen_records: Set[str] = set()
+    seen_media: Set[str] = set()
+
+    for a_tag in soup.find_all("a", href=True):
+        href = a_tag["href"].strip()
+        full_url = urljoin(base_url, href)
+        href_lower = href.lower()
+
+        if any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4")) or "/assets/media/" in href_lower:
+            if full_url not in seen_media:
+                seen_media.add(full_url)
+                media_urls.append(full_url)
+        elif "record" in href_lower or "/pam_listings/" in href_lower or "/unionsearch/" in href_lower:
+            if full_url not in seen_records:
+                seen_records.add(full_url)
+                record_urls.append(full_url)
+
+    for img_tag in soup.find_all("img", src=True):
+        src = img_tag["src"].strip()
+        full_img_url = urljoin(base_url, src)
+        if "/thumbs/" not in src.lower() and full_img_url not in seen_media:
+            seen_media.add(full_img_url)
+            media_urls.append(full_img_url)
+
+    return {"record_urls": record_urls, "media_urls": media_urls}
+
+
+def query_keystone_for_code(
+    location_code: str,
+    base_url: str = KEYSTONE_BASE_URL,
+    session: Optional[requests.Session] = None,
+) -> Dict[str, List[str]]:
+    """Queries Keystone database for a given location code."""
+    url = build_keystone_search_url(location_code, base_url)
+    client = session or requests.Session()
+    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Resolver)"}
+    try:
+        resp = client.get(url, headers=headers, timeout=20)
+        if resp.status_code == 200:
+            return parse_keystone_search_response(resp.text, base_url)
+    except Exception as e:
+        print(f"[WARN] Failed to query Keystone for {location_code}: {e}")
+    return {"record_urls": [url], "media_urls": []}
+
+
+def download_keystone_media(
+    media_urls: List[str],
+    target_dir: Path,
+    session: Optional[requests.Session] = None,
+) -> List[str]:
+    """Downloads digitized microfilm or document media files from Keystone."""
+    target_dir.mkdir(parents=True, exist_ok=True)
+    client = session or requests.Session()
+    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Media Downloader)"}
+    downloaded_paths: List[str] = []
+
+    for url in media_urls:
+        filename = Path(url.split("?")[0]).name or f"media_{len(downloaded_paths)+1}.jpg"
+        dest_file = target_dir / filename
+        if not dest_file.exists():
+            try:
+                resp = client.get(url, headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    with open(dest_file, "wb") as f:
+                        f.write(resp.content)
+            except Exception as e:
+                print(f"[WARN] Failed to download media from {url}: {e}")
+                continue
+        if dest_file.exists():
+            downloaded_paths.append(str(dest_file))
+
+    return downloaded_paths
+
+
+# ==========================================
+# SCAFFOLD & MASTER DB STORAGE
+# ==========================================
+def build_hbca_scaffold_sheet(
+    entry: BioSheetEntry,
+    raw_text: str = "",
+    keystone_urls: Optional[List[str]] = None,
+) -> dict:
     """Builds a Commissioner-compliant placeholder sheet dict for an HBCA bio sheet."""
+    codes = extract_hbca_location_codes(raw_text)
     return {
         "page_id": entry.file_name,
         "document_metadata": {
@@ -159,7 +294,7 @@ def build_hbca_scaffold_sheet(entry: BioSheetEntry, raw_text: str = "") -> dict:
             "employee_name": entry.employee_name,
             "pdf_url": entry.pdf_url,
             "raw_text": raw_text,
-            "keystone_urls": [],
+            "keystone_urls": keystone_urls or [],
         },
         "records": [
             {
@@ -175,16 +310,16 @@ def build_hbca_scaffold_sheet(entry: BioSheetEntry, raw_text: str = "") -> dict:
                 "review": False,
                 "continues_on_next_image": False,
                 "continues_from_previous_image": False,
-                "type_specific_fields": {},
+                "type_specific_fields": {
+                    "hbca_references": codes,
+                    "keystone_urls": keystone_urls or [],
+                },
                 "participants": [],
             }
         ],
     }
 
 
-# ==========================================
-# CHECKPOINT & MASTER DB STORAGE
-# ==========================================
 def load_checkpoint(checkpoint_file: Path) -> Set[str]:
     """Loads set of completed file names from checkpoint file."""
     if not checkpoint_file.exists():
@@ -246,14 +381,18 @@ def gather_hbca_sheets(
     image_dir: Optional[Path] = None,
     master_db_path: Optional[Path] = None,
     checkpoint_dir: Optional[Path] = None,
+    media_dir: Optional[Path] = None,
+    resolve_keystone: bool = HBCA_RESOLVE_KEYSTONE,
+    download_keystone: bool = HBCA_DOWNLOAD_KEYSTONE_MEDIA,
     delay_sec: float = 0.2,
 ) -> int:
-    """Headless gatherer: fetches index, downloads PDFs, prefetches text, builds scaffold sheets."""
+    """Headless gatherer: fetches index, downloads PDFs, prefetches text, resolves Keystone links, builds scaffold sheets."""
     image_dir = image_dir or (Path(PROGRAM_DIR) / HBCA_IMAGE_DIR)
     master_db_path = master_db_path or (
         Path(PROGRAM_DIR) / os.environ.get("JSON_DIR", "JSON") / HBCA_MASTER_DB_NAME
     )
     checkpoint_dir = checkpoint_dir or Path(CHECKPOINT_DIR)
+    media_dir = media_dir or Path(MEDIA_DIR)
 
     image_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -273,6 +412,7 @@ def gather_hbca_sheets(
     if letter_filter:
         print(f"Filtered to {len(filtered_entries)} sheets matching letter(s): {letter_filter}")
 
+    session = requests.Session()
     new_downloads = 0
     for entry in filtered_entries:
         if entry.file_name in downloaded_set:
@@ -283,7 +423,7 @@ def gather_hbca_sheets(
 
         if not target_file.exists():
             print(f"Downloading {entry.file_name} from {entry.pdf_url}...")
-            pdf_resp = requests.get(entry.pdf_url, headers=headers, timeout=30)
+            pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)
             if pdf_resp.status_code == 200:
                 with open(target_file, "wb") as f:
                     f.write(pdf_resp.content)
@@ -292,7 +432,19 @@ def gather_hbca_sheets(
                 continue
 
         raw_text = extract_text_from_pdf(target_file)
-        sheet = build_hbca_scaffold_sheet(entry, raw_text=raw_text)
+        keystone_urls: List[str] = []
+
+        if resolve_keystone:
+            codes = extract_hbca_location_codes(raw_text)
+            for code in codes:
+                res = query_keystone_for_code(code, session=session)
+                keystone_urls.extend(res.get("record_urls", []))
+                if download_keystone and res.get("media_urls"):
+                    clean_code = re.sub(r"[^\w\.-]", "_", code)
+                    dest_media_dir = media_dir / "HBCA" / clean_code
+                    download_keystone_media(res["media_urls"], dest_media_dir, session=session)
+
+        sheet = build_hbca_scaffold_sheet(entry, raw_text=raw_text, keystone_urls=keystone_urls)
         append_scaffold_sheet(master_db_path, sheet)
 
         downloaded_set.add(entry.file_name)
@@ -319,6 +471,18 @@ def main() -> None:
         help="Index URL for HBCA biographical sheets",
     )
     parser.add_argument(
+        "--resolve-keystone",
+        action="store_true",
+        default=HBCA_RESOLVE_KEYSTONE,
+        help="Resolve HBCA location codes against Keystone database",
+    )
+    parser.add_argument(
+        "--download-media",
+        action="store_true",
+        default=HBCA_DOWNLOAD_KEYSTONE_MEDIA,
+        help="Download digitized media from Keystone",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         default=True,
@@ -326,7 +490,12 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    gather_hbca_sheets(letter_filter=args.letter, index_url=args.index_url)
+    gather_hbca_sheets(
+        letter_filter=args.letter,
+        index_url=args.index_url,
+        resolve_keystone=args.resolve_keystone,
+        download_keystone=args.download_media,
+    )
 
 
 if __name__ == "__main__":
