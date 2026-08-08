@@ -1320,6 +1320,77 @@
             return {citationText, catalogItems};
         }
 
+        async function parseHouseholdSections() {
+            const ok = await clickTab('Names');
+            if (!ok) return [];
+
+            // FamilySearch renders the "Names" panel shell immediately but fills in household
+            // content a beat later (same skeleton-then-fill race already handled for the old
+            // Image Index table and the citation panel) - wait for at least one household
+            // heading, or the panel's own "no names" state, before reading anything.
+            const namesWait = await waitForCondition(() => {
+                if (document.body.innerText.includes('No names have been indexed for this image')) {
+                    return {empty: true};
+                }
+                const heading = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+                    .find(h => /\sHousehold$/.test(h.textContent.trim()));
+                return heading ? {found: true} : null;
+            }, {timeoutMs: 15000});
+            if (!namesWait.result || namesWait.result.empty) return [];
+
+            // Scope to the Names panel's own <aside> (identified by its own "Names" heading) -
+            // confirmed live that document-wide list queries pick up unrelated <ul>s (e.g. the
+            // "Manage Indexes" dropdown menu) ahead of the real household lists.
+            const panel = [...document.querySelectorAll('aside')]
+                .find(a => [...a.querySelectorAll('h1,h2,h3,h4,h5,h6')].some(h => h.textContent.trim() === 'Names'));
+            if (!panel) return [];
+
+            // FamilySearch's own household heading level/tag isn't assumed stable (matches this
+            // file's own "don't trust FamilySearch's markup" convention) - collect every heading
+            // and every list-like container in document order, then attribute each container to
+            // whichever heading precedes it, up to the next heading.
+            const headings = [...panel.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+                .filter(h => /\sHousehold$/.test(h.textContent.trim()));
+            const listContainers = [...panel.querySelectorAll('[role="list"], ul, ol')];
+
+            const sections = [];
+            for (let i = 0; i < headings.length; i++) {
+                const heading = headings[i];
+                const nextHeading = headings[i + 1] || null;
+                const inRange = (el) => {
+                    const afterThis = heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
+                    // Confirmed live: this must check that `el` PRECEDES nextHeading, not that it
+                    // FOLLOWS it - the two are easy to invert since both read as "& FOLLOWING" from
+                    // one comparison direction or the other. Getting this backwards makes every
+                    // heading grab the *next* household's list instead of its own.
+                    const beforeNext = !nextHeading
+                        || (nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING);
+                    return afterThis && beforeNext;
+                };
+                const container = listContainers.find(inRange);
+                if (!container) continue;
+
+                const items = [...container.querySelectorAll('[role="listitem"], li')];
+                const members = items.map(item => {
+                    // The list item's own visible text is "{Name}\n{Role}" (confirmed live: e.g.
+                    // "Joseph Rolette\nPrimary | Spouse") - the accessible "Click to view {name}"
+                    // button is a second, separately-labeled element inside the same item, not the
+                    // one carrying the name/role text itself.
+                    const lines = item.innerText.split('\n').map(s => s.trim()).filter(Boolean);
+                    const name = lines[0] || '';
+                    const roleHint = lines[1] || '';
+                    const viewButton = [...item.querySelectorAll('button')].find(b => {
+                        const label = b.getAttribute('aria-label') || b.textContent || '';
+                        return label.trim().startsWith('Click to view');
+                    });
+                    return viewButton ? {name, roleHint, viewButton} : null;
+                }).filter(Boolean);
+
+                sections.push({householdLabel: heading.textContent.trim(), members});
+            }
+            return sections;
+        }
+
         async function scrapeIndexRows() {
             const ok = await clickTab('Image Index');
             if (!ok) return [];
