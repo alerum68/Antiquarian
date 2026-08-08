@@ -4,7 +4,9 @@ import json
 import os
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 from urllib.parse import quote, urljoin
@@ -73,6 +75,7 @@ HBCA_RESOLVE_KEYSTONE = (
 HBCA_DOWNLOAD_KEYSTONE_MEDIA = (
     os.environ.get("HBCA_DOWNLOAD_KEYSTONE_MEDIA", "true").lower() in ("true", "1", "yes")
 )
+HBCA_MAX_WORKERS = int(os.environ.get("HBCA_MAX_WORKERS", "10").strip() or "10")
 
 
 # ==========================================
@@ -384,7 +387,8 @@ def gather_hbca_sheets(
     media_dir: Optional[Path] = None,
     resolve_keystone: bool = HBCA_RESOLVE_KEYSTONE,
     download_keystone: bool = HBCA_DOWNLOAD_KEYSTONE_MEDIA,
-    delay_sec: float = 0.2,
+    delay_sec: float = 0.0,
+    max_workers: int = HBCA_MAX_WORKERS,
 ) -> int:
     """Headless gatherer: fetches index, downloads PDFs, prefetches text, resolves Keystone links, builds scaffold sheets."""
     image_dir = image_dir or (Path(PROGRAM_DIR) / HBCA_IMAGE_DIR)
@@ -412,15 +416,17 @@ def gather_hbca_sheets(
     if letter_filter:
         print(f"Filtered to {len(filtered_entries)} sheets matching letter(s): {letter_filter}")
 
-    session = requests.Session()
     new_downloads = 0
-    for entry in filtered_entries:
+    db_lock = threading.Lock()
+
+    def process_entry(entry: BioSheetEntry) -> bool:
         if entry.file_name in downloaded_set:
-            continue
+            return False
 
         target_file = image_dir / entry.letter / entry.file_name
         target_file.parent.mkdir(parents=True, exist_ok=True)
 
+        session = requests.Session()
         if not target_file.exists():
             print(f"Downloading {entry.file_name} from {entry.pdf_url}...")
             pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)
@@ -429,7 +435,7 @@ def gather_hbca_sheets(
                     f.write(pdf_resp.content)
             else:
                 print(f"[WARN] Failed to download {entry.pdf_url}: HTTP {pdf_resp.status_code}")
-                continue
+                return False
 
         raw_text = extract_text_from_pdf(target_file)
         keystone_urls: List[str] = []
@@ -445,14 +451,22 @@ def gather_hbca_sheets(
                     download_keystone_media(res["media_urls"], dest_media_dir, session=session)
 
         sheet = build_hbca_scaffold_sheet(entry, raw_text=raw_text, keystone_urls=keystone_urls)
-        append_scaffold_sheet(master_db_path, sheet)
-
-        downloaded_set.add(entry.file_name)
-        save_checkpoint(checkpoint_file, downloaded_set)
-        new_downloads += 1
+        
+        with db_lock:
+            append_scaffold_sheet(master_db_path, sheet)
+            downloaded_set.add(entry.file_name)
+            save_checkpoint(checkpoint_file, downloaded_set)
 
         if delay_sec > 0:
             time.sleep(delay_sec)
+            
+        return True
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [executor.submit(process_entry, e) for e in filtered_entries]
+        for future in as_completed(futures):
+            if future.result():
+                new_downloads += 1
 
     print(f"Gather complete. {new_downloads} new sheets downloaded and indexed.")
     return new_downloads

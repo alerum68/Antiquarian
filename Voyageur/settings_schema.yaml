@@ -76,6 +76,9 @@ sections:
     KEYSTONE_BASE_URL:
       default: "https://pam.minisisinc.com/scripts/mwimain.dll"
       tooltip: "Base URL for the Archives of Manitoba Keystone database search."
+    HBCA_MAX_WORKERS:
+      default: "10"
+      tooltip: "Number of concurrent download workers used when fetching HBCA PDFs (default 10)."
 label_overrides:
   VOYAGEUR_SOURCE: "Gather From"
   A_URL: "Ancestry Census URL"

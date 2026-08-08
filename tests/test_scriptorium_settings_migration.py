@@ -60,6 +60,7 @@ def test_voyageur_schema_matches_expected_shape():
             "HBCA_RESOLVE_KEYSTONE": "false",
             "HBCA_DOWNLOAD_KEYSTONE_MEDIA": "true",
             "KEYSTONE_BASE_URL": "https://pam.minisisinc.com/scripts/mwimain.dll",
+            "HBCA_MAX_WORKERS": "10",
         },
     }
 
