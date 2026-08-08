@@ -1320,185 +1320,93 @@
             return {citationText, catalogItems};
         }
 
-        async function parseHouseholdSections() {
-            const ok = await clickTab('Names');
+        async function scrapeIndexRows() {
+            const ok = await clickTab('Image Index');
             if (!ok) return [];
 
-            // FamilySearch renders the "Names" panel shell immediately but fills in household
-            // content a beat later (same skeleton-then-fill race already handled for the old
-            // Image Index table and the citation panel) - wait for at least one household
-            // heading, or the panel's own "no names" state, before reading anything.
-            const namesWait = await waitForCondition(() => {
-                if (document.body.innerText.includes('No names have been indexed for this image')) {
-                    return {empty: true};
+            // Same race as the citation panel: a table with >1 <tr> can exist before FamilySearch
+            // has filled in its header cells for the new image (a loading skeleton renders empty
+            // headers), which then makes every column look skippable and produces all-blank rows.
+            // Require at least one non-empty header before accepting the table as ready.
+            // Event-driven (see waitForCondition) rather than polling every 200ms for up to 15s -
+            // a blank/title page (common throughout a census book - cover pages, blank versos)
+            // shows a literal "No indexes are available" message instead of ever rendering a
+            // table, so that's checked on every mutation too rather than only at the end of a
+            // fixed retry budget.
+            const tableWait = await waitForCondition(() => {
+                if (document.body.innerText.includes('No indexes are available for this image')) {
+                    return {blank: true};
                 }
-                const heading = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-                    .find(h => /\sHousehold$/.test(h.textContent.trim()));
-                return heading ? {found: true} : null;
+                const candidate = document.querySelector('table');
+                if (candidate) {
+                    const trs = candidate.querySelectorAll('tr');
+                    if (trs.length > 1) {
+                        const candidateHeaders = [...trs[0].querySelectorAll('th, td')].map(c => (c.innerText || '').trim());
+                        if (candidateHeaders.some(h => h.length > 0)) {
+                            return {table: candidate, headers: candidateHeaders};
+                        }
+                    }
+                }
+                return null;
             }, {timeoutMs: 15000});
-            if (!namesWait.result || namesWait.result.empty) return [];
+            if (!tableWait.result || tableWait.result.blank) return [];
+            const table = tableWait.result.table;
+            const headerCells = tableWait.result.headers;
 
-            // FamilySearch's own household heading level/tag isn't assumed stable (matches this
-            // file's own "don't trust FamilySearch's markup" convention) - collect every heading
-            // and every list-like container in document order, then attribute each container to
-            // whichever heading precedes it, up to the next heading.
-            const headings = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-                .filter(h => /\sHousehold$/.test(h.textContent.trim()));
-            const listContainers = [...document.querySelectorAll('[role="list"], ul, ol')];
+            const allRows = [...table.querySelectorAll('tr')];
 
-            const sections = [];
-            for (let i = 0; i < headings.length; i++) {
-                const heading = headings[i];
-                const nextHeading = headings[i + 1] || null;
-                const inRange = (el) => {
-                    const afterThis = heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
-                    const beforeNext = !nextHeading
-                        || (nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING);
-                    return afterThis && beforeNext;
-                };
-                const container = listContainers.find(inRange);
-                if (!container) continue;
-
-                const items = [...container.querySelectorAll('[role="listitem"], li')];
-                const members = items.map(item => {
-                    // The list item's own visible text is "{Name}\n{Role}" (confirmed live: e.g.
-                    // "Joseph Rolette\nPrimary | Spouse") - the accessible "Click to view {name}"
-                    // button is a second, separately-labeled element inside the same item, not the
-                    // one carrying the name/role text itself.
-                    const lines = item.innerText.split('\n').map(s => s.trim()).filter(Boolean);
-                    const name = lines[0] || '';
-                    const roleHint = lines[1] || '';
-                    const viewButton = [...item.querySelectorAll('button')].find(b => {
-                        const label = b.getAttribute('aria-label') || b.textContent || '';
-                        return label.trim().startsWith('Click to view');
-                    });
-                    return viewButton ? {name, roleHint, viewButton} : null;
-                }).filter(Boolean);
-
-                sections.push({householdLabel: heading.textContent.trim(), members});
-            }
-            return sections;
-        }
-
-        async function scrapePersonDetail(viewButton, expectedName) {
-            viewButton.click();
-
-            // Same race as every other panel in this file: wait for the View Name panel to render
-            // for THIS person specifically (not a still-rendering previous person's panel left over
-            // from the last click), matching the citation panel's own name-anchored wait.
-            const panelWait = await waitForCondition(() => {
-                const heading = findByExactText('h1, h2, h3, h4, h5, h6', 'View Name');
-                if (!heading || !heading.closest) return null;
-                const panel = heading.closest('[role="complementary"], aside, div');
-                if (!panel || !panel.innerText.includes(expectedName)) return null;
-                return panel;
-            }, {timeoutMs: 10000});
-            if (!panelWait.result) {
-                debugLog(`scrapePersonDetail: View Name panel never matched "${expectedName}"`);
-                return {recordArk: '', personArk: '', given: '', surname: '', gender: '', age: '',
-                        relationship: '', extraFields: {}};
-            }
-            const panel = panelWait.result;
-            const panelText = panel.innerText;
-
-            // "VIEW RECORD" always points at this specific indexed entry (record_ark) - the Tree
-            // Attachment section, when present, points at the real Family Tree person (person_ark
-            // == PID) via a DIFFERENT href shape than the old UI used
-            // ("/en/tree/person/{PID}", no "/details/" segment - confirmed live, the old
-            // "/tree/person/details/{PID}" regex no longer matches anything on this page).
-            const recordArkLink = [...panel.querySelectorAll('a[href]')]
-                .find(a => /ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/.test(a.getAttribute('href')));
-            const recordArkMatch = recordArkLink
-                && recordArkLink.getAttribute('href').match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
-            const recordArk = recordArkMatch ? recordArkMatch[1] : '';
-
-            const personArkLink = [...panel.querySelectorAll('a[href]')]
-                .find(a => /\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})(?:$|[/?])/.test(a.getAttribute('href')));
-            const personArkMatch = personArkLink
-                && personArkLink.getAttribute('href').match(/\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
-            const personArk = personArkMatch ? personArkMatch[1] : '';
-
-            // Essential Information/Household Details/Events/Additional Facts render as
-            // "Heading\nLabel\nValue\nLabel\nValue..." blocks in the panel's own innerText - parsed
-            // the same way scrapeCitationAndCatalog already parses the Citation panel's prose
-            // (heading-anchored regex over innerText), since FamilySearch's field markup isn't a
-            // stable target any more than its tab markup is.
-            const givenMatch = panelText.match(/Given Name:\s*(.+)/);
-            const surnameMatch = panelText.match(/Surname:\s*(.+)/);
-            const sexMatch = panelText.match(/Sex:\s*(\w+)/);
-            const ageMatch = panelText.match(/Age:\s*(\d+)/);
-
-            // This person's own relationship-to-primary, from the Household Details section, which
-            // lists every household member as "{Relationship}\n{Name}" pairs - find the pair whose
-            // name matches THIS person and take its relationship label. The household's own primary/
-            // head has no such pair (nobody lists their own relationship to themselves) and gets
-            // "Head" directly instead. Households with no real relationship data (every member shown
-            // as bare "Primary" in the list) have no matching pair either - relationship stays ''
-            // rather than being fabricated, matching Census.py's own tolerance of an absent value.
-            let relationship = '';
-            const householdMatch = panelText.match(/Household Details([\s\S]*?)(?:\n\n|Events\n|$)/);
-            if (householdMatch) {
-                const relPairs = [...householdMatch[1].matchAll(
-                    /(Household\s*•\s*Census|Spouse|Child|Father|Mother|No Relation)\n(.+)/g)];
-                const selfLine = relPairs.find(([, , name]) => name && name.trim() === expectedName);
-                if (selfLine) {
-                    relationship = selfLine[1].startsWith('Household') ? 'Head' : selfLine[1];
-                } else if (relPairs.some(([, label]) => label.startsWith('Household'))
-                           && panelText.includes(`${expectedName}\n\nVIEW RECORD`)) {
-                    relationship = 'Head';
-                }
-            }
-
-            return {
-                recordArk, personArk,
-                given: givenMatch ? givenMatch[1].trim() : '',
-                surname: surnameMatch ? surnameMatch[1].trim() : '',
-                gender: sexMatch ? sexMatch[1].trim().toUpperCase() : '',
-                age: ageMatch ? ageMatch[1].trim() : '',
-                relationship,
-                extraFields: {},
-            };
-        }
-
-        async function scrapeNamesPanel() {
-            const sections = await parseHouseholdSections();
-            if (sections.length === 0) return [];
+            // Utility columns ("" for the row-expand toggle, "Attach to Tree" for the Tree-link
+            // button) carry no genealogical data of their own and aren't part of every record
+            // type's column set, so skip them by header text rather than by fixed position.
+            const skipHeaders = new Set(['', 'Attach to Tree']);
+            const dataColumns = headerCells
+                .map((h, i) => ({header: h, index: i}))
+                .filter(c => !skipHeaders.has(c.header));
+            const attachColIndex = headerCells.indexOf('Attach to Tree');
 
             const rows = [];
-            for (let familyNumber = 0; familyNumber < sections.length; familyNumber++) {
-                const {members} = sections[familyNumber];
+            for (const row of allRows.slice(1)) {
+                const cells = [...row.querySelectorAll('th, td')];
+                if (cells.length === 0) continue;
 
-                // FamilySearch's own index can surface the same person twice within one household
-                // (confirmed live: "Josette Cardinal" appeared twice under "J Baptiste Cardinal
-                // Household") - build_census_json() has no row-level dedup of its own (unlike the
-                // Parish path's match_and_link_records), so a duplicate scraped here is a duplicate
-                // person in the final GEDCOM. Skip a repeat of the same name+role within the same
-                // household rather than scraping it a second time.
-                const seen = new Set();
-                const deduped = members.filter(m => {
-                    const key = `${m.name}|${m.roleHint}`;
-                    if (seen.has(key)) return false;
-                    seen.add(key);
-                    return true;
-                });
-
-                for (const member of deduped) {
-                    const detail = await scrapePersonDetail(member.viewButton, member.name);
-
-                    const columns = {
-                        'Given Name': detail.given || member.name.split(' ').slice(0, -1).join(' '),
-                        'Surname': detail.surname || member.name.split(' ').slice(-1).join(' '),
-                        'Gender': detail.gender,
-                        'Age': detail.age,
-                        'Family Number': String(familyNumber + 1),
-                    };
-                    if (detail.relationship) {
-                        columns['Relationship to Head'] = detail.relationship;
-                    }
-
-                    rows.push({columns, person_ark: detail.recordArk, attached_fsftid: detail.personArk});
+                const columns = {};
+                for (const col of dataColumns) {
+                    const cell = cells[col.index];
+                    columns[col.header] = cell ? (cell.innerText || '').trim() : '';
                 }
+
+                // The "Attach to Tree" cell actually holds TWO separate links: a "View record
+                // for <name>" link (always present, an ark:/61903/1:1:XXXX-XXXX pointing at
+                // this specific index entry - NOT a person identifier despite looking like
+                // one) and an "Attach <name> to Family Tree" action. querySelector('a[href]')
+                // used to grab whichever came first (always the view-record link), so the
+                // scraped "fsftid" was actually just that ark regardless of whether the row
+                // was really attached to anything - confirmed live: FamilySearch only shows a
+                // genuine attached Family Tree person via a distinct
+                // /tree/person/details/XXXX-XXXX link (verified on a real attached row, e.g.
+                // "Attached in Tree to Robert Wilson Irwin ... LZG1-MSB" - a completely
+                // different ID from that row's own view-record ark). Person_ark is the
+                // record's own ark (always present, safe for a citation web link); fsftid is
+                // only set when a genuine tree/person/details link is actually present.
+                let personArk = '';
+                let attachedFsftid = '';
+                if (attachColIndex !== -1 && cells[attachColIndex]) {
+                    for (const link of cells[attachColIndex].querySelectorAll('a[href]')) {
+                        const href = link.getAttribute('href') || '';
+                        if (!personArk) {
+                            const arkMatch = href.match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
+                            if (arkMatch) personArk = arkMatch[1];
+                        }
+                        if (!attachedFsftid) {
+                            const treeMatch = href.match(/tree\/person\/details\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
+                            if (treeMatch) attachedFsftid = treeMatch[1];
+                        }
+                    }
+                }
+
+                rows.push({columns, person_ark: personArk, attached_fsftid: attachedFsftid});
             }
+
             return rows;
         }
 
@@ -1506,7 +1414,7 @@
             const itemId = getItemId();
             if (!itemId || seenItemIds.has(itemId)) return;
 
-            const rows = await scrapeNamesPanel();
+            const rows = await scrapeIndexRows();
             const {citationText, catalogItems} = await scrapeCitationAndCatalog();
             // Awaited before moving on to the next image, same convention as Ancestry's
             // own per-page image download.
