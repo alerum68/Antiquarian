@@ -51,6 +51,16 @@ def test_voyageur_schema_matches_expected_shape():
             "LAC_CHECKPOINT_DIR": "Working/LAC", "LAC_CDP_PORT": "9222", "LAC_MAX_WORKERS": "1",
             "LAC_RECORD_TYPE": "", "LAC_VOLUME": "", "VOLUME_TITLE": "",
         },
+        "HBCA / Manitoba Archives": {
+            "HBCA_INDEX_URL": "https://www.gov.mb.ca/chc/archives/hbca/biographical/index.html",
+            "HBCA_IMAGE_DIR": "HBCA",
+            "HBCA_MASTER_DB_NAME": "MasterDB_HBCA.json",
+            "HBCA_CHECKPOINT_DIR": "Working/HBCA",
+            "HBCA_LETTER_FILTER": "",
+            "HBCA_RESOLVE_KEYSTONE": "false",
+            "HBCA_DOWNLOAD_KEYSTONE_MEDIA": "true",
+            "KEYSTONE_BASE_URL": "https://pam.minisisinc.com/scripts/mwimain.dll",
+        },
     }
 
 

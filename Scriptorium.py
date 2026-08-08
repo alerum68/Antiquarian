@@ -247,7 +247,12 @@ ARCHIVIST_VARS = _load_tool_schema(BASE_DIR / "Archivist")
 # ==========================================
 # Each source is one Voyageur sub-script (Voyageur/<code>.py); adding a new Major Repository
 # is exactly this - a new sub-script plus one more entry here, nothing else touched.
-VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]
+VOYAGEUR_SOURCES = [
+    ("A", "Ancestry"),
+    ("FS", "FamilySearch"),
+    ("LAC", "LAC"),
+    ("HBCA", "HBCA / Manitoba Archives"),
+]
 
 VOYAGEUR_VARS = _load_tool_schema(BASE_DIR / "Voyageur")
 

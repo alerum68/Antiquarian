@@ -41,7 +41,7 @@ def _regenerate(fixture: dict, target_software: str, profile) -> str:
     General.COLLECTION_NAME = ""
     General.REPOSITORY = ""
     General.REPOSITORY_LOC = ""
-    General.IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "") or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
+    General.IMAGE_DIR = Utils.safe_path("C:/Users/Jason Cole/Documents/Genealogy", "Census")
     General.GENERAL_CONFIG.clear()
     General.GENERAL_CONFIG.update(DEFAULT_GENERAL_CONFIG)
     raw = General.build_gedcom_from_general(fixture, target_software)

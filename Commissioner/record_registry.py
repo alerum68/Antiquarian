@@ -16,6 +16,7 @@ _PRIMITIVE_TYPE_MAP: Dict[str, type] = {
     "bool": bool,
     "date": date,
     "dict": Dict[str, Any],
+    "list": List[Any],
 }
 
 
