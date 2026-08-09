@@ -8,7 +8,18 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
-- **Scriptorium UI Overhaul**: Refactored Scriptorium UI to remove developer-centric settings and added Antigravity OAuth integration.
+- **Convention-based image directories**: Image source folders are now inferred automatically from the active prompt file name (`Media/<prompt_name>` — e.g. `Media/Parish`, `Media/Scrip`, `Media/Census`, `Media/HBCA`). No user configuration required.
+- **Scrip tab gets its own GEDCOM setting**: `SCRIP_GEDCOM_NAME` added to the Scrip Information section in Paleographer settings, so Scrip and Parish each manage their own output files independently.
+- **HBCA Keystone toggles**: `HBCA_RESOLVE_KEYSTONE` and `HBCA_DOWNLOAD_KEYSTONE_MEDIA` now render as on/off toggle switches in the Voyageur settings UI.
+
+### Removed
+- **`CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` global settings**: Removed from Scriptorium's Global Settings UI — image directories are now resolved automatically.
+- **`CHURCH_IMAGE_DIR` and `SCRIP_IMAGE_DIR` settings**: Removed from Paleographer settings schema — image paths are derived from the active `.pmt` prompt name at runtime.
+
+### Fixed
+- **Voyageur/A.py docstring**: Fixed escaped triple-quote syntax error introduced by a prior edit.
+
+
 - **Archivist Structural Split**: `Archivist.py` (3,691 lines) split into a thin
   dispatcher plus `Utils.py`, `Census.py`, `General.py`, and `Scrip.py`, replacing
   the file's `is_scrip` boolean-flag branching with a `Profile` strategy-pattern

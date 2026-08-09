@@ -7,7 +7,7 @@
 | 3 | UIFormDev | ✅ | Removed CENSUS_IMAGE_DIR/IMAGE_EXTENSION from globals, separated Parish/Scrip settings |
 | 4 | Tester | ✅ | py_compile pass, YAML validation pass, A.py docstring fix applied |
 | 5 | BugFixer | ✅ | Fixed escaped triple-quote docstring in Voyageur/A.py |
-| 6 | DocBot | ⏳ | — |
+| 6 | DocBot | ✅ | CHANGELOG.md updated with Added/Removed/Fixed entries |
 
 ## Current Task: UI Cleanup - Auto Image Dirs & Tab Separation
 * ✅ Removed `CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` from Global Settings (`Scriptorium.py`).
