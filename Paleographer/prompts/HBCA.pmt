@@ -20,6 +20,11 @@ extra_fields:
     - {name: search_file_reference, type: string}
     - {name: hbca_references, type: list}
     - {name: keystone_urls, type: list}
+    - {name: keystone_records, type: dict}
+    - {name: vital_dates_summary, type: string}
+    - {name: birth_date_extracted, type: string}
+    - {name: death_date_extracted, type: string}
+    - {name: needs_llm_structured_review, type: bool}
   participant:
     - {name: relationship_to_employee, type: string}
     - {name: vital_dates_summary, type: string}
