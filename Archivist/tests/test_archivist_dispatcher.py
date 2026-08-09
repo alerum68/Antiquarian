@@ -6,9 +6,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "golden"))
 
-from capture_golden_gedcom import PARISH_FIXTURE, SCRIP_FIXTURE
-import Utils
-import General
+from capture_golden_gedcom import PARISH_FIXTURE, SCRIP_FIXTURE  # noqa: E402
+import Utils  # noqa: E402
+import General  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 
