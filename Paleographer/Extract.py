@@ -390,6 +390,17 @@ def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) 
         file_name = new_sheet.get("document_metadata", {}).get("file_name")
         existing_idx = by_file_name.get(file_name) if file_name is not None else None
         if existing_idx is not None and _sheet_is_placeholder(master_sheets[existing_idx]):
+            placeholder = master_sheets[existing_idx]
+            ph_records = placeholder.get("records", [])
+            new_records = new_sheet.get("records", [])
+            if ph_records and new_records:
+                ph_tsf = ph_records[0].get("type_specific_fields", {})
+                new_tsf = new_records[0].setdefault("type_specific_fields", {})
+                if not ph_tsf.get("needs_llm_structured_review", False):
+                    for field in ["parish_of_origin", "entered_service_year", 
+                                  "birth_date_extracted", "death_date_extracted", "service_history"]:
+                        if field in ph_tsf:
+                            new_tsf[field] = ph_tsf[field]
             master_sheets[existing_idx] = new_sheet
             continue
         master_sheets.append(new_sheet)
