@@ -110,11 +110,8 @@ C_BORDER = "#33363D"
 # ==========================================
 # UNIFIED ENV SCHEMA & CONTEXT OVERRIDES
 # ==========================================
-GLOBAL_VARS = {"API & Processing": {"EXTRACTION_ENGINE": "agy", "AGY_MODEL_NAME": "gemini-3.1-pro-high",
-                                    "GEMINI_API_KEY": "", "API_BUDGET": "20", "MODEL_NAME": "gemini-3.1-pro-preview",
-                                    "COST_PER_1M_INPUT": "2.00", "COST_PER_1M_OUTPUT": "12.00",
-                                    "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
-               "Global Directories": {"PROGRAM_DIR": "C:/Path/To/Your/Genealogy/Folder/Scriptorium",
+GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high"},
+               "Global Directories": {"GENEALOGY_DIR": "C:/Path/To/Your/Genealogy/Folder",
                                       "RM_DIR": "Roots Magic 11",
                                       "FTM_DIR": "Family Tree Maker", "MEDIA_DIR": "Media/Project",
                                       "CENSUS_IMAGE_DIR": "Census",
@@ -123,14 +120,7 @@ GLOBAL_VARS = {"API & Processing": {"EXTRACTION_ENGINE": "agy", "AGY_MODEL_NAME"
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
                "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
-                                             "SOFTWARE_NAME": "RootsMagic", "SOFTWARE_VERS": "11.0",
-                                             "COPYRIGHT_START": "2024",
-                                             "GEDCOM_NOTE": "This file contains original historical translations "
-                                                            "and research.",
-                                             "GEDCOM_CONC": "Please do not upload this raw GEDCOM to public, "
-                                                            "collaborative trees without permission and "
-                                                            "attribution.",
-                                             "REVIEW_COLOR": "1", "ROOT_SOURCE_ID": "@S1@",
+                                             "ROOT_SOURCE_ID": "@S1@",
                                              "SUBM_ADDRESS": "https://www.example.com/contact",
                                              "MGS_GROUP_URL": "https://www.example.com/groups/main",
                                              "ANCESTRY_GROUP_URL": "https://www.ancestry.com/groups/example"}}
@@ -138,38 +128,26 @@ GLOBAL_VARS = {"API & Processing": {"EXTRACTION_ENGINE": "agy", "AGY_MODEL_NAME"
 # ==========================================
 # PATH & FILE PICKER FIELDS CONSTANTS
 # ==========================================
-PROGRAM_DIR_SENTINEL = "__PROGRAM_DIR__"  # Distinct from the real "PROGRAM_DIR" settings key
+GENEALOGY_DIR_SENTINEL = "__GENEALOGY_DIR__"  # Distinct from the real "GENEALOGY_DIR" settings key
 TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (BASE_DIR).
 
 # ==========================================
 # TOOLTIP DESCRIPTIONS
 # ==========================================
 TOOLTIP_DESCRIPTIONS = {  # Global Settings
-    "PROGRAM_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
+    "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
                    "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
                    "this one folder.",
-    "EXTRACTION_ENGINE": "Which backend performs the AI extraction. 'Antigravity CLI' shells out to the agy CLI - "
-                         "covered by a Google account subscription, no per-token API cost, but needs agy installed, "
-                         "on PATH, and signed in (use Test Agy Connection below). 'Gemini API' uses your "
-                         "GEMINI_API_KEY directly, billed per token.",
     "AGY_MODEL_NAME": "The exact Antigravity CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
-    "GEMINI_API_KEY": "Your personal API key from Google AI Studio. Used to read and transcribe handwritten images.",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
-    "API_BUDGET": "A safety limit for your AI costs (e.g., '20' means $20). The script stops if it spends this much.",
-    "MODEL_NAME": "The AI model version you want to use (usually gemini-3.1-pro-preview or gemini-2.5-pro).",
     "RM_DIR": "The folder where your RootsMagic files live, relative to the Program Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
     "RESEARCHER": "Your name. This will be added to the GEDCOM file to give you credit as the transcriber.",
-    "COST_PER_1M_INPUT": "The price Google charges per 1 million input tokens (text/images sent to the AI).",
-    "COST_PER_1M_OUTPUT": "The price Google charges per 1 million output tokens (JSON/text generated by the AI).",
-    "CACHE_DISCOUNT_MULTIPLIER": "The fractional discount applied to tokens loaded from context caching (e.g., 0.10 "
-                                 "means 10% of standard cost).",
     "ORG_NAME": "The name of your Historical Society, Library, or personal organization to include in GEDCOM headers.",
     "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
-    "REVIEW_COLOR": "The numeric RootsMagic color code to paint people who have been flagged for manual review.",
 
     # Archivist (Create step - Census) - CENSUS_IMAGE_DIR is a GLOBAL_VARS key despite the
     # grouping comment; it stays here forever, never migrates to Archivist/settings_schema.yaml.
@@ -181,8 +159,7 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
 # ==========================================
 # Add keys here if you want them to display differently than standard Title Case.
 CUSTOM_LABELS = {
-    "GEMINI_API_KEY": "Google Gemini API Key",
-    "PROGRAM_DIR": "Genealogy Root Directory",
+    "GENEALOGY_DIR": "Genealogy Root Directory",
     "RM_DIR": "RootsMagic Folder",
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
@@ -199,13 +176,13 @@ CUSTOM_LABELS = {
 # start in: another field's key (resolved against PROGRAM_DIR, same as execute_script does),
 # or one of the two sentinels below.
 PATH_PICKER_FIELDS = {
-    # Global: Directories (folders, relative to PROGRAM_DIR unless absolute)
-    "PROGRAM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL, "always_absolute": True},
-    "RM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
-    "FTM_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
-    "MEDIA_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
-    "JSON_DIR": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
-    "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": PROGRAM_DIR_SENTINEL},
+    # Global: Directories (folders, relative to GENEALOGY_DIR unless absolute)
+    "GENEALOGY_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL, "always_absolute": True},
+    "RM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
+    "FTM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
+    "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
+    "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
+    "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
 
     # Archivist
     "CENSUS_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
@@ -216,17 +193,6 @@ PATH_PICKER_FIELDS = {
 # ==========================================
 # Keyed by settings key; any key not listed here keeps the default plain CTkEntry behavior.
 FIELD_WIDGETS = {
-    "EXTRACTION_ENGINE": {
-        "type": "segmented",
-        "options": [
-            ("agy", "Antigravity CLI (subscription)"),
-            ("api", "Gemini API (pay-per-token)"),
-        ],
-    },
-
-    # Bounded numeric tuning knobs.
-    "API_BUDGET": {"type": "slider", "min": 0, "max": 200, "step": 5, "suffix": "$"},
-    "CACHE_DISCOUNT_MULTIPLIER": {"type": "slider", "min": 0, "max": 1, "step": 0.05},
 }
 
 
@@ -735,7 +701,7 @@ class Scriptorium(ctk.CTk):
                            "Global Settings": "Welcome to Global Settings!\n\n"
                                               "How to use:\n"
                                               "These are the master settings shared across all of your tools.\n\n"
-                                              "1. Set your 'PROGRAM_DIR' first. This is the main folder for your "
+                                              "1. Set your 'GENEALOGY_DIR' first. This is the main folder for your "
                                               "genealogy files. All other folder paths build off of this one.\n"
                                               "2. Add your Gemini API Key here so the AI transcription tool can "
                                               "function.\n"
@@ -1374,16 +1340,16 @@ class Scriptorium(ctk.CTk):
         slider._canvas.unbind("<MouseWheel>")
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
-        """Resolves a directory setting (like JSON_DIR) against PROGRAM_DIR the same way
+        """Resolves a directory setting (like JSON_DIR) against GENEALOGY_DIR the same way
         execute_script does, so a file browser opens in the same folder the script itself
-        will actually look in. The two sentinels resolve to PROGRAM_DIR's own current value
+        will actually look in. The two sentinels resolve to GENEALOGY_DIR's own current value
         and to the toolbox's own code folder, respectively, since neither is itself a
         directory setting nested inside another."""
-        prog_dir_var = self.string_vars.get("PROGRAM_DIR")
+        prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
         program_dir = prog_dir_var.get().strip() if prog_dir_var is not None else ""
         if base_dir_key == TOOLBOX_DIR_SENTINEL:
             return str(BASE_DIR)
-        if base_dir_key == PROGRAM_DIR_SENTINEL:
+        if base_dir_key == GENEALOGY_DIR_SENTINEL:
             return program_dir or os.getcwd()
         base_var = self.string_vars.get(base_dir_key)
         base_setting = base_var.get().strip() if base_var is not None else ""
@@ -1430,18 +1396,39 @@ class Scriptorium(ctk.CTk):
         except ValueError:
             self.string_vars[key].set(str(selected_path).replace("\\", "/"))
 
-    def _build_tab_global(self, frame: ctk.CTkFrame):
-        self._build_tab_header(frame, "Global Settings", "SHARED",
+    def _run_agy_login(self, status_label):
+        status_label.configure(text="Logging in...", text_color=C_ACCENT)
+        self.update_idletasks()
+        try:
+            subprocess.run(["agy", "login"], check=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            result = subprocess.run(["agy", "login", "--status"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            if "Logged in as" in result.stdout:
+                status_label.configure(text=result.stdout.strip(), text_color=C_SUCCESS)
+            else:
+                status_label.configure(text="Not connected.", text_color=C_DANGER)
+        except Exception as e:
+            status_label.configure(text=f"Error: {e}", text_color=C_DANGER)
+
+    def _build_tab_global(self, parent_frame: ctk.CTkFrame):
+        self._build_tab_header(parent_frame, "Global Settings", "SHARED",
                                "The API key, folders, and researcher credit every tool above shares, "
                                "so you only enter them once.")
 
         # Build buttons first so they dock safely to the bottom
-        btn_box = self._create_action_box(frame)
+        btn_box = self._create_action_box(parent_frame)
         ctk.CTkButton(btn_box, text="Test Agy Connection", fg_color=C_ACCENT_STRONG, hover_color=C_ACCENT,
                       text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("AGY_TEST_SCRIPT", "test")).pack(side="left", padx=5)
 
-        self._build_form_ui(frame, GLOBAL_VARS)
+        auth_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        auth_frame.pack(fill="x", padx=20, pady=(20, 0))
+        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (Antigravity)", fg_color=C_ACCENT, text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
+        btn.pack(side="left", padx=(0, 10))
+        status_lbl = ctk.CTkLabel(auth_frame, text="Not connected.", text_color=C_TEXT_MUTED)
+        status_lbl.pack(side="left")
+        btn.configure(command=lambda: threading.Thread(target=self._run_agy_login, args=(status_lbl,), daemon=True).start())
+
+        self._build_form_ui(parent_frame, GLOBAL_VARS)
 
     def _build_tab_archivist(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Archivist", "BUILD",
@@ -1617,8 +1604,8 @@ class Scriptorium(ctk.CTk):
         """Launches a dedicated Chrome/Edge window with --remote-debugging-port
         active (fresh profile under Working/LAC/, never touching your normal
         browsing profile) to obtain LAC session cookies via CDP."""
-        program_dir_var = self.string_vars.get("PROGRAM_DIR")
-        program_dir = program_dir_var.get().strip() if program_dir_var else ""
+        program_dir_var = self.string_vars.get("GENEALOGY_DIR")
+        program_dir = program_dir_var.get().strip() if program_dir_var is not None else ""
         profile_dir = os.path.join(program_dir or os.getcwd(), "Working", "LAC", "DebugBrowserProfile")
         os.makedirs(profile_dir, exist_ok=True)
 
@@ -1789,7 +1776,7 @@ class Scriptorium(ctk.CTk):
                 return sub
             return os.path.join(base, sub).replace("\\", "/")
 
-        prog_dir_var: Union[ctk.StringVar, None] = self.string_vars.get("PROGRAM_DIR")
+        prog_dir_var: Union[ctk.StringVar, None] = self.string_vars.get("GENEALOGY_DIR")
         program_dir = prog_dir_var.get().strip() if prog_dir_var is not None else ""
         media_dir_var = self.string_vars.get("MEDIA_DIR")
         media_base = media_dir_var.get().strip() if media_dir_var is not None else "Media"
@@ -1845,7 +1832,7 @@ class Scriptorium(ctk.CTk):
             elif mode in ("enrich", "partition", "resolve-names", "crosscheck"):
                 args.append(mode)
                 if mode == "enrich":
-                    delay_val = self.string_vars.get("SCRIP_DELAY_SECONDS", ctk.StringVar(value="0.4")).get().strip()
+                    delay_val = "0.4"
                     if delay_val:
                         args.extend(["--delay", delay_val])
                     limit_val = self.string_vars.get("SCRIP_ENRICH_LIMIT", ctk.StringVar(value="")).get().strip()

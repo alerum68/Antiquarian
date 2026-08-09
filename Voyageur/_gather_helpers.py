@@ -102,14 +102,14 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     return img_count
 
 
-def resolve_census_image_dir(base_img_setting: str, program_dir: str, census_folder: str,
+def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
                              location_folder: str) -> Path:
     if os.path.isabs(base_img_setting):
         base_img_dir = Path(base_img_setting)
     else:
         media_setting = os.getenv("MEDIA_DIR", "Media")
         base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
-            Path(program_dir) / media_setting if program_dir else Path(media_setting))
+            Path(genealogy_dir) / media_setting if genealogy_dir else Path(media_setting))
         base_img_dir = base_media_dir / base_img_setting
     img_target_dir = base_img_dir / census_folder / location_folder
     img_target_dir.mkdir(parents=True, exist_ok=True)

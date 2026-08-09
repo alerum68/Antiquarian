@@ -27,10 +27,11 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 # ==========================================
 # CONFIGURATION
 # ==========================================
-PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
+PROGRAM_DIR = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
+GENEALOGY_DIR = os.getenv("GENEALOGY_DIR", "")
 
-_target = os.getenv("PDFIX_TARGET_DIR", ".")
-TARGET_DIR = _target if os.path.isabs(_target) else os.path.join(PROGRAM_DIR, _target)
+_target = os.getenv("PDFIX_TARGET_DIR", "Media/Project")
+TARGET_DIR = _target if os.path.isabs(_target) else os.path.join(GENEALOGY_DIR, _target)
 
 
 def _get_env_int(key: str, default: int) -> int:

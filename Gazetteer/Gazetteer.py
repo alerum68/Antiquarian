@@ -33,10 +33,11 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 # ==========================================
 # CONFIGURATION
 # ==========================================
-PROGRAM_DIR = os.getenv("PROGRAM_DIR", "")
+PROGRAM_DIR = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
+GENEALOGY_DIR = os.getenv("GENEALOGY_DIR", "")
 
 _rm_db = os.getenv("GAZETTEER_RM_DATABASE", "Roots Magic 11/Your Tree.rmtree")
-RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(PROGRAM_DIR, _rm_db)
+RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(GENEALOGY_DIR, _rm_db)
 
 _shape = os.getenv(
     "GAZETTEER_SHAPEFILE",

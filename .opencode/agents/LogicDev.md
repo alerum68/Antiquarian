@@ -21,6 +21,7 @@ description: >
 
 ## Hard Constraints
 
+- **CORE ARCHITECTURE CONSTRAINT:** The `Commissioner` module is the absolute conceptual root of this project. When implementing any data transformation, JSON generation, or GEDCOM extraction logic, you MUST use `Commissioner` models as the definitive structural guide.
 - **DO NOT** write CSS, JSX rendering trees, or HTML templates.
 - **DO NOT** write test assertions or test fixtures.
 - **DO NOT** modify folder structure or create new files — only fill in shells created by ArchDev.

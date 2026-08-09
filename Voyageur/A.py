@@ -69,7 +69,8 @@ def main() -> Path:
     load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
     load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
-    program_dir = os.getenv("PROGRAM_DIR", "")
+    program_dir = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
+    genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("A_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
     # Matches Scriptorium.py's own CENSUS_IMAGE_DIR default ("Census", resolved against
@@ -144,7 +145,7 @@ def main() -> Path:
     # as a subprocess) so this script produces correct output standalone, with nothing
     # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
     # directly by the user) is used as-is, never re-nested.
-    img_target_dir = resolve_census_image_dir(base_img_setting, program_dir, census_folder, location_folder)
+    img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
 
     img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)
     print(f"[System] Moved JSON and {img_count} images to Project folders.")

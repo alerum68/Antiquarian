@@ -8,6 +8,7 @@ cleanup with no new functionality.
 ## [Unreleased]
 
 ### Added
+- **Scriptorium UI Overhaul**: Refactored Scriptorium UI to remove developer-centric settings and added Antigravity OAuth integration.
 - **Archivist Structural Split**: `Archivist.py` (3,691 lines) split into a thin
   dispatcher plus `Utils.py`, `Census.py`, `General.py`, and `Scrip.py`, replacing
   the file's `is_scrip` boolean-flag branching with a `Profile` strategy-pattern

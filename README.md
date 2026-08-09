@@ -59,9 +59,9 @@ In general, the workflow is straightforward:
 Scriptorium relies on a few external services, depending on how you choose to use it.
 
 * Windows 10 or Windows 11.
-* Google Gemini API access for document processing.
+* Antigravity (agy) for document processing.
 * Internet access while processing records.
-* A Google Gemini API key.
+* Antigravity initialized via the CLI.
 * Optional subscriptions for external services such as Ancestry if you want to retrieve records directly from those platforms.
 
 Some features may require additional software or accounts. These are documented in the Wiki.

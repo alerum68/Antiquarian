@@ -43,8 +43,9 @@ def _safe_path(base: str, *parts: str) -> str:
     return res
 
 
-PROGRAM_DIR = os.environ.get("PROGRAM_DIR", "").strip()
-MEDIA_DIR = _safe_path(PROGRAM_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
+PROGRAM_DIR = os.environ.get("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent)).strip()
+GENEALOGY_DIR = os.environ.get("GENEALOGY_DIR", "").strip()
+MEDIA_DIR = _safe_path(GENEALOGY_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
 CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("LAC_CHECKPOINT_DIR", "Working/LAC"))
 COOKIE_FILE = _safe_path(PROGRAM_DIR, os.environ.get("LAC_COOKIE_FILE", "Working/LAC/lac_cookies.txt"))
 DEFAULT_ARCHIVAL_NUMBER = os.environ.get("LAC_ARCHIVAL_NUMBER", "RG15")
@@ -623,7 +624,7 @@ def _run_reel(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     document_type = _resolve_record_type(args.record_type)
-    program_dir = os.environ.get("PROGRAM_DIR", "").strip()
+    program_dir = os.environ.get("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent)).strip()
     master_db_path = resolve_master_db_path(document_type, PROGRAM_DIR)
 
     roll, manifest = parse_url(args.url)
@@ -646,7 +647,7 @@ def main() -> None:
                                help="Path to browser cookies file for LAC search.")
     volume_parser.add_argument("--media-dir", default=MEDIA_DIR,
                                help="Base output media directory.")
-    volume_parser.add_argument("--workers", type=int, default=int(os.environ.get("LAC_MAX_WORKERS", "1")),
+    volume_parser.add_argument("--workers", type=int, default=8,
                                help="Number of concurrent workers for volume downloading (default 1).")
     volume_parser.add_argument("--record-type", default=os.environ.get("LAC_RECORD_TYPE", ""),
                                help="Commissioner record type this volume harvest is for: parish or scrip.")

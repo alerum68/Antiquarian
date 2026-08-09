@@ -59,49 +59,6 @@ sections:
     PARISH_FILE_NAME:
       default: "Parish_Export"
       tooltip: "Parish base export filename."
-  Family Inference Tuning:
-    MIN_MARRIAGE_AGE:
-      default: "12"
-      tooltip: "The youngest plausible age someone could be married (used to group families correctly)."
-      widget: slider
-      min: 0
-      max: 30
-      step: 1
-    MAX_SPOUSE_AGE_GAP:
-      default: "25"
-      tooltip: "The largest age gap allowed between a husband and wife before the AI assumes they are not married."
-      widget: slider
-      min: 0
-      max: 50
-      step: 1
-    HUSBAND_CHILD_AGE_GAP_MIN:
-      default: "14"
-      tooltip: "The minimum plausible age difference between a father and his child."
-      widget: slider
-      min: 0
-      max: 30
-      step: 1
-    HUSBAND_CHILD_AGE_GAP_MAX:
-      default: "60"
-      tooltip: "The maximum plausible age difference between a father and his child."
-      widget: slider
-      min: 30
-      max: 90
-      step: 1
-    WIFE_CHILD_AGE_GAP_MIN:
-      default: "12"
-      tooltip: "The minimum plausible age difference between a mother and her child."
-      widget: slider
-      min: 0
-      max: 30
-      step: 1
-    WIFE_CHILD_AGE_GAP_MAX:
-      default: "50"
-      tooltip: "The maximum plausible age difference between a mother and her child."
-      widget: slider
-      min: 20
-      max: 70
-      step: 1
   Citation & Role Vocabulary:
     CITATION_TEXT:
       default: ""

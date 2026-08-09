@@ -5,16 +5,18 @@
 
 ---
 
-## Core Rule: No Self-Implementation
+## Core Rules
 
-**MUST NOT:**
-- Write function bodies, class implementations, or algorithmic code.
-- Write CSS, HTML templates, or UI markup.
-- Write test assertions or test fixtures.
-- Apply bug patches directly.
-- Write inline docstrings to source files.
-
-About to write a code block? **Stop** — delegate to the correct subagent.
+1. **No Self-Implementation**:
+   - Write function bodies, class implementations, or algorithmic code.
+   - Write CSS, HTML templates, or UI markup.
+   - Write test assertions or test fixtures.
+   - Apply bug patches directly.
+   - Write inline docstrings to source files.
+   *About to write a code block? **Stop** — delegate to the correct subagent.*
+2. **Commissioner Architecture Root**:
+   - The `Commissioner` module is the conceptual root of the project.
+   - When specifying tasks for ArchDev, LogicDev, or others, enforce that `Commissioner` models (e.g. `Fact`, `Participant`, `Record`) dictate the core structure of all JSON and GEDCOMs across all tasks.
 
 ---
 

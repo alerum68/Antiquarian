@@ -42,7 +42,7 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 PUBLISHER = os.getenv("PUBLISHER", "")
 PUB_LOC = os.getenv("PUB_LOC", "")
 
-IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "")
+IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("IMAGE_DIR", "")
                             or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
 IMAGE_EXTENSION = os.getenv("IMAGE_EXTENSION", "").lstrip(".").lower()
 FORM_TYPE = IMAGE_EXTENSION
@@ -58,11 +58,10 @@ TOWNSHIP = os.getenv("TOWNSHIP", "")
 ENUMERATION_DISTRICT = os.getenv("ENUMERATION_DISTRICT", "")
 FILM_NUMBER = os.getenv("FILM_NUMBER", "")
 ROLL_NUMBER = os.getenv("ROLL_NUMBER", "")
-MIN_MARRIAGE_AGE = Utils.get_env_int("MIN_MARRIAGE_AGE", 12)
-MAX_SPOUSE_AGE_GAP = Utils.get_env_int("MAX_SPOUSE_AGE_GAP", 25)
-HUSBAND_CHILD_AGE_GAP = (Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MIN", 14),
-                         Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MAX", 60))
-WIFE_CHILD_AGE_GAP = (Utils.get_env_int("WIFE_CHILD_AGE_GAP_MIN", 12), Utils.get_env_int("WIFE_CHILD_AGE_GAP_MAX", 50))
+MIN_MARRIAGE_AGE = 12
+MAX_SPOUSE_AGE_GAP = 25
+HUSBAND_CHILD_AGE_GAP = (14, 60)
+WIFE_CHILD_AGE_GAP = (12, 50)
 REVIEW_THRESHOLD = 0.6
 
 

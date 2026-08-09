@@ -22,6 +22,7 @@ description: >
 
 ## Hard Constraints
 
+- **CORE ARCHITECTURE CONSTRAINT:** The `Commissioner` module is the absolute conceptual root of this project. Any structural logic or data scaffolding must treat `Commissioner` as the authoritative source that dictates how JSON and GEDCOMs are structured.
 - **DO NOT** implement any function body beyond `pass` or a `// TODO` stub.
 - **DO NOT** write CSS, HTML markup beyond skeleton `<html>` shells, or test assertions.
 - **DO NOT** communicate directly with any agent other than the Project Head.

@@ -36,7 +36,7 @@ COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "")
+IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("IMAGE_DIR", "")
                             or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
 
 
@@ -1184,7 +1184,7 @@ def apply_record_type_field_remap(record_type_name: str) -> None:
     REPOSITORY = resolved.get("REPOSITORY") or REPOSITORY
     REPOSITORY_LOC = resolved.get("REPOSITORY_LOC") or REPOSITORY_LOC
     if resolved.get("IMAGE_DIR"):
-        IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, resolved["IMAGE_DIR"])
+        IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, resolved["IMAGE_DIR"])
     if resolved.get("GEDCOM_OUTPUT_NAME") and not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
         Utils.GEDCOM_OUTPUT_NAME = resolved["GEDCOM_OUTPUT_NAME"]
 

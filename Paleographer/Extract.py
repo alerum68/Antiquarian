@@ -247,7 +247,8 @@ COST_CFG = engine.CostConfig(
     cache_discount_multiplier=float(os.getenv("CACHE_DISCOUNT_MULTIPLIER", "0.10")),
 )
 
-PROGRAM_DIR: Path = Path(os.getenv("PROGRAM_DIR", ""))
+PROGRAM_DIR: Path = Path(os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent)))
+GENEALOGY_DIR: Path = Path(os.getenv("GENEALOGY_DIR", ""))
 _MASTER_DB_NAME = resolve_setting("MASTER_DB_NAME")
 if not _MASTER_DB_NAME:
     raise RuntimeError(
@@ -255,7 +256,7 @@ if not _MASTER_DB_NAME:
         "MASTER_DB_NAME setting, e.g. CHURCH_MASTER_DB_NAME for Parish.pmt) - without it "
         "MASTER_DB would just be the JSON folder itself, not a file inside it.")
 MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / _MASTER_DB_NAME)
-SOURCE_DIR: str = str(PROGRAM_DIR / resolve_setting("IMAGE_DIR"))
+SOURCE_DIR: str = str(GENEALOGY_DIR / resolve_setting("IMAGE_DIR"))
 
 MODEL_ID: str = os.getenv("MODEL_NAME") or ""
 if not MODEL_ID:
@@ -270,7 +271,7 @@ DEBUG_FILE: Union[str, None] = sys.argv[1] if (
 # never left to agy's own default.
 AGY_MODEL_ID: str = os.getenv("AGY_MODEL_NAME") or agy_engine.DEFAULT_MODEL
 AGY_CLI_BIN: str = os.getenv("AGY_CLI_BIN") or agy_client.DEFAULT_CLI_BIN
-AGY_TIMEOUT_SECONDS: int = int(os.getenv("AGY_TIMEOUT_SECONDS", str(agy_client.DEFAULT_TIMEOUT_SECONDS)))
+AGY_TIMEOUT_SECONDS: int = 240
 
 SOURCE_SUFFIXES = engine.IMAGE_SUFFIXES + (".pdf",)
 
