@@ -477,19 +477,20 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
         file_ext = "JPEG"
     pages_str = file_base.split("_")[-1]
 
-    file_metadata = {"File": file_base, "Pages": pages_str}
-    dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
-    
+    needs_review = False
     if placeholder_sheet:
         records = placeholder_sheet.get("records", [])
         if records:
             tsf = records[0].get("type_specific_fields", {})
             needs_review = tsf.get("needs_llm_structured_review", False)
-            if needs_review:
-                dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was either empty or missing. You MUST carefully read the unstructured summary paragraph/narrative and attempt to extract all structured vital dates (birth, death) and employment rows (positions, posts, dates) from it, mapping them into the structured JSON fields to the best of your ability."
-            else:
-                dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was successfully parsed by a previous system. DO NOT attempt to extract structured vital dates or employment rows from the image. Focus ONLY on transcribing the unstructured summary narrative exactly as written. Leave the structured data fields empty, as they will be preserved from the previous pass."
-
+            
+    file_metadata = {
+        "File": file_base, 
+        "Pages": pages_str,
+        "needs_llm_structured_review": needs_review
+    }
+    dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
+    
     dynamic_prompt += engine.build_continuation_context(pending_continuation)
 
     if EXTRACTION_ENGINE == "agy":

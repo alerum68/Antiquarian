@@ -71,3 +71,4 @@ EXTRACTION RULES:
 - Service History: Extract outfit year ranges, positions, posts, and districts into the `service_history` list.
 - Archival References: Extract all unique HBCA location codes into `hbca_references`.
 - Citations: Preserve all specific book, folio, and document references.
+- Conditional Extraction: **Only when** the `Metadata Context` indicates `needs_llm_structured_review: true`, you must *also* read the narrative prose and footnotes to fill `parish_of_origin`, `entered_service_year`, vital dates, and `service_history`. If it is missing or false, assume these have already been populated and focus exclusively on the family and biographical notes.

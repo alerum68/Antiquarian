@@ -49,12 +49,14 @@ def test_hbca_record_extra_fields():
             "search_file_reference": "Search File: 'ADAMS, GEORGE'",
             "hbca_references": ["B.239/g/1", "A.32/21"],
             "keystone_urls": ["https://pam.minisisinc.com/scripts/mwimain.dll/..."],
+            "needs_llm_structured_review": False,
         },
     )
     assert extra.parish_of_origin == "Birsay, Orkney"
     assert extra.entered_service_year == "1821"
     assert len(extra.service_history) == 1
     assert len(extra.hbca_references) == 2
+    assert extra.needs_llm_structured_review is False
 
 
 def test_hbca_participant_extra_fields():
