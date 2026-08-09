@@ -188,6 +188,86 @@ def extract_hbca_location_codes(text: str) -> List[str]:
     return codes
 
 
+_FILENAME_FOOTER_REGEX = re.compile(
+    r"Filename:.*?\((?:fl\.|b\.|d\.)\s*([^)]+)\)", re.IGNORECASE
+)
+
+def parse_bio_sheet_text(text: str) -> dict:
+    data = {
+        "parish_of_origin": "", "entered_service_year": "", "service_years_range": "",
+        "vital_dates_summary": "", "birth_date_extracted": "", "death_date_extracted": "",
+        "service_history": [],
+    }
+
+    parish_match = re.search(r'PARISH:\s*(.*?)(?:\s*ENTERED SERVICE:|\s*DATES:|\n)', text)
+    if parish_match:
+        data["parish_of_origin"] = parish_match.group(1).strip()
+
+    service_match = re.search(r'ENTERED SERVICE:\s*(.*?)(?:\s*DATES:|\n)', text)
+    if service_match:
+        data["entered_service_year"] = service_match.group(1).strip()
+
+    dates_match = re.search(r'DATES:\s*(.*?)(?:Appointments & Service|Outfit Year|Filename:|$)', text, re.DOTALL)
+    if dates_match:
+        data["vital_dates_summary"] = dates_match.group(1).strip()
+    b_match = re.search(r'\bb\.\s*([^,;\n]+)', data["vital_dates_summary"])
+    if b_match:
+        data["birth_date_extracted"] = b_match.group(1).strip()
+    d_match = re.search(r'\bd\.\s*([^,;\n]+)', data["vital_dates_summary"])
+    if d_match:
+        data["death_date_extracted"] = d_match.group(1).strip()
+
+    # Fallback: floruit/vital range from the Filename metadata footer
+    if not data["vital_dates_summary"]:
+        footer_match = _FILENAME_FOOTER_REGEX.search(text)
+        if footer_match:
+            data["service_years_range"] = data["service_years_range"] or footer_match.group(1).strip()
+            data["vital_dates_summary"] = footer_match.group(0).strip()
+
+    row_pattern = r'^\s*(\d{4}(?:-\d{4})?)\s+(.+?)\s+([A-Z][.\w/]+(?:/\d+[a-z]?)?)(?:,.*)?$'
+    for oy, middle_text, _ in re.findall(row_pattern, text, re.MULTILINE):
+        codes = extract_hbca_location_codes(middle_text + " " + _)
+        ref = codes[0] if codes else None
+        if not ref:
+            continue
+        
+        pos = ""
+        post = ""
+        for p in ["Clerk in charge", "Postmaster", "Clerk", "Apprentice"]:
+            if middle_text.startswith(p):
+                pos = p
+                post = middle_text[len(p):].strip()
+                break
+        
+        if not pos:
+            parts = middle_text.split()
+            pos = " ".join(parts[:2]) if len(parts) >= 2 else middle_text.strip()
+            post = " ".join(parts[2:]) if len(parts) > 2 else ""
+
+        district = ""
+        if post == "The Pas Cumberland":
+            post, district = "The Pas", "Cumberland"
+        elif post == "Rapid River English River":
+            post, district = "Rapid River", "English River"
+        elif post == "Lake St. Anns Upper Saskatchewan":
+            post, district = "Lake St. Anns", "Upper Saskatchewan"
+
+        data["service_history"].append({
+            "outfit_years": oy.strip(),
+            "position": pos,
+            "post": post,
+            "district": district,
+            "hbca_ref": ref,
+        })
+
+    data["needs_llm_structured_review"] = not any([
+        data["parish_of_origin"], data["entered_service_year"],
+        (data["vital_dates_summary"] if not data["vital_dates_summary"].startswith("Filename:") else ""),
+        data["service_history"],
+    ])
+    return data
+
+
 # ==========================================
 # KEYSTONE RESOLVER & MEDIA DOWNLOADER
 # ==========================================
@@ -288,7 +368,8 @@ def build_hbca_scaffold_sheet(
 ) -> dict:
     """Builds a Commissioner-compliant placeholder sheet dict for an HBCA bio sheet."""
     codes = extract_hbca_location_codes(raw_text)
-    return {
+    parsed = parse_bio_sheet_text(raw_text)
+    scaffold = {
         "page_id": entry.file_name,
         "document_metadata": {
             "file_name": entry.file_name,
@@ -322,6 +403,8 @@ def build_hbca_scaffold_sheet(
             }
         ],
     }
+    scaffold["records"][0]["type_specific_fields"].update(parsed)
+    return scaffold
 
 
 def load_checkpoint(checkpoint_file: Path) -> Set[str]:
