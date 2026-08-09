@@ -19,7 +19,12 @@ import HBCA
 import Scrip
 import Utils
 
-JSON_DIR = os.getenv("JSON_DIR", str(Path(__file__).resolve().parent))
+_JSON_DIR_SETTING = os.getenv("JSON_DIR", "")
+JSON_DIR = (
+    Utils.safe_path(Utils.PROGRAM_DIR, _JSON_DIR_SETTING)
+    if _JSON_DIR_SETTING
+    else str(Path(__file__).resolve().parent)
+)
 JSON_FILE = os.getenv("JSON_FILE", "")
 
 PROFILE_REGISTRY: Dict[str, Callable[[], "General.Profile"]] = {
