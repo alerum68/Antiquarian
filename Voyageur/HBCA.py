@@ -347,10 +347,17 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
                 seen_records.add(full_url)
                 record_urls.append(full_url)
 
+    # Only collect images that are demonstrably digitized archival media,
+    # not page decorations, logos, or icons.
+    _ARCHIVAL_IMG_PATHS = ("/assets/media/", "/images/scans/", "/images/records/", "/digitized/")
+    _ARCHIVAL_IMG_EXTS = (".jpg", ".jpeg", ".tif", ".tiff", ".png")
     for img_tag in soup.find_all("img", src=True):
         src = img_tag["src"].strip()
+        src_lower = src.lower()
         full_img_url = urljoin(base_url, src)
-        if "/thumbs/" not in src.lower() and full_img_url not in seen_media:
+        is_archival_path = any(p in src_lower for p in _ARCHIVAL_IMG_PATHS)
+        is_archival_ext = any(src_lower.endswith(ext) for ext in _ARCHIVAL_IMG_EXTS)
+        if (is_archival_path or is_archival_ext) and "/thumbs/" not in src_lower and full_img_url not in seen_media:
             seen_media.add(full_img_url)
             media_urls.append(full_img_url)
 
