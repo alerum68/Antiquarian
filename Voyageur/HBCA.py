@@ -166,7 +166,7 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
 
 
 _CODE_REGEX = re.compile(
-    r"\b([A-G]\.\d+/[a-z]/\d+[a-z]?(?:\s*-\s*\d+)?(?:\s+fo\.\s*\d+)?|[A-G]\.\d+/\d+[a-z]?(?:\s+fo\.\s*\d+)?)\b",
+    r"\b([A-G]\.\d+(?:/[a-z0-9]+)+(?:[a-z]?)(?:\s*-\s*\d+)?(?:\s+fos?\.\s*\d+[a-z]?(?:\s*-\s*\d+[a-z]?)?)?)\b",
     re.IGNORECASE,
 )
 _SEARCH_FILE_REGEX = re.compile(r"(Search\s+File[:\s]+['\"]?[^'\"\n\r]+['\"]?)", re.IGNORECASE)
@@ -216,10 +216,10 @@ def parse_bio_sheet_text(text: str) -> dict:
     dates_match = re.search(r'DATES:\s*(.*?)(?:Appointments & Service|Outfit Year|Filename:|$)', text, re.DOTALL)
     if dates_match:
         data["vital_dates_summary"] = dates_match.group(1).strip()
-    b_match = re.search(r'\bb\.\s*([^,;\n]+)', data["vital_dates_summary"])
+    b_match = re.search(r'\bb\.[ \t]*([^,;\n]+)', data["vital_dates_summary"])
     if b_match:
         data["birth_date_extracted"] = b_match.group(1).strip()
-    d_match = re.search(r'\bd\.\s*([^,;\n]+)', data["vital_dates_summary"])
+    d_match = re.search(r'\bd\.[ \t]*([^,;\n]+)', data["vital_dates_summary"])
     if d_match:
         data["death_date_extracted"] = d_match.group(1).strip()
 
@@ -282,7 +282,7 @@ from pypdf import PdfWriter
 
 def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> str:
     """Builds a local HTML file that auto-submits a POST search to Keystone."""
-    cleaned_code = location_code.split(" fo.")[0].strip()
+    cleaned_code = re.split(r'\s+fos?\.', location_code, flags=re.IGNORECASE)[0].strip()
     safe_name = "".join(c if c.isalnum() else "_" for c in cleaned_code)
     
     html_content = f"""<!DOCTYPE html>
