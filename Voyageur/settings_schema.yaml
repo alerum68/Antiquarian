@@ -53,13 +53,13 @@ sections:
       default: ""
       tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."
     HBCA_RESOLVE_KEYSTONE:
-      default: "false"
+      default: "False"
       tooltip: "Query Archives of Manitoba Keystone database to resolve microfilm/finding aid links for cited location codes."
-      widget: checkbox
+      widget: toggle
     HBCA_DOWNLOAD_KEYSTONE_MEDIA:
-      default: "true"
+      default: "True"
       tooltip: "When Keystone resolving is enabled, download any digitized microfilm copy media files found."
-      widget: checkbox
+      widget: toggle
     KEYSTONE_BASE_URL:
       default: "https://pam.minisisinc.com/scripts/mwimain.dll"
       tooltip: "Base URL for the Archives of Manitoba Keystone database search."
