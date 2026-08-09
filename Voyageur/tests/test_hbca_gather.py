@@ -108,3 +108,13 @@ def test_checkpoint_roundtrip(tmp_path):
 
     loaded = load_checkpoint(cp_file)
     assert loaded == downloaded
+
+
+def test_parse_biographical_index_html_extracts_letter():
+    mock_html = '<html><body><a href="a/zebra.pdf">Zebra</a><a href="b/x-weird_name.pdf">X-Weird</a></body></html>'
+    entries = parse_biographical_index_html(mock_html, base_url="https://fake.url/")
+
+    assert len(entries) == 2
+    assert entries[0].letter == "a"
+    assert entries[1].letter == "b"
+

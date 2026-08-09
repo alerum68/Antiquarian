@@ -92,8 +92,8 @@ def parse_biographical_index_html(html_text: str, base_url: str = DEFAULT_INDEX_
         if not href.lower().endswith(".pdf"):
             continue
 
-        # Match path structure .../biographical/<letter>/<filename>.pdf
-        match = re.search(r"biographical/([a-z0-9])/([^/]+\.pdf)$", href, re.IGNORECASE)
+        # Match path structure .../<letter>/<filename>.pdf
+        match = re.search(r"([a-z0-9])/([^/]+\.pdf)$", href, re.IGNORECASE)
         if match:
             letter = match.group(1).lower()
             file_name = match.group(2).lower()
