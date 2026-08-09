@@ -744,9 +744,17 @@ def gather_hbca_sheets(
         print(f"Filtered to {len(filtered_entries)} sheets matching letter(s): {letter_filter}")
 
     new_downloads = 0
+    completed_count = 0
+    total_entries = len(filtered_entries)
     db_lock = threading.Lock()
+    print_lock = threading.Lock()
+
+    def log(message: str) -> None:
+        with print_lock:
+            print(message)
 
     def process_entry(entry: BioSheetEntry) -> bool:
+        nonlocal completed_count
         if entry.file_name in downloaded_set:
             return False
 
@@ -755,13 +763,14 @@ def gather_hbca_sheets(
 
         session = requests.Session()
         if not target_file.exists():
-            print(f"Downloading {entry.file_name} from {entry.pdf_url}...")
+            log(f"Downloading {entry.file_name} from {entry.pdf_url}...")
             pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)
             if pdf_resp.status_code == 200:
                 with open(target_file, "wb") as f:
                     f.write(pdf_resp.content)
+                log(f"Downloaded {entry.file_name} ({len(pdf_resp.content):,} bytes)")
             else:
-                print(f"[WARN] Failed to download {entry.pdf_url}: HTTP {pdf_resp.status_code}")
+                log(f"[WARN] Failed to download {entry.pdf_url}: HTTP {pdf_resp.status_code}")
                 return False
 
         raw_text = extract_text_from_pdf(target_file)
@@ -771,13 +780,18 @@ def gather_hbca_sheets(
         if resolve_keystone:
             codes = extract_hbca_location_codes(raw_text)
             for code in codes:
+                log(f"  [{entry.file_name}] Resolving archival source {code}...")
                 res = query_keystone_for_code(code, session=session)
                 keystone_urls.extend(res.get("record_urls", []))
                 keystone_records[code] = res
                 if download_keystone and res.get("media_urls"):
                     clean_code = re.sub(r"[^\w\.-]", "_", code)
                     dest_media_dir = media_dir / "HBCA" / "Archives" / clean_code
-                    download_keystone_media(res["media_urls"], dest_media_dir, session=session)
+                    downloaded_media = download_keystone_media(
+                        res["media_urls"], dest_media_dir, session=session
+                    )
+                    log(f"  [{entry.file_name}] Archived {code}: "
+                        f"{len(downloaded_media)} file(s) -> {dest_media_dir}")
 
         sheet = build_hbca_scaffold_sheet(
             entry, raw_text=raw_text, keystone_urls=keystone_urls, keystone_records=keystone_records
@@ -787,6 +801,10 @@ def gather_hbca_sheets(
             append_scaffold_sheet(master_db_path, sheet)
             downloaded_set.add(entry.file_name)
             save_checkpoint(checkpoint_file, downloaded_set)
+            completed_count += 1
+            count_now = completed_count
+
+        log(f"[{count_now}/{total_entries}] Finished {entry.file_name}")
 
         if delay_sec > 0:
             time.sleep(delay_sec)
