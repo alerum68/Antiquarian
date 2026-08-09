@@ -307,6 +307,9 @@ def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_
     return out_file.absolute().as_uri()
 
 
+_KEYSTONE_MEDIA_EXTENSIONS = (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4")
+
+
 def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, Any]:
     """Parses Keystone HTML search results for finding aid URLs, metadata, and digitized media links."""
     soup = BeautifulSoup(html_text, "html.parser")
@@ -337,7 +340,7 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
         full_url = urljoin(base_url, href)
         href_lower = href.lower()
 
-        is_media_ext = any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4"))
+        is_media_ext = href_lower.endswith(_KEYSTONE_MEDIA_EXTENSIONS)
         if is_media_ext or "/assets/media/" in href_lower:
             if full_url not in seen_media:
                 seen_media.add(full_url)
@@ -373,14 +376,15 @@ _KEYSTONE_BROWSER_UA = (
 
 
 def _query_keystone_with_browser(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, Any]:
-    """Uses Playwright headless Chromium to query Keystone and return DIGITALOBJECTS PDF URLs.
+    """Uses Playwright headless Chromium to query Keystone and return DIGITALOBJECTS media URLs.
 
     MINISIS requires a live browser session (session token embedded in the form
     action URL).  Plain ``requests`` cannot maintain this token across GET→POST;
     a real browser context can.  We load the search landing page, extract the
     session-bound form action via JS, then submit an in-page ``fetch`` POST so
     the session is preserved, and parse the response HTML for ``DIGITALOBJECTS``
-    PDF links.
+    links whose filename carries the HBCA location code (e.g. ``B239-G-11.pdf``) -
+    not just PDFs, since the same code can resolve to a scan in another format.
     """
     result: Dict[str, Any] = {"record_urls": [], "media_urls": [], "metadata": {}}
     try:
@@ -453,7 +457,7 @@ def _query_keystone_with_browser(location_code: str, base_url: str = KEYSTONE_BA
             for a_tag in soup.find_all("a", href=True):
                 href: str = a_tag["href"]
                 href_lower = href.lower()
-                if "digitalobjects" in href_lower and href_lower.endswith(".pdf"):
+                if "digitalobjects" in href_lower and href_lower.endswith(_KEYSTONE_MEDIA_EXTENSIONS):
                     full = href if href.startswith("http") else urljoin(base_url, href)
                     if full not in result["media_urls"]:
                         result["media_urls"].append(full)
@@ -518,7 +522,11 @@ def query_keystone_for_code(
     except Exception as e:
         print(f"[WARN] Failed to query Keystone for {location_code}: {e}")
 
-    result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
+    if not result.get("record_urls"):
+        # No stable permalink was scraped from a live record page (search failed,
+        # or the page didn't carry a Share Link) - fall back to a local
+        # auto-submitting search redirect so there's still something to click.
+        result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
 
     # If the requests-based scrape found no digitised media, fall back to a
     # full headless-browser session which can keep the MINISIS session token
@@ -785,8 +793,7 @@ def gather_hbca_sheets(
                 keystone_urls.extend(res.get("record_urls", []))
                 keystone_records[code] = res
                 if download_keystone and res.get("media_urls"):
-                    clean_code = re.sub(r"[^\w\.-]", "_", code)
-                    dest_media_dir = media_dir / "HBCA" / "Archives" / clean_code
+                    dest_media_dir = media_dir / "HBCA" / "Archives"
                     downloaded_media = download_keystone_media(
                         res["media_urls"], dest_media_dir, session=session
                     )

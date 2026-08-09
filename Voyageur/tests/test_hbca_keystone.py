@@ -1,5 +1,7 @@
 import importlib.util
 from pathlib import Path
+from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 _hbca_path = Path(__file__).resolve().parents[1] / "HBCA.py"
 _spec = importlib.util.spec_from_file_location("voyageur_hbca", _hbca_path)
@@ -48,9 +50,18 @@ def test_extract_hbca_location_codes():
 
 
 def test_build_keystone_search_url():
+    # A plain GET URL can't actually run a MINISIS search (it needs a live,
+    # session-scoped POST), so this writes a local HTML page that auto-submits
+    # the real POST on load and returns that page's file:// URI - a fallback
+    # link a human can still click when the automated lookup finds nothing.
     url = build_keystone_search_url("B.239/g/1")
-    assert "pam.minisisinc.com" in url
-    assert "B.239/g/1" in url or "B_239_g_1" in url or "B.239%2Fg%2F1" in url
+    assert url.startswith("file://")
+    assert url.endswith(".html")
+
+    local_path = Path(url2pathname(urlparse(url).path))
+    contents = local_path.read_text(encoding="utf-8")
+    assert "pam.minisisinc.com" in contents
+    assert "B.239/g/1" in contents
 
 
 def test_parse_keystone_search_response():
