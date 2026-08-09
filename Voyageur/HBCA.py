@@ -271,6 +271,9 @@ def parse_bio_sheet_text(text: str) -> dict:
 # ==========================================
 # KEYSTONE RESOLVER & MEDIA DOWNLOADER
 # ==========================================
+import json
+from pypdf import PdfWriter
+
 def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> str:
     """Builds a direct search URL for Manitoba Archives Keystone database."""
     cleaned_code = location_code.split(" fo.")[0].strip()
@@ -278,20 +281,37 @@ def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_
     return f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH&KEYWORD_CLUSTER={encoded}"
 
 
-def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, List[str]]:
-    """Parses Keystone HTML search results for finding aid URLs and digitized media links."""
+def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, Any]:
+    """Parses Keystone HTML search results for finding aid URLs, metadata, and digitized media links."""
     soup = BeautifulSoup(html_text, "html.parser")
     record_urls: List[str] = []
     media_urls: List[str] = []
     seen_records: Set[str] = set()
     seen_media: Set[str] = set()
+    metadata: Dict[str, str] = {}
+
+    for div in soup.find_all("div"):
+        text = div.get_text(strip=True)
+        if text == "Item Description":
+            nxt = div.find_next_sibling("div")
+            if nxt: metadata["item_description"] = nxt.get_text(strip=True)
+        elif text == "Microfilm No.":
+            nxt = div.find_next_sibling("div")
+            if nxt: metadata["microfilm_no"] = nxt.get_text(strip=True)
+
+    textarea = soup.find("textarea", {"id": "share_link_url"})
+    if textarea:
+        url = textarea.get_text(strip=True)
+        if url and url not in seen_records:
+            seen_records.add(url)
+            record_urls.append(url)
 
     for a_tag in soup.find_all("a", href=True):
         href = a_tag["href"].strip()
         full_url = urljoin(base_url, href)
         href_lower = href.lower()
 
-        is_media_ext = any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4"))  # noqa: E501
+        is_media_ext = any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4"))
         if is_media_ext or "/assets/media/" in href_lower:
             if full_url not in seen_media:
                 seen_media.add(full_url)
@@ -308,25 +328,64 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
             seen_media.add(full_img_url)
             media_urls.append(full_img_url)
 
-    return {"record_urls": record_urls, "media_urls": media_urls}
+    return {"record_urls": record_urls, "media_urls": media_urls, "metadata": metadata}
 
 
 def query_keystone_for_code(
     location_code: str,
     base_url: str = KEYSTONE_BASE_URL,
     session: Optional[requests.Session] = None,
-) -> Dict[str, List[str]]:
+    cache_file: Optional[str] = None,
+) -> Dict[str, Any]:
     """Queries Keystone database for a given location code."""
-    url = build_keystone_search_url(location_code, base_url)
+    if cache_file and Path(cache_file).exists():
+        try:
+            with open(cache_file, "r") as f:
+                cache = json.load(f)
+                if location_code in cache:
+                    return cache[location_code]
+        except Exception:
+            pass
+
     client = session or requests.Session()
     headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Resolver)"}
+    landing_url = f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH"
+    result = {"record_urls": [], "media_urls": [], "metadata": {}}
+
     try:
-        resp = client.get(url, headers=headers, timeout=20)
+        resp = client.get(landing_url, headers=headers, timeout=20)
         if resp.status_code == 200:
-            return parse_keystone_search_response(resp.text, base_url)
+            soup = BeautifulSoup(resp.text, "html.parser")
+            form = soup.find("form", {"name": "frmSearchListings"})
+            if form and form.get("action"):
+                action_url = urljoin(base_url, form["action"])
+                post_resp = client.post(
+                    action_url,
+                    data={"LOCATION_CODE": location_code},
+                    headers=headers,
+                    timeout=20
+                )
+                if post_resp.status_code == 200:
+                    result = parse_keystone_search_response(post_resp.text, base_url)
     except Exception as e:
         print(f"[WARN] Failed to query Keystone for {location_code}: {e}")
-    return {"record_urls": [url], "media_urls": []}
+
+    if not result["record_urls"]:
+        result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
+
+    if cache_file:
+        try:
+            cache = {}
+            if Path(cache_file).exists():
+                with open(cache_file, "r") as f:
+                    cache = json.load(f)
+            cache[location_code] = result
+            with open(cache_file, "w") as f:
+                json.dump(cache, f)
+        except Exception:
+            pass
+
+    return result
 
 
 def download_keystone_media(
@@ -358,6 +417,28 @@ def download_keystone_media(
     return downloaded_paths
 
 
+def download_and_merge_keystone_media(
+    media_urls: List[str],
+    target_dir: Path,
+    output_name: str,
+    session: Optional[requests.Session] = None,
+) -> Path:
+    """Downloads PDFs from Keystone and merges them if there are multiple reels."""
+    downloaded = download_keystone_media(media_urls, target_dir, session)
+    merged_path = target_dir / output_name
+
+    merger = PdfWriter()
+    pdfs_added = 0
+    for pdf in downloaded:
+        if pdf.lower().endswith(".pdf"):
+            merger.append(pdf)
+            pdfs_added += 1
+
+    if pdfs_added > 0:
+        merger.write(merged_path)
+    merger.close()
+
+    return merged_path
 # ==========================================
 # SCAFFOLD & MASTER DB STORAGE
 # ==========================================

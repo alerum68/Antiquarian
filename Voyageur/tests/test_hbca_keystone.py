@@ -62,3 +62,79 @@ def test_parse_keystone_search_response():
     assert len(results["media_urls"]) >= 1
     assert any("B_239_a_1.pdf" in u for u in results["media_urls"])
     assert any("1234?RECORD" in u for u in results["record_urls"])
+
+query_keystone_for_code = getattr(_hbca_mod, "query_keystone_for_code", None)
+download_and_merge_keystone_media = getattr(_hbca_mod, "download_and_merge_keystone_media", None)
+
+LANDING_PAGE_HTML = """
+<html><body>
+<form name="frmSearchListings" method="post" action="/scripts/mwimain.dll/521745500/1/0?SEARCH">
+  <input type="text" name="LOCATION_CODE">
+</form>
+</body></html>
+"""
+
+RECORD_PAGE_HTML = """
+<html><body>
+<h1>Northern Department minutes of council</h1>
+<div>Item Description</div><div>Northern Department minutes of council</div>
+<div>Date</div><div>1851-1870</div>
+<div>Fonds/Series Title</div><div>Northern Department minutes of council</div>
+<div>Notes</div><div>The microfilm of this record has been digitized.</div>
+<div>Location Code</div><div>H2-24-1 ( B.239/k/3 )</div>
+<div>Microfilm No.</div><div>1M814</div>
+<textarea id="share_link_url">https://pam.minisisinc.com/scripts/mwimain.dll/144/LISTINGS_IMAGES/LISTINGS_DET_IMAGES/SISN%205154?sessionsearch</textarea>
+<a href="https://PAM.MINISISINC.COM/DIGITALOBJECTS/Access/HBCA%20Microfilm/1M814/B239-K-3-Reel1.pdf">Click here for PDF File</a>
+<a href="https://PAM.MINISISINC.COM/DIGITALOBJECTS/Access/HBCA%20Microfilm/1M814/B239-K-3-Reel2.pdf">Click here for PDF File</a>
+</body></html>
+"""
+
+def test_query_keystone_for_code_extracts_metadata_permalink_and_all_reel_pdfs(requests_mock):
+    if not query_keystone_for_code:
+        import pytest
+        pytest.fail("query_keystone_for_code missing")
+    requests_mock.get(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/144/PAM_LISTINGS?DIRECTSEARCH",
+        text=LANDING_PAGE_HTML,
+    )
+    requests_mock.post(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/521745500/1/0",
+        text=RECORD_PAGE_HTML,
+    )
+    result = query_keystone_for_code("B.239/k/3")
+    assert len(result["media_urls"]) == 2
+    assert "SISN%205154" in result["record_urls"][0]
+    assert result["metadata"]["item_description"] == "Northern Department minutes of council"
+    assert result["metadata"]["microfilm_no"] == "1M814"
+
+def test_download_and_merge_keystone_media_combines_reels(tmp_path, requests_mock):
+    if not download_and_merge_keystone_media:
+        import pytest
+        pytest.fail("download_and_merge_keystone_media not implemented")
+    minimal_pdf = b"%PDF-1.4\n1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n2 0 obj\n<</Type/Pages/Count 0/Kids[]>>\nendobj\nxref\n0 3\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \ntrailer\n<</Size 3/Root 1 0 R>>\nstartxref\n95\n%%EOF\n"
+    requests_mock.get("https://example.com/reel1.pdf", content=minimal_pdf)
+    requests_mock.get("https://example.com/reel2.pdf", content=minimal_pdf)
+    merged_path = download_and_merge_keystone_media(
+        ["https://example.com/reel1.pdf", "https://example.com/reel2.pdf"],
+        target_dir=tmp_path,
+        output_name="B239-K-3.pdf",
+    )
+    assert merged_path.exists()
+
+def test_keystone_query_is_cached(tmp_path, requests_mock):
+    if not query_keystone_for_code:
+        import pytest
+        pytest.fail("query_keystone_for_code missing")
+    cache_file = tmp_path / "keystone_cache.json"
+    requests_mock.get(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/144/PAM_LISTINGS?DIRECTSEARCH",
+        text=LANDING_PAGE_HTML,
+    )
+    requests_mock.post(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/521745500/1/0",
+        text=RECORD_PAGE_HTML,
+    )
+    res1 = query_keystone_for_code("B.239/k/3", cache_file=str(cache_file))
+    res2 = query_keystone_for_code("B.239/k/3", cache_file=str(cache_file))
+    assert requests_mock.call_count == 2  # one GET + one POST, only on the first call
+    assert res1 == res2

@@ -17,3 +17,4 @@ thefuzz==0.22.1
 tqdm==4.66.5
 websocket-client==1.9.0
 titlecase==2.4.1
+pypdf==4.2.0
