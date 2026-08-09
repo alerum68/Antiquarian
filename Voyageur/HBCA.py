@@ -357,11 +357,111 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
         full_img_url = urljoin(base_url, src)
         is_archival_path = any(p in src_lower for p in _ARCHIVAL_IMG_PATHS)
         is_archival_ext = any(src_lower.endswith(ext) for ext in _ARCHIVAL_IMG_EXTS)
-        if (is_archival_path or is_archival_ext) and "/thumbs/" not in src_lower and full_img_url not in seen_media:
+        is_archival_domain = "pam.minisisinc.com" in full_img_url.lower()
+        if is_archival_domain and (is_archival_path or is_archival_ext) and "/thumbs/" not in src_lower and full_img_url not in seen_media:
             seen_media.add(full_img_url)
             media_urls.append(full_img_url)
 
     return {"record_urls": record_urls, "media_urls": media_urls, "metadata": metadata}
+
+
+_KEYSTONE_BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    "Chrome/125.0.0.0 Safari/537.36"
+)
+
+
+def _query_keystone_with_browser(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, Any]:
+    """Uses Playwright headless Chromium to query Keystone and return DIGITALOBJECTS PDF URLs.
+
+    MINISIS requires a live browser session (session token embedded in the form
+    action URL).  Plain ``requests`` cannot maintain this token across GET→POST;
+    a real browser context can.  We load the search landing page, extract the
+    session-bound form action via JS, then submit an in-page ``fetch`` POST so
+    the session is preserved, and parse the response HTML for ``DIGITALOBJECTS``
+    PDF links.
+    """
+    result: Dict[str, Any] = {"record_urls": [], "media_urls": [], "metadata": {}}
+    try:
+        from playwright.sync_api import sync_playwright  # optional dependency
+    except ImportError:
+        print("[INFO] playwright not installed; skipping browser-based Keystone query.")
+        return result
+
+    search_url = f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH"
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(
+                headless=True,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            context = browser.new_context(
+                user_agent=_KEYSTONE_BROWSER_UA,
+                ignore_https_errors=True,
+            )
+            page = context.new_page()
+            page.goto(search_url, timeout=30_000)
+            page.wait_for_load_state("domcontentloaded")
+
+            # Extract form action URL (contains live session token) and all
+            # non-submit field values via JS so we don't need to click around.
+            form_info: Optional[Dict] = page.evaluate("""
+                () => {
+                    const form = Array.from(document.querySelectorAll('form'))
+                        .find(f => f.action && f.action.includes('SEARCH'));
+                    if (!form) return null;
+                    const data = {};
+                    Array.from(form.elements).forEach(el => {
+                        if (!el.name) return;
+                        if (el.type === 'radio' && !el.checked) return;
+                        if (['submit', 'reset', 'button'].includes(el.type)) return;
+                        data[el.name] = el.value || '';
+                    });
+                    return { action: form.action, data };
+                }
+            """)
+
+            if not form_info:
+                print(f"[WARN] Keystone browser: search form not found at {search_url}")
+                browser.close()
+                return result
+
+            form_info["data"]["LOCATION_CODE"] = location_code
+
+            # Submit via in-page fetch to preserve the session cookie / token.
+            fetch_result: Dict = page.evaluate("""
+                async (fi) => {
+                    const body = new URLSearchParams(fi.data).toString();
+                    const resp = await fetch(fi.action, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body
+                    });
+                    return { status: resp.status, url: resp.url, html: await resp.text() };
+                }
+            """, form_info)
+
+            browser.close()
+
+            if fetch_result.get("status") != 200:
+                print(f"[WARN] Keystone browser POST returned HTTP {fetch_result.get('status')} for {location_code}")
+                return result
+
+            soup = BeautifulSoup(fetch_result["html"], "html.parser")
+            for a_tag in soup.find_all("a", href=True):
+                href: str = a_tag["href"]
+                href_lower = href.lower()
+                if "digitalobjects" in href_lower and href_lower.endswith(".pdf"):
+                    full = href if href.startswith("http") else urljoin(base_url, href)
+                    if full not in result["media_urls"]:
+                        result["media_urls"].append(full)
+
+    except Exception as exc:
+        print(f"[WARN] Keystone browser query failed for {location_code}: {exc}")
+
+    return result
 
 
 def query_keystone_for_code(
@@ -370,7 +470,13 @@ def query_keystone_for_code(
     session: Optional[requests.Session] = None,
     cache_file: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Queries Keystone database for a given location code."""
+    """Queries Keystone database for a given location code.
+
+    First attempts a lightweight ``requests``-based HTML scrape.  If no
+    digitised media URLs are found that way (the MINISIS session often expires
+    between GET and POST), falls back to a full headless-Chromium session via
+    ``_query_keystone_with_browser`` which maintains the live session token.
+    """
     if cache_file and Path(cache_file).exists():
         try:
             with open(cache_file, "r") as f:
@@ -413,6 +519,16 @@ def query_keystone_for_code(
         print(f"[WARN] Failed to query Keystone for {location_code}: {e}")
 
     result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
+
+    # If the requests-based scrape found no digitised media, fall back to a
+    # full headless-browser session which can keep the MINISIS session token
+    # alive across the GET → POST transition.
+    if not result.get("media_urls"):
+        print(f"[INFO] No media URLs via requests for {location_code}; trying browser fallback...")
+        browser_result = _query_keystone_with_browser(location_code, base_url)
+        if browser_result.get("media_urls"):
+            result["media_urls"] = browser_result["media_urls"]
+            print(f"[INFO] Browser found {len(result['media_urls'])} media URL(s) for {location_code}")
 
     if cache_file:
         try:
