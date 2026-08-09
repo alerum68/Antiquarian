@@ -368,8 +368,10 @@ def get_processed_files(master_data: Dict[str, Any]) -> set:
 
 
 def get_placeholder_for_file(master_data: Dict[str, Any], filename: str) -> Optional[Dict[str, Any]]:
+    base = os.path.basename(filename)
     for sheet in master_data.get("sheets", []):
-        if sheet.get("document_metadata", {}).get("file_name") == filename:
+        db_filename = sheet.get("document_metadata", {}).get("file_name")
+        if db_filename == filename or db_filename == base:
             if _sheet_is_placeholder(sheet):
                 return sheet
     return None
@@ -447,7 +449,13 @@ def print_cost_line(master_data: Dict[str, Any], cost: engine.CallCost) -> None:
 # FILE CLASSIFICATION
 # ==============================================================================
 def list_source_files() -> List[str]:
-    return sorted(f for f in os.listdir(SOURCE_DIR) if f.lower().endswith(SOURCE_SUFFIXES))
+    files = []
+    for root, _, filenames in os.walk(SOURCE_DIR):
+        for f in filenames:
+            if f.lower().endswith(SOURCE_SUFFIXES):
+                rel_path = os.path.relpath(os.path.join(root, f), SOURCE_DIR)
+                files.append(rel_path.replace("\\", "/"))
+    return sorted(files)
 
 
 def is_batch_eligible(file_path: Path) -> bool:
@@ -742,7 +750,12 @@ def main() -> None:
     processed_files = get_processed_files(master_data)
     already_in_batch = {fn for entry in master_data.get("pending_batch_jobs", [])
                         for fn in entry.get("file_names", [])}
-    pending_files = [f for f in all_files if f not in processed_files and f not in already_in_batch]
+    pending_files = []
+    for f in all_files:
+        base = os.path.basename(f)
+        if f not in processed_files and base not in processed_files:
+            if f not in already_in_batch and base not in already_in_batch:
+                pending_files.append(f)
 
     if EXTRACTION_ENGINE == "agy":
         if pending_files:

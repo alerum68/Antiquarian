@@ -1,6 +1,7 @@
 import argparse
 import dataclasses
 import json
+import logging
 import os
 import re
 import sys
@@ -14,6 +15,11 @@ from urllib.parse import quote, urljoin
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+
+# pypdf logs "incorrect startxref pointer" / "parsing for Object Streams" as
+# non-fatal recovery warnings for malformed archival PDFs; it still parses
+# them successfully, so these are noise for this script.
+logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 # Repo root on sys.path for sibling module imports
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -593,7 +599,7 @@ def gather_hbca_sheets(
         if entry.file_name in downloaded_set:
             return False
 
-        target_file = image_dir / entry.letter / entry.file_name
+        target_file = image_dir / "Bios" / entry.letter / entry.file_name
         target_file.parent.mkdir(parents=True, exist_ok=True)
 
         session = requests.Session()
@@ -619,7 +625,7 @@ def gather_hbca_sheets(
                 keystone_records[code] = res
                 if download_keystone and res.get("media_urls"):
                     clean_code = re.sub(r"[^\w\.-]", "_", code)
-                    dest_media_dir = media_dir / "HBCA" / clean_code
+                    dest_media_dir = media_dir / "HBCA" / "Archives" / clean_code
                     download_keystone_media(res["media_urls"], dest_media_dir, session=session)
 
         sheet = build_hbca_scaffold_sheet(
