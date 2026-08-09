@@ -281,10 +281,30 @@ import json
 from pypdf import PdfWriter
 
 def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> str:
-    """Builds a direct search URL for Manitoba Archives Keystone database."""
+    """Builds a local HTML file that auto-submits a POST search to Keystone."""
     cleaned_code = location_code.split(" fo.")[0].strip()
-    encoded = quote(cleaned_code)
-    return f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH&KEYWORD_CLUSTER={encoded}"
+    safe_name = "".join(c if c.isalnum() else "_" for c in cleaned_code)
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head><title>Redirecting to Keystone Search...</title></head>
+<body onload="document.forms[0].submit()">
+    <p>Searching Archives of Manitoba for {cleaned_code}...</p>
+    <form method="POST" action="{base_url}/144/PAM_LISTINGS?DIRECTSEARCH">
+        <input type="hidden" name="LOCATION_CODE" value="{cleaned_code}">
+        <input type="hidden" name="FLD_OP1" value="AND_WORD">
+    </form>
+</body>
+</html>"""
+    
+    out_dir = Path(CHECKPOINT_DIR) / "SearchLinks"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_file = out_dir / f"Search_{safe_name}.html"
+    
+    with open(out_file, "w", encoding="utf-8") as f:
+        f.write(html_content)
+        
+    return out_file.absolute().as_uri()
 
 
 def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE_URL) -> Dict[str, Any]:
@@ -362,12 +382,21 @@ def query_keystone_for_code(
         resp = client.get(landing_url, headers=headers, timeout=20)
         if resp.status_code == 200:
             soup = BeautifulSoup(resp.text, "html.parser")
-            form = soup.find("form", {"name": "frmSearchListings"})
+            form = next((f for f in soup.find_all("form") if "?SEARCH" in f.get("action", "")), None)
             if form and form.get("action"):
                 action_url = urljoin(base_url, form["action"])
+                data = {}
+                for input_tag in form.find_all("input"):
+                    name = input_tag.get("name")
+                    if name:
+                        if input_tag.get("type") == "radio" and not input_tag.has_attr("checked"):
+                            continue
+                        data[name] = input_tag.get("value", "")
+                data["LOCATION_CODE"] = location_code
+                
                 post_resp = client.post(
                     action_url,
-                    data={"LOCATION_CODE": location_code},
+                    data=data,
                     headers=headers,
                     timeout=20
                 )
@@ -376,8 +405,7 @@ def query_keystone_for_code(
     except Exception as e:
         print(f"[WARN] Failed to query Keystone for {location_code}: {e}")
 
-    if not result["record_urls"]:
-        result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
+    result["record_urls"] = [build_keystone_search_url(location_code, base_url)]
 
     if cache_file:
         try:
@@ -683,6 +711,10 @@ def main() -> None:
         help="Run gatherer headlessly (default: True)",
     )
     args = parser.parse_args()
+
+    env_letter_filter = os.environ.get("HBCA_LETTER_FILTER", "").strip()
+    if not args.letter and env_letter_filter:
+        args.letter = env_letter_filter.split()
 
     gather_hbca_sheets(
         letter_filter=args.letter,
