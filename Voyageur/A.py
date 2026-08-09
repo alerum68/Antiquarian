@@ -42,10 +42,10 @@ def parse_ancestry_url(url: str):
 
 
 def normalize_ancestry_census_gather(raw_gather: dict, dbid: str = "") -> dict:
-    \"\"\"Translates a raw Ancestry census gather into the shared record schema, deriving
+    """Translates a raw Ancestry census gather into the shared record schema, deriving
     collection_title/record_type_name from the gather's own census_year/location - the
     exact translation main() applies at gather time, pulled out here so it's testable
-    without a browser session.\"\"\"
+    without a browser session."""
     census_year_raw = raw_gather.get("census_year", "")
     collection_title = f"{census_year_raw} US Federal Census - {raw_gather.get('location', '')}".strip(" -")
     normalized = census_schema.normalize_and_validate_census(
@@ -73,10 +73,9 @@ def main() -> Path:
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("A_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
-    # Matches Scriptorium.py's own CENSUS_IMAGE_DIR default ("Census", resolved against
-    # MEDIA_DIR by the GUI before this ever runs) - only used at all when running this
-    # script standalone with no .env value set.
-    base_img_setting = os.getenv("CENSUS_IMAGE_DIR", "Census")
+    # Matches Scriptorium.py's own default ("Census", resolved against
+    # MEDIA_DIR by the GUI before this ever runs).
+    base_img_setting = "Census"
 
     if not url:
         print("[ERROR] Please enter an Ancestry URL in the Toolbox settings first.")

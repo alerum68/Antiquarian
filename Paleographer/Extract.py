@@ -256,7 +256,8 @@ if not _MASTER_DB_NAME:
         "MASTER_DB_NAME setting, e.g. CHURCH_MASTER_DB_NAME for Parish.pmt) - without it "
         "MASTER_DB would just be the JSON folder itself, not a file inside it.")
 MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / _MASTER_DB_NAME)
-SOURCE_DIR: str = str(GENEALOGY_DIR / resolve_setting("IMAGE_DIR"))
+MEDIA_DIR: Path = GENEALOGY_DIR / (os.getenv("MEDIA_DIR") or "Media")
+SOURCE_DIR: str = str(MEDIA_DIR / TYPE_CFG.name)
 
 MODEL_ID: str = os.getenv("MODEL_NAME") or ""
 if not MODEL_ID:

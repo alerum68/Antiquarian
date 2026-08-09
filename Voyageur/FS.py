@@ -813,15 +813,9 @@ def main() -> None:
     location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
     census_folder = f"{census_year} US Federal Census"
 
-    # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
-    # PROGRAM_DIR directly - confirmed live: running this standalone (bypassing
-    # Scriptorium.py's GUI, which normally pre-resolves this into an absolute path before
-    # launching the subprocess) put a stray "Census" folder at the program root instead of
-    # nested under the user's actual RootsMagic media folder. Resolved here independently
-    # so this script produces correct output standalone, with nothing else open - matching
-    # every other tool in this project. An already-absolute CENSUS_IMAGE_DIR (whether
-    # GUI-resolved or set directly by the user) is used as-is, never re-nested.
-    base_img_setting = os.getenv("CENSUS_IMAGE_DIR", "Census")
+    # Matches Scriptorium.py's own default ("Census", resolved against
+    # MEDIA_DIR by the GUI before this ever runs).
+    base_img_setting = "Census"
     img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
 
     img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)

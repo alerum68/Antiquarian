@@ -113,9 +113,9 @@ C_BORDER = "#33363D"
 GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high"},
                "Global Directories": {"GENEALOGY_DIR": "C:/Path/To/Your/Genealogy/Folder",
                                       "RM_DIR": "Roots Magic 11",
-                                      "FTM_DIR": "Family Tree Maker", "MEDIA_DIR": "Media/Project",
-                                      "CENSUS_IMAGE_DIR": "Census",
-                                      "JSON_DIR": "Working/Project/JSON", "IMAGE_EXTENSION": "jpg",
+                                      "FTM_DIR": "Family Tree Maker",
+                                      "MEDIA_DIR": "Media/Project",
+                                      "JSON_DIR": "Working/Project/JSON",
                                       "GEDCOM_OUTPUT_PATH": "GEDCOM/Project"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
@@ -147,12 +147,7 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
     "RESEARCHER": "Your name. This will be added to the GEDCOM file to give you credit as the transcriber.",
     "ORG_NAME": "The name of your Historical Society, Library, or personal organization to include in GEDCOM headers.",
-    "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
-
-    # Archivist (Create step - Census) - CENSUS_IMAGE_DIR is a GLOBAL_VARS key despite the
-    # grouping comment; it stays here forever, never migrates to Archivist/settings_schema.yaml.
-    "CENSUS_IMAGE_DIR": "The subfolder name (e.g., 'Census') inside your Base Media Directory. Can also be an "
-                         "absolute path."}
+    "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@)."}
 
 # ==========================================
 # CUSTOM UI LABELS OVERRIDE
@@ -163,8 +158,7 @@ CUSTOM_LABELS = {
     "RM_DIR": "RootsMagic Folder",
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
-    "JSON_DIR": "JSON Download Folder",
-    "CENSUS_IMAGE_DIR": "Census Image Save Folder"}
+    "JSON_DIR": "JSON Download Folder"}
 
 # ==========================================
 # PATH & FILE PICKER FIELDS
@@ -183,9 +177,6 @@ PATH_PICKER_FIELDS = {
     "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
     "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
-
-    # Archivist
-    "CENSUS_IMAGE_DIR": {"kind": "directory", "base_dir_key": "MEDIA_DIR"},
 }
 
 # ==========================================
@@ -1580,18 +1571,10 @@ class Scriptorium(ctk.CTk):
         """Opens a file browser rooted in whichever image folder the current Record Type
         actually reads from (nested under MEDIA_DIR - mirroring how each script resolves
         its own IMAGE_DIR), storing just the bare filename since that's what Paleographer.py
-        compares DEBUG_FILE against. Which prefixed key that is comes directly from the
-        active .pmt's own field_remap declaration - never a hardcoded record-type name."""
+        compares DEBUG_FILE against."""
         record_type = self.string_vars["PALEOGRAPHER_RECORD_TYPE"].get()
-        field_remap = self._get_pmt_field_remap(record_type)
-        image_dir_key = next((src for src, dst in field_remap.items() if dst == "IMAGE_DIR"), "CHURCH_IMAGE_DIR")
         media_base = self._resolve_base_dir("MEDIA_DIR")
-        image_dir_var = self.string_vars.get(image_dir_key)
-        image_setting = image_dir_var.get().strip() if image_dir_var is not None else ""
-        if image_setting and os.path.isabs(image_setting):
-            source_dir = image_setting
-        else:
-            source_dir = os.path.join(media_base, image_setting) if image_setting else media_base
+        source_dir = os.path.join(media_base, record_type.replace(".pmt", ""))
 
         selected = filedialog.askopenfilename(
             title="Select Debug Image File", initialdir=source_dir if os.path.isdir(source_dir) else None,
@@ -1789,10 +1772,7 @@ class Scriptorium(ctk.CTk):
         env_overrides = {}
 
         # Pre-resolve these specific nested directory variables
-        nested_dir_keys = [("CHURCH_IMAGE_DIR", full_media_dir), ("SCRIP_IMAGE_DIR", full_media_dir),
-                           ("CENSUS_IMAGE_DIR", full_media_dir), ("LAC_IMAGE_DIR", full_media_dir),
-                           ("HBCA_IMAGE_DIR", full_media_dir),
-                           ("REGISTRAR_RM_DATABASE", full_rm_dir), ("GAZETTEER_RM_DATABASE", full_rm_dir),
+        nested_dir_keys = [("REGISTRAR_RM_DATABASE", full_rm_dir), ("GAZETTEER_RM_DATABASE", full_rm_dir),
                            ("PDFIX_TARGET_DIR", full_media_dir)]
         for key, base_dir in nested_dir_keys:
             if key in self.string_vars:

@@ -34,7 +34,6 @@ settings_sections:
 # and Archivist.py each actually read from their own .env - so neither script depends on
 # Scriptorium.py's GUI layer to bridge the two; each resolves this itself, standalone.
 field_remap:
-  CHURCH_IMAGE_DIR: IMAGE_DIR
   CHURCH_MASTER_DB_NAME: MASTER_DB_NAME
   CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
   CHURCH_CALL_NUMBER: CALL_NUMBER

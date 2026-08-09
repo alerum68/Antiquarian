@@ -37,7 +37,6 @@ settings_sections:
   - "Antigravity CLI"
   - "HBCA / Manitoba Archives"
 field_remap:
-  HBCA_IMAGE_DIR: IMAGE_DIR
   HBCA_MASTER_DB_NAME: MASTER_DB_NAME
   HBCA_COLLECTION_NAME: COLLECTION_NAME
   HBCA_GEDCOM_NAME: GEDCOM_OUTPUT_NAME

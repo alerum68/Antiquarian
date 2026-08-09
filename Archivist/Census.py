@@ -42,9 +42,8 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 PUBLISHER = os.getenv("PUBLISHER", "")
 PUB_LOC = os.getenv("PUB_LOC", "")
 
-IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("IMAGE_DIR", "")
-                            or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
-IMAGE_EXTENSION = os.getenv("IMAGE_EXTENSION", "").lstrip(".").lower()
+IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Census")
+IMAGE_EXTENSION = "jpg"
 FORM_TYPE = IMAGE_EXTENSION
 
 CENSUS_YEAR = Utils.get_env_int("CENSUS_YEAR", 0)

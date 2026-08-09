@@ -45,7 +45,6 @@ settings_sections:
   - "Antigravity CLI"
   - "Scrip Information"
 field_remap:
-  SCRIP_IMAGE_DIR: IMAGE_DIR
   SCRIP_MASTER_DB_NAME: MASTER_DB_NAME
   SCRIP_COLLECTION_NAME: COLLECTION_NAME
   SCRIP_GEDCOM_NAME: GEDCOM_OUTPUT_NAME

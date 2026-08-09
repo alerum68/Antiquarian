@@ -5,12 +5,12 @@ sections:
       tooltip: "Which record type (from Paleographer/prompts) to transcribe. Leave blank to use the default, Parish.pmt."
       widget: dropdown
       options: [["Parish.pmt", "Parish.pmt"], ["Scrip.pmt", "Scrip.pmt"]]
-    CHURCH_IMAGE_DIR:
-      default: "Parish"
-      tooltip: "The subfolder name (e.g., 'Parish') inside your Base Media Directory. Can also be an absolute path."
-      picker:
-        kind: directory
-        base_dir_key: "MEDIA_DIR"
+    PALEOGRAPHER_PDF_COMPRESSION_LEVEL:
+      default: "2"
+      tooltip: "How aggressively PDFix's lossless structural optimization (garbage collection + stream deflate) runs on a scanned PDF before it's uploaded to the AI: 0=low, 1=medium, 2=high (recommended). This never touches embedded image resolution/DPI, so transcription quality is unaffected at any level."
+      widget: segmented
+      options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
+  Parish Information:
     CHURCH_GEDCOM_NAME:
       default: "Parish.ged"
       tooltip: "The filename for the generated GEDCOM file."
@@ -27,12 +27,6 @@ sections:
         base_dir_key: "JSON_DIR"
         filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
         defaultextension: ".json"
-    PALEOGRAPHER_PDF_COMPRESSION_LEVEL:
-      default: "2"
-      tooltip: "How aggressively PDFix's lossless structural optimization (garbage collection + stream deflate) runs on a scanned PDF before it's uploaded to the AI: 0=low, 1=medium, 2=high (recommended). This never touches embedded image resolution/DPI, so transcription quality is unaffected at any level."
-      widget: segmented
-      options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
-  Parish Information:
     PARISH_NAME:
       default: "St. Generic Catholic Church"
       tooltip: "The full historical name of the church (e.g., St. Joseph Catholic Church)."
@@ -81,12 +75,14 @@ sections:
       default: "Granite Mountain, UT"
       tooltip: "The physical location or address of that repository, used in the citation (e.g., 'Granite Mountain, UT' for FamilySearch, 'Ottawa, ON' for LAC)."
   Scrip Information:
-    SCRIP_IMAGE_DIR:
-      default: "Scrip"
-      tooltip: "The subfolder name (e.g., 'Scrip') inside your Base Media Directory. Can also be an absolute path."
+    SCRIP_GEDCOM_NAME:
+      default: "Scrip.ged"
+      tooltip: "The filename for the generated GEDCOM file."
       picker:
-        kind: directory
-        base_dir_key: "MEDIA_DIR"
+        kind: save
+        base_dir_key: "GEDCOM_OUTPUT_PATH"
+        filetypes: [["GEDCOM files", "*.ged"], ["All files", "*.*"]]
+        defaultextension: ".ged"
     SCRIP_MASTER_DB_NAME:
       default: "scrip_records.json"
       tooltip: "The filename for the JSON database storing the extracted scrip records."

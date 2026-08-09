@@ -2,38 +2,15 @@
 
 | Stage | Agent | Status | Notes |
 |-------|-------|--------|-------|
-| 1 | ArchDev | ⏳ | Decompose Commissioner root requirements into folder/file structural spec |
-| 2 | LogicDev | ⏳ | — |
-| 3 | UIFormDev | ⏳ | — |
-| 4 | Tester | ⏳ | — |
-| 5 | BugFixer | ⏳ | — |
+| 1 | ArchDev | ⏭️ | Skip (no new folders/files) |
+| 2 | LogicDev | ✅ | Auto image dirs, hardcoded IMAGE_EXTENSION, removed env lookups |
+| 3 | UIFormDev | ✅ | Removed CENSUS_IMAGE_DIR/IMAGE_EXTENSION from globals, separated Parish/Scrip settings |
+| 4 | Tester | ✅ | py_compile pass, YAML validation pass, A.py docstring fix applied |
+| 5 | BugFixer | ✅ | Fixed escaped triple-quote docstring in Voyageur/A.py |
 | 6 | DocBot | ⏳ | — |
 
-## Completed Task: Commissioner SubAgent Rules
-* ✅ Required ArchDev and LogicDev to use `Commissioner` as the conceptual root for how everything is built.
-* ✅ Added constraints to `.opencode/` and `.claude/` subagent profiles (and `AGENTS.md`) so Commissioner dictates the core structure of JSON and GEDCOMs going forward.
-
-## Task Definition
-Update directory logic across the project:
-1. `PROGRAM_DIR` is currently being used as the genealogy root. We need to rename its concept in the UI/settings to `GENEALOGY_DIR`.
-2. `PROGRAM_DIR` should be redefined as the directory where the Scriptorium codebase resides.
-3. The following directories should default as subdirectories of `GENEALOGY_DIR`:
-   - Media Dir (`MEDIA_DIR`)
-   - Gedcom Output Dir (`GEDCOM_OUTPUT_PATH`)
-   - Roots Magic Dir (`RM_DIR`)
-   - Family Tree Maker Dir (`FTM_DIR`)
-4. The following directories should default as subdirectories of `PROGRAM_DIR`:
-   - JSON Dir (`JSON_DIR`)
-   - Working Dir (any other working/temp dirs)
-
-## Files to touch
-- `Scriptorium.py`
-- `Archivist/Utils.py`
-- `Voyageur/A.py`
-- `Voyageur/FS.py`
-- `Voyageur/LAC.py`
-- `Paleographer/Extract.py`
-- `Gazetteer/Gazetteer.py`
-- `Registrar/Registrar.py`
-- `PDFix/PDFix.py`
-- Any related schema or utility files where `PROGRAM_DIR` is used as the base for Genealogy files.
+## Current Task: UI Cleanup - Auto Image Dirs & Tab Separation
+* ✅ Removed `CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` from Global Settings (`Scriptorium.py`).
+* ✅ Removed `*_IMAGE_DIR` (e.g. `CHURCH_IMAGE_DIR`, `SCRIP_IMAGE_DIR`) from `Paleographer/settings_schema.yaml` and `.pmt` field_remaps.
+* ✅ Automated Image Dir resolution: `Media/<Prompt_Name>` via `TYPE_CFG.name` in `Extract.py`.
+* ✅ Separated Paleographer settings: Scrip now has its own `SCRIP_GEDCOM_NAME`; Parish keeps `CHURCH_GEDCOM_NAME`/`CHURCH_MASTER_DB_NAME`.
