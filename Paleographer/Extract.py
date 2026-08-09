@@ -375,6 +375,15 @@ def get_placeholder_for_file(master_data: Dict[str, Any], filename: str) -> Opti
     return None
 
 
+def _merge_type_specific_fields(existing_fields: Dict[str, Any], incoming_fields: Dict[str, Any]) -> Dict[str, Any]:
+    """Merges incoming into existing, keeping existing's value for any key it has already set."""
+    merged = dict(existing_fields)
+    for key, value in incoming_fields.items():
+        if value and not merged.get(key):
+            merged[key] = value
+    return merged
+
+
 def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None:
     master_sheets = master_data.get("sheets")
     if not isinstance(master_sheets, list):
@@ -393,14 +402,11 @@ def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) 
             placeholder = master_sheets[existing_idx]
             ph_records = placeholder.get("records", [])
             new_records = new_sheet.get("records", [])
-            if ph_records and new_records:
-                ph_tsf = ph_records[0].get("type_specific_fields", {})
-                new_tsf = new_records[0].setdefault("type_specific_fields", {})
-                if not ph_tsf.get("needs_llm_structured_review", False):
-                    for field in ["parish_of_origin", "entered_service_year", 
-                                  "birth_date_extracted", "death_date_extracted", "service_history"]:
-                        if field in ph_tsf:
-                            new_tsf[field] = ph_tsf[field]
+            for ph_rec, new_rec in zip(ph_records, new_records):
+                new_rec["type_specific_fields"] = _merge_type_specific_fields(
+                    ph_rec.get("type_specific_fields", {}),
+                    new_rec.get("type_specific_fields", {}),
+                )
             master_sheets[existing_idx] = new_sheet
             continue
         master_sheets.append(new_sheet)

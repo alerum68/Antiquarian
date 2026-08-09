@@ -96,6 +96,44 @@ def test_merge_sheets_replaces_placeholder_with_real_sheet_same_file_name(minima
     assert master_data["sheets"][0] is real_sheet
 
 
+def test_merge_sheets_preserves_voyageur_fields_on_placeholder_replacement(minimal_paleographer_env):
+    module = minimal_paleographer_env
+    placeholder = {
+        "page_id": "adams_charles.pdf",
+        "document_metadata": {"file_name": "adams_charles.pdf"},
+        "records": [{
+            "event_type": "Employment",
+            "participants": [],
+            "type_specific_fields": {
+                "parish_of_origin": "",
+                "service_history": [{"outfit_years": "1866-1868", "hbca_ref": "B.239/k/3"}],
+                "hbca_references": ["B.239/k/3"],
+                "keystone_urls": ["https://pam.minisisinc.com/scripts/mwimain.dll/144/x?sessionsearch"],
+                "keystone_records": {"B.239/k/3": {"metadata": {"microfilm_no": "1M814"}}},
+            },
+        }],
+    }
+    real_sheet = {
+        "page_id": "adams_charles.pdf",
+        "document_metadata": {"file_name": "adams_charles.pdf"},
+        "records": [{
+            "event_type": "Employment",
+            "participants": [{"role_name": "Employee", "std_given": "Charles", "std_surname": "Adams"}],
+            "type_specific_fields": {},
+        }],
+    }
+    master_data = {"sheets": [placeholder]}
+    module.merge_sheets(master_data, [real_sheet])
+
+    merged = master_data["sheets"][0]["records"][0]
+    assert merged["participants"][0]["std_given"] == "Charles"
+    tsf = merged["type_specific_fields"]
+    assert tsf["service_history"][0]["hbca_ref"] == "B.239/k/3"
+    assert tsf["hbca_references"] == ["B.239/k/3"]
+    assert tsf["keystone_urls"] == placeholder["records"][0]["type_specific_fields"]["keystone_urls"]
+    assert tsf["keystone_records"]["B.239/k/3"]["metadata"]["microfilm_no"] == "1M814"
+
+
 def test_merge_sheets_appends_when_no_matching_placeholder(minimal_paleographer_env):
     module = minimal_paleographer_env
     master_data = {"sheets": [_real_sheet("abc123.jpg")]}
