@@ -26,7 +26,13 @@ HBCA_TEMPLATE_ID = 10009
 
 
 class HBCAProfile:
-    def dynamic_source_id(self, vol_digits: str) -> str:
+    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+        if GENERAL_CONFIG.get("platform_source_id"):
+            return f"@S{GENERAL_CONFIG['platform_source_id']}@"
+        if rec:
+            refd = Utils.clean_val((rec.get('type_specific_fields') or {}).get('refd'))
+            if refd:
+                return f"@S{refd}@"
         return f"@S{HBCA_TEMPLATE_ID}@"
 
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:

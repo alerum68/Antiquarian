@@ -1469,9 +1469,19 @@ def run_census_flavor(data: dict) -> None:
     CENSUS_ERA = get_census_era(CENSUS_YEAR)
 
     record_type_name = data.get("record_type_name") or f"Census_{CENSUS_YEAR}"
-    CENSUS_SOURCE_ID = Utils.resolve_source_id(record_type_name, COLLECTION_NAME)
-
     APID_DB = get_json_fallback(census_df, ['APID_DB', 'APID', 'Database ID', 'dbid'], APID_DB)
+
+    citation = data.get("citation") or {}
+    cc = citation.get("collection_id")
+    apid = APID_DB or citation.get("apid_db")
+    
+    if cc:
+        CENSUS_SOURCE_ID = str(cc)
+    elif apid:
+        CENSUS_SOURCE_ID = str(apid)
+    else:
+        CENSUS_SOURCE_ID = Utils.resolve_source_id(record_type_name, COLLECTION_NAME)
+
     COLLECTION_NAME = get_json_fallback(census_df, ['Collection Name', 'Collection_Name', 'Collection'],
                                         COLLECTION_NAME) or (f'{CENSUS_YEAR} United States Federal Census'
                                                              if CENSUS_YEAR else COLLECTION_NAME)

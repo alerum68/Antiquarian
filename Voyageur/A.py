@@ -41,15 +41,19 @@ def parse_ancestry_url(url: str):
     return None, None
 
 
-def normalize_ancestry_census_gather(raw_gather: dict) -> dict:
-    """Translates a raw Ancestry census gather into the shared record schema, deriving
+def normalize_ancestry_census_gather(raw_gather: dict, dbid: str = "") -> dict:
+    \"\"\"Translates a raw Ancestry census gather into the shared record schema, deriving
     collection_title/record_type_name from the gather's own census_year/location - the
     exact translation main() applies at gather time, pulled out here so it's testable
-    without a browser session."""
+    without a browser session.\"\"\"
     census_year_raw = raw_gather.get("census_year", "")
     collection_title = f"{census_year_raw} US Federal Census - {raw_gather.get('location', '')}".strip(" -")
-    return census_schema.normalize_and_validate_census(
+    normalized = census_schema.normalize_and_validate_census(
         raw_gather, "ancestry_census", collection_title, f"Census_{census_year_raw}")
+    if dbid:
+        for page in normalized.get("pages", []):
+            page["apid_db"] = dbid
+    return normalized
 
 
 # ==========================================
@@ -112,7 +116,7 @@ def main() -> Path:
     # file in place - Archivist still just reads whatever JSON_FILE points to.
     with open(final_json, "r", encoding="utf-8") as f:
         raw_gather = json.load(f)
-    normalized = normalize_ancestry_census_gather(raw_gather)
+    normalized = normalize_ancestry_census_gather(raw_gather, dbid)
     with open(final_json, "w", encoding="utf-8") as f:
         json.dump(normalized, f, indent=2, ensure_ascii=False)
 

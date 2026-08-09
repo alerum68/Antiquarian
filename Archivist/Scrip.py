@@ -311,7 +311,13 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
 
 
 class ScripProfile:
-    def dynamic_source_id(self, vol_digits: str) -> str:
+    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+        if GENERAL_CONFIG.get("platform_source_id"):
+            return f"@S{GENERAL_CONFIG['platform_source_id']}@"
+        if rec:
+            mikan = Utils.clean_val((rec.get('type_specific_fields') or {}).get('collection_mikan'))
+            if mikan:
+                return f"@S{mikan}@"
         return f"@S{vol_digits.zfill(3)}@"
 
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:

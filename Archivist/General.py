@@ -41,7 +41,7 @@ IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "")
 
 
 class Profile(Protocol):
-    def dynamic_source_id(self, vol_digits: str) -> str: ...
+    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str: ...
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]: ...
     def family_uid(self, identity: str) -> Optional[str]: ...
     def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
@@ -105,7 +105,10 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
 
 
 class GeneralProfile:
-    def dynamic_source_id(self, vol_digits: str) -> str:
+    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+        if GENERAL_CONFIG.get("platform_source_id"):
+            return f"@S{GENERAL_CONFIG['platform_source_id']}@"
+            
         base_id = re.sub(r'\D', '', f"{GENERAL_CONFIG.get('register_source_id', '1')}")
         if base_id.endswith('001') and len(base_id) > 1:
             base_id = base_id[:-3]
@@ -291,9 +294,9 @@ def extract_volume(sheet: dict) -> str:
     return Utils.clean_val(GENERAL_CONFIG.get('volume_num'))
 
 
-def get_dynamic_source_id(vol_val: str) -> str:
+def get_dynamic_source_id(vol_val: str, rec: Optional[dict] = None) -> str:
     vol_digits = re.sub(r'\D', '', f"{vol_val or '1'}") or '1'
-    return _ACTIVE_PROFILE.dynamic_source_id(vol_digits)
+    return _ACTIVE_PROFILE.dynamic_source_id(vol_digits, rec)
 
 
 def get_by_semantic(rec: dict, semantic: str) -> Optional[dict]:
@@ -521,7 +524,7 @@ def generate_fam_uid(rec: dict, vol: str) -> str:
     if override:
         return override
 
-    src_id = re.sub(r'\D', '', get_dynamic_source_id(vol))
+    src_id = re.sub(r'\D', '', get_dynamic_source_id(vol, rec))
     page_str = Utils.clean_val(rec.get('page'))
     unique_string = f"fam_{vol}_{page_str}_{identity}"
     numeric_id = int(hashlib.md5(unique_string.encode('utf-8')).hexdigest(), 16) % (10 ** 10)
@@ -541,7 +544,7 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     page_line = _ACTIVE_PROFILE.citation_page(rec, part, page)
 
     template_id = _ACTIVE_PROFILE.citation_template_id(rec, vol)
-    sour_id = f"@S{template_id}@" if template_id else get_dynamic_source_id(vol)
+    sour_id = f"@S{template_id}@" if template_id else get_dynamic_source_id(vol, rec)
 
     computed_status = proof_status
     try:
@@ -1206,6 +1209,20 @@ def apply_resolved_source_id(data: dict) -> None:
     explicit = os.getenv("REGISTER_SOURCE_ID", "").strip()
     if explicit and explicit != "1":
         return
+        
+    citation = data.get("citation") or {}
+    cc = citation.get("collection_id")
+    if cc:
+        GENERAL_CONFIG["register_source_id"] = str(cc)
+        GENERAL_CONFIG["platform_source_id"] = str(cc)
+        return
+        
+    apid = Utils.APID_DB or citation.get("apid_db")
+    if apid:
+        GENERAL_CONFIG["register_source_id"] = str(apid)
+        GENERAL_CONFIG["platform_source_id"] = str(apid)
+        return
+        
     record_type_name = data.get("record_type_name") or "Church"
     collection_name = GENERAL_CONFIG.get("parish_name", "")
     GENERAL_CONFIG["register_source_id"] = str(Utils.resolve_source_id(record_type_name, collection_name))

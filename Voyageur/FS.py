@@ -382,7 +382,12 @@ def parse_citation(text: str) -> Dict[str, str]:
     # (ark:/61903/3:1:...), truncating the URL long before the real " : <date>" separator.
     url_match = re.search(r'\((https?://\S+)\s+:', text)
     if url_match:
-        result["collection_url"] = url_match.group(1)
+        url = url_match.group(1)
+        result["collection_url"] = url
+        # Extract cc if present, e.g., ?cc=1803986
+        cc_match = re.search(r'[?&]cc=([^&#]+)', url)
+        if cc_match:
+            result["collection_id"] = cc_match.group(1)
 
     m = CITATION_RE.match(text.strip())
     if m:
@@ -665,6 +670,7 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             "film_number": "",
             "roll_number": roll_number,
             "apid_db": "",
+            "collection_id": citation.get("collection_id", ""),
             "repository": citation.get("repository", ""),
             "repository_loc": citation.get("repository_loc", ""),
             "publisher": publisher,
