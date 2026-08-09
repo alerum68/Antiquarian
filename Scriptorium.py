@@ -114,10 +114,10 @@ GLOBAL_VARS = {"API & Processing": {"EXTRACTION_ENGINE": "agy", "AGY_MODEL_NAME"
                                     "GEMINI_API_KEY": "", "API_BUDGET": "20", "MODEL_NAME": "gemini-3.1-pro-preview",
                                     "COST_PER_1M_INPUT": "2.00", "COST_PER_1M_OUTPUT": "12.00",
                                     "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
-               "Global Directories": {"PROGRAM_DIR": "C:/Path/To/Your/Genealogy/Folder", "RM_DIR": "Roots Magic 11",
+               "Global Directories": {"PROGRAM_DIR": "C:/Path/To/Your/Genealogy/Folder/Scriptorium", "RM_DIR": "Roots Magic 11",
                                       "FTM_DIR": "Family Tree Maker", "MEDIA_DIR": "Media/Project",
                                       "CENSUS_IMAGE_DIR": "Census",
-                                      "JSON_DIR": "Scriptorium/Working/Project/JSON", "IMAGE_EXTENSION": "jpg",
+                                      "JSON_DIR": "Working/Project/JSON", "IMAGE_EXTENSION": "jpg",
                                       "GEDCOM_OUTPUT_PATH": "GEDCOM/Project"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").

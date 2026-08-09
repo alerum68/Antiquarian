@@ -73,6 +73,7 @@ cleanup with no new functionality.
   "Researcher & Organization" card.
 
 ### Fixed
+- **Voyageur (HBCA)**: fixed a crash during the HBCA gather run caused by `HBCA_IMAGE_DIR` missing from Scriptorium's internal `nested_dir_keys` resolution list. The setting was correctly resolving to `MEDIA_DIR/HBCA` inside `HBCA.py` standalone, but failing with a `KeyError` when launched via the Scriptorium GUI.
 - **Archivist (census GEDCOM)**: a `NAME` line was being written as a direct child of a
   `SOUR` citation (both inside each person's own citation block and, duplicated one level
   shallower, inside `_TASK` records) - `NAME` isn't a legal `SOURCE_CITATION` child under
