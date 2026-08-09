@@ -1,0 +1,250 @@
+0 HEAD
+1 FILE .ged
+1 SOUR RootsMagic
+2 VERS 11.0
+2 NAME RootsMagic
+2 CORP RootsMagic, Inc.
+1 DEST RootsMagic
+1 DATE 09 AUG 2026
+2 TIME 08:55:07
+1 SUBM @SUBM1@
+1 COPR Copyright (c) 2018-2026 Michif Genealogical Society. All rights reserved.
+1 NOTE This file contains original historical translations and research.
+2 CONC Please do not upload this raw GEDCOM to public, collaborative trees without permission and attribution.
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @SUBM1@ SUBM
+1 NAME Jason Cole
+2 ADDR https://www.facebook.com/groups/149982655772008
+1 NOTE Michif Genealogical Society
+0 @M1202199891@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yelland_lewis.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M1096760547@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_john-jr.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5557674495@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_edwin-w.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M7375247562@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_robert.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5484288226@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_thomas.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M8897946211@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yates_james.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5026939286@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_john.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M0515051430@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yarrow_thomas.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M6073240364@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_harrison-stevens.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M4693122932@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\zastre_gonzague.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M8540471199@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yorston_hugh.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @S1@ SOUR
+1 TITL Michif Genealogical Society
+1 AUTH
+1 PUBL Researcher: Jason Cole.
+1 _WEBTAG
+2 NAME Facebook Group
+2 URL https://www.facebook.com/groups/149982655772008
+1 _WEBTAG
+2 NAME Ancestry Group
+2 URL https://www.ancestry.com/groups/85343
+0 @S1001@ SOUR
+1 ABBR Hudson's Bay Company Archives: Biographical Sheets 
+1 REFN 1001
+1 TITL Hudson's Bay Company Archives: Biographical Sheets, ,  ; , Hudson's Bay Company Archives: Biographical Sheets, .
+1 _SUBQ Hudson's Bay Company Archives: Biographical Sheets - .
+1 _BIBL Hudson's Bay Company Archives: Biographical Sheets. . Hudson's Bay Company Archives: Biographical Sheets, .
+1 _TMPLT
+2 TID 10009
+2 FIELD
+3 NAME PrimaryCreator
+3 VALUE Hudson's Bay Company Archives: Biographical Sheets
+2 FIELD
+3 NAME Repository
+3 VALUE FamilySearch.org
+2 FIELD
+3 NAME PublishLocation
+3 VALUE Granite Mountain, UT
+0 _SRCTEMPLATE * Simple Citations: Non-traditional
+1 TID 10009
+1 DESC (NOTE: changes made to the content of this template should also be made to the master template. Alterations made for the sole purpose of allowing the content to print correctly do not need to be made.)
+
+This template is designed for citing non-traditional sources: birth certificates; cemetery records, census records, death certificates, gravestones, photographs,  social security records, etc.
+
+Many, if not most, of these records were created anonymously on behalf of an agency, institution, or other entity.
+
+This custom template and the citation style it uses was created by Jeff La Marca.
+1 CAT Simplified Citations for Genealogical Sources
+1 FOOT <[PrimaryCreator]<?[PrimaryCreator]|<,  [Department]>|[Department]>><?[Date]|< ([Date]).>|.> <?[SourceDescription]|[SourceDescription:Caps]<: [Person]>.|< [Person].>> ||< [Page].>< [SourceDetailPerson].>< [Location].><< [Repository:Caps]><?[Repository]|< ([URL]><? [URL]|<: accessed [Accessed]>><?[URL]|)>.>>< [RefNumber:Caps].>
+1 SHORT <[PrimaryCreator]<,  [Department]>> <([Date])>. <?[SourceDescription]|[SourceDescription:Caps]<: [Person]>.|< [Person].>>
+1 BIBL <[PrimaryCreator]<,  [Department]>> <([Date])>. <?[SourceDescription]|[SourceDescription:Caps]<: [Person]>.|< [Person].>> ||< [Page].>< [SourceDetailPerson].>< [Location].><< [Repository:Caps]><?[Repository]|< ([URL]><? [URL]|<: accessed [Accessed]>><?[URL]|)>.>>< [RefNumber:Caps].>
+1 FIELD
+2 TYPE Name
+2 NAME PrimaryCreator
+2 DISP Primary Creator
+2 HINT i.e., Bellevue Hospital for the Criminally Insane, End of the Road Cemetery, California, etc.
+2 DETL N
+2 LHNT List the agency, organization, state, or other entity that created and/or has sole responsibility for maintenance of this source.
+
+Examples might include the names of:
+
+    cemetery,
+    church,
+    hospital, 
+    mortuary,
+    school,
+    state or other large government entity.
+
+In the event that one or more individuals names are listed here (for example the name of a photographer or the writer of a letter), the following format should be used:
+
+    1 name:  Doe, John (list surnmame first)
+    2 names: Doe, John and John Brown
+    3 or more names: Doe, John; John Brown; and Susy Smith
+1 FIELD
+2 TYPE Text
+2 NAME Department
+2 DISP Dept. or Office
+2 HINT Department of Vital Statistics, Department of Motor Vehicles, etc.
+2 DETL N
+2 LHNT Optional field. Some sources come from very large entities (esp. govermental records). Examples might be Dept. of Vital Records or Dept. of Motor Vehicles.
+1 FIELD
+2 TYPE Date
+2 NAME Date
+2 DISP Date
+2 HINT date created, issued, or published
+2 DETL N
+2 LHNT Enter the date when this source was created, initially indexed, or first came into being.
+1 FIELD
+2 TYPE Text
+2 NAME SourceDescription
+2 DISP Source Description
+2 HINT Title or description of document
+2 DETL N
+2 LHNT Used for documents and sources where a person or persons name are the main topic. 
+
+Examples:
+
+   Birth Certificate
+   Diploma
+   Golf Club Membership Card
+   Headstone
+   Letter (or Personal Correspondence)
+   Marriage Certificate
+   Passsenger Ship List, S.S. Trojan Prince
+   Photograph
+   1880 U.S. Census
+
+Use "title casing" for capitalization. The field should be kept as generic as possible. A few sources may require clarification. For example, passenger ship records should list the name of the ship. Date or other very specific information should not be included except for cenus records (the year distinguishes one census from another).
+1 FIELD
+2 TYPE Text
+2 NAME Person
+2 DISP Person(s) of Interest
+2 HINT John Doe, Jane Smith, Doe Family, etc.
+2 DETL N
+2 LHNT If this source refers to a specific individual, list his or her name.
+
+If two individuals are list and are of equal primary importance to the source (e.g., a wedding couple), list as: Ralph Brown and Jane Doe
+
+If this source refers to a group of individuals of primary interest, list by family names (e.g. Brown Family, Smith Family, Brown and Smith Families), or by group (e.g., Doe cousins, Smalltown Bowling Club, Boy Scouts from Troop XYZ, etc.).
+1 FIELD
+2 TYPE Text
+2 NAME Page
+2 DISP Page Number(s)
+2 HINT p. 25, pp. 52, sheet B-4, etc.
+2 DETL Y
+2 LHNT If the document has a page number, list it here.
+
+Found in traditional and non-traditional sources.
+1 FIELD
+2 TYPE Name
+2 NAME SourceDetailPerson
+2 DISP Person
+2 HINT enter name of individual (refer to hint for details on when to use)
+2 DETL Y
+2 LHNT This is an optional element and should only be used if more than one person's name (or that of a group) is listed on the master source. This element is also used to recognize the person's inclusion in a book or periodical..
+1 FIELD
+2 TYPE Place
+2 NAME Location
+2 DISP Location
+2 HINT e.g., city, county, state, country
+2 DETL Y
+2 LHNT Provide location where source was created (if not mentioned above), it's physical location (e.g., grave site), or where the event occurred (locatation of baptism, place of census, marriage location, etc.)
+1 FIELD
+2 TYPE Text
+2 NAME Repository
+2 DISP Repository
+2 HINT i.e., Ancestry.com, National Archives and Records Administration, etc.
+2 DETL Y
+2 LHNT This field should only be used for hard-to-find, one-of-a-kind documents, or individually held sources. If this source was found on the Internet, then the name of the web site should be listed here. This is an OPTIONAL field and should not be used for traditional materials (books, articles, etc.) that can easily be found using standard reference search techniques (such as looking through a library card catalog).
+
+Examples:
+
+    Ancestry.com
+    National Archives and Records Administration
+
+In the event that there is just one known copy of a source (and it is unlikely that other copies exist), state:
+
+    "privately held by [name of owner]"
+
+If an individual has possession of a source and that other copies of that source may exist (although locating these copies would be difficult, if not impossible), state:
+
+    "copy in possession of [name of owner]"
+1 FIELD
+2 TYPE Text
+2 NAME URL
+2 DISP URL
+2 HINT http://www.ancestry.com
+2 DETL Y
+2 LHNT Provide the address of the home page of the website where this document was found (optional - list the full path to the document but remember that this will not always remain the same and, dependent upon the web site, is also subject to change).
+1 FIELD
+2 TYPE Date
+2 NAME Accessed
+2 DISP Date File Accessed
+2 HINT enter the date this source was accessed or viewed
+2 DETL Y
+2 LHNT In the event that this source was found online, enter the date it was viewed.
+1 FIELD
+2 TYPE Text
+2 NAME RefNumber
+2 DISP Misc. Ref. Num.
+2 HINT "document # 123", "case # 456", etc.
+2 DETL Y
+2 LHNT Examples of numbers that might be included here are:
+
+driver license
+Social Security number
+Grave plot number
+Passport number
+1 FIELD
+2 TYPE Text
+2 NAME PersonalID
+2 DISP Personal ID
+2 HINT e.g. STGe0123
+2 DETL Y
+2 LHNT Copies of EVERYTHING should be kept. List your personal Library Document ID number here (use whatever numbering/cataloging method you like, just be consistent).
+0 TRLR

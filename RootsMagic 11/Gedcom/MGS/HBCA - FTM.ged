@@ -1,0 +1,79 @@
+0 HEAD
+1 FILE .ged
+1 SOUR RootsMagic
+2 VERS 11.0
+2 NAME RootsMagic
+2 CORP RootsMagic, Inc.
+1 DEST RootsMagic
+1 DATE 09 AUG 2026
+2 TIME 08:55:07
+1 SUBM @SUBM1@
+1 COPR Copyright (c) 2018-2026 Michif Genealogical Society. All rights reserved.
+1 NOTE This file contains original historical translations and research.
+2 CONC Please do not upload this raw GEDCOM to public, collaborative trees without permission and attribution.
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @SUBM1@ SUBM
+1 NAME Jason Cole
+2 ADDR https://www.facebook.com/groups/149982655772008
+1 NOTE Michif Genealogical Society
+0 @M1202199891@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yelland_lewis.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M1096760547@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_john-jr.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5557674495@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_edwin-w.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M7375247562@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_robert.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5484288226@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_thomas.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M8897946211@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yates_james.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M5026939286@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_john.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M0515051430@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yarrow_thomas.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M6073240364@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\young_harrison-stevens.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M4693122932@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\zastre_gonzague.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @M8540471199@ OBJE
+1 FILE //ALIENWARE/Elements/Genealogy/Media/Census\yorston_hugh.pdf
+2 FORM jpg
+2 TITL  - Vol Unknown - Page X
+0 @S1@ SOUR
+1 TITL Michif Genealogical Society
+1 AUTH
+1 PUBL Researcher: Jason Cole.
+1 _LINK https://www.facebook.com/groups/149982655772008
+1 NOTE https://www.facebook.com/groups/149982655772008
+1 _LINK https://www.ancestry.com/groups/85343
+1 NOTE https://www.ancestry.com/groups/85343
+0 @S1001@ SOUR
+1 TITL Hudson's Bay Company Archives: Biographical Sheets, 
+1 AUTH Hudson's Bay Company Archives: Biographical Sheets
+1 PUBL Granite Mountain, UT: FamilySearch.org
+1 REFN 1001
+0 TRLR
