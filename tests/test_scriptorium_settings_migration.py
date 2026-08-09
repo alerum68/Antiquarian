@@ -128,6 +128,8 @@ def test_registrar_schema_matches_expected_shape():
             "REGISTRAR_COLOR_SET": "1", "REGISTRAR_COLOR_VALUE": "27",
         },
     }
+
+
 def test_gazetteer_schema_matches_expected_shape():
     result = Scriptorium._load_tool_schema(BASE_DIR / "Gazetteer")
 
@@ -135,7 +137,7 @@ def test_gazetteer_schema_matches_expected_shape():
         "File Paths": {
             "GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
             "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
-                                    "US_HistCounties_Shapefile/US_HistCounties.shp",
+            "US_HistCounties_Shapefile/US_HistCounties.shp",
             "GAZETTEER_CA_SHAPEFILE_DIR": "Scriptorium/Gazetteer/CA_UNICEN_Counties",
         },
         "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"},
@@ -168,5 +170,3 @@ def test_batch_set_env_updates_existing_and_preserves_comments(tmp_path):
     assert "BAR='keep'" in lines
     assert "BAZ='created'" in lines
     assert "EMPTY=''" in lines
-
-

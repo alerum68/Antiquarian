@@ -42,7 +42,8 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 PUBLISHER = os.getenv("PUBLISHER", "")
 PUB_LOC = os.getenv("PUB_LOC", "")
 
-IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "") or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
+IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "")
+                            or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
 IMAGE_EXTENSION = os.getenv("IMAGE_EXTENSION", "").lstrip(".").lower()
 FORM_TYPE = IMAGE_EXTENSION
 
@@ -59,7 +60,8 @@ FILM_NUMBER = os.getenv("FILM_NUMBER", "")
 ROLL_NUMBER = os.getenv("ROLL_NUMBER", "")
 MIN_MARRIAGE_AGE = Utils.get_env_int("MIN_MARRIAGE_AGE", 12)
 MAX_SPOUSE_AGE_GAP = Utils.get_env_int("MAX_SPOUSE_AGE_GAP", 25)
-HUSBAND_CHILD_AGE_GAP = (Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MIN", 14), Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MAX", 60))
+HUSBAND_CHILD_AGE_GAP = (Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MIN", 14),
+                         Utils.get_env_int("HUSBAND_CHILD_AGE_GAP_MAX", 60))
 WIFE_CHILD_AGE_GAP = (Utils.get_env_int("WIFE_CHILD_AGE_GAP_MIN", 12), Utils.get_env_int("WIFE_CHILD_AGE_GAP_MAX", 50))
 REVIEW_THRESHOLD = 0.6
 
@@ -389,7 +391,8 @@ def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.S
                         last_c_age = get_age(m_unit['children'][-1])
                     m_age = get_age(m)
                     if last_c_age != -1 and m_age != -1 and m_age > last_c_age and m_age >= MIN_MARRIAGE_AGE:
-                        anc_member = m if Utils.clean_val(m.get('Surname')) == Utils.clean_val(head.get('Surname')) else nxt
+                        anc_member = m if Utils.clean_val(
+                            m.get('Surname')) == Utils.clean_val(head.get('Surname')) else nxt
                         units[m_unit_idx]['children'].append(anc_member)
                         units.append(make_unit(m, nxt, anchor_person=anc_member))
                         flagged_person = nxt if anc_member is m else m
@@ -741,8 +744,8 @@ def get_row_val(r: pd.Series, cols: List[str], default: str) -> str:
 
 
 def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str, target_software: str,
-                           row_town: str, row_county: str, row_state: str, row_roll: str, row_film: str,
-                           row_ed: str = "") -> List[str]:
+                          row_town: str, row_county: str, row_state: str, row_roll: str, row_film: str,
+                          row_ed: str = "") -> List[str]:
     giv = Utils.clean_val(row.get('Given Name'))
     sur = Utils.clean_val(row.get('Surname'))
     person_str = f"{giv} {sur}".strip()
@@ -998,14 +1001,14 @@ def get_census_sources(target_software: str) -> List[str]:
                 f"1 TITL {source_title}",
                 f"1 _BIBL {bibl}",
                 "1 REPO @R1@", "1 _TMPLT", f"2 TID {tid}"] + tmplt_fields + [
-                f"0 {Utils.ROOT_SOURCE_ID} SOUR", f"1 TITL {Utils.ORG_NAME}", "1 AUTH",
-                f"1 PUBL Researcher: {Utils.RESEARCHER}."] + Utils.weblink_lines(
-            Utils.MGS_GROUP_URL, "Facebook Group", "RM") + Utils.weblink_lines(Utils.ANCESTRY_GROUP_URL, "Ancestry Group", "RM")
+            f"0 {Utils.ROOT_SOURCE_ID} SOUR", f"1 TITL {Utils.ORG_NAME}", "1 AUTH",
+            f"1 PUBL Researcher: {Utils.RESEARCHER}."] + Utils.weblink_lines(
+            Utils.MGS_GROUP_URL, "Facebook Group", "RM") + Utils.weblink_lines(Utils.ANCESTRY_GROUP_URL, "Ancestry Group", "RM")  # noqa: E501
     else:
         return [f"0 @S{CENSUS_SOURCE_ID}@ SOUR", f"1 REFN {CENSUS_SOURCE_ID}",
                 f"1 TITL {source_title}",
                 f"1 PUBL {PUB_LOC}: {PUBLISHER}", "1 REPO @R1@", f"1 _APID 1,{APID_DB}::0",
-                f"0 {Utils.ROOT_SOURCE_ID} SOUR", f"1 TITL {Utils.ORG_NAME}", f"1 AUTH Research conducted by {Utils.RESEARCHER}.",
+                f"0 {Utils.ROOT_SOURCE_ID} SOUR", f"1 TITL {Utils.ORG_NAME}", f"1 AUTH Research conducted by {Utils.RESEARCHER}.",  # noqa: E501
                 f"1 _LINK {Utils.MGS_GROUP_URL}", "2 NAME Facebook Group", f"1 _LINK {Utils.ANCESTRY_GROUP_URL}",
                 "2 NAME Ancestry Group"]
 
@@ -1073,7 +1076,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
     str_columns: List[str] = list(df.columns.astype(str))
 
-    ged = ["0 HEAD", f"1 SOUR {Utils.SOFTWARE_NAME}", f"2 VERS {Utils.SOFTWARE_VERS}", f"2 CORP {Utils.ORG_NAME}", "1 GEDC",
+    ged = ["0 HEAD", f"1 SOUR {Utils.SOFTWARE_NAME}", f"2 VERS {Utils.SOFTWARE_VERS}", f"2 CORP {Utils.ORG_NAME}", "1 GEDC",  # noqa: E501
            "2 VERS 5.5.1", "2 FORM LINEAGE-LINKED", "1 CHAR UTF-8", f"1 DATE {Utils.CURRENT_DATE}",
            f"1 COPR Copyright {Utils.COPYRIGHT_START}", "1 SUBM @SUB1@"]
     if Utils.GEDCOM_NOTE:
@@ -1124,7 +1127,8 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             if not isinstance(anchor_row, pd.Series):
                 continue
 
-            anchor_pid = Utils.clean_val(anchor_row.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, anchor_row.name))
+            anchor_pid = Utils.clean_val(anchor_row.get('PID')) or str(
+                ANCESTRY_START_RECORD_ID + cast(int, anchor_row.name))
 
             base_f_id = f"@F{anchor_pid}_{u_type}@" if u_type != 'main' else f"@F{anchor_pid}@"
             f_id = base_f_id
@@ -1148,7 +1152,8 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             if isinstance(children_list, list):
                 for child in children_list:
                     if isinstance(child, pd.Series):
-                        c_idx = Utils.clean_val(child.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, child.name))
+                        c_idx = Utils.clean_val(child.get('PID')) or str(
+                            ANCESTRY_START_RECORD_ID + cast(int, child.name))
                         fam_blocks.append(f"1 CHIL @I{c_idx}@")
                         fam_links[child.name].append(f"1 FAMC {f_id}")
 
@@ -1303,7 +1308,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
              "1 SENT [person] had military service.< [Desc]>< [Date]>.", "1 PLAC N", "1 DATE Y", "1 DESC Y"])
         ged.extend(get_source_templates({10008}))
 
-    ged.extend(["0 @SUB1@ SUBM", f"1 NAME {Utils.RESEARCHER}", f"1 ADDR {Utils.SUBM_ADDRESS}", f"1 NOTE {Utils.ORG_NAME}", "0 @R1@ REPO",
+    ged.extend(["0 @SUB1@ SUBM", f"1 NAME {Utils.RESEARCHER}", f"1 ADDR {Utils.SUBM_ADDRESS}", f"1 NOTE {Utils.ORG_NAME}", "0 @R1@ REPO",  # noqa: E501
                 f"1 NAME {REPOSITORY}", f"1 ADDR {REPOSITORY_LOC}", f"1 CALN {CALL_NUMBER}", "2 MEDI Electronic",
                 f"2 _URL {COLLECTION_URL}", "0 TRLR"])
 

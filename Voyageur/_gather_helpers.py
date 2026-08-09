@@ -84,7 +84,7 @@ def wait_for_downloaded_json(downloads_dir: Path, prefix: str, start_time: float
 
 
 def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: float,
-                            img_target_dir: Path) -> int:
+                           img_target_dir: Path) -> int:
     img_count = 0
     image_candidates = [
         p for p in downloads_dir.iterdir()
@@ -103,7 +103,7 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
 
 
 def resolve_census_image_dir(base_img_setting: str, program_dir: str, census_folder: str,
-                              location_folder: str) -> Path:
+                             location_folder: str) -> Path:
     if os.path.isabs(base_img_setting):
         base_img_dir = Path(base_img_setting)
     else:

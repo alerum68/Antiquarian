@@ -6,17 +6,16 @@ is always the marriage bride, ...) with a small fixed role_semantic vocabulary
 participant, the same way for any record type.
 """
 
+import Utils
+import Scrip
+import General
+import Census
 import pandas as pd
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import Census
-import General
-import Scrip
-import Utils
 
 
 def test_generate_uid_same_person_same_page_matches():
@@ -572,12 +571,12 @@ def test_build_family_baptism_shape_single_famc_no_suffix():
 def test_build_family_marriage_shape_three_families_with_suffixes():
     rec = {"event_type": "Marriage", "page": "5", "record_id": "M-1", "event_date": "1850-01-01",
            "participants": [
-              make_participant("primary", given="Jean", surname="Gagnon"),
-              make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
-              make_participant("father", given="Pierre", surname="Gagnon"),
-              make_participant("mother", given="Anne", surname="Cyr", sex="F"),
-              make_participant("father_in_law", given="Louis", surname="Boucher"),
-              make_participant("mother_in_law", given="Rose", surname="Dubois", sex="F"),
+               make_participant("primary", given="Jean", surname="Gagnon"),
+               make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
+               make_participant("father", given="Pierre", surname="Gagnon"),
+               make_participant("mother", given="Anne", surname="Cyr", sex="F"),
+               make_participant("father_in_law", given="Louis", surname="Boucher"),
+               make_participant("mother_in_law", given="Rose", surname="Dubois", sex="F"),
            ]}
     fams = General.build_family(rec, "5", "M0000000001", "RM")
     assert len(fams) == 3
@@ -617,9 +616,9 @@ def test_build_family_scrip_shape_claimant_spouse_and_children_share_one_family(
 def test_build_individual_famc_and_fams_tags_use_semantic_not_digits():
     rec = {"event_type": "Marriage", "page": "5", "record_id": "M-1", "event_date": "1850-01-01",
            "participants": [
-              make_participant("primary", given="Jean", surname="Gagnon"),
-              make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
-              make_participant("father", given="Pierre", surname="Gagnon"),
+               make_participant("primary", given="Jean", surname="Gagnon"),
+               make_participant("spouse", given="Marie", surname="Boucher", sex="F"),
+               make_participant("father", given="Pierre", surname="Gagnon"),
            ]}
     primary = rec["participants"][0]
     lines, _, _, _ = General.build_individual("I1", rec, primary, "5", "M0000000001", "26 JUL 2026", False, "RM")
@@ -816,7 +815,7 @@ def test_select_scrip_template_id_prefers_series_code_over_commission_reference_
     authoritative than the printed commission_reference text, so it wins when present,
     even when commission_reference text alone would have matched a different template."""
     assert Scrip.select_scrip_template_id("some unrelated header text", "Witness Affidavit",
-                                        series_code="RG15-D-II-8-c") == 20002
+                                          series_code="RG15-D-II-8-c") == 20002
 
 
 def test_select_scrip_template_id_returns_none_when_unrecognized():
@@ -896,7 +895,7 @@ def test_build_general_citation_scrip_forces_proven_even_when_date_is_estimated(
         rec = {"page": "1", "record_id": "SC-1", "type_specific_fields": {}}
         part = make_participant("primary")
         blocks = General.build_general_citation(rec, part, "BIRT", "1324", "M0000000001",
-                                            proof_status="proposed", target_software="RM")
+                                                proof_status="proposed", target_software="RM")
         assert "2 _PROOF proven" in blocks[0]
     finally:
         General.set_active_profile(General.GeneralProfile())
@@ -1145,4 +1144,3 @@ def test_build_individual_skips_unknown_fact_type_gracefully():
     joined = "\n".join(lines)
 
     assert "irrelevant" not in joined
-

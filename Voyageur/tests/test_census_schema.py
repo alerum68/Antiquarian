@@ -207,4 +207,3 @@ def test_normalize_and_validate_census_returns_normalized_doc():
     assert doc["record_type_name"] == "Census_1900"
     assert doc["collection_title"] == "1900 US Census"
     assert len(doc["sheets"]) == 1
-

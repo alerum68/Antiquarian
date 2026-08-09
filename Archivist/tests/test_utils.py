@@ -1,8 +1,8 @@
+import Utils
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import Utils
 
 
 def test_clean_val_strips_and_stringifies():

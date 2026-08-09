@@ -23,10 +23,10 @@ SAMPLE_INDEX_HTML = """
 <body>
   <div class="content">
     <ul>
-      <li><a href="../../_assets/docs/hbca/biographical/a/adams_george.pdf">Adams, George (b. ca. 1796-d. 1864) (fl. 1821-1854)</a></li>
+      <li><a href="../../_assets/docs/hbca/biographical/a/adams_george.pdf">Adams, George (b. ca. 1796-d. 1864) (fl. 1821-1854)</a></li>  # noqa: E501
       <li><a href="../../_assets/docs/hbca/biographical/a/adams_joseph.pdf">Adams, Joseph (fl. 1730-1737)</a></li>
-      <li><a href="../../_assets/docs/hbca/biographical/b/ballenden_john.pdf">Ballenden, John (1810-1856) (fl. 1829-1856)</a></li>
-      <li><a href="../../_assets/docs/hbca/biographical/c/connolly_william.pdf">Connolly, William (1786-1849) (fl. 1801-1831)</a></li>
+      <li><a href="../../_assets/docs/hbca/biographical/b/ballenden_john.pdf">Ballenden, John (1810-1856) (fl. 1829-1856)</a></li>  # noqa: E501
+      <li><a href="../../_assets/docs/hbca/biographical/c/connolly_william.pdf">Connolly, William (1786-1849) (fl. 1801-1831)</a></li>  # noqa: E501
     </ul>
   </div>
 </body>

@@ -32,7 +32,7 @@ SAMPLE_KEYSTONE_HTML = """
   <div class="record">
     <h3>Post Journal B.239/a/1</h3>
     <a class="finding-aid" href="/scripts/mwimain.dll/144/PAM_LISTINGS/1234?RECORD">View Record 1234</a>
-    <a class="media-link" href="https://pam.minisisinc.com/assets/media/B_239_a_1.pdf">Digitized Microfilm Copy (PDF)</a>
+    <a class="media-link" href="https://pam.minisisinc.com/assets/media/B_239_a_1.pdf">Digitized Microfilm Copy (PDF)</a>  # noqa: E501
     <img src="https://pam.minisisinc.com/assets/images/thumbs/B_239_a_1_001.jpg" />
   </div>
 </body>

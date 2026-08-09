@@ -1,8 +1,8 @@
+import Scrip
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-import Scrip
 
 
 def test_scrip_profile_dynamic_source_id_has_no_register_prefix():

@@ -192,9 +192,9 @@ class HBCAProfile:
         return str(rec.get('year', '')) if is_primary and rec.get('year') else ""
 
     def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]:
+                                  vol: str, media_uid: str, target_software: str, resi: str,
+                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+                                  age: str) -> List[str]:
         return General._build_generic_primary_event_lines(
             rec, part, event_tag, witnesses, vol, media_uid, target_software,
             alt_names, raw_event_date, age

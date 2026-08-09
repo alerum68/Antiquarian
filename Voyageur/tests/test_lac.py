@@ -1,6 +1,7 @@
 """Tests for LAC.py's Commissioner-scaffold building blocks: MASTER_DB path resolution
 (mirroring Paleographer.py's own resolve_setting), load/save, and scaffold-sheet
 deduplicated append. See the Voyageur-Parish-Scrip-scaffold design spec."""
+from pathlib import Path
 import os
 
 import pytest
@@ -114,6 +115,7 @@ def test_download_volume_assets_writes_one_scaffold_sheet_per_asset(monkeypatch,
 
 def test_download_volume_assets_skips_already_downloaded_pid(monkeypatch, tmp_path):
     calls = []
+
     def fake_download_pid_bundle(pid, media_dir):
         calls.append(pid)
         return {"source_documents": []}
@@ -186,7 +188,7 @@ def test_download_volume_assets_multiworker_no_op_when_all_downloaded(tmp_path):
     master_db_path = str(tmp_path / "scrip_records.json")
 
     result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
-                                                     master_db_path, "Scrip", "Test", max_workers=2)
+                                                    master_db_path, "Scrip", "Test", max_workers=2)
 
     assert result["downloaded_pids"] == ["pid1"]
 
@@ -200,7 +202,7 @@ def test_download_volume_assets_multiworker_reseeds_scaffold_for_already_downloa
     master_db_path = str(tmp_path / "scrip_records.json")
 
     result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
-                                                     master_db_path, "Scrip", "Test", max_workers=2)
+                                                    master_db_path, "Scrip", "Test", max_workers=2)
 
     assert result["downloaded_pids"] == ["pid1"]
     master_data = LAC.load_master_db(master_db_path, "Test", "Scrip")
@@ -240,7 +242,7 @@ def test_download_volume_assets_multiworker_writes_scaffold_sheet_on_success(mon
     master_db_path = str(tmp_path / "scrip_records.json")
 
     result = LAC.download_volume_assets_multiworker(["pid1"], str(tmp_path), checkpoint_path,
-                                                     master_db_path, "Scrip", "Test", max_workers=1)
+                                                    master_db_path, "Scrip", "Test", max_workers=1)
 
     assert result["downloaded_pids"] == ["pid1"]
     master_data = LAC.load_master_db(master_db_path, "Test", "Scrip")
@@ -263,9 +265,6 @@ def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch
     assert len(master_data["sheets"]) == 1
 
 
-from pathlib import Path
-
-
 def test_download_images_writes_scaffold_sheet_per_canvas(monkeypatch, tmp_path):
     manifest_data = {
         "sequences": [{"canvases": [
@@ -275,6 +274,7 @@ def test_download_images_writes_scaffold_sheet_per_canvas(monkeypatch, tmp_path)
 
     class FakeResponse:
         content = b"fake-image-bytes"
+
         def raise_for_status(self):
             pass
 

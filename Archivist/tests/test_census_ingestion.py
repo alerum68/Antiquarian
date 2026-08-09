@@ -7,15 +7,13 @@ get_census_era, etc.) are deliberately NOT changed by this rework - only what fe
 changed - so these tests confirm the adapter's column-naming/grouping produces input
 those functions still handle correctly, not that the functions themselves changed.
 """
+import Utils
+import Census as arc
+import pandas as pd
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
-import pandas as pd
-
-import Census as arc
-import Utils
 
 
 def _unified_doc(record_type_name, sheets):

@@ -63,7 +63,7 @@ def test_normalize_familysearch_census_gather_derives_record_type():
             "repository": "FamilySearch",
             "people": [
                 {"columns": {"Given Name": "Marie", "Surname": "Boucher", "Gender": "F",
-                            "Age": "35", "Relationship to Head": "Head", "Family Number": "2"},
+                             "Age": "35", "Relationship to Head": "Head", "Family Number": "2"},
                  "pid": "p2"},
             ],
         }],
@@ -89,23 +89,23 @@ def test_build_census_json_accepts_household_view_row_shape():
     items_raw = [{
         "item_id": "3:1:S3HY-67NL-ZP",
         "citation_text": '"Minnesota, 1850 federal census," database with images, FamilySearch '
-                          '(https://familysearch.org : 3 August 2026), Kittson > image 39; '
-                          "NARA microfilm publication.",
+        '(https://familysearch.org : 3 August 2026), Kittson > image 39; '
+        "NARA microfilm publication.",
         "rows": [
             {"columns": {"Given Name": "Joseph", "Surname": "Rolette", "Gender": "M", "Age": "35",
-                        "Relationship to Head": "Head", "Family Number": "1"},
+                         "Relationship to Head": "Head", "Family Number": "1"},
              "person_ark": "MZ2Z-WM4", "attached_fsftid": "9CJG-851"},
             {"columns": {"Given Name": "Angelic", "Surname": "Rolette", "Gender": "F", "Age": "30",
-                        "Relationship to Head": "Spouse", "Family Number": "1"},
+                         "Relationship to Head": "Spouse", "Family Number": "1"},
              "person_ark": "MZ2Z-WM5", "attached_fsftid": ""},
             {"columns": {"Given Name": "Joseph", "Surname": "Rolette", "Gender": "M", "Age": "9",
-                        "Relationship to Head": "Child", "Family Number": "1"},
+                         "Relationship to Head": "Child", "Family Number": "1"},
              "person_ark": "MZ2Z-WM6", "attached_fsftid": ""},
             {"columns": {"Given Name": "George", "Surname": "Monison", "Gender": "M", "Age": "22",
-                        "Relationship to Head": "No Relation", "Family Number": "1"},
+                         "Relationship to Head": "No Relation", "Family Number": "1"},
              "person_ark": "MZ2Z-WM7", "attached_fsftid": ""},
             {"columns": {"Given Name": "J Baptiste", "Surname": "Cardinal", "Gender": "M", "Age": "40",
-                        "Family Number": "2"},
+                         "Family Number": "2"},
              "person_ark": "MZ2Z-XX1", "attached_fsftid": ""},
         ],
     }]
@@ -122,4 +122,3 @@ def test_build_census_json_accepts_household_view_row_shape():
     # J Baptiste Cardinal's household has no relationship data at all (the bare-"Primary"
     # case confirmed live) - the column must simply be absent, not fabricated as empty string.
     assert "Relationship to Head" not in people[4]["columns"]
-

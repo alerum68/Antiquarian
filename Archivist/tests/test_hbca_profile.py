@@ -1,14 +1,13 @@
+import Archivist as arch_dispatcher
+import Utils
+import HBCA
+import General
 import sys
 from pathlib import Path
 
 archivist_dir = Path(__file__).resolve().parents[1]
 if str(archivist_dir) not in sys.path:
     sys.path.insert(0, str(archivist_dir))
-
-import General
-import HBCA
-import Utils
-import Archivist as arch_dispatcher
 
 
 HBCA_SAMPLE_REC = {
@@ -24,7 +23,7 @@ HBCA_SAMPLE_REC = {
         "death_date_extracted": "1864",
         "hbca_references": ["B.239/g/1-4", "A.32/21"],
         "pdf_url": "https://www.gov.mb.ca/chc/archives/hbca/biographical/a/adams_george.pdf",
-        "keystone_urls": ["https://pam.minisisinc.com/scripts/mwimain.dll/144/PAM_AUTHORITY/AUTH_DESC_HOLD_EXP/KEY%201234"],
+        "keystone_urls": ["https://pam.minisisinc.com/scripts/mwimain.dll/144/PAM_AUTHORITY/AUTH_DESC_HOLD_EXP/KEY%201234"],  # noqa: E501
     },
     "participants": [
         {

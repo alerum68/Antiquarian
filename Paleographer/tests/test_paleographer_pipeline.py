@@ -35,6 +35,7 @@ class FakeModels:
     """fake_page_data is either one dict (returned for every call, the common case) or a
     list of dicts (consumed one per call, in order - for simulating a multi-file run where
     each image needs its own distinct response, e.g. page-continuation tests)."""
+
     def __init__(self, fake_page_data):
         self.fake_page_data = fake_page_data
         self.calls = []

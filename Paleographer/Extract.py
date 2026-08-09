@@ -12,6 +12,8 @@ Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
 cwd=Paleographer/, so engine and agy_engine import here as plain sibling modules.
 """
 
+import agy_engine
+import engine
 import json
 import math
 import os
@@ -39,8 +41,6 @@ from ScriptoriumMCP import agy_client  # noqa: E402
 
 from Commissioner import normalization  # noqa: E402
 
-import engine
-import agy_engine
 
 # Global settings come from the project root's .env; this tool's own settings come from
 # its own subfolder's .env, so Paleographer stays runnable standalone.
@@ -468,7 +468,7 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
 
         def call_fn() -> Any:
             result = agy_engine.call_agy_extract_chunked(images, SCHEMA, full_prompt, model=AGY_MODEL_ID,
-                                              cli_bin=AGY_CLI_BIN, timeout_seconds=AGY_TIMEOUT_SECONDS)
+                                                         cli_bin=AGY_CLI_BIN, timeout_seconds=AGY_TIMEOUT_SECONDS)
             return result.structured_output, result.usage
 
         try:
@@ -652,7 +652,7 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
         prompt = system_instruction + "\n\n" + engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
         gen_config_kwargs: Dict[str, Any] = dict(response_mime_type="application/json", response_schema=SCHEMA)
         requests.append(engine.build_batch_request(MODEL_ID, [prompt, content_part], filename,
-                                            gen_config_kwargs))
+                                                   gen_config_kwargs))
 
     job_name = engine.submit_batch_job(client, MODEL_ID, requests)
     master_data.setdefault("pending_batch_jobs", []).append(
@@ -716,4 +716,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

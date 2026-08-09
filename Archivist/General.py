@@ -16,7 +16,7 @@ GENERAL_CONFIG = {
     'parish_name': os.getenv('PARISH_NAME', 'Parish Name'),
     'parish_name_short': os.getenv('PARISH_NAME_SHORT', 'Parish'),
     'parish_location': (f"{os.getenv('PARISH_CITY', 'City')}, "
-                         f"{os.getenv('PARISH_STATE', 'State')}").strip(", "),
+                        f"{os.getenv('PARISH_STATE', 'State')}").strip(", "),
     'volume_title': os.getenv('VOLUME_TITLE', ''),
     'date_range_str': '',
     'diocese': '',
@@ -36,7 +36,8 @@ COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "") or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
+IMAGE_DIR = Utils.safe_path(Utils.PROGRAM_DIR, os.getenv("IMAGE_DIR", "")
+                            or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
 
 
 class Profile(Protocol):
@@ -44,20 +45,24 @@ class Profile(Protocol):
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]: ...
     def family_uid(self, identity: str) -> Optional[str]: ...
     def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                        document_type: Optional[str]) -> str: ...
+                       document_type: Optional[str]) -> str: ...
+
     def citation_page(self, rec: dict, part: dict, page: str) -> str: ...
     def citation_template_id(self, rec: dict, vol: str) -> Optional[int]: ...
     def citation_proof_status(self, computed_status: str, rec: Optional[dict] = None) -> str: ...
     def citation_quality_fields(self, rec: dict, part: dict, target_software: str) -> List[str]: ...
     def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
-                                target_software: str) -> List[str]: ...
+                               target_software: str) -> List[str]: ...
+
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]: ...
     def citation_uses_source_documents(self, rec: dict) -> bool: ...
     def primary_fact_date(self, rec: dict, is_primary: bool) -> str: ...
+
     def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]: ...
+                                  vol: str, media_uid: str, target_software: str, resi: str,
+                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+                                  age: str) -> List[str]: ...
+
     def volume_source_detail_fields(self, v_clause: str) -> List[str]: ...
     def media_caption(self, sheet: dict, vol: str, pages: str) -> str: ...
     def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]: ...
@@ -66,8 +71,8 @@ class Profile(Protocol):
 
 
 def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                        vol: str, media_uid: str, target_software: str,
-                                        alt_names: list, raw_event_date: str, age: str) -> List[str]:
+                                       vol: str, media_uid: str, target_software: str,
+                                       alt_names: list, raw_event_date: str, age: str) -> List[str]:
     """The non-Scrip primary-event GEDCOM block (today's `Archivist.py:3138-3158`
     else-branch). Exposed as a module function, not only a GeneralProfile method,
     because Scrip.ScripProfile.build_primary_event_lines also needs it verbatim for the
@@ -95,7 +100,7 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
         lines.append(f"2 NOTE Margin note suggests alternate spelling: {alt_values}")
     lines.extend(build_witness_links(rec, witnesses, vol, target_software))
     lines.extend(build_general_citation(rec, part, event_tag, vol, media_uid,
-                                         Utils.get_proof_status(raw_event_date), target_software))
+                                        Utils.get_proof_status(raw_event_date), target_software))
     return lines
 
 
@@ -113,7 +118,7 @@ class GeneralProfile:
         return None
 
     def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                        document_type: Optional[str]) -> str:
+                       document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
         titl = f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}"
@@ -150,7 +155,7 @@ class GeneralProfile:
         return [f"3 REFN {refn}", "3 QUAY 3"]
 
     def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
-                                target_software: str) -> List[str]:
+                               target_software: str) -> List[str]:
         if target_software != "RM":
             return []
         std_g = Utils.clean_val(part.get('std_given'))
@@ -218,11 +223,11 @@ class GeneralProfile:
         return ""
 
     def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]:
+                                  vol: str, media_uid: str, target_software: str, resi: str,
+                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+                                  age: str) -> List[str]:
         return _build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
-                                                    target_software, alt_names, raw_event_date, age)
+                                                  target_software, alt_names, raw_event_date, age)
 
     def volume_source_detail_fields(self, v_clause: str) -> List[str]:
         tid = 10009
@@ -524,10 +529,10 @@ def generate_fam_uid(rec: dict, vol: str) -> str:
 
 
 def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_uid: str,
-                           proof_status: str, target_software: str, document_type: Optional[str] = None,
-                           page: Optional[str] = None, citation_text: Optional[str] = None,
-                           citation_details: Optional[str] = None,
-                           doc_media_uid: Optional[str] = None) -> str:
+                          proof_status: str, target_software: str, document_type: Optional[str] = None,
+                          page: Optional[str] = None, citation_text: Optional[str] = None,
+                          citation_details: Optional[str] = None,
+                          doc_media_uid: Optional[str] = None) -> str:
     page = Utils.clean_val(page if page is not None else rec.get('page')) or 'X'
     rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
     year = Utils.clean_val(rec.get('year')) or 'Unknown'
@@ -744,7 +749,8 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     needs_primary_review = rec.get('review', False) and not any_part_review and is_primary
     if part.get('review', False) or needs_primary_review:
         needs_review = True
-        reasons = [r for r in [Utils.clean_val(part.get('review_reason')), Utils.clean_val(rec.get('review_reason'))] if r]
+        reasons = [r for r in [Utils.clean_val(part.get('review_reason')),
+                               Utils.clean_val(rec.get('review_reason'))] if r]
         task_note = "; ".join(reasons) if reasons else "Review requested during extraction."
 
         priority, color_code, folder_name = evaluate_task_priority(task_note)
@@ -944,7 +950,7 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
             event_tag = Utils.get_event_gedcom_tag(event_type)
             event_date = Utils.format_gedcom_date(Utils.clean_val(rec.get('event_date')))
             main_fam.extend([f"1 {event_tag}", f"2 DATE {event_date}" if event_date else "",
-                             f"2 PLAC {Utils.clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])
+                             f"2 PLAC {Utils.clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}"])  # noqa: E501
 
             if Utils.clean_val(primary.get('age')):
                 slot = "HUSB" if husb is primary else "WIFE"
@@ -1048,7 +1054,7 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
         f"1 DEST {Utils.SOFTWARE_NAME}",
         f"1 DATE {gedcom_date}",
         f"2 TIME {now.strftime('%H:%M:%S')}",
-        "1 SUBM @SUBM1@", f"1 COPR Copyright (c) {Utils.COPYRIGHT_START}-{now.year} {Utils.ORG_NAME}. All rights reserved.",
+        "1 SUBM @SUBM1@", f"1 COPR Copyright (c) {Utils.COPYRIGHT_START}-{now.year} {Utils.ORG_NAME}. All rights reserved.",  # noqa: E501
         f"1 NOTE {Utils.GEDCOM_NOTE}",
         f"2 CONC {Utils.GEDCOM_CONC}",
         "1 GEDC",
@@ -1188,7 +1194,8 @@ def apply_extracted_parish_name(data: dict) -> None:
             return
 
     if not GENERAL_CONFIG.get('parish_name') and data.get('record_type_name') == 'Scrip':
-        collection = Utils.clean_val(COLLECTION_NAME) or Utils.clean_val(data.get('collection_title')) or 'Scrip Records'
+        collection = Utils.clean_val(COLLECTION_NAME) or Utils.clean_val(
+            data.get('collection_title')) or 'Scrip Records'
         GENERAL_CONFIG['parish_name'] = Utils.clean_val(REPOSITORY) or 'Library and Archives Canada'
         GENERAL_CONFIG['register_name'] = collection
         GENERAL_CONFIG['volume_title'] = collection

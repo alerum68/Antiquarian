@@ -10,7 +10,7 @@ def test_normalize_ancestry_census_gather_derives_title_and_record_type():
             "country": "USA", "roll_number": "T9_1", "repository": "Ancestry.com",
             "people": [
                 {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M",
-                            "Age": "40", "Relationship to Head": "Head", "Family Number": "5"},
+                             "Age": "40", "Relationship to Head": "Head", "Family Number": "5"},
                  "pid": "p1"},
             ],
         }],

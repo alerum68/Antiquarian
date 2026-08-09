@@ -327,7 +327,7 @@ class ScripProfile:
         return f"FAM_{identity}"
 
     def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                        document_type: Optional[str]) -> str:
+                       document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
         type_fields = rec.get('type_specific_fields') or {}
@@ -356,7 +356,7 @@ class ScripProfile:
         return "proven"
 
     def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
-                                target_software: str) -> List[str]:
+                               target_software: str) -> List[str]:
         if target_software != "RM":
             return []
         template_id = resolve_scrip_template_id(rec)
@@ -387,9 +387,9 @@ class ScripProfile:
         return str(year) if is_primary and year else ""
 
     def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]:
+                                  vol: str, media_uid: str, target_software: str, resi: str,
+                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+                                  age: str) -> List[str]:
         if event_tag != 'EVEN':
             return General._build_generic_primary_event_lines(
                 rec, part, event_tag, witnesses, vol, media_uid, target_software,
@@ -417,7 +417,7 @@ class ScripProfile:
         scrip_place = Utils.clean_place(rec.get('event_place')) or resi or General.GENERAL_CONFIG['default_location']
 
         lines = General.build_custom_fact_lines('Scrip', scrip_value, rec, part, vol, media_uid,
-                                                  target_software, date=scrip_fact_date, place=scrip_place)
+                                                target_software, date=scrip_fact_date, place=scrip_place)
         if alt_names:
             alt_values = ", ".join(Utils.clean_val(a.get('value')) for a in alt_names)
             lines.append(f"2 NOTE Margin note suggests alternate spelling: {alt_values}")
@@ -435,7 +435,8 @@ class ScripProfile:
         media_std_s = Utils.clean_val(primary.get('std_surname'))
         media_ref_bits = [b for b in (
             f"Claim: {Utils.clean_val(scrip_tf.get('claim_number'))}" if scrip_tf.get('claim_number') else "",
-            f"Affidavit: {Utils.clean_val(scrip_tf.get('affidavit_number'))}" if scrip_tf.get('affidavit_number') else "",
+            f"Affidavit: {Utils.clean_val(scrip_tf.get('affidavit_number'))}" if scrip_tf.get(
+                'affidavit_number') else "",
             f"Scrip: {Utils.clean_val(scrip_tf.get('scrip_number'))}" if scrip_tf.get('scrip_number') else "",
         ) if b]
         if media_std_s or media_std_g:

@@ -211,7 +211,8 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
         full_url = urljoin(base_url, href)
         href_lower = href.lower()
 
-        if any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4")) or "/assets/media/" in href_lower:
+        is_media_ext = any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".jpeg", ".tif", ".tiff", ".png", ".mp4"))  # noqa: E501
+        if is_media_ext or "/assets/media/" in href_lower:
             if full_url not in seen_media:
                 seen_media.add(full_url)
                 media_urls.append(full_url)
@@ -390,7 +391,10 @@ def gather_hbca_sheets(
     delay_sec: float = 0.0,
     max_workers: int = HBCA_MAX_WORKERS,
 ) -> int:
-    """Headless gatherer: fetches index, downloads PDFs, prefetches text, resolves Keystone links, builds scaffold sheets."""
+    """
+    Headless gatherer: fetches index, downloads PDFs, prefetches text,
+    resolves Keystone links, builds scaffold sheets.
+    """
     image_dir = image_dir or Path(_safe_path(str(media_dir or MEDIA_DIR), HBCA_IMAGE_DIR))
     master_db_path = master_db_path or (
         Path(PROGRAM_DIR) / os.environ.get("JSON_DIR", "JSON") / HBCA_MASTER_DB_NAME
@@ -451,7 +455,7 @@ def gather_hbca_sheets(
                     download_keystone_media(res["media_urls"], dest_media_dir, session=session)
 
         sheet = build_hbca_scaffold_sheet(entry, raw_text=raw_text, keystone_urls=keystone_urls)
-        
+
         with db_lock:
             append_scaffold_sheet(master_db_path, sheet)
             downloaded_set.add(entry.file_name)
@@ -459,7 +463,7 @@ def gather_hbca_sheets(
 
         if delay_sec > 0:
             time.sleep(delay_sec)
-            
+
         return True
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:

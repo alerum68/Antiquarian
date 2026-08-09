@@ -322,4 +322,3 @@ def normalize_and_validate_census(raw: dict, field_map_name: str, collection_tit
     normalized = normalize_census_pages(raw, field_map_name, collection_title, record_type_name)
     validate_against_commissioner(normalized, collection_title)
     return normalized
-

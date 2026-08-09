@@ -5,13 +5,13 @@ Task 6's regression test rebuilds the same fixtures through the post-split
 modules and diffs byte-for-byte against these files - run this script again,
 by hand, ONLY if a real (intentional) behavior change is made after the split;
 never re-run it to make a failing regression test pass."""
+import Scrip
+import General as arc
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-import General as arc
-import Scrip
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 
@@ -46,7 +46,7 @@ PARISH_FIXTURE = {
     "collection_title": "St. Boniface Parish Register", "record_type_name": "Parish",
     "sheets": [{
         "document_metadata": {"file_name": "st_boniface_vol3_p12.pdf", "pages": "12",
-                               "file_type": "pdf", "source_name": "St. Boniface"},
+                              "file_type": "pdf", "source_name": "St. Boniface"},
         "records": [{
             "event_type": "Baptism", "page": "12", "record_id": "REC-1", "year": "1875",
             "event_place": "St. Boniface, Manitoba", "vol": "3",
