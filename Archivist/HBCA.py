@@ -138,6 +138,21 @@ class HBCAProfile:
         else:
             ref_val = f"Search File: {emp_name}" if emp_name else ""
 
+        keystone_records = tf.get('keystone_records') or {}
+        microfilm_nos = []
+        archival_urls = []
+        for code in (hbca_refs if isinstance(hbca_refs, list) else [hbca_refs]):
+            entry = keystone_records.get(code)
+            if not entry:
+                continue
+            meta = entry.get('metadata') or {}
+            if meta.get('microfilm_no'):
+                microfilm_nos.append(meta['microfilm_no'])
+            archival_urls.extend(entry.get('record_urls') or [])
+
+        if microfilm_nos:
+            ref_val = f"{ref_val} (Microfilm {', '.join(dict.fromkeys(microfilm_nos))})"
+
         detail_fields = [
             ("Page", page_val),
             ("SourceDetailPerson", person_name),
@@ -147,6 +162,9 @@ class HBCAProfile:
             ("Accessed", accessed_val),
             ("RefNumber", ref_val),
         ]
+        
+        if archival_urls:
+            detail_fields.append(("ArchivalRecordURL", archival_urls[0]))
 
         lines = []
         for f_name, f_val in detail_fields:
@@ -157,6 +175,35 @@ class HBCAProfile:
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
         trans_val = Utils.clean_val(raw_trans)
+        
+        tf = rec.get('type_specific_fields') or {}
+        keystone_records = tf.get('keystone_records') or {}
+        hbca_refs = tf.get('hbca_references') or []
+        
+        keystone_parts = []
+        for code in (hbca_refs if isinstance(hbca_refs, list) else [hbca_refs]):
+            entry = keystone_records.get(code)
+            if not entry:
+                continue
+            meta = entry.get('metadata') or {}
+            item_desc = meta.get('item_description')
+            date_str = meta.get('date')
+            microfilm = meta.get('microfilm_no')
+            
+            if item_desc:
+                desc = item_desc
+                if date_str:
+                    desc += f", {date_str}"
+                desc += f" (Archives of Manitoba, HBCA {code}"
+                if microfilm:
+                    desc += f", Microfilm {microfilm}"
+                desc += ")"
+                keystone_parts.append(desc)
+                
+        if keystone_parts:
+            narrative = "Archival Sources: " + "; ".join(keystone_parts)
+            trans_val = f"{narrative}\n{trans_val}" if trans_val else narrative
+            
         norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
         norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
         same_text = orig_val and trans_val and norm_orig == norm_trans

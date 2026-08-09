@@ -149,3 +149,36 @@ def test_hbca_build_gedcom_end_to_end():
     assert "1 BIRT" in gedcom_text
     assert "1 DEAT" in gedcom_text
     assert "0 TRLR" in gedcom_text
+
+def test_citation_detail_fields_include_keystone_metadata_when_present():
+    profile = HBCA.HBCAProfile()
+    rec = {
+        "type_specific_fields": {
+            "employee_name": "Charles Adams",
+            "hbca_references": ["B.239/k/3"],
+            "keystone_records": {
+                "B.239/k/3": {
+                    "metadata": {
+                        "item_description": "Northern Department minutes of council",
+                        "date": "1851-1870",
+                        "microfilm_no": "1M814",
+                    },
+                    "record_urls": [
+                        "https://pam.minisisinc.com/scripts/mwimain.dll/144/LISTINGS_IMAGES/LISTINGS_DET_IMAGES/SISN%205154?sessionsearch"
+                    ],
+                },
+            },
+        },
+    }
+    part = {"std_given": "Charles", "std_surname": "Adams"}
+    lines = profile.citation_detail_fields(rec, part, page="adams_charles.pdf", vol="", target_software="RM")
+    joined = "\n".join(lines)
+    assert "1M814" in joined
+    assert "SISN%205154" in joined
+
+def test_citation_detail_fields_degrade_gracefully_without_keystone_records():
+    profile = HBCA.HBCAProfile()
+    rec = {"type_specific_fields": {"employee_name": "Charles Adams", "hbca_references": ["B.239/k/3"]}}
+    part = {"std_given": "Charles", "std_surname": "Adams"}
+    lines = profile.citation_detail_fields(rec, part, page="adams_charles.pdf", vol="", target_software="RM")
+    assert any("B.239/k/3" in line for line in lines)

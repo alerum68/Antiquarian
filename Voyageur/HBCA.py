@@ -446,6 +446,7 @@ def build_hbca_scaffold_sheet(
     entry: BioSheetEntry,
     raw_text: str = "",
     keystone_urls: Optional[List[str]] = None,
+    keystone_records: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """Builds a Commissioner-compliant placeholder sheet dict for an HBCA bio sheet."""
     codes = extract_hbca_location_codes(raw_text)
@@ -479,6 +480,7 @@ def build_hbca_scaffold_sheet(
                 "type_specific_fields": {
                     "hbca_references": codes,
                     "keystone_urls": keystone_urls or [],
+                    "keystone_records": keystone_records or {},
                 },
                 "participants": [],
             }
@@ -607,18 +609,22 @@ def gather_hbca_sheets(
 
         raw_text = extract_text_from_pdf(target_file)
         keystone_urls: List[str] = []
+        keystone_records: Dict[str, Any] = {}
 
         if resolve_keystone:
             codes = extract_hbca_location_codes(raw_text)
             for code in codes:
                 res = query_keystone_for_code(code, session=session)
                 keystone_urls.extend(res.get("record_urls", []))
+                keystone_records[code] = res
                 if download_keystone and res.get("media_urls"):
                     clean_code = re.sub(r"[^\w\.-]", "_", code)
                     dest_media_dir = media_dir / "HBCA" / clean_code
                     download_keystone_media(res["media_urls"], dest_media_dir, session=session)
 
-        sheet = build_hbca_scaffold_sheet(entry, raw_text=raw_text, keystone_urls=keystone_urls)
+        sheet = build_hbca_scaffold_sheet(
+            entry, raw_text=raw_text, keystone_urls=keystone_urls, keystone_records=keystone_records
+        )
 
         with db_lock:
             append_scaffold_sheet(master_db_path, sheet)
