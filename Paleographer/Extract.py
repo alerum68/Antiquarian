@@ -367,6 +367,14 @@ def get_processed_files(master_data: Dict[str, Any]) -> set:
     return processed
 
 
+def get_placeholder_for_file(master_data: Dict[str, Any], filename: str) -> Optional[Dict[str, Any]]:
+    for sheet in master_data.get("sheets", []):
+        if sheet.get("document_metadata", {}).get("file_name") == filename:
+            if _sheet_is_placeholder(sheet):
+                return sheet
+    return None
+
+
 def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None:
     master_sheets = master_data.get("sheets")
     if not isinstance(master_sheets, list):
@@ -446,7 +454,8 @@ def build_gen_config_kwargs(active_cache_name: Optional[str]) -> Dict[str, Any]:
 
 
 def process_one_file_sync(filename: str, active_cache_name: Optional[str],
-                          pending_continuation: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+                          pending_continuation: Optional[Dict[str, Any]] = None,
+                          placeholder_sheet: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """Processes one file synchronously. Returns a dict with page_data/usage_metadata on
     success, or None on failure. Raises DailyQuotaExhausted, which the caller must handle
     by stopping the run."""
@@ -459,6 +468,17 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
 
     file_metadata = {"File": file_base, "Pages": pages_str}
     dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
+    
+    if placeholder_sheet:
+        records = placeholder_sheet.get("records", [])
+        if records:
+            tsf = records[0].get("type_specific_fields", {})
+            needs_review = tsf.get("needs_llm_structured_review", False)
+            if needs_review:
+                dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was either empty or missing. You MUST carefully read the unstructured summary paragraph/narrative and attempt to extract all structured vital dates (birth, death) and employment rows (positions, posts, dates) from it, mapping them into the structured JSON fields to the best of your ability."
+            else:
+                dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was successfully parsed by a previous system. DO NOT attempt to extract structured vital dates or employment rows from the image. Focus ONLY on transcribing the unstructured summary narrative exactly as written. Leave the structured data fields empty, as they will be preserved from the previous pass."
+
     dynamic_prompt += engine.build_continuation_context(pending_continuation)
 
     if EXTRACTION_ENGINE == "agy":
@@ -566,7 +586,8 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
         for index, filename in enumerate(files, start=1):
             print(f"[{index}/{total_files}] Processing {filename} with {MODEL_ID}...", end="", flush=True)
             try:
-                result = process_one_file_sync(filename, active_cache_name, pending_continuation)
+                placeholder = get_placeholder_for_file(master_data, filename)
+                result = process_one_file_sync(filename, active_cache_name, pending_continuation, placeholder_sheet=placeholder)
             except engine.DailyQuotaExhausted:
                 print("\n\n[FATAL ERROR] Daily Quota Exhausted.")
                 print("Progress saved. Exiting script to prevent infinite crashing.")
@@ -649,7 +670,20 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
         file_path = Path(SOURCE_DIR) / filename
         _, content_part = engine.build_content_part_for_file(client, file_path)
         file_metadata = {"File": file_path.stem, "Pages": str(engine.get_pdf_page_count(file_path))}
-        prompt = system_instruction + "\n\n" + engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
+        dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
+        
+        placeholder = get_placeholder_for_file(master_data, filename)
+        if placeholder:
+            records = placeholder.get("records", [])
+            if records:
+                tsf = records[0].get("type_specific_fields", {})
+                needs_review = tsf.get("needs_llm_structured_review", False)
+                if needs_review:
+                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was either empty or missing. You MUST carefully read the unstructured summary paragraph/narrative and attempt to extract all structured vital dates (birth, death) and employment rows (positions, posts, dates) from it, mapping them into the structured JSON fields to the best of your ability."
+                else:
+                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was successfully parsed by a previous system. DO NOT attempt to extract structured vital dates or employment rows from the image. Focus ONLY on transcribing the unstructured summary narrative exactly as written. Leave the structured data fields empty, as they will be preserved from the previous pass."
+        
+        prompt = system_instruction + "\n\n" + dynamic_prompt
         gen_config_kwargs: Dict[str, Any] = dict(response_mime_type="application/json", response_schema=SCHEMA)
         requests.append(engine.build_batch_request(MODEL_ID, [prompt, content_part], filename,
                                                    gen_config_kwargs))
