@@ -18,6 +18,12 @@ venv/
 .agentsroom/handoff-summary-*.md
 .agents/mcp_config.json
 /.agentsroom/
+/opencode.json
+
+# Local-only (never version controlled)
+/.opencode/
+/Working/
+/AGENTS.md
 
 # OS junk
 .DS_Store
@@ -40,3 +46,6 @@ Thumbs.db
 worktrees/
 
 /.superpowers/
+/.gsd/
+/scripts/opencode-serve.log
+/scripts/opencode-serve.ps1
