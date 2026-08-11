@@ -8,6 +8,17 @@
 | 4 | ✅ | py_compile pass, YAML validation pass, A.py docstring fix applied |
 | 5 | ✅ | Fixed escaped triple-quote docstring in Voyageur/A.py |
 | 6 | ✅ | CHANGELOG.md updated with Added/Removed/Fixed entries |
+| 7 | ✅ | Debt plan written + fully executed: `docs/superpowers/plans/2026-08-11-resolve-reviewer-debt.md` (D1–D5 committed; D6/D7 ruled no-op) |
+
+## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
+* ✅ **D1 (HBCA_MAX_WORKERS)** — `Voyageur/HBCA.py:87` → `int(os.getenv("HBCA_MAX_WORKERS", "8"))`; schema default `"10"`→`"8"` (`7856b39`). Task-reviewer REQUIRED-ALL-MET/PASS.
+* ✅ **D2 (dead LAC_MAX_WORKERS)** — schema key + migration-test shape removed; repo grep zero refs outside docs (`7856b39`).
+* ✅ **D3 (MASTER_DB tooltip)** — reworded to real fallback (`1a62204`); fix round made blank GUI honor `master_database.json` (`f3ac2e5`, re-reviewer ADDRESSED/CLEAR).
+* ✅ **D4 (dead IMAGE_DIR conftest)** — `os.environ.setdefault("IMAGE_DIR", "images")` deleted; `MASTER_DB_NAME`/`MODEL_NAME` kept (`1a62204`).
+* ✅ **D5 (golden hermeticity)** — `Archivist/tests/conftest.py` pins 6 env keys (ORG_NAME, RESEARCHER, SUBM_ADDRESS, MGS_GROUP_URL, ANCESTRY_GROUP_URL, ROOT_SOURCE_ID) before `Utils` import; proven byte-identical with env cleared (`6271f36`). Task-reviewer REQUIRED-ALL-MET/PASS.
+* ✅ **Docs checkboxes** — 453 `-x[ ]` → `- [ ]` + SUPERSEDED banners in 13 historical plan docs (`d99370b`); 6 inline-code refs in active plan intentionally left (describing the finding itself).
+* ⏭️ **D6 (whitespace hunks HBCA.py)** — no-op (harmless committed content). **D7 (untracked opencode.json)** — no-op (gitignored per local-only policy).
+* ✅ Gates: full suite **406 passed**, pycodestyle exit 0, py_compile exit 0, code-reviewer verdict below.
 
 ## Infra: Remote phone access (open-code serve + Tailscale)
 * ✅ `scripts/opencode-serve.ps1` — hidden launcher, reads creds from `.agent/.env`, self-healing restart loop.
