@@ -636,7 +636,7 @@ def main() -> None:
     args, _ = parser.parse_known_args()
 
     if args.mode == "crosscheck":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
+        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
         print(f"Cross-checking claims in dataset: {target}...")
         try:
@@ -656,7 +656,7 @@ def main() -> None:
         return
 
     if args.mode == "enrich":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
+        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
         print(f"Enriching dataset: {target}...")
         with open(target, "r", encoding="utf-8") as f:
@@ -668,7 +668,7 @@ def main() -> None:
         return
 
     if args.mode == "partition":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
+        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
         out_dir = Path(args.output_dir) if args.output_dir else target.parent / "partitioned"
         print(f"Partitioning dataset {target} into {out_dir}...")
@@ -681,7 +681,7 @@ def main() -> None:
         return
 
     if args.mode == "resolve-names":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB", "master_database.json"),
+        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
         print(f"Resolving names in dataset: {target}...")
         with open(target, "r", encoding="utf-8") as f:
