@@ -499,14 +499,14 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
         if records:
             tsf = records[0].get("type_specific_fields", {})
             needs_review = tsf.get("needs_llm_structured_review", False)
-            
+
     file_metadata = {
-        "File": file_base, 
+        "File": file_base,
         "Pages": pages_str,
         "needs_llm_structured_review": needs_review
     }
     dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
-    
+
     dynamic_prompt += engine.build_continuation_context(pending_continuation)
 
     if EXTRACTION_ENGINE == "agy":
@@ -615,7 +615,8 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
             print(f"[{index}/{total_files}] Processing {filename} with {MODEL_ID}...", end="", flush=True)
             try:
                 placeholder = get_placeholder_for_file(master_data, filename)
-                result = process_one_file_sync(filename, active_cache_name, pending_continuation, placeholder_sheet=placeholder)
+                result = process_one_file_sync(filename, active_cache_name,
+                                               pending_continuation, placeholder_sheet=placeholder)
             except engine.DailyQuotaExhausted:
                 print("\n\n[FATAL ERROR] Daily Quota Exhausted.")
                 print("Progress saved. Exiting script to prevent infinite crashing.")
@@ -699,7 +700,7 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
         _, content_part = engine.build_content_part_for_file(client, file_path)
         file_metadata = {"File": file_path.stem, "Pages": str(engine.get_pdf_page_count(file_path))}
         dynamic_prompt = engine.get_dynamic_prompt(TYPE_CFG, file_metadata)
-        
+
         placeholder = get_placeholder_for_file(master_data, filename)
         if placeholder:
             records = placeholder.get("records", [])
@@ -707,10 +708,10 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
                 tsf = records[0].get("type_specific_fields", {})
                 needs_review = tsf.get("needs_llm_structured_review", False)
                 if needs_review:
-                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was either empty or missing. You MUST carefully read the unstructured summary paragraph/narrative and attempt to extract all structured vital dates (birth, death) and employment rows (positions, posts, dates) from it, mapping them into the structured JSON fields to the best of your ability."
+                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was either empty or missing. You MUST carefully read the unstructured summary paragraph/narrative and attempt to extract all structured vital dates (birth, death) and employment rows (positions, posts, dates) from it, mapping them into the structured JSON fields to the best of your ability."  # noqa: E501
                 else:
-                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was successfully parsed by a previous system. DO NOT attempt to extract structured vital dates or employment rows from the image. Focus ONLY on transcribing the unstructured summary narrative exactly as written. Leave the structured data fields empty, as they will be preserved from the previous pass."
-        
+                    dynamic_prompt += "\n\nCRITICAL INSTRUCTION: The structured data table in this document was successfully parsed by a previous system. DO NOT attempt to extract structured vital dates or employment rows from the image. Focus ONLY on transcribing the unstructured summary narrative exactly as written. Leave the structured data fields empty, as they will be preserved from the previous pass."  # noqa: E501
+
         prompt = system_instruction + "\n\n" + dynamic_prompt
         gen_config_kwargs: Dict[str, Any] = dict(response_mime_type="application/json", response_schema=SCHEMA)
         requests.append(engine.build_batch_request(MODEL_ID, [prompt, content_part], filename,

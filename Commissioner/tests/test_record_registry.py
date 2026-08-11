@@ -588,13 +588,15 @@ def test_build_empty_sheet_validates_against_commissioner_schema():
 def test_get_field_remap_parish():
     remap = record_registry.get_field_remap("Parish")
     assert remap["CHURCH_MASTER_DB_NAME"] == "MASTER_DB_NAME"
-    assert remap["CHURCH_IMAGE_DIR"] == "IMAGE_DIR"
+    # Image dirs are auto-resolved as Media/<Prompt_Name>, not remapped.
+    assert "CHURCH_IMAGE_DIR" not in remap
 
 
 def test_get_field_remap_scrip():
     remap = record_registry.get_field_remap("Scrip")
     assert remap["SCRIP_MASTER_DB_NAME"] == "MASTER_DB_NAME"
-    assert remap["SCRIP_IMAGE_DIR"] == "IMAGE_DIR"
+    # Image dirs are auto-resolved as Media/<Prompt_Name>, not remapped.
+    assert "SCRIP_IMAGE_DIR" not in remap
 
 
 def test_get_field_remap_unknown_document_type_raises():

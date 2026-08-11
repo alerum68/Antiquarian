@@ -9,6 +9,7 @@ _spec.loader.exec_module(_hbca_mod)
 
 parse_bio_sheet_text = _hbca_mod.parse_bio_sheet_text
 
+
 def test_parse_bio_sheet_populated_table():
     sample_text = """
     NAME: ADAMS, Charles PARISH: ENTERED SERVICE: DATES:
@@ -29,6 +30,7 @@ def test_parse_bio_sheet_populated_table():
     assert data["needs_llm_structured_review"] is False
     # No structured DATES field, so the Filename footer's floruit range is the fallback
     assert "1866-1882" in data["service_years_range"] or "1866-1882" in (data.get("vital_dates_summary") or "")
+
 
 def test_parse_bio_sheet_blank_header_and_empty_table_flags_for_llm_review():
     sample_text = """

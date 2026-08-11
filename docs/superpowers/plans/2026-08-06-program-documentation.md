@@ -40,7 +40,7 @@
 - Create: `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs\Voyageur-User-Guide.md`
 - Create: `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs\Paleographer-User-Guide.md`
 
-- [ ] **Step 1: Author `Home.md`, `_Sidebar.md`, and `_Footer.md` in `Scriptorium-Docs`**
+-x[ ] **Step 1: Author `Home.md`, `_Sidebar.md`, and `_Footer.md` in `Scriptorium-Docs`**
 
 `_Sidebar.md`:
 ```markdown
@@ -97,7 +97,7 @@ It manages repetitive archival tasks:
 - **Help**: Consult [[Troubleshooting & FAQ|Troubleshooting-&-FAQ]] for common error fixes.
 ```
 
-- [ ] **Step 2: Author `Getting-Started.md` and `Configuration-&-Settings.md`**
+-x[ ] **Step 2: Author `Getting-Started.md` and `Configuration-&-Settings.md`**
 
 `Getting-Started.md`:
 ```markdown
@@ -193,7 +193,7 @@ C:\Genealogy\Projects\Assumption_Parish_1850\
 - **`*.ged`**: The final genealogical tree file exported by Archivist.
 ```
 
-- [ ] **Step 3: Author `Voyageur-User-Guide.md` and `Paleographer-User-Guide.md`**
+-x[ ] **Step 3: Author `Voyageur-User-Guide.md` and `Paleographer-User-Guide.md`**
 
 `Voyageur-User-Guide.md`:
 ```markdown
@@ -282,7 +282,7 @@ Record extraction formats are defined in `.pmt` files located in the `Paleograph
 Each file contains front-matter schema constraints and prompt instructions. You can edit prompt guidelines to add domain-specific vocabulary or historical terminology relevant to your collection.
 ```
 
-- [ ] **Step 4: Check formatting and verify git status in `Scriptorium-Docs`**
+-x[ ] **Step 4: Check formatting and verify git status in `Scriptorium-Docs`**
 
 Run:
 ```bash
@@ -300,7 +300,7 @@ Expected: New and modified files listed cleanly.
 - Create: `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs\PDFix-Utility.md`
 - Create: `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs\Troubleshooting-&-FAQ.md`
 
-- [ ] **Step 1: Author `Archivist-User-Guide.md` and `Registrar-&-Gazetteer.md`**
+-x[ ] **Step 1: Author `Archivist-User-Guide.md` and `Registrar-&-Gazetteer.md`**
 
 `Archivist-User-Guide.md`:
 ```markdown
@@ -381,7 +381,7 @@ Modern county names often do not match the historical jurisdictions that existed
 5. Click **Apply Standardized Names** to update place records.
 ```
 
-- [ ] **Step 2: Author `PDFix-Utility.md` and `Troubleshooting-&-FAQ.md`**
+-x[ ] **Step 2: Author `PDFix-Utility.md` and `Troubleshooting-&-FAQ.md`**
 
 `PDFix-Utility.md`:
 ```markdown
@@ -430,7 +430,7 @@ PDFix is a document preparation utility designed to repair broken PDF files and 
 - **Fix**: Re-run the gather command for the same reel or volume. Voyageur checks existing files on disk and resumes downloading only missing or zero-byte images.
 ```
 
-- [ ] **Step 3: Commit and push all wiki documentation to `Scriptorium-Docs`**
+-x[ ] **Step 3: Commit and push all wiki documentation to `Scriptorium-Docs`**
 
 ```bash
 git -C "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs" add .
@@ -447,14 +447,14 @@ git -C "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs" push origin ma
 - Create: `docs/developer/commissioner-domain-models.md`
 - Create: `docs/developer/pmt-specification.md`
 
-- [ ] **Step 1: Author `docs/developer/architecture-overview.md`**
+-x[ ] **Step 1: Author `docs/developer/architecture-overview.md`**
 
 Create `docs/developer/architecture-overview.md` documenting:
 - Pipeline stages: Gather (`Voyageur/`), Analyze (`Paleographer/`), Create (`Archivist/`), Domain Validation (`Commissioner/`).
 - Module boundaries, UI entry point (`Scriptorium.py`), background task handling.
 - Mermaid diagram illustrating data flow from archival sources to Master DB to GEDCOM export.
 
-- [ ] **Step 2: Author `docs/developer/commissioner-domain-models.md`**
+-x[ ] **Step 2: Author `docs/developer/commissioner-domain-models.md`**
 
 Create `docs/developer/commissioner-domain-models.md` documenting:
 - Pydantic v2 core schemas: `Collection`, `Sheet`, `Record`, `Participant`, `Fact`, `Citation`.
@@ -462,7 +462,7 @@ Create `docs/developer/commissioner-domain-models.md` documenting:
 - Role validation modes: `closed` (exact whitelist matching) vs `open` (unrestricted / passthrough).
 - Type-specific extra fields validation.
 
-- [ ] **Step 3: Author `docs/developer/pmt-specification.md`**
+-x[ ] **Step 3: Author `docs/developer/pmt-specification.md`**
 
 Create `docs/developer/pmt-specification.md` documenting:
 - The `.pmt` file structure: YAML front matter + Markdown prompt body.
@@ -478,7 +478,7 @@ Create `docs/developer/pmt-specification.md` documenting:
 - Create: `docs/developer/scaffold-data-contract.md`
 - Create: `docs/developer/development-workflow.md`
 
-- [ ] **Step 1: Author `docs/developer/scaffold-data-contract.md`**
+-x[ ] **Step 1: Author `docs/developer/scaffold-data-contract.md`**
 
 Create `docs/developer/scaffold-data-contract.md` documenting:
 - Master DB JSON top-level keys (`collection_title`, `record_type_name`, `sheets`).
@@ -486,7 +486,7 @@ Create `docs/developer/scaffold-data-contract.md` documenting:
 - Merge logic: how Paleographer replaces placeholder scaffold sheets with real analyzed record sheets while preserving page ordering.
 - Checkpoint file format and resumption mechanics.
 
-- [ ] **Step 2: Author `docs/developer/development-workflow.md`**
+-x[ ] **Step 2: Author `docs/developer/development-workflow.md`**
 
 Create `docs/developer/development-workflow.md` documenting:
 - Python 3.12 environment setup and dependency installation.
@@ -502,11 +502,11 @@ Create `docs/developer/development-workflow.md` documenting:
 - Modify: `README.md`
 - Test: Full repository test suite and linter
 
-- [ ] **Step 1: Update `README.md` with links to Wiki and Developer docs**
+-x[ ] **Step 1: Update `README.md` with links to Wiki and Developer docs**
 
 Add direct links to the GitHub Wiki pages (`https://github.com/alerum68/Scriptorium/wiki/...`) and local `docs/developer/` specifications in `README.md`.
 
-- [ ] **Step 2: Run linter and test suite across the entire repository**
+-x[ ] **Step 2: Run linter and test suite across the entire repository**
 
 Run:
 ```bash
@@ -515,7 +515,7 @@ python -m pytest
 ```
 Expected: 0 lint errors, all 303+ tests pass.
 
-- [ ] **Step 3: Commit and push changes to `origin/Unify`**
+-x[ ] **Step 3: Commit and push changes to `origin/Unify`**
 
 ```bash
 git add docs/developer/ README.md docs/superpowers/plans/2026-08-06-program-documentation.md

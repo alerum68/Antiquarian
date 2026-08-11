@@ -116,7 +116,7 @@ No boolean `is_scrip` attribute exists on `Profile` — every behavioral differe
 - Consumes: today's unmodified `Archivist.build_gedcom_from_general(json_data: dict, target_software: str) -> str`.
 - Produces: four `.ged` fixture files that Task 6's regression test diffs against, and the two `SCRIP_FIXTURE`/`PARISH_FIXTURE` dicts (importable from this module) that Task 6's test reuses to regenerate GEDCOM through the split modules.
 
-- [ ] **Step 1: Write the capture script**
+-x[ ] **Step 1: Write the capture script**
 
 ```python
 """Golden-file capture: runs build_gedcom_from_general on today's unmodified
@@ -210,16 +210,16 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 2: Run the capture script against today's unmodified `Archivist.py`**
+-x[ ] **Step 2: Run the capture script against today's unmodified `Archivist.py`**
 
 Run: `cd Archivist && python tests/golden/capture_golden_gedcom.py`
 Expected: prints `Wrote 4 golden files to ...`; `scrip_rm.ged`, `scrip_ftm.ged`, `parish_rm.ged`, `parish_ftm.ged` now exist under `Archivist/tests/golden/`.
 
-- [ ] **Step 3: Manually inspect the four files**
+-x[ ] **Step 3: Manually inspect the four files**
 
 Confirm `scrip_rm.ged`/`scrip_ftm.ged` contain `_TITL`/`PAGE` lines shaped like the Scrip branch (e.g. `3 _TITL Letendre, Roger: Claim: 3126; Affidavit: 5473; Scrip: 12761`) and `3 QUAY 3` / proven proof status; confirm `parish_rm.ged`/`parish_ftm.ged` contain the generic `3 _TITL Gagnon, Marie, BAPM, 1875` shape and both a `4 TEXT` (French) and `3 NOTE`/`4 CONT` (English translation) block. This confirms the fixtures actually exercise both branches before they're frozen as golden files.
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Archivist/tests/golden/capture_golden_gedcom.py Archivist/tests/golden/scrip_rm.ged Archivist/tests/golden/scrip_ftm.ged Archivist/tests/golden/parish_rm.ged Archivist/tests/golden/parish_ftm.ged
@@ -238,7 +238,7 @@ git commit -m "test: capture golden GEDCOM fixtures ahead of Archivist structura
 - Consumes: nothing from other split modules (Utils.py is the dependency floor).
 - Produces: `get_env_int`, `safe_path`, `resolve_source_id`, `get_event_gedcom_tag`, `is_family_event`, `clean_val`, `cap_case`, `clean_place`, `split_full_name`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, plus module constants `FACT_TYPES`, `GEDCOM_OUTPUT_NAME` (mutable, see constant-ownership note above), `PROGRAM_DIR`, `RM_DIR`, `FTM_DIR`, `GEDCOM_OUTPUT_PATH`, `GEDCOM_OUTPUT_MODE`, `CURRENT_DATE`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`, `SUBM_ADDRESS`, `MGS_GROUP_URL`, `ANCESTRY_GROUP_URL`, `ROOT_SOURCE_ID`, `APID_DB` (read-only canonical default).
 
-- [ ] **Step 1: Create `Archivist/Utils.py`**
+-x[ ] **Step 1: Create `Archivist/Utils.py`**
 
 Move verbatim from `Archivist.py`, using the module boundary table above:
 - Lines 11–27 imports actually used by the moved code (`calendar`, `datetime`, `hashlib` is NOT needed here — only General.py's UID hashing needs it — `json`, `os`, `re`, `Path`, `Dict`, `List`, `Optional`, `Tuple`, `Union`, `yaml`, `load_dotenv`, `titlecase`, `CellValue`); add `import re` explicitly since `clean_place`/`_titlecase_callback` need it.
@@ -251,7 +251,7 @@ Move verbatim from `Archivist.py`, using the module boundary table above:
 - Lines 353–548 (`format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`) verbatim — note `resolve_gedcom_output_path` reads `GEDCOM_OUTPUT_NAME` as a plain module-level name here (it's defined in this same module, so no qualification needed inside Utils.py itself).
 - `APID_DB`'s canonical read-only default (find its `os.getenv`-based definition in the `CONFIGURATION` block and confirm via grep — `APID_DB` is not in this plan's already-read line ranges, so grep `^APID_DB` in the original file before moving; it is Utils.py-owned per the ownership table).
 
-- [ ] **Step 2: Add `Archivist/tests/test_utils.py`**
+-x[ ] **Step 2: Add `Archivist/tests/test_utils.py`**
 
 ```python
 import sys
@@ -280,12 +280,12 @@ def test_resolve_source_id_returns_precoded_value_for_known_census_year():
     assert Utils.resolve_source_id("Census_1881") == Utils.PRECODED_SOURCE_IDS["Census_1881"]
 ```
 
-- [ ] **Step 3: Run tests to verify they pass**
+-x[ ] **Step 3: Run tests to verify they pass**
 
 Run: `cd Archivist && pytest tests/test_utils.py -v`
 Expected: PASS (4 tests)
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Archivist/Utils.py Archivist/tests/test_utils.py
@@ -304,7 +304,7 @@ git commit -m "refactor: extract Utils.py from Archivist.py"
 - Consumes: `Utils.get_env_int`, `Utils.safe_path`, `Utils.clean_val`, `Utils.cap_case`, `Utils.clean_place`, `Utils.format_gedcom_date`, `Utils.get_proof_status`, `Utils.estimate_birth_from_age`, `Utils.wrap_text`, `Utils.resolve_gedcom_output_targets`, `Utils.resolve_gedcom_output_path`, `Utils.dedent_citation_lines`, `Utils.weblink_lines`, `Utils.get_event_gedcom_tag`, `Utils.is_family_event`, `Utils.resolve_source_id`, `Utils.GEDCOM_OUTPUT_NAME`, `Utils.ROOT_SOURCE_ID`, `Utils.ORG_NAME`, `Utils.RESEARCHER`, `Utils.SOFTWARE_NAME`, `Utils.SOFTWARE_VERS`, `Utils.COPYRIGHT_START`, `Utils.GEDCOM_NOTE`, `Utils.GEDCOM_CONC`, `Utils.SUBM_ADDRESS`, `Utils.CURRENT_DATE`.
 - Produces: `run_census_flavor(data: dict) -> None` (called by Archivist.py's dispatcher), plus `build_gedcom_from_census`, `load_census_dataframe`, `build_census_dataframe_from_unified`, `get_gender`, `split_full_name` re-export not needed (Census.py calls `Utils.split_full_name` directly).
 
-- [ ] **Step 1: Create `Archivist/Census.py`**
+-x[ ] **Step 1: Create `Archivist/Census.py`**
 
 `import Utils` at the top; every reference to a Utils.py-owned constant or function is qualified (`Utils.clean_val(...)`, `Utils.GEDCOM_OUTPUT_NAME`, etc.) since these are cross-module now. Move verbatim, using the module boundary table above:
 - Lines 30–45 (`HouseholdUnit`, `FlagRecord`) — interleaving exception.
@@ -313,7 +313,7 @@ git commit -m "refactor: extract Utils.py from Archivist.py"
 - Lines 554–1995 (`get_age` through `run_census_flavor`) verbatim, **except** line 1414–1424 (`split_full_name`, moved to Utils.py in Task 2 — replace internal calls with `Utils.split_full_name(...)`).
 - Every bare reference inside these moved functions to a name now owned by Utils.py (`clean_val`, `cap_case`, `clean_place`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, `get_event_gedcom_tag`, `is_family_event`, `resolve_source_id`, `GEDCOM_OUTPUT_NAME`, `ROOT_SOURCE_ID`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `SUBM_ADDRESS`, `CURRENT_DATE`, `get_env_int`, `safe_path`) becomes `Utils.<name>`. `run_census_flavor`'s `global GEDCOM_OUTPUT_NAME` (if present — grep to confirm before moving) becomes a qualified `Utils.GEDCOM_OUTPUT_NAME = ...` assignment, not a `global` statement, per the cross-module mutation rule.
 
-- [ ] **Step 2: Verify the module imports cleanly and `run_census_flavor` is reachable**
+-x[ ] **Step 2: Verify the module imports cleanly and `run_census_flavor` is reachable**
 
 ```python
 import sys
@@ -329,12 +329,12 @@ def test_census_module_imports_and_exposes_run_census_flavor():
 
 Save as `Archivist/tests/test_census_module_smoke.py`.
 
-- [ ] **Step 3: Run test to verify it passes**
+-x[ ] **Step 3: Run test to verify it passes**
 
 Run: `cd Archivist && pytest tests/test_census_module_smoke.py -v`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Archivist/Census.py Archivist/tests/test_census_module_smoke.py
@@ -353,7 +353,7 @@ git commit -m "refactor: extract Census.py from Archivist.py"
 - Consumes: `Utils.*` (same set as Census.py, plus `Utils.FACT_TYPES`, `Utils.APID_DB` read-only, `Utils.PROGRAM_DIR`).
 - Produces: `Profile` (the `typing.Protocol` from the reference section above), `GeneralProfile` class, `_ACTIVE_PROFILE` module global, `set_active_profile(profile: Profile) -> None`, `run_general_flavor(data: dict, profile: Profile) -> None`, plus every unchanged function in the 1999–2638 and 2641–3638 ranges (`get_dynamic_source_id`, `get_by_semantic`, `get_all_by_semantic`, `get_role_name`, `resolve_family_links`, `assign_spouses_by_sex`, `evaluate_task_priority`, `generate_uid`, `generate_media_uid`, `generate_media_uid_for_path`, `generate_media_uid_for_lac_asset`, `_rmst_element_to_gedcom`, `load_source_template_lines`, `get_source_templates`, `generate_fam_uid`, `_build_citation_block`, `build_general_citation`, `build_custom_fact_lines`, `build_witness_links`, `build_individual`, `build_family`, `get_source_root`, `get_volume_sources`, `build_gedcom_from_general`, `apply_record_type_field_remap`, `apply_extracted_parish_name`, `apply_resolved_source_id`), used by both `ScripProfile.py` (one-way import) and `Archivist.py` (dispatcher).
 
-- [ ] **Step 1: Move the unchanged functions verbatim**
+-x[ ] **Step 1: Move the unchanged functions verbatim**
 
 `import Utils` at the top plus `import hashlib`, `import re`, `import xml.etree.ElementTree as ET`, `from pathlib import Path`, `from typing import Dict, List, Optional, Protocol, Tuple`. Move verbatim from `Archivist.py`, qualifying every Utils.py-owned reference as `Utils.<name>`:
 - Lines 1999–2030 (`extract_volume`, `get_by_semantic`) — `get_dynamic_source_id` (2014–2027) changes, see Step 2.
@@ -364,7 +364,7 @@ git commit -m "refactor: extract Census.py from Archivist.py"
 - `apply_extracted_parish_name` (3563–3590), `apply_resolved_source_id` (3592–3603) — unconditional, qualify `clean_val`/`resolve_source_id` as `Utils.clean_val`/`Utils.resolve_source_id`.
 - `GENERAL_CONFIG` dict (237–257) verbatim, **minus** the `'omit_source_id_prefix'` key.
 
-- [ ] **Step 2: Define the `Profile` Protocol and `GeneralProfile`**
+-x[ ] **Step 2: Define the `Profile` Protocol and `GeneralProfile`**
 
 ```python
 class Profile(Protocol):
@@ -577,7 +577,7 @@ def set_active_profile(profile: Profile) -> None:
 
 Note: `GENERAL_CONFIG.get('default_location')` referenced in `_build_generic_primary_event_lines` must exist as a key in the `GENERAL_CONFIG` dict moved in Step 1 — confirm it's present (it is, per the original `GENERAL_CONFIG` dict at 237–257) before this compiles.
 
-- [ ] **Step 3: Rewrite `get_dynamic_source_id` and `generate_uid`/`generate_fam_uid` to consult `_ACTIVE_PROFILE`**
+-x[ ] **Step 3: Rewrite `get_dynamic_source_id` and `generate_uid`/`generate_fam_uid` to consult `_ACTIVE_PROFILE`**
 
 Replace the original bodies (2014–2027, 2128–2190, 2621–2635) with:
 
@@ -639,7 +639,7 @@ def generate_fam_uid(rec: dict, vol: str) -> str:
 
 Both preserve the original fall-through order exactly: `link_id` and `is_priest` checks run unconditionally before any profile consultation (they never depended on `is_scrip` in the original either).
 
-- [ ] **Step 4: Rewrite `_build_citation_block`**
+-x[ ] **Step 4: Rewrite `_build_citation_block`**
 
 Replace the body (2641–2805) with a version that delegates the six divergence points to `_ACTIVE_PROFILE`, keeping the unconditional shared trailer (REFN/QUAY/`_QUAL`, `_APID`, person_ark FamilySearch webtag, LAC-URL webtag, media OBJE) untouched:
 
@@ -695,7 +695,7 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
 
 **Note for the implementer:** the exact field names/format of the unconditional trailer block (`_APID`, `_WEBTAG` field names, `_QUAL` numeric mapping) must be copied verbatim from `Archivist.py:2772-2804` — the snippet above reconstructs the shape from the divergence-point analysis but the implementer must diff this against the original trailer lines during Task 4's self-test (Step 6) and correct any literal mismatch before committing, since this section was paraphrased rather than character-verified in this planning pass.
 
-- [ ] **Step 5: Rewrite `build_general_citation`, `build_individual`'s Scrip-fact-date and primary-event block, `get_volume_sources`, `build_gedcom_from_general`, `apply_record_type_field_remap`, `run_general_flavor`**
+-x[ ] **Step 5: Rewrite `build_general_citation`, `build_individual`'s Scrip-fact-date and primary-event block, `get_volume_sources`, `build_gedcom_from_general`, `apply_record_type_field_remap`, `run_general_flavor`**
 
 `build_general_citation` (2808–2839) — replace the `is_scrip` check with the profile method:
 
@@ -817,11 +817,11 @@ def run_general_flavor(data: dict, profile: Profile) -> None:
 ```
 Note `data.get("record_type_name") == "Scrip"` no longer needs to be computed inside this function — the caller (Archivist.py's dispatcher, Task 6) already chose which `Profile` instance to pass in based on that same field.
 
-- [ ] **Step 6: Self-test — diff the two paraphrased trailer sections against the original file**
+-x[ ] **Step 6: Self-test — diff the two paraphrased trailer sections against the original file**
 
 Before committing, open the original `Archivist.py` at lines 2772–2805 (the `_build_citation_block` trailer) and lines 2819–2838 (the `build_general_citation` source-document loop) side by side with the new `General.py` and confirm every field name, GEDCOM tag, and fallback order matches exactly. Fix any mismatch found. This step exists because those two spans were reconstructed from this planning session's earlier paraphrase rather than a fresh character-by-character read; every other function in this task was re-verified against the live file this same session.
 
-- [ ] **Step 7: Add `Archivist/tests/test_general_smoke.py`**
+-x[ ] **Step 7: Add `Archivist/tests/test_general_smoke.py`**
 
 ```python
 import sys
@@ -841,12 +841,12 @@ def test_get_dynamic_source_id_keeps_prefix_by_default():
     assert General.get_dynamic_source_id("3") == "@S1042003@"
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+-x[ ] **Step 8: Run tests to verify they pass**
 
 Run: `cd Archivist && pytest tests/test_general_smoke.py -v`
 Expected: PASS (2 tests)
 
-- [ ] **Step 9: Commit**
+-x[ ] **Step 9: Commit**
 
 ```bash
 git add Archivist/General.py Archivist/tests/test_general_smoke.py
@@ -865,11 +865,11 @@ git commit -m "refactor: extract General.py with Profile strategy pattern from A
 - Consumes: `General.GENERAL_CONFIG`, `General.REPOSITORY`, `General.COLLECTION_URL`, `General.COLLECTION_NAME`, `General.build_custom_fact_lines`, `General.build_witness_links`, `General._build_generic_primary_event_lines`, `General.get_source_templates`, `General.get_by_semantic`, `Utils.clean_val`, `Utils.clean_place`, `Utils.cap_case`, `Utils.wrap_text`.
 - Produces: `ScripProfile` class implementing every `Profile` method (see reference section above), plus the Scrip-only template cluster (`resolve_scrip_template_id`, `select_scrip_template_id`, `get_scrip_citation_fields`, `get_scrip_template_sources`) that `Archivist.py`'s `PROFILE_REGISTRY` (Task 6) and `General.py`'s callers never call directly except through `ScripProfile`'s own methods.
 
-- [ ] **Step 1: Move the Scrip-only cluster verbatim**
+-x[ ] **Step 1: Move the Scrip-only cluster verbatim**
 
 `import re`, `import General`, `import Utils` at the top. Move lines 2362–2536 verbatim (`_SIMPLIFIED_CITATION_TEMPLATES` dict, `_SCRIP_TEMPLATES`, `_SCRIP_YEAR_RE`, `_scrip_record_year`, `select_scrip_template_id`, `resolve_scrip_template_id`, `_scrip_template_field_value`, `get_scrip_citation_fields`, `get_scrip_template_sources`), qualifying `REPOSITORY`/`COLLECTION_URL`/`COLLECTION_NAME` as `General.REPOSITORY`/`General.COLLECTION_URL`/`General.COLLECTION_NAME` and `clean_val`/`weblink_lines` as `Utils.clean_val`/`Utils.weblink_lines`.
 
-- [ ] **Step 2: Implement the `ScripProfile` class**
+-x[ ] **Step 2: Implement the `ScripProfile` class**
 
 ```python
 class ScripProfile:
@@ -1029,7 +1029,7 @@ Add `from typing import List, Optional, Tuple` to the imports.
 
 **Note for the implementer:** `citation_title`/`citation_page`'s `ref_bits`/field-name logic and `build_primary_event_lines`'s `consumed` tuple and `value_parts` assembly were reconstructed from this planning session's divergence analysis rather than a final character-by-character diff against `Archivist.py:2663-2680` (TITL), `2685-2693` (PAGE), and `3100-3137` (Scrip EVEN block). Before committing this task, diff each of these three methods against those exact original line ranges and correct any mismatch — same self-test discipline as Task 4 Step 6.
 
-- [ ] **Step 3: Add `Archivist/tests/test_scrip_profile_smoke.py`**
+-x[ ] **Step 3: Add `Archivist/tests/test_scrip_profile_smoke.py`**
 
 ```python
 import sys
@@ -1054,12 +1054,12 @@ def test_scrip_profile_repository_defaults_to_lac():
     assert profile.repository_defaults() == ("Library and Archives Canada", "Ottawa, ON")
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `cd Archivist && pytest tests/test_scrip_profile_smoke.py -v`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Archivist/ScripProfile.py Archivist/tests/test_scrip_profile_smoke.py
@@ -1078,7 +1078,7 @@ git commit -m "refactor: extract ScripProfile.py implementing the Profile patter
 - Consumes: `Utils.GEDCOM_OUTPUT_NAME`, `Census.run_census_flavor`, `General.run_general_flavor`, `General.GeneralProfile`, `ScripProfile.ScripProfile`.
 - Produces: `PROFILE_REGISTRY: Dict[str, type]`, `resolve_profile(record_type_name: str) -> General.Profile`, `resolve_json_input` (unchanged), `main()`-equivalent `__main__` block.
 
-- [ ] **Step 1: Rewrite `Archivist.py`**
+-x[ ] **Step 1: Rewrite `Archivist.py`**
 
 ```python
 """
@@ -1155,7 +1155,7 @@ if __name__ == "__main__":
         )
 ```
 
-- [ ] **Step 2: Add the golden-file regression test**
+-x[ ] **Step 2: Add the golden-file regression test**
 
 ```python
 import sys
@@ -1200,12 +1200,12 @@ def test_parish_ftm_matches_golden():
     assert actual == expected
 ```
 
-- [ ] **Step 3: Run tests to verify they pass**
+-x[ ] **Step 3: Run tests to verify they pass**
 
 Run: `cd Archivist && pytest tests/test_archivist_dispatcher.py -v`
 Expected: PASS (4 tests). Any failure here means a Task 4/5 method has a real behavior mismatch against the golden fixtures — fix the mismatched Profile method (most likely one of the two paraphrased spans flagged in Task 4 Step 6 / Task 5's implementer note) before proceeding; do not regenerate the golden files to make the test pass.
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Archivist/Archivist.py Archivist/tests/test_archivist_dispatcher.py
@@ -1224,18 +1224,18 @@ git commit -m "refactor: rewrite Archivist.py as thin dispatcher over Census/Gen
 - Consumes: `Utils`, `Census`, `General`, `ScripProfile` (all created in Tasks 2–5).
 - Produces: no new symbols — every existing test keeps its name and assertions, only its target import and (for the three flag-manipulating tests below) its setup/call shape changes.
 
-- [ ] **Step 1: Repoint `test_census_ingestion.py`'s import**
+-x[ ] **Step 1: Repoint `test_census_ingestion.py`'s import**
 
 Change `import Archivist as arc` to `import Census as arc` (every symbol that test file exercises — `run_census_flavor`, `build_gedcom_from_census`, `load_census_dataframe`, `build_census_dataframe_from_unified`, household-grouping helpers — now lives in `Census.py`). Add `sys.path.insert(0, ...)` pointing at `Archivist/` if not already present (matches the pattern in Task 2/3's smoke tests).
 
-- [ ] **Step 2: Repoint `test_archivist.py`'s import and split it by target module**
+-x[ ] **Step 2: Repoint `test_archivist.py`'s import and split it by target module**
 
 Grep each test function for which module its target symbol now lives in:
 - Tests calling `arc.get_dynamic_source_id`, `arc.generate_uid`, `arc.generate_fam_uid`, `arc.generate_media_uid*`, `arc._build_citation_block`, `arc.build_general_citation`, `arc.build_custom_fact_lines`, `arc.build_witness_links`, `arc.build_individual`, `arc.build_family`, `arc.get_volume_sources`, `arc.build_gedcom_from_general`, `arc.run_general_flavor`, `arc.GENERAL_CONFIG` → change `import Archivist as arc` to `import General as arc` for those, or split into a new `test_general.py` if cleaner (implementer's judgment — either is acceptable as long as every test still runs and passes).
 - Tests calling `arc.get_scrip_*`, `arc.resolve_scrip_template_id`, `arc.select_scrip_template_id`, `arc._scrip_*` → repoint to `import ScripProfile as arc`.
 - Tests calling `arc.clean_val`, `arc.cap_case`, `arc.clean_place`, `arc.format_gedcom_date`, `arc.get_proof_status`, `arc.wrap_text`, `arc.get_event_gedcom_tag`, `arc.is_family_event`, `arc.split_full_name` → repoint to `import Utils as arc`.
 
-- [ ] **Step 3: Rewrite the three `omit_source_id_prefix`-manipulating tests**
+-x[ ] **Step 3: Rewrite the three `omit_source_id_prefix`-manipulating tests**
 
 These three tests (named per the inherited task list: a test asserting the prefix is omitted for Scrip, one asserting it's kept by default for Parish, and one asserting `run_general_flavor` sets the flag from record type) directly manipulate `GENERAL_CONFIG['omit_source_id_prefix']`, which no longer exists. Locate them by grepping `test_archivist.py` for `omit_source_id_prefix` (this plan's earlier reconnaissance found this flag manipulated at line 325/346/near `run_general_flavor` call sites — re-grep at implementation time since line numbers will have shifted after Task 6 rewrites the file). Rewrite each to construct the appropriate `Profile` directly instead of mutating the flag, e.g.:
 
@@ -1265,12 +1265,12 @@ def test_run_general_flavor_sets_profile_from_record_type():
 
 (Exact original assertions for the first two must be preserved — these two snippets reproduce the two `get_dynamic_source_id` expectations already used in Task 4/5's smoke tests; the third test's shape is new since `run_general_flavor` no longer computes `is_scrip` itself, so the "sets the flag from record type" behavior has moved to `Archivist.resolve_profile`, and the rewritten test must assert that instead.)
 
-- [ ] **Step 4: Run full existing test suite**
+-x[ ] **Step 4: Run full existing test suite**
 
 Run: `cd Archivist && pytest tests/ -v`
 Expected: PASS, same test count as before Task 1 (minus the 3 rewritten tests' old bodies, plus their new bodies — net count unchanged) plus every new test added in Tasks 2–6.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Archivist/tests/test_archivist.py Archivist/tests/test_census_ingestion.py
@@ -1287,7 +1287,7 @@ git commit -m "test: repoint Archivist tests to split Utils/Census/General/Scrip
 **Interfaces:**
 - Consumes: `General.GeneralProfile`, `ScripProfile.ScripProfile`, both implementing the `Profile` reference from the top of this plan.
 
-- [ ] **Step 1: Write parity tests — same input, both profiles, assert the documented divergence**
+-x[ ] **Step 1: Write parity tests — same input, both profiles, assert the documented divergence**
 
 ```python
 import sys
@@ -1340,17 +1340,17 @@ def test_dynamic_source_id_scrip_has_no_register_prefix():
     assert SCRIP.dynamic_source_id("3") == "@S003@"
 ```
 
-- [ ] **Step 2: Run test to verify it passes**
+-x[ ] **Step 2: Run test to verify it passes**
 
 Run: `cd Archivist && pytest tests/test_profile_parity.py -v`
 Expected: PASS (6 tests)
 
-- [ ] **Step 3: Run the full suite one final time**
+-x[ ] **Step 3: Run the full suite one final time**
 
 Run: `cd Archivist && pytest tests/ -v`
 Expected: PASS, all tests green.
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Archivist/tests/test_profile_parity.py

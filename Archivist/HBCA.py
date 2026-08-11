@@ -27,8 +27,8 @@ HBCA_TEMPLATE_ID = 10009
 
 class HBCAProfile:
     def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
-        if GENERAL_CONFIG.get("platform_source_id"):
-            return f"@S{GENERAL_CONFIG['platform_source_id']}@"
+        if General.GENERAL_CONFIG.get("platform_source_id"):
+            return f"@S{General.GENERAL_CONFIG['platform_source_id']}@"
         if rec:
             refd = Utils.clean_val((rec.get('type_specific_fields') or {}).get('refd'))
             if refd:
@@ -168,7 +168,7 @@ class HBCAProfile:
             ("Accessed", accessed_val),
             ("RefNumber", ref_val),
         ]
-        
+
         if archival_urls:
             detail_fields.append(("ArchivalRecordURL", archival_urls[0]))
 
@@ -181,11 +181,11 @@ class HBCAProfile:
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
         trans_val = Utils.clean_val(raw_trans)
-        
+
         tf = rec.get('type_specific_fields') or {}
         keystone_records = tf.get('keystone_records') or {}
         hbca_refs = tf.get('hbca_references') or []
-        
+
         keystone_parts = []
         for code in (hbca_refs if isinstance(hbca_refs, list) else [hbca_refs]):
             entry = keystone_records.get(code)
@@ -195,7 +195,7 @@ class HBCAProfile:
             item_desc = meta.get('item_description')
             date_str = meta.get('date')
             microfilm = meta.get('microfilm_no')
-            
+
             if item_desc:
                 desc = item_desc
                 if date_str:
@@ -205,11 +205,11 @@ class HBCAProfile:
                     desc += f", Microfilm {microfilm}"
                 desc += ")"
                 keystone_parts.append(desc)
-                
+
         if keystone_parts:
             narrative = "Archival Sources: " + "; ".join(keystone_parts)
             trans_val = f"{narrative}\n{trans_val}" if trans_val else narrative
-            
+
         norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
         norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
         same_text = orig_val and trans_val and norm_orig == norm_trans

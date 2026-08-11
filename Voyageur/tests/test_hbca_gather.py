@@ -117,4 +117,3 @@ def test_parse_biographical_index_html_extracts_letter():
     assert len(entries) == 2
     assert entries[0].letter == "a"
     assert entries[1].letter == "b"
-

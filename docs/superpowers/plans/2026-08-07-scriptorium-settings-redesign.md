@@ -44,7 +44,7 @@ Purely additive: adds the function and its dedicated test file. No `*_VARS` assi
 **Interfaces:**
 - Produces: `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]`, a module-level function (not a method) in `Scriptorium.py`. Reachable in tests as `Scriptorium._load_tool_schema` after `import Scriptorium`. Raises `FileNotFoundError`/`RuntimeError`/`ValueError` as described in Global Constraints. Side effect: mutates the module globals `TOOLTIP_DESCRIPTIONS`, `CUSTOM_LABELS`, `PATH_PICKER_FIELDS`, `FIELD_WIDGETS` via `.update()`/item-assignment (never reassigns them, so existing references stay valid).
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Create `tests/test_load_tool_schema.py`:
 
@@ -233,12 +233,12 @@ def test_load_tool_schema_field_missing_default_raises_value_error(tmp_path):
         Scriptorium._load_tool_schema(tmp_path)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_load_tool_schema.py -v`
 Expected: every test FAILs with `AttributeError: module 'Scriptorium' has no attribute '_load_tool_schema'`.
 
-- [ ] **Step 3: Add `_load_tool_schema` to `Scriptorium.py`**
+-x[ ] **Step 3: Add `_load_tool_schema` to `Scriptorium.py`**
 
 Insert this immediately after the `FIELD_WIDGETS = {...}` dict's closing `}` (currently line 435), before the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment block (currently line 438):
 
@@ -302,12 +302,12 @@ def _load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
 
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest tests/test_load_tool_schema.py -v`
 Expected: all 11 tests PASS.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Scriptorium.py tests/test_load_tool_schema.py
@@ -329,7 +329,7 @@ This is the first tool migrated, so it also performs the one-time relocation thi
 - Consumes: `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]` from Task 1.
 - Produces: `ARCHIVIST_VARS` module-level name now holds `_load_tool_schema(BASE_DIR / "Archivist")`'s return value instead of a literal — same shape, same consumers (`_build_tab_archivist` reads it via `_build_form_ui(frame, ARCHIVIST_VARS)`, no changes needed there).
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Create `tests/test_scriptorium_settings_migration.py`:
 
@@ -362,12 +362,12 @@ def test_archivist_schema_matches_expected_shape():
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py -v`
 Expected: FAIL with `FileNotFoundError` (no `Archivist/settings_schema.yaml` yet).
 
-- [ ] **Step 3: Create `Archivist/settings_schema.yaml`**
+-x[ ] **Step 3: Create `Archivist/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -461,7 +461,7 @@ label_overrides:
   JSON_FILE: "Downloaded JSON File Name"
 ```
 
-- [ ] **Step 4: Relocate the four shared dicts (and their supporting constants) to sit before `ARCHIVIST_VARS`, trimmed of Archivist's own entries**
+-x[ ] **Step 4: Relocate the four shared dicts (and their supporting constants) to sit before `ARCHIVIST_VARS`, trimmed of Archivist's own entries**
 
 In `Scriptorium.py`, cut the entire block starting at `# ==========================================` / `# TOOLTIP DESCRIPTIONS` (currently line 172) through the end of the `_load_tool_schema` function added in Task 1 (the blank line right after its closing `return result`) — this is everything currently between `ENV_TARGETS = [...]` and the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment. Delete it from that location.
 
@@ -621,7 +621,7 @@ def _load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
 
 Note what was deliberately dropped from this relocated block versus the original: every Archivist-owned key (`JSON_FILE`, `STATE`, `COUNTY`, `TOWNSHIP`, `MIN_MARRIAGE_AGE`, `MAX_SPOUSE_AGE_GAP`, `HUSBAND_CHILD_AGE_GAP_MIN`, `HUSBAND_CHILD_AGE_GAP_MAX`, `WIFE_CHILD_AGE_GAP_MIN`, `WIFE_CHILD_AGE_GAP_MAX`) is gone from `TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`; `JSON_FILE` is gone from `CUSTOM_LABELS`/`PATH_PICKER_FIELDS`. Every other tool's entries (Voyageur, Paleographer, Registrar, Gazetteer, PDFix) are carried over unchanged for now — they're trimmed in their own tasks (3-7). `RMTREE_FILETYPES`/`JSON_FILETYPES`/`GED_FILETYPES`/`SHP_FILETYPES` are also carried over unchanged (still referenced by other tools' still-hardcoded `PATH_PICKER_FIELDS` entries) — do NOT paste them into this new location; leave them exactly where they currently are (lines 353-356), since Archivist's own picker no longer needs them (its `JSON_FILE` picker's `filetypes` now lives inline in the YAML).
 
-- [ ] **Step 5: Replace the `ARCHIVIST_VARS` literal with a loader call**
+-x[ ] **Step 5: Replace the `ARCHIVIST_VARS` literal with a loader call**
 
 Old (now sitting right after the relocated block from Step 4):
 
@@ -639,25 +639,25 @@ New:
 ARCHIVIST_VARS = _load_tool_schema(BASE_DIR / "Archivist")
 ```
 
-- [ ] **Step 6: Delete the now-empty original location's leftover comment header**
+-x[ ] **Step 6: Delete the now-empty original location's leftover comment header**
 
 Where the `# TOOLTIP DESCRIPTIONS` block used to sit (originally right after `ENV_TARGETS`), only the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment (originally line 438) and the `class ToolTip` definition that follows it should remain — confirm no orphaned blank block or duplicate comment header is left behind between `ENV_TARGETS = [...]` and that class.
 
-- [ ] **Step 7: Run the app's existing test to confirm nothing broke**
+-x[ ] **Step 7: Run the app's existing test to confirm nothing broke**
 
 Run: `pytest tests/test_scriptorium_paleographer_gating.py -v`
 Expected: both tests still PASS (Paleographer isn't migrated yet in this task, so this is a regression check on the reorder itself — if `Scriptorium.py` fails to import, both tests error immediately).
 
-- [ ] **Step 8: Run the migration test to verify it passes**
+-x[ ] **Step 8: Run the migration test to verify it passes**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py -v`
 Expected: `test_archivist_schema_matches_expected_shape` PASSES.
 
-- [ ] **Step 9: Manual click-through**
+-x[ ] **Step 9: Manual click-through**
 
 Launch `python Scriptorium.py`, open the Archivist tab, confirm all four sections render (including the new "Citation & Role Vocabulary" section with its five fields), confirm the age-gap sliders still work, confirm "Downloaded JSON File Name" still shows as `JSON_FILE`'s label with its Browse button, save, and confirm `Archivist/.env` gets the new keys with their defaults.
 
-- [ ] **Step 10: Commit**
+-x[ ] **Step 10: Commit**
 
 ```bash
 git add Scriptorium.py Archivist/settings_schema.yaml tests/test_scriptorium_settings_migration.py
@@ -679,7 +679,7 @@ Fixes the confirmed `LAC_HARVEST_ARCHIVAL_NUMBER` bug — `LAC.py` line 50 actua
 - Consumes: `_load_tool_schema` (Task 1).
 - Produces: `VOYAGEUR_VARS` now holds loader output.
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Append to `tests/test_scriptorium_settings_migration.py`:
 
@@ -700,12 +700,12 @@ def test_voyageur_schema_matches_expected_shape():
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py::test_voyageur_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
-- [ ] **Step 3: Create `Voyageur/settings_schema.yaml`**
+-x[ ] **Step 3: Create `Voyageur/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -803,7 +803,7 @@ label_overrides:
   FS_URL: "FamilySearch Record URL"
 ```
 
-- [ ] **Step 4: Trim Voyageur's entries out of the four shared dicts in `Scriptorium.py`**
+-x[ ] **Step 4: Trim Voyageur's entries out of the four shared dicts in `Scriptorium.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete these entries (the `# LAC & Scrip Enrichment` group's LAC-only lines, plus the `# Voyageur (Gather step)` group):
 
@@ -849,7 +849,7 @@ In `PATH_PICKER_FIELDS`, delete:
 
 `FIELD_WIDGETS` has no Voyageur-owned entries — no change needed there.
 
-- [ ] **Step 5: Replace the `VOYAGEUR_VARS` literal with a loader call**
+-x[ ] **Step 5: Replace the `VOYAGEUR_VARS` literal with a loader call**
 
 Old:
 
@@ -870,16 +870,16 @@ VOYAGEUR_VARS = _load_tool_schema(BASE_DIR / "Voyageur")
 
 (`VOYAGEUR_SOURCES = [("A", "Ancestry"), ("FS", "FamilySearch"), ("LAC", "LAC")]`, the line immediately above, is unrelated dropdown-population data — leave it exactly as-is.)
 
-- [ ] **Step 6: Run tests to verify they pass**
+-x[ ] **Step 6: Run tests to verify they pass**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
 Expected: all PASS.
 
-- [ ] **Step 7: Manual click-through**
+-x[ ] **Step 7: Manual click-through**
 
 Launch `python Scriptorium.py`, open the Voyageur tab, confirm the LAC section shows all 8 fields including the 3 new ones, save, and confirm `Voyageur/.env` now has `LAC_ARCHIVAL_NUMBER` (not `LAC_HARVEST_ARCHIVAL_NUMBER`) plus the three new keys.
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Scriptorium.py Voyageur/settings_schema.yaml tests/test_scriptorium_settings_migration.py
@@ -902,7 +902,7 @@ Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"
 - Consumes: `_load_tool_schema` (Task 1).
 - Produces: `PALEOGRAPHER_VARS` now holds loader output.
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Append to `tests/test_scriptorium_settings_migration.py`:
 
@@ -960,12 +960,12 @@ def test_paleographer_help_text_mentions_resolve_names():
         root.destroy()
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py::test_paleographer_schema_matches_expected_shape tests/test_scriptorium_settings_migration.py::test_paleographer_help_text_mentions_resolve_names -v`
 Expected: the schema test FAILs with `FileNotFoundError`; the help-text test FAILs with `AssertionError` (current text only mentions "Enrich Metadata"/"Partition Collections").
 
-- [ ] **Step 3: Create `Paleographer/settings_schema.yaml`**
+-x[ ] **Step 3: Create `Paleographer/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -1095,7 +1095,7 @@ sections:
         base_dir_key: "JSON_DIR"
 ```
 
-- [ ] **Step 4: Add "Antigravity CLI" to both `.pmt` files' `settings_sections:` lists**
+-x[ ] **Step 4: Add "Antigravity CLI" to both `.pmt` files' `settings_sections:` lists**
 
 In `Paleographer/prompts/Parish.pmt`, change:
 
@@ -1133,7 +1133,7 @@ settings_sections:
   - "Scrip Information"
 ```
 
-- [ ] **Step 5: Trim Paleographer's entries out of the four shared dicts in `Scriptorium.py`**
+-x[ ] **Step 5: Trim Paleographer's entries out of the four shared dicts in `Scriptorium.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the Scrip-only lines from the `# LAC & Scrip Enrichment` group:
 
@@ -1232,7 +1232,7 @@ and:
 
 Note: `SCRIP_DELAY_SECONDS` doesn't actually appear in `FIELD_WIDGETS` today (confirmed absent from the original dict — it was rendered as a plain text entry despite having a natural slider shape). This task adds it as a real slider for the first time, via the YAML `widget: slider` spec in Step 3 — there is nothing to delete for it here; only skip this deletion sub-step.
 
-- [ ] **Step 6: Replace the `PALEOGRAPHER_VARS` literal with a loader call**
+-x[ ] **Step 6: Replace the `PALEOGRAPHER_VARS` literal with a loader call**
 
 Old (the full 6-section literal at what is currently lines 112-134):
 
@@ -1268,7 +1268,7 @@ New:
 PALEOGRAPHER_VARS = _load_tool_schema(BASE_DIR / "Paleographer")
 ```
 
-- [ ] **Step 7: Fix the stale Paleographer help text**
+-x[ ] **Step 7: Fix the stale Paleographer help text**
 
 In `self.help_texts`'s `"Paleographer"` entry (currently lines 689-704), change:
 
@@ -1287,16 +1287,16 @@ to:
                            "deduplicate participant names across records.\n\n"
 ```
 
-- [ ] **Step 8: Run tests to verify they pass**
+-x[ ] **Step 8: Run tests to verify they pass**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
 Expected: all PASS, including the two new Paleographer tests from Step 1.
 
-- [ ] **Step 9: Manual click-through**
+-x[ ] **Step 9: Manual click-through**
 
 Launch `python Scriptorium.py`, open the Paleographer tab, switch the Record Type dropdown between `Parish.pmt` and `Scrip.pmt`, and for each confirm the "Antigravity CLI" section now appears alongside that type's usual sections. Click the ⓘ help icon and confirm the updated text mentions Resolve Names.
 
-- [ ] **Step 10: Commit**
+-x[ ] **Step 10: Commit**
 
 ```bash
 git add Scriptorium.py Paleographer/settings_schema.yaml Paleographer/prompts/Parish.pmt Paleographer/prompts/Scrip.pmt tests/test_scriptorium_settings_migration.py
@@ -1319,7 +1319,7 @@ No missing fields (all 8 already represented), but harvests `Registrar/schema_ui
 - Consumes: `_load_tool_schema` (Task 1).
 - Produces: `REGISTRAR_VARS` now holds loader output.
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Append to `tests/test_scriptorium_settings_migration.py`:
 
@@ -1340,12 +1340,12 @@ def test_registrar_schema_matches_expected_shape():
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py::test_registrar_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
-- [ ] **Step 3: Create `Registrar/settings_schema.yaml`**
+-x[ ] **Step 3: Create `Registrar/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -1400,7 +1400,7 @@ label_overrides:
   REGISTRAR_RM_DATABASE: "RootsMagic Database Path"
 ```
 
-- [ ] **Step 4: Trim Registrar's entries out of the four shared dicts in `Scriptorium.py`**
+-x[ ] **Step 4: Trim Registrar's entries out of the four shared dicts in `Scriptorium.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# Registrar` group:
 
@@ -1444,7 +1444,7 @@ In `FIELD_WIDGETS`, delete:
     "REGISTRAR_FAMILY_MATCH_THRESHOLD": {"type": "slider", "min": 0, "max": 100, "step": 1},
 ```
 
-- [ ] **Step 5: Replace the `REGISTRAR_VARS` literal with a loader call**
+-x[ ] **Step 5: Replace the `REGISTRAR_VARS` literal with a loader call**
 
 Old:
 
@@ -1469,7 +1469,7 @@ New:
 REGISTRAR_VARS = _load_tool_schema(BASE_DIR / "Registrar")
 ```
 
-- [ ] **Step 6: Delete `Registrar/schema_ui_map.py`**
+-x[ ] **Step 6: Delete `Registrar/schema_ui_map.py`**
 
 Confirm nothing imports it first:
 
@@ -1480,16 +1480,16 @@ Expected: no output (already confirmed dead/unimported during the design phase; 
 git rm Registrar/schema_ui_map.py
 ```
 
-- [ ] **Step 7: Run tests to verify they pass**
+-x[ ] **Step 7: Run tests to verify they pass**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
 Expected: all PASS.
 
-- [ ] **Step 8: Manual click-through**
+-x[ ] **Step 8: Manual click-through**
 
 Launch `python Scriptorium.py`, open the Registrar tab, hover each field's ⓘ icon and confirm the new, more specific tooltip text shows, confirm the four sliders and the file picker still work, save.
 
-- [ ] **Step 9: Commit**
+-x[ ] **Step 9: Commit**
 
 ```bash
 git add Scriptorium.py Registrar/settings_schema.yaml tests/test_scriptorium_settings_migration.py
@@ -1511,7 +1511,7 @@ No missing fields — a straightforward move.
 - Consumes: `_load_tool_schema` (Task 1).
 - Produces: `GAZETTEER_VARS` now holds loader output.
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Append to `tests/test_scriptorium_settings_migration.py`:
 
@@ -1529,12 +1529,12 @@ def test_gazetteer_schema_matches_expected_shape():
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py::test_gazetteer_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
-- [ ] **Step 3: Create `Gazetteer/settings_schema.yaml`**
+-x[ ] **Step 3: Create `Gazetteer/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -1566,7 +1566,7 @@ label_overrides:
   GAZETTEER_RM_DATABASE: "RootsMagic Database Path"
 ```
 
-- [ ] **Step 4: Trim Gazetteer's entries out of the four shared dicts in `Scriptorium.py`**
+-x[ ] **Step 4: Trim Gazetteer's entries out of the four shared dicts in `Scriptorium.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# Gazetteer` group:
 
@@ -1604,7 +1604,7 @@ In `FIELD_WIDGETS`, delete:
 
 (Leave the `PDFIX_CREATE_BACKUP`/`PDFIX_REPAIR_MODE` toggle lines that follow — those are trimmed in Task 7. If the leading comment `# Real booleans in the schema - a switch, not a "True"/"False" text box.` would otherwise sit directly above only PDFix's two remaining toggle entries, keep the comment; it still describes them correctly.)
 
-- [ ] **Step 5: Replace the `GAZETTEER_VARS` literal with a loader call**
+-x[ ] **Step 5: Replace the `GAZETTEER_VARS` literal with a loader call**
 
 Old:
 
@@ -1621,16 +1621,16 @@ New:
 GAZETTEER_VARS = _load_tool_schema(BASE_DIR / "Gazetteer")
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+-x[ ] **Step 6: Run tests to verify they pass**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
 Expected: all PASS.
 
-- [ ] **Step 7: Manual click-through**
+-x[ ] **Step 7: Manual click-through**
 
 Launch `python Scriptorium.py`, open the Gazetteer tab, confirm both toggles and both file pickers still work, confirm the RootsMagic database field shows the "RootsMagic Database Path" label, save.
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Scriptorium.py Gazetteer/settings_schema.yaml tests/test_scriptorium_settings_migration.py
@@ -1652,7 +1652,7 @@ No missing fields — a straightforward move, and the last of the six tools.
 - Consumes: `_load_tool_schema` (Task 1).
 - Produces: `PDFIX_VARS` now holds loader output.
 
-- [ ] **Step 1: Write the failing migration test**
+-x[ ] **Step 1: Write the failing migration test**
 
 Append to `tests/test_scriptorium_settings_migration.py`:
 
@@ -1668,12 +1668,12 @@ def test_pdfix_schema_matches_expected_shape():
     }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py::test_pdfix_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
-- [ ] **Step 3: Create `PDFix/settings_schema.yaml`**
+-x[ ] **Step 3: Create `PDFix/settings_schema.yaml`**
 
 ```yaml
 sections:
@@ -1710,7 +1710,7 @@ label_overrides:
   PDFIX_TARGET_DIR: "PDF Scan Folder"
 ```
 
-- [ ] **Step 4: Trim PDFix's entries out of the four shared dicts in `Scriptorium.py`**
+-x[ ] **Step 4: Trim PDFix's entries out of the four shared dicts in `Scriptorium.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# PDFix` group (the last group in the dict):
 
@@ -1768,7 +1768,7 @@ and:
 
 After these deletions, confirm `FIELD_WIDGETS` contains exactly three entries: `EXTRACTION_ENGINE`, `API_BUDGET`, `CACHE_DISCOUNT_MULTIPLIER` (all `GLOBAL_VARS`-owned, per Task 2's relocated block). If the `# Real booleans in the schema...` comment from Task 6 is now left with nothing beneath it, delete that orphaned comment too.
 
-- [ ] **Step 5: Replace the `PDFIX_VARS` literal with a loader call**
+-x[ ] **Step 5: Replace the `PDFIX_VARS` literal with a loader call**
 
 Old:
 
@@ -1784,16 +1784,16 @@ New:
 PDFIX_VARS = _load_tool_schema(BASE_DIR / "PDFix")
 ```
 
-- [ ] **Step 6: Run tests to verify they pass**
+-x[ ] **Step 6: Run tests to verify they pass**
 
 Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
 Expected: all PASS. All 6 migration tests (Archivist, Voyageur, Paleographer, Registrar, Gazetteer, PDFix) plus the Paleographer help-text test now pass.
 
-- [ ] **Step 7: Manual click-through**
+-x[ ] **Step 7: Manual click-through**
 
 Launch `python Scriptorium.py`, click through all 7 tabs (6 tools + Global Settings) once, confirming every field, tooltip, toggle, slider, segmented control, and Browse button still renders and works, and every tab still saves without error.
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Scriptorium.py PDFix/settings_schema.yaml tests/test_scriptorium_settings_migration.py
@@ -1813,12 +1813,12 @@ git commit -m "Migrate PDFix settings to settings_schema.yaml, completing the si
 - Consumes: nothing new.
 - Produces: nothing new — pure dead-code removal, verified by grep before deleting.
 
-- [ ] **Step 1: Confirm the four constants are unreferenced outside their own definitions**
+-x[ ] **Step 1: Confirm the four constants are unreferenced outside their own definitions**
 
 Run: `python -c "import re,pathlib; text=pathlib.Path('Scriptorium.py').read_text(encoding='utf-8'); [print(name, text.count(name)) for name in ('RMTREE_FILETYPES','JSON_FILETYPES','GED_FILETYPES','SHP_FILETYPES')]"`
 Expected: each name prints a count of exactly `1` (only its own definition line remains; every consuming `PATH_PICKER_FIELDS` entry was already migrated to inline YAML `filetypes` lists in Tasks 2-7).
 
-- [ ] **Step 2: Delete the four constant definitions**
+-x[ ] **Step 2: Delete the four constant definitions**
 
 In `Scriptorium.py`, delete:
 
@@ -1831,16 +1831,16 @@ SHP_FILETYPES = [("Shapefiles", "*.shp"), ("All files", "*.*")]
 
 (This sits directly beneath `PROGRAM_DIR_SENTINEL`/`TOOLBOX_DIR_SENTINEL`, which stay.)
 
-- [ ] **Step 3: Run the full test suite**
+-x[ ] **Step 3: Run the full test suite**
 
 Run: `pytest tests/ -v`
 Expected: all tests PASS (loader unit tests, all 6 migration tests, the Paleographer help-text test, and the pre-existing gating tests).
 
-- [ ] **Step 4: Launch check**
+-x[ ] **Step 4: Launch check**
 
 Run: `python Scriptorium.py`, confirm the app launches with no import error, click through all 7 tabs once more.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Scriptorium.py
@@ -1860,7 +1860,7 @@ Adds the automated check the spec calls for: for each of the six tools, grep its
 - Consumes: `_load_tool_schema` (Task 1), the six committed `settings_schema.yaml` files (Tasks 2-7).
 - Produces: nothing consumed by later code — this is a standalone regression test.
 
-- [ ] **Step 1: Write the test**
+-x[ ] **Step 1: Write the test**
 
 Create `tests/test_settings_schema_completeness.py`:
 
@@ -1921,17 +1921,17 @@ def test_tool_schema_covers_every_env_var_the_tool_reads(tool_name):
     )
 ```
 
-- [ ] **Step 2: Run the test**
+-x[ ] **Step 2: Run the test**
 
 Run: `pytest tests/test_settings_schema_completeness.py -v`
 Expected: all 6 parametrized cases PASS, since Tasks 2-7 already closed every gap this test checks for. If any case unexpectedly fails, it has found a real gap beyond this plan's known debt fixes (a `_get_env_int()`-style wrapper the regex can't see through, or a genuinely new setting) — per the spec's own intent for this test ("turning silent drift into an automated check"), add the missing key(s) to that tool's `settings_schema.yaml` before proceeding, rather than weakening the test.
 
-- [ ] **Step 3: Run the full test suite one more time**
+-x[ ] **Step 3: Run the full test suite one more time**
 
 Run: `pytest tests/ -v`
 Expected: all tests PASS.
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add tests/test_settings_schema_completeness.py

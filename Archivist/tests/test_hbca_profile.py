@@ -150,6 +150,7 @@ def test_hbca_build_gedcom_end_to_end():
     assert "1 DEAT" in gedcom_text
     assert "0 TRLR" in gedcom_text
 
+
 def test_citation_detail_fields_include_keystone_metadata_when_present():
     profile = HBCA.HBCAProfile()
     rec = {
@@ -164,7 +165,7 @@ def test_citation_detail_fields_include_keystone_metadata_when_present():
                         "microfilm_no": "1M814",
                     },
                     "record_urls": [
-                        "https://pam.minisisinc.com/scripts/mwimain.dll/144/LISTINGS_IMAGES/LISTINGS_DET_IMAGES/SISN%205154?sessionsearch"
+                        "https://pam.minisisinc.com/scripts/mwimain.dll/144/LISTINGS_IMAGES/LISTINGS_DET_IMAGES/SISN%205154?sessionsearch"  # noqa: E501
                     ],
                 },
             },
@@ -175,6 +176,7 @@ def test_citation_detail_fields_include_keystone_metadata_when_present():
     joined = "\n".join(lines)
     assert "1M814" in joined
     assert "SISN%205154" in joined
+
 
 def test_citation_detail_fields_degrade_gracefully_without_keystone_records():
     profile = HBCA.HBCAProfile()

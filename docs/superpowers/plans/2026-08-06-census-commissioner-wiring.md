@@ -29,7 +29,7 @@
 - Consumes: nothing new — extends `_DocumentTypeSchema`, `_build_registry()`, `validate_role_name()`, `_PRIMITIVE_TYPE_MAP`, all already defined in this file.
 - Produces: `_DocumentTypeSchema.role_validation_mode: str` (`"closed"` or `"open"`), read from front matter key `role_validation`. `validate_role_name(document_type, role_name)` becomes a no-op (never raises `InvalidRoleError`) when the resolved document type's mode is `"open"`. `_PRIMITIVE_TYPE_MAP["dict"]` resolves to `Dict[str, Any]`, usable as a field `type:` token in any `.pmt` file's `extra_fields`. These are consumed by Task 2 (Census.pmt/Parish.pmt/Scrip.pmt front matter) and Task 3 (indirectly, since Census's `unmapped` field depends on the `dict` type existing).
 
-- [ ] **Step 1: Write failing tests for the new mechanism**
+-x[ ] **Step 1: Write failing tests for the new mechanism**
 
 Add to `Commissioner/tests/test_record_registry.py`, after the existing `test_build_registry_accepts_a_valid_fixture_dir` function (currently ending at line 152) and before the `import pytest` / `from pydantic import ValidationError` block that starts the `parse_collection` tests (currently line 155):
 
@@ -96,12 +96,12 @@ def test_dict_field_type_accepts_a_nested_dict_value(tmp_path):
 
 Note: `UNKNOWN_TYPE_PMT` and `_build_registry`/`InvalidRoleError`/`validate_role_name`/`pytest` are already defined/imported earlier in this file — do not re-import or redefine them.
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+-x[ ] **Step 2: Run the new tests to verify they fail**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v -k "open_role_validation or closed_is_the_default or noop_for_open_mode or still_rejects_unknown_role_for_closed or dict_field_type"`
 Expected: FAIL — `AttributeError: 'OpenFixture' has no attribute 'role_validation_mode'` (or similar) for the first three; the `dict` field type test fails with `UnknownFieldTypeError: ... unrecognized field type 'dict'`.
 
-- [ ] **Step 3: Implement `role_validation_mode` on `_DocumentTypeSchema`**
+-x[ ] **Step 3: Implement `role_validation_mode` on `_DocumentTypeSchema`**
 
 In `Commissioner/record_registry.py`, modify the `_DocumentTypeSchema.__init__` (currently lines 32-40):
 
@@ -120,7 +120,7 @@ class _DocumentTypeSchema:
         self.role_validation_mode = role_validation_mode
 ```
 
-- [ ] **Step 4: Pass the mode through `_build_registry()`**
+-x[ ] **Step 4: Pass the mode through `_build_registry()`**
 
 Modify `_build_registry()` (currently lines 75-94): after the existing `valid_roles = frozenset(role["name"] for role in roles.values())` line (currently line 91), add:
 
@@ -136,7 +136,7 @@ Then update the `_DocumentTypeSchema(...)` construction (currently line 93) to p
         )
 ```
 
-- [ ] **Step 5: Make `validate_role_name()` a no-op in open mode**
+-x[ ] **Step 5: Make `validate_role_name()` a no-op in open mode**
 
 Replace `validate_role_name()` (currently lines 125-133):
 
@@ -154,7 +154,7 @@ def validate_role_name(document_type: str, role_name: Optional[str]) -> None:
         )
 ```
 
-- [ ] **Step 6: Add the `dict` primitive type**
+-x[ ] **Step 6: Add the `dict` primitive type**
 
 Modify `_PRIMITIVE_TYPE_MAP` (currently lines 10-16):
 
@@ -171,7 +171,7 @@ _PRIMITIVE_TYPE_MAP: Dict[str, Any] = {
 
 (`Any` and `Dict` are already imported at the top of the file — no new imports needed.)
 
-- [ ] **Step 7: Run the new tests to verify they pass, then the full Commissioner suite**
+-x[ ] **Step 7: Run the new tests to verify they pass, then the full Commissioner suite**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v`
 Expected: all tests pass, including the 5 new ones and every pre-existing test in the file (Parish/Scrip/Census tests are unaffected — none of their `.pmt` files have a `role_validation` key yet, so they still resolve to `"closed"`, identical to today's behavior).
@@ -179,7 +179,7 @@ Expected: all tests pass, including the 5 new ones and every pre-existing test i
 Run: `pytest Commissioner/ -v`
 Expected: full Commissioner suite passes.
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Commissioner/record_registry.py Commissioner/tests/test_record_registry.py
@@ -200,7 +200,7 @@ git commit -m "Add opt-in open role-validation mode and dict field type to recor
 - Consumes: `role_validation_mode`/`"dict"` type from Task 1 (must be complete first — this task's tests exercise real `.pmt` files through the mechanism Task 1 built).
 - Produces: `Census` document type now resolves to `role_validation_mode == "open"` with a 9-name `valid_roles` set and a `dict`-typed `unmapped` participant field, consumed by Task 3's `A.py`/`FS.py` wiring (which relies on Census accepting any `role_name` and any `unmapped` shape `normalize_census_pages()` produces).
 
-- [ ] **Step 1: Update the two now-stale Census tests and add coverage for the new behavior**
+-x[ ] **Step 1: Update the two now-stale Census tests and add coverage for the new behavior**
 
 In `Commissioner/tests/test_record_registry.py`, replace `test_census_roles_cover_standard_household_relationships` (currently lines 96-102):
 
@@ -275,12 +275,12 @@ def test_parse_collection_validates_census_unmapped_dict_field():
     assert participant.type_specific_fields["unmapped"] == {"Race": "W", "Column_9": "Yes"}
 ```
 
-- [ ] **Step 2: Run the updated/new tests to verify they fail**
+-x[ ] **Step 2: Run the updated/new tests to verify they fail**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v -k "census"`
 Expected: FAIL — `test_census_roles_are_restricted_to_family_relationships` fails because `Census.pmt` still declares all 20 original roles; `test_census_role_validation_is_open` fails with `InvalidRoleError` (mode still closed); `test_parse_collection_accepts_any_role_for_census` fails with `InvalidRoleError`; `test_parse_collection_validates_census_unmapped_dict_field` fails with a `ValidationError` (`unmapped` not declared).
 
-- [ ] **Step 3: Rewrite Census.pmt's front matter**
+-x[ ] **Step 3: Rewrite Census.pmt's front matter**
 
 Replace `Paleographer/prompts/Census.pmt` lines 1-44 (the entire front-matter block) with:
 
@@ -322,7 +322,7 @@ extra_fields:
 ---
 ```
 
-- [ ] **Step 4: Update Census.pmt's prose to match the open vocabulary**
+-x[ ] **Step 4: Update Census.pmt's prose to match the open vocabulary**
 
 The prose body (after the front matter) still describes the old closed-list-plus-"Other" fallback. Replace this paragraph (currently lines 73-75):
 
@@ -344,7 +344,7 @@ with:
   only, not family-tree linking.
 ```
 
-- [ ] **Step 5: Add `role_validation: closed` to Parish.pmt and Scrip.pmt**
+-x[ ] **Step 5: Add `role_validation: closed` to Parish.pmt and Scrip.pmt**
 
 In `Paleographer/prompts/Parish.pmt`, insert a new line directly after the last `roles` entry (currently line 12, `"0": {name: "Other", ...}`) and before `defaults:` (currently line 13):
 
@@ -358,7 +358,7 @@ In `Paleographer/prompts/Scrip.pmt`, insert the same line directly after the las
 role_validation: closed
 ```
 
-- [ ] **Step 6: Run the tests to verify they pass, then the full Commissioner suite**
+-x[ ] **Step 6: Run the tests to verify they pass, then the full Commissioner suite**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v`
 Expected: all tests pass, including every pre-existing Parish/Scrip test (now with an explicit `role_validation: closed` — behavior-neutral, so no assertions change).
@@ -366,7 +366,7 @@ Expected: all tests pass, including every pre-existing Parish/Scrip test (now wi
 Run: `pytest Commissioner/ -v`
 Expected: full Commissioner suite passes.
 
-- [ ] **Step 7: Commit**
+-x[ ] **Step 7: Commit**
 
 ```bash
 git add Paleographer/prompts/Census.pmt Paleographer/prompts/Parish.pmt Paleographer/prompts/Scrip.pmt Commissioner/tests/test_record_registry.py
@@ -387,7 +387,7 @@ git commit -m "Give Census an open role vocabulary restricted to 9 family relati
 - Consumes: `Commissioner.record_registry.parse_collection(raw_json: dict, document_type: str) -> Collection` (existing signature, unchanged). Relies on Task 2's Census.pmt changes being in place (open role validation, `unmapped` declared as `dict`) — without Task 2, real gather output would trip `[WARN]` logs constantly.
 - Produces: `census_schema.validate_against_commissioner(normalized: dict, collection_title: str) -> None` — never raises; logs via `print(f"[WARN] ...")` on any Commissioner exception. Called from `A.py` and `FS.py` immediately after `normalize_census_pages()`.
 
-- [ ] **Step 1: Write failing tests for the new helper**
+-x[ ] **Step 1: Write failing tests for the new helper**
 
 Add to `Voyageur/tests/test_census_schema.py`, after the existing `_page()` helper (currently lines 5-13):
 
@@ -418,12 +418,12 @@ def test_validate_against_commissioner_logs_and_does_not_raise_on_bad_shape(caps
     assert "Bad Collection" in captured.out
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+-x[ ] **Step 2: Run the new tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_census_schema.py -v -k "validate_against_commissioner"`
 Expected: FAIL — `AttributeError: module 'census_schema' has no attribute 'validate_against_commissioner'`.
 
-- [ ] **Step 3: Add the Commissioner import bootstrap and the helper function to `census_schema.py`**
+-x[ ] **Step 3: Add the Commissioner import bootstrap and the helper function to `census_schema.py`**
 
 Add `import sys` to the existing import block (currently lines 21-25):
 
@@ -465,12 +465,12 @@ def validate_against_commissioner(normalized: dict, collection_title: str) -> No
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
-- [ ] **Step 4: Run the new tests to verify they pass, then the full census_schema test file**
+-x[ ] **Step 4: Run the new tests to verify they pass, then the full census_schema test file**
 
 Run: `pytest Voyageur/tests/test_census_schema.py -v`
 Expected: all tests pass, including the 2 new ones and every pre-existing normalization test (unaffected — `normalize_census_pages()` itself is unchanged).
 
-- [ ] **Step 5: Call the helper from `A.py`'s Census gather path**
+-x[ ] **Step 5: Call the helper from `A.py`'s Census gather path**
 
 In `Voyageur/A.py`, modify the block around the existing `normalize_census_pages()` call (currently lines 163-166):
 
@@ -482,7 +482,7 @@ In `Voyageur/A.py`, modify the block around the existing `normalize_census_pages
         json.dump(normalized, f, indent=2, ensure_ascii=False)
 ```
 
-- [ ] **Step 6: Call the helper from `FS.py`'s Census gather path**
+-x[ ] **Step 6: Call the helper from `FS.py`'s Census gather path**
 
 In `Voyageur/FS.py`, modify the block around the existing `normalize_census_pages()` call (currently lines 898-901):
 
@@ -494,7 +494,7 @@ In `Voyageur/FS.py`, modify the block around the existing `normalize_census_page
         clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
 ```
 
-- [ ] **Step 7: Run the full Voyageur and Commissioner test suites**
+-x[ ] **Step 7: Run the full Voyageur and Commissioner test suites**
 
 Run: `pytest Voyageur/ -v`
 Expected: all tests pass, including `test_fs.py` and `test_census_schema.py` (no test in either file calls `A.py`'s or `FS.py`'s top-level gather functions directly, so the new one-line call sites don't require new mocks — confirm this holds; if a test does exercise the full gather path, it must still pass since `validate_against_commissioner()` never raises).
@@ -502,7 +502,7 @@ Expected: all tests pass, including `test_fs.py` and `test_census_schema.py` (no
 Run: `pytest Commissioner/ -v`
 Expected: full Commissioner suite still passes (unaffected by Voyageur changes).
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Voyageur/census_schema.py Voyageur/A.py Voyageur/FS.py Voyageur/tests/test_census_schema.py

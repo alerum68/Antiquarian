@@ -110,7 +110,14 @@ C_BORDER = "#33363D"
 # ==========================================
 # UNIFIED ENV SCHEMA & CONTEXT OVERRIDES
 # ==========================================
-GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high"},
+GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
+                                    "EXTRACTION_ENGINE": "agy",
+                                    "GEMINI_API_KEY": "",
+                                    "API_BUDGET": "5.00",
+                                    "MODEL_NAME": "",
+                                    "COST_PER_1M_INPUT": "0.075",
+                                    "COST_PER_1M_OUTPUT": "0.30",
+                                    "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
                "Global Directories": {"GENEALOGY_DIR": "C:/Path/To/Your/Genealogy/Folder",
                                       "RM_DIR": "Roots Magic 11",
                                       "FTM_DIR": "Family Tree Maker",
@@ -136,8 +143,8 @@ TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (
 # ==========================================
 TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
-                   "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
-                   "this one folder.",
+    "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
+    "this one folder.",
     "AGY_MODEL_NAME": "The exact Antigravity CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
@@ -1391,8 +1398,10 @@ class Scriptorium(ctk.CTk):
         status_label.configure(text="Logging in...", text_color=C_ACCENT)
         self.update_idletasks()
         try:
-            subprocess.run(["agy", "login"], check=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            result = subprocess.run(["agy", "login", "--status"], capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            subprocess.run(["agy", "login"], check=True,
+                           creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+            result = subprocess.run(["agy", "login", "--status"], capture_output=True, text=True,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
             if "Logged in as" in result.stdout:
                 status_label.configure(text=result.stdout.strip(), text_color=C_SUCCESS)
             else:
@@ -1413,11 +1422,13 @@ class Scriptorium(ctk.CTk):
 
         auth_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
         auth_frame.pack(fill="x", padx=20, pady=(20, 0))
-        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (Antigravity)", fg_color=C_ACCENT, text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
+        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (Antigravity)", fg_color=C_ACCENT,
+                            text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
         btn.pack(side="left", padx=(0, 10))
         status_lbl = ctk.CTkLabel(auth_frame, text="Not connected.", text_color=C_TEXT_MUTED)
         status_lbl.pack(side="left")
-        btn.configure(command=lambda: threading.Thread(target=self._run_agy_login, args=(status_lbl,), daemon=True).start())
+        btn.configure(command=lambda: threading.Thread(
+            target=self._run_agy_login, args=(status_lbl,), daemon=True).start())
 
         self._build_form_ui(parent_frame, GLOBAL_VARS)
 

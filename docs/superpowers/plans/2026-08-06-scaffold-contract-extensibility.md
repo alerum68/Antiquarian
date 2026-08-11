@@ -27,7 +27,7 @@
 - Consumes: `Commissioner.record_registry._build_registry()` (already exists, unchanged) — scans `Paleographer/prompts/*.pmt`, keyed by `pmt_path.stem`.
 - Produces: `get_document_types()` includes `"Census"`; `get_valid_roles("Census")` returns the frozenset of role names declared below; `validate_record_extra_fields("Census", {...})` / `validate_participant_extra_fields("Census", {...})` validate against the extra-fields models declared below.
 
-- [ ] **Step 1: Fix the test that hardcodes "Census" as an unrecognized type**
+-x[ ] **Step 1: Fix the test that hardcodes "Census" as an unrecognized type**
 
 `Commissioner/tests/test_record_registry.py:57-59` currently reads:
 
@@ -45,12 +45,12 @@ def test_unknown_document_type_raises():
         validate_record_extra_fields("Wills", {})
 ```
 
-- [ ] **Step 2: Run the full Commissioner suite to confirm it still passes**
+-x[ ] **Step 2: Run the full Commissioner suite to confirm it still passes**
 
 Run: `python -m pytest Commissioner/tests -q`
 Expected: `36 passed` (same count as before — this step only changes what a test asserts against, not how many tests exist).
 
-- [ ] **Step 3: Write failing tests for Census's registry entry**
+-x[ ] **Step 3: Write failing tests for Census's registry entry**
 
 Add to `Commissioner/tests/test_record_registry.py`, after `test_valid_roles_differ_by_document_type` (around line 68):
 
@@ -90,12 +90,12 @@ def test_census_roles_cover_standard_household_relationships():
     assert "Coordinator" not in roles
 ```
 
-- [ ] **Step 4: Run the new tests to verify they fail for the right reason**
+-x[ ] **Step 4: Run the new tests to verify they fail for the right reason**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -k census -v`
 Expected: FAIL — `"Census" in get_document_types()` is false, and `validate_record_extra_fields("Census", ...)` raises `UnknownDocumentTypeError` (no `Census.pmt` exists yet).
 
-- [ ] **Step 5: Author `Paleographer/prompts/Census.pmt`**
+-x[ ] **Step 5: Author `Paleographer/prompts/Census.pmt`**
 
 Create `Paleographer/prompts/Census.pmt` with this exact content:
 
@@ -186,17 +186,17 @@ Only extract what the image actually shows. Never infer a value the image does
 not support, even if it would be historically plausible.
 ```
 
-- [ ] **Step 6: Run the new tests to verify they pass**
+-x[ ] **Step 6: Run the new tests to verify they pass**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -k census -v`
 Expected: PASS — all 4 new tests green.
 
-- [ ] **Step 7: Run the full suite**
+-x[ ] **Step 7: Run the full suite**
 
 Run: `python -m pytest Commissioner/tests -q`
 Expected: `40 passed` (36 baseline + 4 new Census tests; the repointed `test_unknown_document_type_raises` still counts as 1 of the original 36).
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Paleographer/prompts/Census.pmt Commissioner/tests/test_record_registry.py
@@ -214,7 +214,7 @@ git commit -m "Add Census.pmt so Commissioner's record_registry recognizes Censu
 - Consumes: `Commissioner.record_registry.parse_collection(raw_json: dict, document_type: str) -> Collection` (existing, unchanged); the `Census.pmt` declarations from Task 1.
 - Produces: proof that a dict shaped exactly like `Voyageur/census_schema.py`'s real `normalize_census_pages()` output validates end-to-end through `parse_collection()`.
 
-- [ ] **Step 1: Write a fixture payload matching `normalize_census_pages()`'s real output shape**
+-x[ ] **Step 1: Write a fixture payload matching `normalize_census_pages()`'s real output shape**
 
 Add to `Commissioner/tests/test_record_registry.py`:
 
@@ -320,17 +320,17 @@ def test_parse_collection_rejects_invalid_role_for_census():
         parse_collection(bad_payload, document_type="Census")
 ```
 
-- [ ] **Step 2: Run the two new tests to verify they pass**
+-x[ ] **Step 2: Run the two new tests to verify they pass**
 
 Run: `python -m pytest Commissioner/tests/test_record_registry.py -k "census_payload or invalid_role_for_census" -v`
 Expected: PASS — both tests green. (They should pass immediately since `Census.pmt` already exists from Task 1; this task adds coverage, it doesn't require new production code.)
 
-- [ ] **Step 3: Run the full suite**
+-x[ ] **Step 3: Run the full suite**
 
 Run: `python -m pytest Commissioner/tests -q`
 Expected: `42 passed` (40 from Task 1 + these 2 new tests).
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Commissioner/tests/test_record_registry.py

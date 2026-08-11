@@ -1,3 +1,4 @@
+from pypdf import PdfWriter
 import argparse
 import dataclasses
 import json
@@ -69,7 +70,6 @@ def resolve_generic_setting(document_type: str, generic_key: str, default: str =
 PROGRAM_DIR = os.environ.get("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent)).strip()
 GENEALOGY_DIR = os.environ.get("GENEALOGY_DIR", "").strip()
 
-START_URL = os.environ.get("HBCA_URL", "").strip()
 DEFAULT_INDEX_URL = "https://www.gov.mb.ca/chc/archives/hbca/biographical/index.html"
 INDEX_URL = os.environ.get("HBCA_INDEX_URL", DEFAULT_INDEX_URL).strip() or DEFAULT_INDEX_URL
 HBCA_IMAGE_DIR = "HBCA"
@@ -201,6 +201,7 @@ _FILENAME_FOOTER_REGEX = re.compile(
     r"Filename:.*?\((?:fl\.|b\.|d\.)\s*([^)]+)\)", re.IGNORECASE
 )
 
+
 def parse_bio_sheet_text(text: str) -> dict:
     data = {
         "parish_of_origin": "", "entered_service_year": "", "service_years_range": "",
@@ -239,7 +240,7 @@ def parse_bio_sheet_text(text: str) -> dict:
         ref = codes[0] if codes else None
         if not ref:
             continue
-        
+
         pos = ""
         post = ""
         for p in ["Clerk in charge", "Postmaster", "Clerk", "Apprentice"]:
@@ -247,7 +248,7 @@ def parse_bio_sheet_text(text: str) -> dict:
                 pos = p
                 post = middle_text[len(p):].strip()
                 break
-        
+
         if not pos:
             parts = middle_text.split()
             pos = " ".join(parts[:2]) if len(parts) >= 2 else middle_text.strip()
@@ -280,14 +281,13 @@ def parse_bio_sheet_text(text: str) -> dict:
 # ==========================================
 # KEYSTONE RESOLVER & MEDIA DOWNLOADER
 # ==========================================
-import json
-from pypdf import PdfWriter
+
 
 def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_URL) -> str:
     """Builds a local HTML file that auto-submits a POST search to Keystone."""
     cleaned_code = re.split(r'\s+fos?\.', location_code, flags=re.IGNORECASE)[0].strip()
     safe_name = "".join(c if c.isalnum() else "_" for c in cleaned_code)
-    
+
     html_content = f"""<!DOCTYPE html>
 <html>
 <head><title>Redirecting to Keystone Search...</title></head>
@@ -299,14 +299,14 @@ def build_keystone_search_url(location_code: str, base_url: str = KEYSTONE_BASE_
     </form>
 </body>
 </html>"""
-    
+
     out_dir = Path(CHECKPOINT_DIR) / "SearchLinks"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_file = out_dir / f"Search_{safe_name}.html"
-    
+
     with open(out_file, "w", encoding="utf-8") as f:
         f.write(html_content)
-        
+
     return out_file.absolute().as_uri()
 
 
@@ -326,10 +326,12 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
         text = div.get_text(strip=True)
         if text == "Item Description":
             nxt = div.find_next_sibling("div")
-            if nxt: metadata["item_description"] = nxt.get_text(strip=True)
+            if nxt:
+                metadata["item_description"] = nxt.get_text(strip=True)
         elif text == "Microfilm No.":
             nxt = div.find_next_sibling("div")
-            if nxt: metadata["microfilm_no"] = nxt.get_text(strip=True)
+            if nxt:
+                metadata["microfilm_no"] = nxt.get_text(strip=True)
 
     textarea = soup.find("textarea", {"id": "share_link_url"})
     if textarea:
@@ -364,7 +366,8 @@ def parse_keystone_search_response(html_text: str, base_url: str = KEYSTONE_BASE
         is_archival_path = any(p in src_lower for p in _ARCHIVAL_IMG_PATHS)
         is_archival_ext = any(src_lower.endswith(ext) for ext in _ARCHIVAL_IMG_EXTS)
         is_archival_domain = "pam.minisisinc.com" in full_img_url.lower()
-        if is_archival_domain and (is_archival_path or is_archival_ext) and "/thumbs/" not in src_lower and full_img_url not in seen_media:
+        if (is_archival_domain and (is_archival_path or is_archival_ext)
+                and "/thumbs/" not in src_lower and full_img_url not in seen_media):
             seen_media.add(full_img_url)
             media_urls.append(full_img_url)
 
@@ -513,7 +516,7 @@ def query_keystone_for_code(
                             continue
                         data[name] = input_tag.get("value", "")
                 data["LOCATION_CODE"] = location_code
-                
+
                 post_resp = client.post(
                     action_url,
                     data=data,
@@ -610,6 +613,8 @@ def download_and_merge_keystone_media(
 # ==========================================
 # SCAFFOLD & MASTER DB STORAGE
 # ==========================================
+
+
 def build_hbca_scaffold_sheet(
     entry: BioSheetEntry,
     raw_text: str = "",

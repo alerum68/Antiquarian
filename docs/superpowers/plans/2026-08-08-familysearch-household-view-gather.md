@@ -42,7 +42,7 @@
 - Consumes: `FS.build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str, dict]) -> dict` (existing, unchanged signature).
 - Produces: nothing new — this task adds coverage only, proving the design's core assumption before any JS is touched.
 
-- [ ] **Step 1: Write the test, using the new scraper's target row shape**
+-x[ ] **Step 1: Write the test, using the new scraper's target row shape**
 
 Add to `Voyageur/tests/test_fs.py`:
 
@@ -95,17 +95,17 @@ def test_build_census_json_accepts_household_view_row_shape():
     assert "Relationship to Head" not in people[4]["columns"]
 ```
 
-- [ ] **Step 2: Run the test to verify it already passes against unmodified `FS.py`**
+-x[ ] **Step 2: Run the test to verify it already passes against unmodified `FS.py`**
 
 Run: `cd Voyageur && pytest tests/test_fs.py::test_build_census_json_accepts_household_view_row_shape -v`
 Expected: **PASS**, with zero changes to `FS.py` or `Archivist/Census.py`. This is not a red-green cycle — a failure here means the design's central compatibility claim is wrong and Task 2 onward should not proceed until that's resolved (re-open `docs/superpowers/specs/2026-08-07-familysearch-household-view-gather-design.md`'s Background section).
 
-- [ ] **Step 3: Run the full Voyageur test suite to confirm nothing else regressed**
+-x[ ] **Step 3: Run the full Voyageur test suite to confirm nothing else regressed**
 
 Run: `cd Voyageur && pytest tests/ -v`
 Expected: all PASS (same count as before this change, plus the one new test).
 
-- [ ] **Step 4: Commit**
+-x[ ] **Step 4: Commit**
 
 ```bash
 git add Voyageur/tests/test_fs.py
@@ -123,7 +123,7 @@ git commit -m "test: lock in build_census_json's tolerance of the household-view
 - Consumes: `findByExactText`, `clickTab`, `waitForCondition` (all existing, unchanged).
 - Produces: `async function parseHouseholdSections(): Promise<Array<{householdLabel: string, members: Array<{name: string, roleHint: string, viewButton: Element}>}>>` — consumed by Task 4's `scrapeNamesPanel()`. `viewButton` is the clickable element Task 3's `scrapePersonDetail()` clicks.
 
-- [ ] **Step 1: Add `parseHouseholdSections()`**
+-x[ ] **Step 1: Add `parseHouseholdSections()`**
 
 Insert immediately before `scrapeIndexRows()` in `Voyageur.js` (`scrapeIndexRows()` itself is deleted in Task 4, once nothing references it):
 
@@ -189,7 +189,7 @@ async function parseHouseholdSections() {
 }
 ```
 
-- [ ] **Step 2: Live-verify against the reference record**
+-x[ ] **Step 2: Live-verify against the reference record**
 
 Open `https://www.familysearch.org/ark:/61903/3:1:S3HY-67NL-ZP?view=index&personArk=%2Fark%3A%2F61903%2F1%3A1%3AMZ2Z-WM4&cc=1401638&lang=en` (the Rolette record used throughout this design's brainstorming) with the updated userscript active, open DevTools console, and run:
 
@@ -199,7 +199,7 @@ await parseHouseholdSections()
 
 Expected: an array whose first element has `householdLabel: "Joseph Rolette Household"` and 5 `members` (Joseph Rolette/Primary, Angelic Rolette/Primary | Spouse, Joseph Rolette/Primary | Child, Virginia Rolette/Primary | Child, George D Monison/Primary), plus further elements for the Cardinal/Matwein/Dejarlais/Lasert households also visible on that image. If the household/list grouping comes back empty or wrong, inspect the live DOM (right-click a household heading → Inspect) and adjust the heading/list selectors above before proceeding — this step is this task's actual test, there being no automated harness for DOM scraping in this file (see Global Constraints).
 
-- [ ] **Step 3: Commit**
+-x[ ] **Step 3: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js
@@ -217,7 +217,7 @@ git commit -m "feat(fs-gather): add parseHouseholdSections for the new Names pan
 - Consumes: `waitForCondition`, `debugLog` (existing).
 - Produces: `async function scrapePersonDetail(viewButton: Element, expectedName: string): Promise<{recordArk: string, personArk: string, given: string, surname: string, gender: string, age: string, relationship: string, extraFields: Record<string,string>}>` — consumed by Task 4.
 
-- [ ] **Step 1: Add `scrapePersonDetail()`**
+-x[ ] **Step 1: Add `scrapePersonDetail()`**
 
 ```javascript
 async function scrapePersonDetail(viewButton, expectedName) {
@@ -303,7 +303,7 @@ async function scrapePersonDetail(viewButton, expectedName) {
 
 **Note for the implementer:** the Household Details self-vs-head detection above (the `relPairs`/`selfLine` block) is this plan's best read of the panel's `innerText` shape from a live read during design brainstorming, not a character-verified regex — confirm it against the real panel's `innerText` (log it to the console: `panel.innerText`) during Task 5's live-verification pass and correct the regex if the actual line breaks differ.
 
-- [ ] **Step 2: Live-verify against the reference record**
+-x[ ] **Step 2: Live-verify against the reference record**
 
 In the same DevTools console (page still on the Rolette record, `Names` panel open):
 
@@ -315,7 +315,7 @@ await scrapePersonDetail(joseph.viewButton, joseph.name)
 
 Expected: `{recordArk: "MZ2Z-WM4", personArk: "9CJG-851", given: "Joseph", surname: "Rolette", gender: "M", age: "35", relationship: "Head", extraFields: {}}`. If `panel.innerText` doesn't match the assumed shape, log it directly and adjust the regexes in Step 1 before proceeding.
 
-- [ ] **Step 3: Commit**
+-x[ ] **Step 3: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js
@@ -333,11 +333,11 @@ git commit -m "feat(fs-gather): add scrapePersonDetail for the View Name panel"
 - Consumes: `parseHouseholdSections()`, `scrapePersonDetail()` (Tasks 2-3), `debugLog`.
 - Produces: `async function scrapeNamesPanel(): Promise<Array<{columns: Record<string,string>, person_ark: string, attached_fsftid: string}>>` — replaces `scrapeIndexRows()`'s return value at its one call site, `scrapeCurrentImage()` (`Voyageur.js:1417`).
 
-- [ ] **Step 1: Delete `scrapeIndexRows()`**
+-x[ ] **Step 1: Delete `scrapeIndexRows()`**
 
 Remove `Voyageur.js:1323-1411` (the full function, from `async function scrapeIndexRows() {` through its closing `}`) — now fully superseded by Tasks 2-3.
 
-- [ ] **Step 2: Add `scrapeNamesPanel()`** in its place
+-x[ ] **Step 2: Add `scrapeNamesPanel()`** in its place
 
 ```javascript
 async function scrapeNamesPanel() {
@@ -383,7 +383,7 @@ async function scrapeNamesPanel() {
 }
 ```
 
-- [ ] **Step 3: Repoint `scrapeCurrentImage()` to call the new scraper**
+-x[ ] **Step 3: Repoint `scrapeCurrentImage()` to call the new scraper**
 
 In `Voyageur.js:1413-1427`, change:
 
@@ -399,7 +399,7 @@ to:
 
 (No other change needed in `scrapeCurrentImage()` — `rows` is consumed downstream in the same shape as before.)
 
-- [ ] **Step 4: Live-verify the full per-image flow**
+-x[ ] **Step 4: Live-verify the full per-image flow**
 
 On the Rolette record page, with the batch UI's "Start Auto-Batch" NOT clicked (avoid a real multi-image batch run for this check), open DevTools console and run:
 
@@ -413,7 +413,7 @@ Expected: an array of row objects covering every household visible on the image 
 - The Cardinal household's rows have no `"Relationship to Head"` key at all (the bare-"Primary" case).
 - Only one "Josette Cardinal" row exists, not two.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js
@@ -428,13 +428,13 @@ git commit -m "feat(fs-gather): replace scrapeIndexRows with scrapeNamesPanel fo
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Run a real gather against the reference record**
+-x[ ] **Step 1: Run a real gather against the reference record**
 
 With `Voyageur/.env`'s `FS_URL` set to the Rolette record URL, run `Voyageur/FS.py` standalone (`cd Voyageur && python FS.py`) or via Scriptorium's own Voyageur tab, letting the batch UI's "Start Auto-Batch" run for at least the 2-3 images starting at image 39, then "Stop & Download JSON".
 
 Expected: a `FS - {collection}.json` file downloads with no console errors reported by the userscript's own toast notifications, and `item_id` `3:1:S3HY-67NL-ZP` (image 39) present with all households from Step 4 above.
 
-- [ ] **Step 2: Feed the captured raw JSON through `FS.py`'s conversion pipeline**
+-x[ ] **Step 2: Feed the captured raw JSON through `FS.py`'s conversion pipeline**
 
 ```bash
 cd Voyageur
@@ -455,12 +455,12 @@ print(json.dumps(normalized['sheets'][0]['records'][:2], indent=2))
 
 Expected: runs without exception, prints at least one household correctly grouped with a head, spouse, and children under one family, matching what `Archivist/Census.py`'s own household-parsing already does for Ancestry-sourced data — confirming Task 1's regression test reflects real gathered data, not just a hand-built fixture.
 
-- [ ] **Step 3: Run the full test suite one more time**
+-x[ ] **Step 3: Run the full test suite one more time**
 
 Run: `cd Voyageur && pytest tests/ -v` and `cd Archivist && pytest tests/ -v`
 Expected: all PASS.
 
-- [ ] **Step 4: Commit** (only if Steps 1-3 required any fixes to Tasks 1-4's code)
+-x[ ] **Step 4: Commit** (only if Steps 1-3 required any fixes to Tasks 1-4's code)
 
 ```bash
 git add Voyageur/Voyageur.js Voyageur/tests/test_fs.py

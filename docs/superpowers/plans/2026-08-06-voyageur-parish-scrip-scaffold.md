@@ -42,7 +42,7 @@
 - Produces: `build_empty_sheet(file_name: str, file_type: str, page_id: Optional[str] = None) -> dict` - a `Sheet`-shaped dict with real `document_metadata` and one placeholder `Record` (`participants: []`, every other field its model default).
 - Produces: `get_field_remap(document_type: str) -> Dict[str, str]` - a `.pmt` file's `field_remap` table (e.g. `{"CHURCH_MASTER_DB_NAME": "MASTER_DB_NAME", ...}`). Raises `UnknownDocumentTypeError` for an unrecognized `document_type`.
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Append to `Commissioner/tests/test_record_registry.py`:
 
@@ -102,12 +102,12 @@ def test_get_field_remap_unknown_document_type_raises():
         record_registry.get_field_remap("NotARecordType")
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -k "build_empty_sheet or get_field_remap" -v`
 Expected: FAIL with `AttributeError: module 'Commissioner.record_registry' has no attribute 'build_empty_sheet'` (and similarly for `get_field_remap`).
 
-- [ ] **Step 3: Implement `build_empty_sheet` and `get_field_remap`**
+-x[ ] **Step 3: Implement `build_empty_sheet` and `get_field_remap`**
 
 In `Commissioner/record_registry.py`, add after `parse_collection` (end of file):
 
@@ -160,12 +160,12 @@ def get_field_remap(document_type: str) -> Dict[str, str]:
     return front_matter.get("field_remap") or {}
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Commissioner/tests/test_record_registry.py -v`
 Expected: PASS (all tests, including the pre-existing ones).
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Commissioner/record_registry.py Commissioner/tests/test_record_registry.py
@@ -184,7 +184,7 @@ git commit -m "feat(commissioner): add build_empty_sheet and get_field_remap"
 - Consumes: nothing new from Task 1 (these are pure dict functions; the placeholder shape they must recognize is the same shape `build_empty_sheet` produces, but they don't import it).
 - Produces: `get_processed_files(master_data: Dict[str, Any]) -> set` - unchanged signature, now excludes all-placeholder sheets. `merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None` - unchanged signature, now replaces a same-`file_name` placeholder sheet in place instead of appending a duplicate.
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Create `Paleographer/tests/test_master_db_merge.py`:
 
@@ -307,7 +307,7 @@ def test_merge_sheets_appends_when_master_sheets_missing(minimal_paleographer_en
     assert master_data["sheets"] == [new_sheet]
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Paleographer/tests/test_master_db_merge.py -v`
 Expected: FAIL - `test_get_processed_files_excludes_placeholder_scaffold_sheet` and
@@ -315,7 +315,7 @@ Expected: FAIL - `test_get_processed_files_excludes_placeholder_scaffold_sheet` 
 treats any `file_name` as processed, and `merge_sheets` always appends). The other tests
 pass already against unfixed code - that's expected, they document unchanged behavior.
 
-- [ ] **Step 3: Implement the fixes**
+-x[ ] **Step 3: Implement the fixes**
 
 In `Paleographer/Paleographer.py`, replace lines 1428-1442:
 
@@ -379,12 +379,12 @@ def merge_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) 
         master_sheets.append(new_sheet)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Paleographer/tests/test_master_db_merge.py Paleographer/tests/test_settings_standalone.py -v`
 Expected: PASS (both files - confirms the fix doesn't disturb existing settings-resolution behavior).
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Paleographer/Paleographer.py Paleographer/tests/test_master_db_merge.py
@@ -407,7 +407,7 @@ git commit -m "fix(paleographer): treat all-empty-participants sheets as unproce
 - Produces: `validate_against_commissioner(final_data: dict, record_family: str, collection_title: str) -> None` - non-blocking; looks up `record_family` (`"church"`/`"scrip"`/other) against a `Parish`/`Scrip` Commissioner document type and skips silently for families with no Commissioner counterpart (e.g. `"wills"`, `"other"`).
 - Modifies: `build_universal_json`'s sheet dict now sets real `file_name`/`file_type` instead of `""`.
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Create `Voyageur/tests/test_fs.py`:
 
@@ -469,14 +469,14 @@ def test_validate_against_commissioner_warns_and_does_not_raise_on_bad_shape(cap
     assert "Bad Collection" in captured.out
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_fs.py -v`
 Expected: FAIL with `AttributeError: module 'FS' has no attribute 'sanitize_item_id_filename'`
 (and similarly for `validate_against_commissioner`); the `document_metadata` tests fail
 because `file_name`/`file_type` are still `""`.
 
-- [ ] **Step 3: Implement the fix**
+-x[ ] **Step 3: Implement the fix**
 
 In `Voyageur/FS.py`, add before `build_universal_json` (currently line 421):
 
@@ -552,13 +552,13 @@ with:
         validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_fs.py Voyageur/tests/test_census_schema.py -v`
 Expected: PASS (both files - confirms the Census path, which doesn't touch
 `build_universal_json`, is unaffected).
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/FS.py Voyageur/tests/test_fs.py
@@ -577,7 +577,7 @@ git commit -m "fix(fs): populate document_metadata from item_id, validate agains
 - Consumes: `Commissioner.record_registry.get_field_remap(document_type)` (Task 1), `Commissioner.record_registry.parse_collection(raw_json, document_type)` (pre-existing).
 - Produces: `resolve_generic_setting(document_type: str, generic_key: str, default: str = "") -> str`; `resolve_master_db_path(document_type: str, program_dir: str) -> str`; `load_master_db(master_db_path: str, collection_title: str, record_type_name: str) -> Dict[str, Any]`; `save_master_db(master_db_path: str, master_data: Dict[str, Any]) -> None`; `append_scaffold_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None`; `validate_master_db_against_commissioner(master_data: Dict[str, Any], document_type: str, collection_title: str) -> None`; `RECORD_TYPE_ARG_TO_DOCUMENT_TYPE: Dict[str, str]`; `_resolve_record_type(record_type_arg: str) -> str` (calls `sys.exit(1)` on an unrecognized/empty arg).
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Create `Voyageur/tests/test_lac.py`:
 
@@ -671,13 +671,13 @@ def test_resolve_record_type_exits_on_empty(capsys):
     assert "[ERROR]" in capsys.readouterr().out
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_lac.py -v`
 Expected: FAIL with `AttributeError: module 'LAC' has no attribute 'resolve_generic_setting'`
 (and similarly down the list, as each referenced name doesn't exist yet).
 
-- [ ] **Step 3: Implement the building blocks**
+-x[ ] **Step 3: Implement the building blocks**
 
 In `Voyageur/LAC.py`, add the repo-root `sys.path` insertion right after the existing
 `load_dotenv` calls (currently lines 17-18), before the `try: from . import lac_client`
@@ -824,12 +824,12 @@ with:
 `_resolve_record_type` rather than being rejected by argparse before `_run_volume`/`_run_reel`
 even runs.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_lac.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/LAC.py Voyageur/tests/test_lac.py
@@ -848,7 +848,7 @@ git commit -m "feat(lac): add MASTER_DB path resolution and scaffold-sheet build
 - Consumes: `load_master_db`, `save_master_db`, `append_scaffold_sheets`, `validate_master_db_against_commissioner`, `resolve_master_db_path`, `_resolve_record_type`, `RECORD_TYPE_ARG_TO_DOCUMENT_TYPE` (Task 4); `Commissioner.record_registry.build_empty_sheet` (Task 1).
 - Produces: `download_volume_assets(pids, media_dir, checkpoint_path, master_db_path, document_type, collection_title) -> Dict[str, Any]`; `download_volume_assets_multiworker(pids, media_dir, checkpoint_path, master_db_path, document_type, collection_title, max_workers=4, base_delay=0.3, timeout_seconds=45) -> Dict[str, Any]`; `retrieve_volume(vol, cookies, media_dir, checkpoint_path, master_db_path, document_type, collection_title, archival_number=DEFAULT_ARCHIVAL_NUMBER, max_workers=1) -> Dict[str, Any]` (signatures gain three new required params, inserted after `checkpoint_path`).
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Append to `Voyageur/tests/test_lac.py`:
 
@@ -936,14 +936,14 @@ def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch
     assert len(master_data["sheets"]) == 1
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_lac.py -v`
 Expected: FAIL with `TypeError: download_volume_assets() takes 3 positional arguments but 6
 were given` (and similarly for `download_volume_assets_multiworker`/`retrieve_volume`) - the
 new params don't exist on these functions yet.
 
-- [ ] **Step 3: Wire the scaffold writes**
+-x[ ] **Step 3: Wire the scaffold writes**
 
 In `Voyageur/LAC.py`, replace `download_volume_assets` (currently lines 281-301):
 
@@ -1173,12 +1173,12 @@ def _run_volume(args: argparse.Namespace) -> None:
           f"{len(result.get('failed_pids', {}))} failed.")
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_lac.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/LAC.py Voyageur/tests/test_lac.py
@@ -1199,7 +1199,7 @@ git commit -m "feat(lac): write Commissioner scaffold sheets during volume harve
   (Task 4); `Commissioner.record_registry.build_empty_sheet` (Task 1).
 - Produces: `download_images(manifest_data, out_dir, roll_num, master_db_path, document_type, collection_title) -> None` (signature gains three new required params, inserted after `roll_num`).
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Append to `Voyageur/tests/test_lac.py`:
 
@@ -1259,13 +1259,13 @@ def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch,
     assert len(master_data["sheets"]) == 1
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_lac.py -k download_images -v`
 Expected: FAIL with `TypeError: download_images() takes 3 positional arguments but 6 were
 given`.
 
-- [ ] **Step 3: Wire the scaffold write**
+-x[ ] **Step 3: Wire the scaffold write**
 
 In `Voyageur/LAC.py`, replace `download_images` (currently lines 105-165):
 
@@ -1443,12 +1443,12 @@ def _run_reel(args: argparse.Namespace) -> None:
     download_images(manifest_json, output_directory, roll, master_db_path, document_type, collection_title)
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Voyageur/tests/ Commissioner/tests/ Paleographer/tests/ -v`
 Expected: PASS (full suite across all three packages this plan touched).
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/LAC.py Voyageur/tests/test_lac.py

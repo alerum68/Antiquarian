@@ -185,6 +185,12 @@ def test_census_gedcom_output_has_no_illegal_name_under_sour_and_single_extensio
     monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
     monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
     monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    # GEDCOM_OUTPUT_NAME is read from the environment at Utils import time, and this
+    # dev machine's Archivist/.env sets it to an empty string - resolve_gedcom_output_path
+    # would then produce a filename with no base and no ".ged" extension (" - RM").
+    # Pin a real name here so the output is a findable *.ged file (in production
+    # Archivist.py fills an empty name from the input file's stem before this is called).
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
     monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
 
     arc.build_gedcom_from_census(df, "RM")

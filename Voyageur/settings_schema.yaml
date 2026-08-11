@@ -27,6 +27,18 @@ sections:
     LAC_ARCHIVAL_NUMBER:
       default: "RG15"
       tooltip: "Archival series prefix used when harvesting an LAC volume (default 'RG15')."
+    LAC_COOKIE_FILE:
+      default: "Working/LAC/lac_cookies.txt"
+      tooltip: "Path (relative to Program Dir) to the text file used to persist LAC search session cookies."
+    LAC_CHECKPOINT_DIR:
+      default: "Working/LAC"
+      tooltip: "Subfolder (relative to Program Dir) where LAC harvest checkpoints are saved."
+    LAC_CDP_PORT:
+      default: "9222"
+      tooltip: "Port used by the Chrome DevTools Protocol connection when driving the LAC harvest browser."
+    LAC_MAX_WORKERS:
+      default: "1"
+      tooltip: "Number of parallel workers used when harvesting an LAC volume."
     LAC_RECORD_TYPE:
       default: ""
       tooltip: "Record type identifier for LAC volume harvesting (e.g. 'Scrip')."
@@ -49,15 +61,21 @@ sections:
     HBCA_MASTER_DB_NAME:
       default: "MasterDB_HBCA.json"
       tooltip: "Name of the Master DB JSON file where extracted HBCA records are stored."
+    HBCA_CHECKPOINT_DIR:
+      default: "Working/HBCA"
+      tooltip: "Subfolder (relative to Program Dir) where HBCA download checkpoints are saved."
     HBCA_LETTER_FILTER:
       default: ""
       tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."
+    HBCA_MAX_WORKERS:
+      default: "10"
+      tooltip: "Number of parallel workers used when gathering HBCA biographical sheets."
     HBCA_RESOLVE_KEYSTONE:
-      default: "False"
+      default: "false"
       tooltip: "Query Archives of Manitoba Keystone database to resolve microfilm/finding aid links for cited location codes."
       widget: toggle
     HBCA_DOWNLOAD_KEYSTONE_MEDIA:
-      default: "True"
+      default: "true"
       tooltip: "When Keystone resolving is enabled, download any digitized microfilm copy media files found."
       widget: toggle
     KEYSTONE_BASE_URL:

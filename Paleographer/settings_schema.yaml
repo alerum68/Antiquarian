@@ -1,4 +1,8 @@
 sections:
+  Antigravity CLI:
+    AGY_CLI_BIN:
+      default: "agy"
+      tooltip: "The Antigravity CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
   Data & Directories:
     PALEOGRAPHER_RECORD_TYPE:
       default: ""
@@ -10,6 +14,12 @@ sections:
       tooltip: "How aggressively PDFix's lossless structural optimization (garbage collection + stream deflate) runs on a scanned PDF before it's uploaded to the AI: 0=low, 1=medium, 2=high (recommended). This never touches embedded image resolution/DPI, so transcription quality is unaffected at any level."
       widget: segmented
       options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
+    MASTER_DB:
+      default: ""
+      tooltip: "Path to the JSON master database used by the Scrip enrichment/partitioning tools. Leave blank to use the active record type's own MASTER_DB_NAME setting."
+    OUTPUT_DIR:
+      default: ""
+      tooltip: "Directory where partitioned/enriched output files are written. Leave blank to use the default output folder."
   Parish Information:
     CHURCH_GEDCOM_NAME:
       default: "Parish.ged"

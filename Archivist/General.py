@@ -37,7 +37,7 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
 IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("IMAGE_DIR", "")
-                            or os.getenv("CENSUS_IMAGE_DIR", "") or "Census")
+                            or "Census")
 
 
 class Profile(Protocol):
@@ -108,7 +108,7 @@ class GeneralProfile:
     def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
         if GENERAL_CONFIG.get("platform_source_id"):
             return f"@S{GENERAL_CONFIG['platform_source_id']}@"
-            
+
         base_id = re.sub(r'\D', '', f"{GENERAL_CONFIG.get('register_source_id', '1')}")
         if base_id.endswith('001') and len(base_id) > 1:
             base_id = base_id[:-3]
@@ -1209,20 +1209,20 @@ def apply_resolved_source_id(data: dict) -> None:
     explicit = os.getenv("REGISTER_SOURCE_ID", "").strip()
     if explicit and explicit != "1":
         return
-        
+
     citation = data.get("citation") or {}
     cc = citation.get("collection_id")
     if cc:
         GENERAL_CONFIG["register_source_id"] = str(cc)
         GENERAL_CONFIG["platform_source_id"] = str(cc)
         return
-        
+
     apid = Utils.APID_DB or citation.get("apid_db")
     if apid:
         GENERAL_CONFIG["register_source_id"] = str(apid)
         GENERAL_CONFIG["platform_source_id"] = str(apid)
         return
-        
+
     record_type_name = data.get("record_type_name") or "Church"
     collection_name = GENERAL_CONFIG.get("parish_name", "")
     GENERAL_CONFIG["register_source_id"] = str(Utils.resolve_source_id(record_type_name, collection_name))

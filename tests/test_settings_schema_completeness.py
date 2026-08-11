@@ -8,6 +8,11 @@ import Scriptorium
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_VAR_PATTERN = re.compile(r"os\.(?:getenv|environ\.get)\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']")
 
+# PROGRAM_DIR is set by the Scriptorium launcher, never user-configured: the codebase
+# resolves its own install location via the __PROGRAM_DIR__ sentinel (see Scriptorium.py)
+# rather than a settings key, so it is excluded from schema completeness checks.
+INTERNAL_KEYS = {"PROGRAM_DIR"}
+
 TOOL_DIRS = {
     "Archivist": BASE_DIR / "Archivist",
     "Voyageur": BASE_DIR / "Voyageur",
@@ -44,7 +49,7 @@ def _schema_keys(tool_dir: Path) -> set:
 @pytest.mark.parametrize("tool_name", sorted(TOOL_DIRS))
 def test_tool_schema_covers_every_env_var_the_tool_reads(tool_name):
     tool_dir = TOOL_DIRS[tool_name]
-    read_keys = _env_keys_read_by(tool_dir) - _global_keys()
+    read_keys = _env_keys_read_by(tool_dir) - _global_keys() - INTERNAL_KEYS
     schema_keys = _schema_keys(tool_dir)
 
     missing = read_keys - schema_keys

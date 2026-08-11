@@ -81,23 +81,39 @@ _PREFIXED_KEYS_TO_CLEAR = (
 )
 
 
+def _media_type_name(env_overrides):
+    """TYPE_CFG.name equals the active .pmt file's stem (engine.parse_type_config sets
+    name=pmt_path.stem), and Extract.py scans <GENEALOGY_DIR>/Media/<TYPE_CFG.name> for new
+    images (SOURCE_DIR). Parish.pmt -> "Parish", Scrip.pmt -> "Scrip" - the fixtures must
+    stage their images under the same subfolder the active record type resolves to."""
+    record_type = env_overrides.get("PALEOGRAPHER_RECORD_TYPE") or "Parish.pmt"
+    return Path(record_type).stem
+
+
 def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_data, argv=None,
                                image_filenames=("TestFile_00001.jpg",)):
     program_dir = tmp_path / "program"
-    image_dir_name = "Images"
     json_dir_name = "JSON"
-    (program_dir / image_dir_name).mkdir(parents=True)
+    media_dir = program_dir / "Media" / _media_type_name(env_overrides)
     (program_dir / json_dir_name).mkdir(parents=True)
+    media_dir.mkdir(parents=True)
 
     for name in image_filenames:
-        Image.new("RGB", (10, 10), color="white").save(program_dir / image_dir_name / name)
+        Image.new("RGB", (10, 10), color="white").save(media_dir / name)
 
     for key in _PREFIXED_KEYS_TO_CLEAR:
         monkeypatch.delenv(key, raising=False)
 
     env = {
         "PROGRAM_DIR": str(program_dir),
-        "IMAGE_DIR": image_dir_name,
+        "GENEALOGY_DIR": str(program_dir),
+        # Importing engine.py at module top pulls in PDFix/PDFix.py, whose real
+        # load_dotenv(override=True) call loads the root .env into the process env -
+        # including an absolute MEDIA_DIR ('//ALIENWARE/...'). Extract.py reads
+        # MEDIA_DIR verbatim (GENEALOGY_DIR / MEDIA_DIR / TYPE_CFG.name), so pin it to
+        # the relative "Media" the fixture stages images under, or SOURCE_DIR would
+        # point at the real (empty-for-tests) network media folder instead.
+        "MEDIA_DIR": "Media",
         "JSON_DIR": json_dir_name,
         "MASTER_DB_NAME": "master.json",
         "MODEL_NAME": "gemini-test-model",
@@ -535,25 +551,27 @@ def test_page_continuation_saves_leftover_when_nothing_continues_it(tmp_path, mo
 def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_structured_output,
                                    image_filenames=("TestFile_00001.jpg",), pdf_filenames=()):
     program_dir = tmp_path / "program"
-    image_dir_name = "Images"
     json_dir_name = "JSON"
-    (program_dir / image_dir_name).mkdir(parents=True)
+    media_dir = program_dir / "Media" / _media_type_name(env_overrides)
     (program_dir / json_dir_name).mkdir(parents=True)
+    media_dir.mkdir(parents=True)
 
     for name in image_filenames:
-        Image.new("RGB", (10, 10), color="white").save(program_dir / image_dir_name / name)
+        Image.new("RGB", (10, 10), color="white").save(media_dir / name)
     for name in pdf_filenames:
         # Content is irrelevant - rasterize_pdf_to_images is monkeypatched below, so
         # this is never actually opened/parsed; only its existence/extension matters
         # for list_source_files() to pick it up.
-        (program_dir / image_dir_name / name).write_bytes(b"%PDF-1.4 fake")
+        (media_dir / name).write_bytes(b"%PDF-1.4 fake")
 
     for key in _PREFIXED_KEYS_TO_CLEAR:
         monkeypatch.delenv(key, raising=False)
 
     env = {
         "PROGRAM_DIR": str(program_dir),
-        "IMAGE_DIR": image_dir_name,
+        "GENEALOGY_DIR": str(program_dir),
+        # Same MEDIA_DIR pinning as the api fixture - see _import_paleographer_fresh.
+        "MEDIA_DIR": "Media",
         "JSON_DIR": json_dir_name,
         "MASTER_DB_NAME": "master.json",
         "MODEL_NAME": "gemini-test-model",

@@ -59,6 +59,25 @@ sections:
     PARISH_FILE_NAME:
       default: "Parish_Export"
       tooltip: "Parish base export filename."
+  Family Inference Tuning:
+    MIN_MARRIAGE_AGE:
+      default: "12"
+      tooltip: "Minimum age at which a participant is treated as married for family inference; younger couples are flagged for review."
+    MAX_SPOUSE_AGE_GAP:
+      default: "25"
+      tooltip: "Maximum acceptable age gap between spouses for family inference; larger gaps are flagged for review."
+    HUSBAND_CHILD_AGE_GAP_MIN:
+      default: "14"
+      tooltip: "Minimum plausible age gap between a husband and his inferred children."
+    HUSBAND_CHILD_AGE_GAP_MAX:
+      default: "60"
+      tooltip: "Maximum plausible age gap between a husband and his inferred children."
+    WIFE_CHILD_AGE_GAP_MIN:
+      default: "12"
+      tooltip: "Minimum plausible age gap between a wife and her inferred children."
+    WIFE_CHILD_AGE_GAP_MAX:
+      default: "50"
+      tooltip: "Maximum plausible age gap between a wife and her inferred children."
   Citation & Role Vocabulary:
     CITATION_TEXT:
       default: ""

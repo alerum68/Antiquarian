@@ -43,7 +43,7 @@
 - Consumes: `engine.py` and `agy_engine.py` as real sibling modules (both already exist, untouched).
 - Produces: `Extract.main()` — no arguments, reads `sys.argv[1]` itself for the optional `DEBUG_FILE` positional. Consumed by Task 3's dispatcher and by the four test files repointed in Task 4.
 
-- [ ] **Step 1: Create `Paleographer/Extract.py` with header, imports, and the POSTPROCESS-Extract functions**
+-x[ ] **Step 1: Create `Paleographer/Extract.py` with header, imports, and the POSTPROCESS-Extract functions**
 
 Use the Write tool. Start the file with:
 
@@ -106,7 +106,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 Then append the body of the `POSTPROCESS`-to-`Extract.py` functions, copied **verbatim** (unchanged) from the current `Paleographer/Paleographer.py` lines 80–245: `strip_diacritics`, `derive_role_numbers`, `derive_role_semantics`, `_find_role_number`, `derive_suffixes`, `_participant_key`, `_label_for`, `_source_document_entry`, `_merge_record_into`, `merge_same_claim_records`, `apply_defaults` — in that order, exactly as they appear today. Copy the text directly; do not retype it by hand.
 
-- [ ] **Step 2: Append the `PALEOGRAPHER CONFIGURATION` section**
+-x[ ] **Step 2: Append the `PALEOGRAPHER CONFIGURATION` section**
 
 Copy `Paleographer.py` lines 1291–1365 verbatim (everything from the `EXTRACTION_ENGINE` comment through the `SCHEMA` assignment, including the `CONFIGURATION` sub-banner and `resolve_setting`), under a new banner:
 
@@ -126,7 +126,7 @@ Then apply these exact substitutions to the copied text (every other line is unc
 | `SOURCE_SUFFIXES = IMAGE_SUFFIXES + (".pdf",)` | `SOURCE_SUFFIXES = engine.IMAGE_SUFFIXES + (".pdf",)` |
 | `SCHEMA: Dict[str, Any] = build_merged_schema(CORE_SCHEMA, TYPE_CFG.extra_fields)` | `SCHEMA: Dict[str, Any] = engine.build_merged_schema(CORE_SCHEMA, TYPE_CFG.extra_fields)` |
 
-- [ ] **Step 3: Append `RECORD POST-PROCESSING`, `MASTER DB HELPERS`, `FILE CLASSIFICATION`, `SYNCHRONOUS PROCESSING`, `BATCH PROCESSING`**
+-x[ ] **Step 3: Append `RECORD POST-PROCESSING`, `MASTER DB HELPERS`, `FILE CLASSIFICATION`, `SYNCHRONOUS PROCESSING`, `BATCH PROCESSING`**
 
 Copy `Paleographer.py` lines 1369–1747 verbatim, in order, keeping their existing banner comments (`RECORD POST-PROCESSING`, `MASTER DB HELPERS`, `FILE CLASSIFICATION`, `SYNCHRONOUS PROCESSING`, `BATCH PROCESSING`). Then apply these exact substitutions:
 
@@ -162,7 +162,7 @@ Copy `Paleographer.py` lines 1369–1747 verbatim, in order, keeping their exist
 | `        requests.append(build_batch_request(MODEL_ID, [prompt, content_part], filename,` | `        requests.append(engine.build_batch_request(MODEL_ID, [prompt, content_part], filename,` |
 | `    job_name = submit_batch_job(client, MODEL_ID, requests)` | `    job_name = engine.submit_batch_job(client, MODEL_ID, requests)` |
 
-- [ ] **Step 4: Append `Extract.py`'s own `main()`**
+-x[ ] **Step 4: Append `Extract.py`'s own `main()`**
 
 ```python
 # ==============================================================================
@@ -223,7 +223,7 @@ if __name__ == "__main__":
 
 This is a verbatim copy of current `Paleographer.py` lines 2098–2145, wrapped as a standalone function (no substitutions needed — none of the names it calls are `engine`/`agy_engine` names).
 
-- [ ] **Step 5: Fix any missed import or unused import**
+-x[ ] **Step 5: Fix any missed import or unused import**
 
 Run: `python -c "import ast; ast.parse(open('Paleographer/Extract.py', encoding='utf-8').read())"`
 Expected: no output (valid syntax).
@@ -231,7 +231,7 @@ Expected: no output (valid syntax).
 Run: `cd Paleographer && python -c "import Extract"`
 Expected: no `ImportError`/`NameError`. If one occurs naming a stdlib/typing symbol, add it to the Step 1 import block (the Step 1 list is a best-effort starting set, not guaranteed complete for every corner of the copied code). If it names an `engine.py`/`agy_engine.py` symbol, that call site was missed in Step 2/3's substitution table — find it and prefix it.
 
-- [ ] **Step 6: Write a minimal dispatch-import smoke test**
+-x[ ] **Step 6: Write a minimal dispatch-import smoke test**
 
 Create `Paleographer/tests/test_extract_dispatch.py`:
 
@@ -243,12 +243,12 @@ def test_extract_module_has_main():
     assert callable(Extract.main)
 ```
 
-- [ ] **Step 7: Run the new test**
+-x[ ] **Step 7: Run the new test**
 
 Run: `pytest Paleographer/tests/test_extract_dispatch.py -v`
 Expected: PASS.
 
-- [ ] **Step 8: Commit**
+-x[ ] **Step 8: Commit**
 
 ```bash
 git add Paleographer/Extract.py Paleographer/tests/test_extract_dispatch.py
@@ -267,7 +267,7 @@ git commit -m "Create Extract.py: record-type-generic extraction split out of Pa
 - Consumes: `Voyageur.lac_client`/`Voyageur.LAC` (triple-fallback import, same pattern as today).
 - Produces: `ScripTools.main()` — no arguments, parses `sys.argv` itself via `argparse` (the `mode` positional is still present in `sys.argv` when this is called — the dispatcher in Task 3 does not strip it). Consumed by Task 3's dispatcher and by `test_crosscheck.py` in Task 4.
 
-- [ ] **Step 1: Create `Paleographer/ScripTools.py` with header, imports, and the POSTPROCESS-ScripTools functions**
+-x[ ] **Step 1: Create `Paleographer/ScripTools.py` with header, imports, and the POSTPROCESS-ScripTools functions**
 
 ```python
 """
@@ -321,7 +321,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
 Then append the body of `fix_mojibake`, `clean_dit_name`, `parse_single_name`, `fix_participant_name`, `fix_all_participant_names_in_record`, `build_composite_record_number`, `resolve_maiden_name_for_record`, `resolve_dataset_maiden_names`, `extract_citation_fields`, copied **verbatim** from current `Paleographer.py` lines 246–530, in that order. Copy the text directly; do not retype it by hand.
 
-- [ ] **Step 2: Append `SCRIP ENRICHMENT & PARTITIONING`, with the `type_specific_fields` bug fixed**
+-x[ ] **Step 2: Append `SCRIP ENRICHMENT & PARTITIONING`, with the `type_specific_fields` bug fixed**
 
 Copy `Paleographer.py` lines 1751–2018 verbatim (everything under the `SCRIP ENRICHMENT & PARTITIONING` banner), keeping the banner comment, **except** for `build_claim_search_queries`/`build_claim_search_query` (current lines 1843–1867): every other reader of Scrip's type-specific fields goes through `record["type_specific_fields"]` (per `build_merged_schema` — `.pmt`-declared `extra_fields` nest there), but these two functions currently read `claim_number`/`scrip_number`/`affidavit_number` off the top level of `record`, so they silently return no query for any real extracted record. Write these two functions as:
 
@@ -359,7 +359,7 @@ def build_claim_search_query(record: Dict[str, Any]) -> Optional[str]:
 
 Read the actual current bodies of `expand_scrip_number_range` (line 1830), `build_claim_search_queries` (1843), and `build_claim_search_query` (1865) in `Paleographer/Paleographer.py` before writing this — the block above is the corrected shape (top-level reads replaced with `record.get("type_specific_fields", {})` reads), but copy `expand_scrip_number_range`'s body and `_SCRIP_RANGE_RE`'s definition (line 1827) verbatim from the source; only `build_claim_search_queries`/`build_claim_search_query` change behavior.
 
-- [ ] **Step 3: Append `ScripTools.py`'s own `main()`**
+-x[ ] **Step 3: Append `ScripTools.py`'s own `main()`**
 
 ```python
 # ==============================================================================
@@ -441,7 +441,7 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Fix any missed import**
+-x[ ] **Step 4: Fix any missed import**
 
 Run: `python -c "import ast; ast.parse(open('Paleographer/ScripTools.py', encoding='utf-8').read())"`
 Expected: no output.
@@ -449,7 +449,7 @@ Expected: no output.
 Run: `cd Paleographer && python -c "import ScripTools"`
 Expected: no error. Add any missing import the same way as Task 1 Step 5.
 
-- [ ] **Step 5: Write the `type_specific_fields` regression test and a dispatch smoke test**
+-x[ ] **Step 5: Write the `type_specific_fields` regression test and a dispatch smoke test**
 
 Create `Paleographer/tests/test_scriptools_dispatch.py`:
 
@@ -471,12 +471,12 @@ def test_build_claim_search_query_top_level_fields_are_ignored():
     assert ScripTools.build_claim_search_query(record) is None
 ```
 
-- [ ] **Step 6: Run the new tests**
+-x[ ] **Step 6: Run the new tests**
 
 Run: `pytest Paleographer/tests/test_scriptools_dispatch.py -v`
 Expected: PASS (3 tests). The second test documents the fix — before this task, `build_claim_search_query` read the top level and this same input would have returned a truthy value instead of `None`.
 
-- [ ] **Step 7: Commit**
+-x[ ] **Step 7: Commit**
 
 ```bash
 git add Paleographer/ScripTools.py Paleographer/tests/test_scriptools_dispatch.py
@@ -495,7 +495,7 @@ git commit -m "Create ScripTools.py: Scrip-only enrichment split out of Paleogra
 - Consumes: `Extract.main()`, `ScripTools.main()` (Tasks 1–2) — both take no arguments and read `sys.argv` themselves.
 - Produces: nothing consumed by later tasks. `Scriptorium.py` already launches `Paleographer/Paleographer.py` as a subprocess with cwd set to its own directory (`Scriptorium.py:1869`) — that contract is unchanged.
 
-- [ ] **Step 1: Write the failing dispatcher tests**
+-x[ ] **Step 1: Write the failing dispatcher tests**
 
 Create `Paleographer/tests/test_paleographer_dispatcher.py`:
 
@@ -545,12 +545,12 @@ def test_main_dispatches_debug_filename_to_extract(monkeypatch):
     assert calls == [["Paleographer.py", "some_file.pdf"]]
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+-x[ ] **Step 2: Run the new tests to verify they fail**
 
 Run: `pytest Paleographer/tests/test_paleographer_dispatcher.py -v`
 Expected: FAIL — the current `Paleographer.py` is still the 2,148-line monolith; `Paleographer.main()` does not dispatch to sibling modules at all.
 
-- [ ] **Step 3: Overwrite `Paleographer.py` entirely**
+-x[ ] **Step 3: Overwrite `Paleographer.py` entirely**
 
 This is a full-file replacement (use the Write tool, not a targeted edit). Replace the entire contents of `Paleographer/Paleographer.py` with:
 
@@ -583,17 +583,17 @@ if __name__ == "__main__":
     main()
 ```
 
-- [ ] **Step 4: Run the new tests to verify they pass**
+-x[ ] **Step 4: Run the new tests to verify they pass**
 
 Run: `pytest Paleographer/tests/test_paleographer_dispatcher.py -v`
 Expected: PASS (6 tests).
 
-- [ ] **Step 5: Run the full Paleographer test suite**
+-x[ ] **Step 5: Run the full Paleographer test suite**
 
 Run: `pytest Paleographer/tests/ -v`
 Expected: `test_engine.py`, `test_agy_engine.py`, `test_schema.py` still PASS unchanged. `test_master_db_merge.py`, `test_paleographer_pipeline.py`, `test_crosscheck.py`, `test_settings_standalone.py` will FAIL at collection (they still do `importlib.import_module("Paleographer")` and call functions no longer defined there) — this is expected here; Task 4 fixes them. Confirm the failures are exactly these four files and are import/attribute errors, not something new.
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Paleographer/Paleographer.py Paleographer/tests/test_paleographer_dispatcher.py
@@ -621,7 +621,7 @@ This task has no new tests of its own — it repoints existing tests to the modu
 - `test_crosscheck.py` (line 45) exercises `cross_check_claim_record` and LAC cookie handling — all `ScripTools.py`.
 - `test_paleographer_pipeline.py` (two import sites, lines 127 and 574) calls `module.main()`, `module.EXTRACTION_ENGINE`, `module.client` (all `Extract.py`), **and** `module.build_merged_schema`, `module.parse_type_config`, `module.resolve_prompt_path`, `module.build_vocabulary_summary` (lines 350, 370, 373, 393, 396 — these are `engine.py` functions, no longer defined on `Extract` as bare names since `Extract.py` calls them as `engine.build_merged_schema` etc.).
 
-- [ ] **Step 1: Repoint `test_master_db_merge.py`**
+-x[ ] **Step 1: Repoint `test_master_db_merge.py`**
 
 ```python
 old_string: return importlib.import_module("Paleographer")
@@ -631,7 +631,7 @@ old_string: return importlib.import_module("Paleographer")
 new_string: return importlib.import_module("Extract")
 ```
 
-- [ ] **Step 2: Repoint `test_settings_standalone.py`**
+-x[ ] **Step 2: Repoint `test_settings_standalone.py`**
 
 ```python
 old_string: return importlib.import_module("Paleographer")
@@ -641,7 +641,7 @@ old_string: return importlib.import_module("Paleographer")
 new_string: return importlib.import_module("Extract")
 ```
 
-- [ ] **Step 3: Repoint `test_crosscheck.py`**
+-x[ ] **Step 3: Repoint `test_crosscheck.py`**
 
 ```python
 old_string: return importlib.import_module("Paleographer")
@@ -651,7 +651,7 @@ old_string: return importlib.import_module("Paleographer")
 new_string: return importlib.import_module("ScripTools")
 ```
 
-- [ ] **Step 4: Repoint `test_paleographer_pipeline.py`**
+-x[ ] **Step 4: Repoint `test_paleographer_pipeline.py`**
 
 Read the file first to confirm the exact surrounding context at each site (two `importlib.import_module("Paleographer")` calls and the five `module.<engine-function>` call sites), then:
 
@@ -661,12 +661,12 @@ Read the file first to confirm the exact surrounding context at each site (two `
 - Replace both `module.parse_type_config(module.resolve_prompt_path(` with `engine.parse_type_config(engine.resolve_prompt_path(` (lines ~370, ~393).
 - Replace both `module.build_vocabulary_summary(` with `engine.build_vocabulary_summary(` (lines ~373, ~396).
 
-- [ ] **Step 5: Run the full Paleographer test suite**
+-x[ ] **Step 5: Run the full Paleographer test suite**
 
 Run: `pytest Paleographer/tests/ -v`
 Expected: all tests PASS, including the four repointed files.
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Paleographer/tests/test_master_db_merge.py Paleographer/tests/test_settings_standalone.py Paleographer/tests/test_crosscheck.py Paleographer/tests/test_paleographer_pipeline.py
@@ -688,7 +688,7 @@ git commit -m "Repoint Paleographer test suite from the monolith to Extract.py/S
 
 A Parish or Census user can click "Enrich Metadata" today and get a silent no-op — `classify_sheet_collection` falls to `UNKNOWN_COLLECTION_LABEL` for any sheet without Scrip-shaped fields. Disable (not hide, to keep layout stable) the Enrich Metadata / Partition Collections / Resolve Names / Crosscheck-adjacent buttons unless the selected Record Type is `Scrip`.
 
-- [ ] **Step 1: Store button references and gate them in `_on_record_type_change`**
+-x[ ] **Step 1: Store button references and gate them in `_on_record_type_change`**
 
 ```python
 old_string:
@@ -719,7 +719,7 @@ new_string:
         self.paleographer_resolve_names_btn.pack(side="left", padx=5)
 ```
 
-- [ ] **Step 2: Gate the buttons inside `_on_record_type_change`**
+-x[ ] **Step 2: Gate the buttons inside `_on_record_type_change`**
 
 ```python
 old_string:
@@ -753,11 +753,11 @@ new_string:
         if hasattr(self, "paleographer_form_container"):
 ```
 
-- [ ] **Step 3: Determine the record-type values `_list_record_types()` actually produces**
+-x[ ] **Step 3: Determine the record-type values `_list_record_types()` actually produces**
 
 Read `Scriptorium.py`'s `_list_record_types` method (referenced at line 1548) to confirm it returns `.pmt` file stems (e.g. `"Scrip"`, `"Parish"`, `"Census"`) and not full filenames like `"Scrip.pmt"` — the gating check in Step 2 compares `record_type == "Scrip"`. If `_list_record_types()` returns filenames with the `.pmt` suffix instead, change the comparison to `record_type == "Scrip.pmt"` and note this in the commit message.
 
-- [ ] **Step 4: Write the gating test**
+-x[ ] **Step 4: Write the gating test**
 
 Create `tests/test_scriptorium_paleographer_gating.py` (adjust the import path in the first line if `Scriptorium.py`'s test suite imports it differently elsewhere — check an existing Scriptorium test file for the established import pattern first):
 
@@ -793,12 +793,12 @@ def test_non_scrip_record_type_disables_enrichment_buttons(app):
 
 If `ScriptoriumApp()` cannot be constructed headlessly in this environment (CustomTkinter needs a display), report `DONE_WITH_CONCERNS` rather than forcing it — note in the report which import/construction failed, keep Steps 1-3's gating code as-is (it is correct regardless), and skip Steps 4-5 for an automated test; manual verification substitutes (toggle Record Type in the running GUI, confirm the three buttons enable/disable).
 
-- [ ] **Step 5: Run the test**
+-x[ ] **Step 5: Run the test**
 
 Run: `pytest tests/test_scriptorium_paleographer_gating.py -v` (or skip per the fallback above)
 Expected: PASS (2 tests).
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Scriptorium.py tests/test_scriptorium_paleographer_gating.py
@@ -818,15 +818,15 @@ git commit -m "Gate Enrich/Partition/Resolve-Names buttons to Scrip record type"
 
 This verifies the "consume the Sub-project 3 scaffold as pure analysis" half of the original Sub-project 6 scope. Investigation during brainstorming found the mechanism already implemented by Sub-projects 3/4 — this task is verification, adding coverage only if a real gap exists.
 
-- [ ] **Step 1: Read the current test coverage**
+-x[ ] **Step 1: Read the current test coverage**
 
 Read `Paleographer/tests/test_master_db_merge.py` in full (it is short — under 180 lines per the grep in Task 4). Check whether an existing test already covers this exact scenario: a `master_data` dict seeded with a `build_empty_sheet`-shaped placeholder sheet for a given `file_name` (i.e. a sheet whose `records` are absent/empty and that `Extract._sheet_is_placeholder` would return `True` for), then `merge_sheets` called with a real (non-placeholder) sheet for that same `file_name`, asserting the placeholder is replaced in place (one sheet in the result, not two).
 
-- [ ] **Step 2: If covered, stop here**
+-x[ ] **Step 2: If covered, stop here**
 
 If an existing test (e.g. one of the ones referencing `other_sheet`/`new_sheet` around lines 93-115 per Task 4's grep) already exercises exactly that placeholder-replacement path, no new test is needed. Report which test covers it and move to Step 5 (commit is a no-op in this case — skip it).
 
-- [ ] **Step 3: If not covered, add the test**
+-x[ ] **Step 3: If not covered, add the test**
 
 Read `Commissioner/record_registry.py`'s `build_empty_sheet()` (referenced at `Commissioner/record_registry.py:178-211`) first to construct a realistic placeholder shape. Add to `Paleographer/tests/test_master_db_merge.py`:
 
@@ -854,12 +854,12 @@ def test_merge_sheets_replaces_placeholder_scaffold_in_place(build_master_data):
 
 Adapt this to whatever fixture/helper pattern (`build_master_data` or equivalent) the existing tests in this file already use — read the file's existing fixtures first rather than inventing a new one; use `module.merge_sheets` (the file's existing alias for the `Extract` import from Task 4) consistently with the rest of the file.
 
-- [ ] **Step 4: Run the test**
+-x[ ] **Step 4: Run the test**
 
 Run: `pytest Paleographer/tests/test_master_db_merge.py -v`
 Expected: PASS.
 
-- [ ] **Step 5: Commit (only if Step 3 added a test)**
+-x[ ] **Step 5: Commit (only if Step 3 added a test)**
 
 ```bash
 git add Paleographer/tests/test_master_db_merge.py
@@ -880,7 +880,7 @@ git commit -m "Add scaffold-placeholder round-trip regression test for merge_she
 - Consumes: nothing new.
 - Produces: nothing consumed by later tasks. Purely mechanical rename — matches the `FS_URL`/`LAC_URL` convention the other two Voyageur sources already follow.
 
-- [ ] **Step 1: Rename in `Voyageur/A.py`**
+-x[ ] **Step 1: Rename in `Voyageur/A.py`**
 
 ```python
 old_string:
@@ -892,7 +892,7 @@ new_string:
     url = os.getenv("A_URL", "").strip()
 ```
 
-- [ ] **Step 2: Rename in `Scriptorium.py`**
+-x[ ] **Step 2: Rename in `Scriptorium.py`**
 
 ```python
 old_string:
@@ -924,24 +924,24 @@ new_string:
     "A_URL": "Ancestry Census URL",
 ```
 
-- [ ] **Step 3: Rename the env var key in `Voyageur/.env`**
+-x[ ] **Step 3: Rename the env var key in `Voyageur/.env`**
 
 Change line 4 from `CENSUS_URL='https://www.ancestry.com/imageviewer/collections/7667/images/4211353_00001?queryId=527a29b7-f294-4e6a-814a-76b2b4e11e0b&usePUB=true&_phsrc=uYF181&_phstart=successSource&usePUBJs=true&pId=17613762'` to `A_URL='https://www.ancestry.com/imageviewer/collections/7667/images/4211353_00001?queryId=527a29b7-f294-4e6a-814a-76b2b4e11e0b&usePUB=true&_phsrc=uYF181&_phstart=successSource&usePUBJs=true&pId=17613762'` — only the key name changes, the URL value is untouched. `.env` files are typically gitignored; confirm with `git check-ignore Voyageur/.env` before attempting to `git add` it in Step 6 — if ignored, this edit still matters locally but is not part of the commit.
 
-- [ ] **Step 4: Rename the env var key in `Archivist/.env`**
+-x[ ] **Step 4: Rename the env var key in `Archivist/.env`**
 
 Change line 1 from `CENSUS_URL='https://www.ancestry.com/imageviewer/collections/2442/images/M-T0627-03009-00399?usePUB=true&_phsrc=MpD112&pId=105307051'` to `A_URL='https://www.ancestry.com/imageviewer/collections/2442/images/M-T0627-03009-00399?usePUB=true&_phsrc=MpD112&pId=105307051'` — same rule, key only.
 
-- [ ] **Step 5: Search for any remaining `CENSUS_URL` references and update tests**
+-x[ ] **Step 5: Search for any remaining `CENSUS_URL` references and update tests**
 
 Run: `grep -rn "CENSUS_URL" --include=*.py .` (or the project's Grep tool equivalent) and fix any remaining source-code or test reference this plan's Step 1-2 greps didn't already cover (the design doc's own text mentioning `CENSUS_URL` historically, in `docs/superpowers/specs/`, is documentation of past work and does not need updating).
 
-- [ ] **Step 6: Run the full test suite**
+-x[ ] **Step 6: Run the full test suite**
 
 Run: `pytest -v` (project-wide)
 Expected: all tests PASS.
 
-- [ ] **Step 7: Commit**
+-x[ ] **Step 7: Commit**
 
 ```bash
 git add Voyageur/A.py Scriptorium.py

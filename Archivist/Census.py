@@ -1472,7 +1472,7 @@ def run_census_flavor(data: dict) -> None:
     citation = data.get("citation") or {}
     cc = citation.get("collection_id")
     apid = APID_DB or citation.get("apid_db")
-    
+
     if cc:
         CENSUS_SOURCE_ID = str(cc)
     elif apid:

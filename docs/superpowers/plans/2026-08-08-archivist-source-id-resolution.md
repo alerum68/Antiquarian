@@ -43,7 +43,7 @@
 **Interfaces:**
 - Produces: `RecordMetadata.collection_mikan: Optional[str]` — the MIKAN number (digits only, as a string) of the item's immediate parent in LAC's hierarchy breadcrumb, or `None` if the hierarchy has fewer than 2 levels.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Voyageur/tests/test_lac.py` (fixture HTML condensed from a real captured LAC record page, PID 1502188 — "Scrip affidavit for Letendre, Roger", confirmed live during this design's investigation: fonds id=30 → branch id=134031 → series id=134034 → item id=1502188):
 
@@ -130,12 +130,12 @@ def test_get_record_metadata_collection_mikan_none_when_hierarchy_too_shallow(mo
     assert metadata.collection_mikan is None
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest Voyageur/tests/test_lac.py -k collection_mikan -v`
 Expected: FAIL with `AttributeError: 'RecordMetadata' object has no attribute 'collection_mikan'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 In `Voyageur/lac_client.py`, add the field to `RecordMetadata` (after `series_code`, `lac_client.py:88-92`):
 
@@ -169,17 +169,17 @@ Then in `get_record_metadata()` (after the `control_el`/`series_code` block, `la
                           collection_mikan=collection_mikan)
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+-x[ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest Voyageur/tests/test_lac.py -k collection_mikan -v`
 Expected: PASS
 
-- [ ] **Step 5: Run the full test suite to check for RecordMetadata construction breakage**
+-x[ ] **Step 5: Run the full test suite to check for RecordMetadata construction breakage**
 
 Run: `pytest -q`
 Expected: PASS. (`RecordMetadata` is a dataclass with no default for the new field, so any other test constructing it directly, not through `get_record_metadata()`, will fail loudly with a clear `TypeError: missing 1 required positional argument` — fix any such call site by adding `collection_mikan=None`.)
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Voyageur/lac_client.py Voyageur/tests/test_lac.py
@@ -198,7 +198,7 @@ git commit -m "feat(lac): parse collection MIKAN number from hierarchy breadcrum
 - Consumes: `lac_client.RecordMetadata.collection_mikan` (Task 1)
 - Produces: `download_pid_bundle(pid, media_dir, ...)`'s returned dict gains a `"collection_mikan"` key.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 ```python
 def test_download_pid_bundle_includes_collection_mikan(monkeypatch, tmp_path):
@@ -215,12 +215,12 @@ def test_download_pid_bundle_includes_collection_mikan(monkeypatch, tmp_path):
     assert bundle["collection_mikan"] == "134034"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest Voyageur/tests/test_lac.py -k download_pid_bundle_includes_collection_mikan -v`
 Expected: FAIL with `KeyError: 'collection_mikan'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 In `Voyageur/LAC.py`, `download_pid_bundle` (`LAC.py:305-311`):
 
@@ -235,12 +235,12 @@ In `Voyageur/LAC.py`, `download_pid_bundle` (`LAC.py:305-311`):
     }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+-x[ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest Voyageur/tests/test_lac.py -k download_pid_bundle_includes_collection_mikan -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/LAC.py Voyageur/tests/test_lac.py
@@ -259,7 +259,7 @@ git commit -m "feat(lac): thread collection_mikan through download_pid_bundle"
 - Consumes: `bundle["collection_mikan"]` (Task 2), `metadata.collection_mikan` (Task 1)
 - Produces: `record["type_specific_fields"]["collection_mikan"]`
 
-- [ ] **Step 1: Write the failing tests**
+-x[ ] **Step 1: Write the failing tests**
 
 Add to `Paleographer/tests/test_crosscheck.py` (matching that file's existing fixture/mocking conventions for `cross_check_claim_record` and `enrich_record_from_lac_metadata` — read the file's existing tests for the exact monkeypatch targets it uses for `voyageur_lac.download_pid_bundle` and `lac_client.get_record_metadata` before writing these, and follow the same pattern):
 
@@ -297,12 +297,12 @@ def test_enrich_record_from_lac_metadata_merges_collection_mikan():
     assert record["type_specific_fields"]["collection_mikan"] == "134034"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Paleographer/tests/test_crosscheck.py -k collection_mikan -v`
 Expected: FAIL with `KeyError: 'collection_mikan'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 In `Paleographer/ScripTools.py`, `cross_check_claim_record` (`ScripTools.py:485-490`):
 
@@ -329,12 +329,12 @@ And `enrich_record_from_lac_metadata` (`ScripTools.py:538-542`):
         type_fields["collection_mikan"] = metadata.collection_mikan
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Paleographer/tests/test_crosscheck.py -k collection_mikan -v`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+-x[ ] **Step 5: Commit**
 
 ```bash
 git add Paleographer/ScripTools.py Paleographer/tests/test_crosscheck.py
@@ -352,7 +352,7 @@ git commit -m "feat(scriptools): merge collection_mikan into type_specific_field
 **Interfaces:**
 - Produces: `Profile.dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str` (new protocol shape — every implementation ignores `rec` except `ScripProfile`, changed in Task 5). `get_dynamic_source_id(vol_val: str, rec: Optional[dict] = None) -> str`.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 The existing `test_dynamic_source_id_scrip_has_no_register_prefix` in `Archivist/tests/test_profile_parity.py` already asserts `SCRIP.dynamic_source_id("3") == "@S003@"` with no `rec` — this must keep passing unchanged (proves the default stays backward compatible). Add a new test alongside it for the `rec`-aware call shape (still asserting today's fallback behavior, since Task 5 is what makes `ScripProfile` actually use `rec`):
 
@@ -370,12 +370,12 @@ def test_hbca_dynamic_source_id_accepts_optional_rec_param():
     assert profile.dynamic_source_id("1", rec={}) == profile.dynamic_source_id("1")
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Archivist/tests/test_profile_parity.py Archivist/tests/test_hbca_profile.py -k optional_rec -v`
 Expected: FAIL with `TypeError: dynamic_source_id() got an unexpected keyword argument 'rec'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Archivist/General.py`, `GeneralProfile.dynamic_source_id` (`General.py:103-107`):
 
@@ -421,17 +421,17 @@ Leave unchanged in this task.
         return f"@S{HBCA_TEMPLATE_ID}@"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Archivist/tests/test_profile_parity.py Archivist/tests/test_hbca_profile.py -v`
 Expected: PASS, including the pre-existing `test_dynamic_source_id_scrip_has_no_register_prefix` unchanged.
 
-- [ ] **Step 5: Run the full test suite and the golden regression explicitly**
+-x[ ] **Step 5: Run the full test suite and the golden regression explicitly**
 
 Run: `pytest -q` then `pytest Archivist/tests/test_archivist_dispatcher.py -v`
 Expected: PASS. The golden files must be byte-identical to before this task — confirms the signature change alone caused zero behavior change.
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Archivist/General.py Archivist/Scrip.py Archivist/HBCA.py Archivist/tests/test_profile_parity.py Archivist/tests/test_hbca_profile.py
@@ -450,7 +450,7 @@ git commit -m "refactor(archivist): Profile.dynamic_source_id accepts optional r
 - Consumes: `rec['type_specific_fields']['collection_mikan']` (Task 3)
 - Produces: `ScripProfile.dynamic_source_id(vol_digits, rec)` returns `@S{collection_mikan}@` when available.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Archivist/tests/test_profile_parity.py`:
 
@@ -465,12 +465,12 @@ def test_dynamic_source_id_scrip_falls_back_without_collection_mikan():
     assert SCRIP.dynamic_source_id("3", rec=None) == "@S003@"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest Archivist/tests/test_profile_parity.py -k collection_mikan -v`
 Expected: FAIL — `test_dynamic_source_id_scrip_uses_collection_mikan_when_present` asserts `@S134034@`, gets `@S003@`.
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Archivist/Scrip.py`:
 
@@ -483,17 +483,17 @@ Expected: FAIL — `test_dynamic_source_id_scrip_uses_collection_mikan_when_pres
         return f"@S{vol_digits.zfill(3)}@"
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Archivist/tests/test_profile_parity.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite + golden regression**
+-x[ ] **Step 5: Run full suite + golden regression**
 
 Run: `pytest -q` then `pytest Archivist/tests/test_archivist_dispatcher.py -v`
 Expected: PASS unchanged (the golden Scrip fixture has no `collection_mikan` in its `type_specific_fields`, so falls through to the unchanged formula).
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Archivist/Scrip.py Archivist/tests/test_profile_parity.py
@@ -512,7 +512,7 @@ git commit -m "feat(scrip): use collection_mikan for source ID when available"
 - Consumes: `get_dynamic_source_id(vol, rec)` (Task 4)
 - Produces: `Profile.owns_source_records(self) -> bool` (new protocol method, default `False`). `get_volume_sources(sources_used: Dict[str, str], target_software: str) -> list` (signature change: was `volumes_used: set`, now a dict mapping resolved source ID to a representative `vol` string for display text).
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Archivist/tests/test_general_smoke.py` (read the file first for its existing fixture-building helpers and mirror them):
 
@@ -563,12 +563,12 @@ def test_build_gedcom_from_general_emits_one_source_for_shared_collection_mikan(
     assert ged.count("0 @S134034@ SOUR") == 1
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Archivist/tests/test_general_smoke.py -k "dedupes_by_resolved_source_id or shared_collection_mikan" -v`
 Expected: FAIL — with today's code, `get_volume_sources` takes a `set` not a `dict` (first test errors on iteration), and the second test's two different volumes each produce their own `0 @S...@ SOUR` block (two blocks, not one — since today's `dynamic_source_id` isn't yet reached in this collapsed form).
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Archivist/General.py`, `GeneralProfile` — add alongside its other methods (near `family_uid`, `General.py:112-113`):
 
@@ -666,17 +666,17 @@ Replace the call site (`General.py:1138`):
         ged.extend(get_volume_sources(sources_used, target_software))
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Archivist/tests/test_general_smoke.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite + golden regression**
+-x[ ] **Step 5: Run full suite + golden regression**
 
 Run: `pytest -q` then `pytest Archivist/tests/test_archivist_dispatcher.py -v`
 Expected: PASS unchanged. Parish and Scrip golden fixtures have no shared `collection_mikan` across distinct volumes (or none at all), so the dedup produces the same one-block-per-volume output as before.
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Archivist/General.py Archivist/Scrip.py Archivist/HBCA.py Archivist/tests/test_general_smoke.py
@@ -694,7 +694,7 @@ git commit -m "fix(archivist): dedupe SOUR blocks by resolved source ID, not raw
 **Interfaces:**
 - Produces: `FS.py`'s citation dict gains `"collection_id"` (the FS `cc` value) alongside the existing `"apid_db"` field.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Voyageur/tests/test_fs.py` (read the file first to match its existing `build_universal_json` test fixture shape exactly):
 
@@ -714,12 +714,12 @@ def test_build_universal_json_captures_collection_id():
     assert result["citation"]["collection_id"] == "1401638"
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest Voyageur/tests/test_fs.py -k collection_id -v`
 Expected: FAIL with `KeyError: 'collection_id'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Voyageur/Voyageur.js` — in `runFamilySearchGather()`'s scraping loop, alongside the existing `accumulatedItems.push({item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows});` (`Voyageur.js:1599`), capture `cc` from the current page URL and include it:
 
@@ -744,17 +744,17 @@ accumulatedItems.push({item_id: itemId, citation_text: citationText, catalog_ite
 
 `Voyageur/FS.py`, census path (`FS.py:667-668`, inside the per-page dict) — thread the same `cc` value through if available on the raw item; read the surrounding function signature first (`build_census_json`) to confirm whether `items_raw` is in scope at that point before adding `"collection_id": <value>` next to the existing `"apid_db": ""` line, following the same pattern as the general path above.
 
-- [ ] **Step 4: Run test to verify it passes**
+-x[ ] **Step 4: Run test to verify it passes**
 
 Run: `pytest Voyageur/tests/test_fs.py -k collection_id -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite**
+-x[ ] **Step 5: Run full suite**
 
 Run: `pytest -q`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js Voyageur/FS.py Voyageur/tests/test_fs.py
@@ -772,7 +772,7 @@ git commit -m "feat(fs): capture FamilySearch collection code (cc) from record p
 **Interfaces:**
 - Produces: new `parse_keystone_refd(html_text: str) -> Optional[str]`. `query_keystone_for_code()`'s return dict gains a `"refd"` key.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Voyageur/tests/test_hbca_keystone.py` (read the file first for its existing fixture-HTML style and mirror it — condensed real markup confirmed live during this design's investigation, for the `B.239/g/13` result page):
 
@@ -806,12 +806,12 @@ def test_query_keystone_for_code_includes_refd(monkeypatch):
     assert result["refd"] == "14374"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_hbca_keystone.py -k refd -v`
 Expected: FAIL — `AttributeError: module 'HBCA' has no attribute 'parse_keystone_refd'`, then `KeyError: 'refd'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Voyageur/HBCA.py`, add near `parse_keystone_search_response` (`HBCA.py:201-230`):
 
@@ -853,17 +853,17 @@ def query_keystone_for_code(
 
 (`parse_keystone_search_response`'s return type annotation, `HBCA.py:201`, changes from `Dict[str, List[str]]` to `Dict[str, Any]` to match — update the import at the top of the file if `Any` isn't already imported; it already is, per `HBCA.py:11`.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_hbca_keystone.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite**
+-x[ ] **Step 5: Run full suite**
 
 Run: `pytest -q`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Voyageur/HBCA.py Voyageur/tests/test_hbca_keystone.py
@@ -883,7 +883,7 @@ git commit -m "feat(hbca): parse Keystone REFD collection identifier"
 - Consumes: `record['type_specific_fields']['hbca_references']` (list of strings, already populated by `HBCA.pmt`'s AI extraction — this task does not touch extraction), `HBCA.query_keystone_for_code()` (Task 8)
 - Produces: `enrich_hbca_json_data(data: Dict[str, Any], cookies: Optional[dict] = None) -> Dict[str, Any]`. Populates each record's `source_documents` list with one entry per reference: `{"reference_code": str, "resolved_source_id": Optional[str]}`.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Create `Paleographer/tests/test_hbcatools.py`:
 
@@ -933,12 +933,12 @@ def test_enrich_hbca_json_data_skips_records_without_references():
     assert "source_documents" not in result["sheets"][0]["records"][0]
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+-x[ ] **Step 2: Run test to verify it fails**
 
 Run: `pytest Paleographer/tests/test_hbcatools.py -v`
 Expected: FAIL — `ModuleNotFoundError: No module named 'HBCATools'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 Create `Paleographer/HBCATools.py`, mirroring `ScripTools.py`'s import pattern (`ScripTools.py:24-34`):
 
@@ -1041,17 +1041,17 @@ def main() -> None:
         Extract.main()
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Paleographer/tests/test_hbcatools.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite**
+-x[ ] **Step 5: Run full suite**
 
 Run: `pytest -q`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Paleographer/HBCATools.py Paleographer/Paleographer.py Paleographer/tests/test_hbcatools.py
@@ -1070,7 +1070,7 @@ git commit -m "feat(hbca): add Keystone REFD enrichment pass for HBCA biographic
 - Consumes: `doc['resolved_source_id']` (Task 9)
 - Produces: `_build_citation_block(..., source_id_override: Optional[str] = None)`. `build_general_citation`'s existing `source_documents` loop passes it.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Archivist/tests/test_general_smoke.py`:
 
@@ -1114,12 +1114,12 @@ def test_build_general_citation_passes_source_id_override_per_document():
     assert "2 SOUR @S14374@" in blocks[1]
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Archivist/tests/test_general_smoke.py -k source_id_override -v`
 Expected: FAIL — `TypeError: _build_citation_block() got an unexpected keyword argument 'source_id_override'`
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Archivist/General.py`, `_build_citation_block` signature and `sour_id` resolution (`General.py:526-539`):
 
@@ -1168,17 +1168,17 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
     return blocks
 ```
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Archivist/tests/test_general_smoke.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite + golden regression**
+-x[ ] **Step 5: Run full suite + golden regression**
 
 Run: `pytest -q` then `pytest Archivist/tests/test_archivist_dispatcher.py -v`
 Expected: PASS unchanged (no golden fixture record has `resolved_source_id` in its `source_documents`, so `source_id_override` is always `None` there, falling through to the existing `template_id`/`get_dynamic_source_id` path).
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Archivist/General.py Archivist/tests/test_general_smoke.py
@@ -1197,7 +1197,7 @@ git commit -m "feat(archivist): per-document source_id_override for multi-source
 - Consumes: `record['source_documents'][]['resolved_source_id']` (Task 9), `owns_source_records()` (Task 6)
 - Produces: `HBCAProfile.resolve_source_templates(json_data, target_software)` emits one `0 @S{refd}@ SOUR` block per distinct REFD found across `json_data`'s records, instead of the single hardcoded `@S10009@` block. `HBCAProfile.owns_source_records()` returns `True`.
 
-- [ ] **Step 1: Write the failing test**
+-x[ ] **Step 1: Write the failing test**
 
 Add to `Archivist/tests/test_hbca_profile.py`:
 
@@ -1233,12 +1233,12 @@ def test_resolve_source_templates_falls_back_when_no_references_resolved():
     assert f"0 @S{HBCA.HBCA_TEMPLATE_ID}@ SOUR" in blocks
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+-x[ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest Archivist/tests/test_hbca_profile.py -k "owns_source_records or resolve_source_templates" -v`
 Expected: FAIL — `owns_source_records` doesn't exist yet; `resolve_source_templates` today always returns the single hardcoded `@S10009@` block regardless of `json_data` content, so the multi-REFD test fails.
 
-- [ ] **Step 3: Implement**
+-x[ ] **Step 3: Implement**
 
 `Archivist/HBCA.py` — set `owns_source_records` to `True` (`HBCA.py:35-36`, added in Task 6 as `False`):
 
@@ -1297,17 +1297,17 @@ Rewrite `resolve_source_templates` (`HBCA.py:218-244`) to collect distinct REFDs
 
 (`HBCA_TEMPLATE_ID` stays exactly as-is — it's still correct as the RM citation *template* ID passed to `2 TID`; only its former reuse as the source XREF is gone, replaced by real per-REFD XREFs.)
 
-- [ ] **Step 4: Run tests to verify they pass**
+-x[ ] **Step 4: Run tests to verify they pass**
 
 Run: `pytest Archivist/tests/test_hbca_profile.py -v`
 Expected: PASS
 
-- [ ] **Step 5: Run full suite**
+-x[ ] **Step 5: Run full suite**
 
 Run: `pytest -q`
 Expected: PASS. (No golden-file regression check for HBCA — confirmed during Task planning that `Archivist/tests/golden/` only has `parish_*`/`scrip_*` fixtures, no HBCA golden file exists yet.)
 
-- [ ] **Step 6: Commit**
+-x[ ] **Step 6: Commit**
 
 ```bash
 git add Archivist/HBCA.py Archivist/tests/test_hbca_profile.py

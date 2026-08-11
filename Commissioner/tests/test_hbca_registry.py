@@ -26,7 +26,8 @@ def test_hbca_valid_roles():
 def test_hbca_field_remap():
     remap = get_field_remap("HBCA")
     assert remap.get("HBCA_MASTER_DB_NAME") == "MASTER_DB_NAME"
-    assert remap.get("HBCA_IMAGE_DIR") == "IMAGE_DIR"
+    # Image dirs are auto-resolved as Media/<Prompt_Name>, not remapped.
+    assert "HBCA_IMAGE_DIR" not in remap
 
 
 def test_hbca_record_extra_fields():

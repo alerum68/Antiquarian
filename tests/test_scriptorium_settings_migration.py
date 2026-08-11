@@ -69,13 +69,15 @@ def test_paleographer_schema_matches_expected_shape():
     result = Scriptorium._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
-        "Antigravity CLI": {"AGY_CLI_BIN": "agy", "AGY_TIMEOUT_SECONDS": "240"},
+        "Antigravity CLI": {"AGY_CLI_BIN": "agy"},
         "Data & Directories": {
-            "PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
-            "CHURCH_GEDCOM_NAME": "Parish.ged", "CHURCH_MASTER_DB_NAME": "parish_register.json",
-            "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2", "MASTER_DB": "", "OUTPUT_DIR": "",
+            "PALEOGRAPHER_RECORD_TYPE": "",
+            "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2",
+            "MASTER_DB": "", "OUTPUT_DIR": "",
         },
         "Parish Information": {
+            "CHURCH_GEDCOM_NAME": "Parish.ged",
+            "CHURCH_MASTER_DB_NAME": "parish_register.json",
             "PARISH_NAME": "St. Generic Catholic Church",
             "PARISH_NAME_SHORT": "St. Generic Parish, Anytown, ST",
             "PARISH_CITY": "Anytown", "PARISH_STATE": "State",
@@ -94,10 +96,10 @@ def test_paleographer_schema_matches_expected_shape():
             "CHURCH_REPOSITORY": "FamilySearch.org", "CHURCH_REPOSITORY_LOC": "Granite Mountain, UT",
         },
         "Scrip Information": {
-            "SCRIP_IMAGE_DIR": "Scrip", "SCRIP_MASTER_DB_NAME": "scrip_records.json",
+            "SCRIP_GEDCOM_NAME": "Scrip.ged",
+            "SCRIP_MASTER_DB_NAME": "scrip_records.json",
             "SCRIP_COLLECTION_NAME": "Library and Archives Canada, RG15 Scrip Records",
-            "SCRIP_DISTRICT": "", "SCRIP_DELAY_SECONDS": "0.4",
-            "SCRIP_ENRICH_LIMIT": "", "SCRIP_PARTITION_OUTPUT_DIR": "",
+            "SCRIP_DISTRICT": "",
         },
     }
 

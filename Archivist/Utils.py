@@ -47,14 +47,17 @@ def safe_path(base: str, *parts: str) -> str:
 
 
 # Shared, generic settings (used regardless of which flavor of JSON is loaded).
+# Research/attribution metadata is hardcoded per the UI-overhaul design: these keys were
+# removed from Global Settings and nothing pins them via env, so they are plain module
+# constants now (General.py / Census.py reference them unchanged).
 ORG_NAME = os.getenv("ORG_NAME", "")
 RESEARCHER = os.getenv("RESEARCHER", "")
-SOFTWARE_NAME = os.getenv("SOFTWARE_NAME", "RootsMagic")
-SOFTWARE_VERS = os.getenv("SOFTWARE_VERS", "11.0")
-COPYRIGHT_START = os.getenv("COPYRIGHT_START", "2026")
-GEDCOM_NOTE = os.getenv("GEDCOM_NOTE", "")
-GEDCOM_CONC = os.getenv("GEDCOM_CONC", "")
-REVIEW_COLOR = os.getenv("REVIEW_COLOR", "1")
+SOFTWARE_NAME = "RootsMagic"
+SOFTWARE_VERS = "11.0"
+COPYRIGHT_START = "2018"
+GEDCOM_NOTE = "This file contains original historical translations and research."
+GEDCOM_CONC = "Please do not upload this raw GEDCOM to public, collaborative trees without permission and attribution."
+REVIEW_COLOR = "1"
 SUBM_ADDRESS = os.getenv("SUBM_ADDRESS", "")
 MGS_GROUP_URL = os.getenv("MGS_GROUP_URL", "")
 ANCESTRY_GROUP_URL = os.getenv("ANCESTRY_GROUP_URL", "")

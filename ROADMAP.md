@@ -17,17 +17,24 @@ a second userscript. Per repository:
   still open - some Scrip records are already partially transcribed there, with key
   information (and sometimes UIDs) displayed on the page itself.
 
-### Keystone (`KS`, Archives of Manitoba)
+### Keystone / HBCA (`HBCA`, Archives of Manitoba)
 
-- First check whether LAC's own search portal actually surfaces Keystone material
-  adequately for our purposes - if so, no separate sub-script is needed. Confirm this
-  rather than assuming it either way.
-- If not, build `Voyageur/KS.py`. HBCRecords.py already has a working (if
-  narrow, HBC-specific) Keystone scraper to use as prior art.
+- **Started and working.** Keystone is the digitized search portal for the Hudson's Bay
+  Company Archives (HBCA), housed at the Archives of Manitoba. The HBCA gather is
+  implemented in `Voyageur/HBCA.py`: biographical index parsing, HBCA reference/location
+  code extraction, Keystone POST search with a Playwright headless fallback, and PDF
+  media download with multi-reel merging into Commissioner-compliant scaffold sheets.
+  Tested by `Voyageur/tests/test_hbca_*.py` and dispatched as source `HBCA` from
+  `Voyageur/Voyageur.py`.
+- Remaining: more live testing against real HBCA/Keystone sessions to configure properly -
+  verify search-form matching, media-type coverage, and permalink fidelity; tighten as
+  gaps surface.
 
 ### NARA (National Archives, US)
 
-- Gather: not started. No site research done yet.
+- Gather: in planning (2026-08-09). Design spec + implementation plan under way - see
+  `docs/superpowers/specs/2026-08-09-nara-gather-design.md` and
+  `docs/superpowers/plans/2026-08-09-nara-gather.md`.
 
 ### BAnQ (`BANQ`, Bibliothèque et Archives nationales du Québec)
 
