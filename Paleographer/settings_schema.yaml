@@ -16,7 +16,7 @@ sections:
       options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
     MASTER_DB:
       default: ""
-      tooltip: "Path to the JSON master database used by the Scrip enrichment/partitioning tools. Leave blank to use the active record type's own MASTER_DB_NAME setting."
+      tooltip: "Path to the JSON master database used by the Scrip enrichment/partitioning tools. Leave blank to use the default 'master_database.json'."
     OUTPUT_DIR:
       default: ""
       tooltip: "Directory where partitioned/enriched output files are written. Leave blank to use the default output folder."
