@@ -84,7 +84,7 @@ HBCA_RESOLVE_KEYSTONE = (
 HBCA_DOWNLOAD_KEYSTONE_MEDIA = (
     os.environ.get("HBCA_DOWNLOAD_KEYSTONE_MEDIA", "true").lower() in ("true", "1", "yes")
 )
-HBCA_MAX_WORKERS = 8
+HBCA_MAX_WORKERS = int(os.getenv("HBCA_MAX_WORKERS", "8"))
 
 
 # ==========================================

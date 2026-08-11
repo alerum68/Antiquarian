@@ -36,9 +36,6 @@ sections:
     LAC_CDP_PORT:
       default: "9222"
       tooltip: "Port used by the Chrome DevTools Protocol connection when driving the LAC harvest browser."
-    LAC_MAX_WORKERS:
-      default: "1"
-      tooltip: "Number of parallel workers used when harvesting an LAC volume."
     LAC_RECORD_TYPE:
       default: ""
       tooltip: "Record type identifier for LAC volume harvesting (e.g. 'Scrip')."
@@ -68,7 +65,7 @@ sections:
       default: ""
       tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."
     HBCA_MAX_WORKERS:
-      default: "10"
+      default: "8"
       tooltip: "Number of parallel workers used when gathering HBCA biographical sheets."
     HBCA_RESOLVE_KEYSTONE:
       default: "false"

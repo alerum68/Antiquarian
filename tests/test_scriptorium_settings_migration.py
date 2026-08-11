@@ -48,7 +48,7 @@ def test_voyageur_schema_matches_expected_shape():
             "LAC_URL": "", "LAC_IMAGE_DIR": "LAC",
             "LAC_HARVEST_VOLUME": "", "LAC_ARCHIVAL_NUMBER": "RG15",
             "LAC_COOKIE_FILE": "Working/LAC/lac_cookies.txt",
-            "LAC_CHECKPOINT_DIR": "Working/LAC", "LAC_CDP_PORT": "9222", "LAC_MAX_WORKERS": "1",
+            "LAC_CHECKPOINT_DIR": "Working/LAC", "LAC_CDP_PORT": "9222",
             "LAC_RECORD_TYPE": "", "LAC_VOLUME": "", "VOLUME_TITLE": "",
         },
         "HBCA / Manitoba Archives": {
@@ -60,7 +60,7 @@ def test_voyageur_schema_matches_expected_shape():
             "HBCA_RESOLVE_KEYSTONE": "false",
             "HBCA_DOWNLOAD_KEYSTONE_MEDIA": "true",
             "KEYSTONE_BASE_URL": "https://pam.minisisinc.com/scripts/mwimain.dll",
-            "HBCA_MAX_WORKERS": "10",
+            "HBCA_MAX_WORKERS": "8",
         },
     }
 
