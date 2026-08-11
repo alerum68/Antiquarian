@@ -66,7 +66,9 @@ def test_move_downloaded_images_moves_matches_and_counts(tmp_path):
     start_time = time_module.time()
 
     (downloads / "TMP_A_Images_page1.jpg").write_bytes(b"x")
+    os.utime(downloads / "TMP_A_Images_page1.jpg", (start_time + 5, start_time + 5))
     (downloads / "TMP_A_Images_page2.jpg").write_bytes(b"x")
+    os.utime(downloads / "TMP_A_Images_page2.jpg", (start_time + 5, start_time + 5))
     unrelated = downloads / "other.jpg"
     unrelated.write_bytes(b"x")
 
@@ -85,6 +87,7 @@ def test_move_downloaded_images_tolerates_failed_move(tmp_path, monkeypatch, cap
     target.mkdir()
     start_time = time_module.time()
     (downloads / "TMP_A_Images_bad.jpg").write_bytes(b"x")
+    os.utime(downloads / "TMP_A_Images_bad.jpg", (start_time + 5, start_time + 5))
 
     def fail_move(src, dst):
         raise OSError("locked")
