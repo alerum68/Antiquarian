@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. **Model selection note (overrides the subagent-driven-development skill's own Model Selection section): never select Opus for any task in this plan — default to Sonnet everywhere, including the final whole-branch review and any fix-loop escalation round.**
 
+> **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
+
 **Goal:** Remove verified dead code, fix the broken `crosscheck` CLI mode, and consolidate duplicated logic across `Paleographer/Paleographer.py` and `Voyageur/` (`LAC.py`, `A.py`, `FS.py`) — a self-contained branch that merges before sub-project 3 begins. No new features, no behavior change except the one explicit bug fix.
 
 **Architecture:** Single branch off `Unify`. Reuses Paleographer.py's existing `from Voyageur import LAC as voyageur_lac` cross-import for the `COLLECTIONS` consolidation. Two new shared modules: `Voyageur/_retry_utils.py` (retry helpers, A.py + FS.py) and `Commissioner/normalization.py` (normalization helpers, Paleographer.py + FS.py).
@@ -32,7 +34,7 @@
 - Consumes: nothing from other tasks.
 - Produces: nothing consumed by later tasks — `clean_race`/`clean_date_and_place`/`MONTHS_REGEX`/`DATE_PATTERN`/`NARRATIVE_JUNK_REGEX` are gone; no other task references them.
 
--x[ ] **Step 1: Confirm zero remaining references before deleting**
+- [ ] **Step 1: Confirm zero remaining references before deleting**
 
 Run:
 ```
@@ -40,13 +42,13 @@ grep -rn "clean_race\|clean_date_and_place\|MONTHS_REGEX\|DATE_PATTERN\|NARRATIV
 ```
 Expected: matches only inside `Paleographer/Paleographer.py` itself (the definitions) — `DATE_PATTERN`/`NARRATIVE_JUNK_REGEX` are used only inside `clean_date_and_place`, `MONTHS_REGEX` only inside `DATE_PATTERN`'s own definition. If any match appears outside `Paleographer.py`, stop and report it — do not delete.
 
--x[ ] **Step 2: Delete the orphaned module and its test file**
+- [ ] **Step 2: Delete the orphaned module and its test file**
 
 ```bash
 git rm Paleographer/postprocess.py Paleographer/tests/test_postprocess.py
 ```
 
--x[ ] **Step 3: Delete the four dead functions/constants from Paleographer.py**
+- [ ] **Step 3: Delete the four dead functions/constants from Paleographer.py**
 
 In `Paleographer/Paleographer.py`, delete this exact block (currently lines 327-340):
 
@@ -151,7 +153,7 @@ new_string:
 COMPOUND_SURNAME_PREFIXES_2 = {
 ```
 
--x[ ] **Step 4: Run pycodestyle and the full test suite**
+- [ ] **Step 4: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Paleographer/Paleographer.py
@@ -159,7 +161,7 @@ pytest Paleographer/tests/ -v
 ```
 Expected: no pycodestyle violations; all tests pass (test_postprocess.py's 25 tests are gone with the file, nothing else references the deleted names).
 
--x[ ] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A -- Paleographer/postprocess.py Paleographer/tests/test_postprocess.py Paleographer/Paleographer.py
@@ -178,7 +180,7 @@ git commit -m "Remove orphaned postprocess.py and dead clean_race/clean_date_and
 - Consumes: nothing from Task 1.
 - Produces: nothing later tasks depend on — `get_env_paths()` and the module-level `resolve_pid_from_filename()`/`_PID_FROM_FILENAME_RE` are gone. Task 4 restructures `main()` in this same file — sequenced after this task so its own edits land on the already-shrunk file.
 
--x[ ] **Step 1: Confirm zero remaining references before deleting**
+- [ ] **Step 1: Confirm zero remaining references before deleting**
 
 Run:
 ```
@@ -187,7 +189,7 @@ grep -rn "resolve_pid_from_filename\b" Voyageur/LAC.py Voyageur/tests/
 ```
 Expected: `get_env_paths` matches only its own definition in `LAC.py`. `resolve_pid_from_filename` inside `LAC.py`/`Voyageur/tests/` matches only its own definition — Paleographer.py has a separate, actually-used copy of the same name at `Paleographer.py:1893`, which is a different file and stays untouched.
 
--x[ ] **Step 2: Delete `resolve_pid_from_filename` and its regex**
+- [ ] **Step 2: Delete `resolve_pid_from_filename` and its regex**
 
 In `Voyageur/LAC.py`, exact block to remove (currently lines 46, 49-56 with the blank line between):
 
@@ -213,7 +215,7 @@ new_string:
 def load_cookies(cookie_file: str = COOKIE_FILE, cdp_port: int = CDP_PORT) -> Dict[str, str]:
 ```
 
--x[ ] **Step 3: Delete `get_env_paths`**
+- [ ] **Step 3: Delete `get_env_paths`**
 
 Exact block to remove (currently lines 74-83, the section header plus the function):
 
@@ -241,7 +243,7 @@ new_string:
 def parse_url(raw_url: str) -> Tuple[str, str]:
 ```
 
--x[ ] **Step 4: Run pycodestyle and the full test suite**
+- [ ] **Step 4: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Voyageur/LAC.py
@@ -249,7 +251,7 @@ pytest Voyageur/tests/ -v
 ```
 Expected: no violations; all tests pass.
 
--x[ ] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/LAC.py
@@ -270,7 +272,7 @@ git commit -m "Remove dead get_env_paths and duplicate resolve_pid_from_filename
 - Consumes: nothing from Tasks 1-2.
 - Produces: `_retry_utils.move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None` and `_retry_utils.cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float) -> None`. No later task calls these directly, but Task 8 edits code in the same two files (the downloads-dir polling loops and image-move loops) — sequenced after this task so its edits land on the already-refactored files. Note the public names drop the leading underscore since they're now a real shared module's public API, not a private same-file helper — every call site is updated accordingly.
 
--x[ ] **Step 1: Create the new shared module**
+- [ ] **Step 1: Create the new shared module**
 
 Write `Voyageur/_retry_utils.py`:
 
@@ -316,7 +318,7 @@ def cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float
                 pass
 ```
 
--x[ ] **Step 2: Update A.py to import from the new module**
+- [ ] **Step 2: Update A.py to import from the new module**
 
 In `Voyageur/A.py`, remove the two function definitions and add the import. Exact block to remove (currently lines 16-46, including the blank lines around them):
 
@@ -433,7 +435,7 @@ new_string:
             img_count += 1
 ```
 
--x[ ] **Step 3: Update FS.py to import from the new module**
+- [ ] **Step 3: Update FS.py to import from the new module**
 
 In `Voyageur/FS.py`, remove `_move_with_retry`/`_cleanup_checkpoint_files` (currently lines 772-801, keeping `_read_text_with_retry`/`_unlink_with_retry` in place — those are FS.py-only, not duplicated):
 
@@ -555,7 +557,7 @@ new_string:
             img_count += 1
 ```
 
--x[ ] **Step 4: Run pycodestyle and the full test suite**
+- [ ] **Step 4: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Voyageur/A.py Voyageur/FS.py Voyageur/_retry_utils.py
@@ -563,7 +565,7 @@ pytest Voyageur/tests/ -v
 ```
 Expected: no violations (including no unused-import warnings — remove any `shutil`/`time` import pycodestyle flags as unused in A.py); all tests pass.
 
--x[ ] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add Voyageur/_retry_utils.py Voyageur/A.py Voyageur/FS.py
@@ -582,7 +584,7 @@ git commit -m "Extract duplicated move_with_retry/cleanup_checkpoint_files into 
 - Consumes: the shrunk `LAC.py` from Task 2 (this task's line numbers/exact text assume Task 2 already landed).
 - Produces: `LAC.py main()` now dispatches via explicit `volume`/`reel` subcommands instead of implicit `if args.volume`. `load_cookies()` now raises `FileNotFoundError`/`ValueError` instead of calling `sys.exit(1)`. No later task calls `load_cookies()` or `main()` directly, but Task 6 mirrors this same cookie-loading pattern in `Paleographer.py`'s new `crosscheck` dispatch — read this task's Step 3 before writing that one.
 
--x[ ] **Step 1: Fix load_cookies to raise instead of exit**
+- [ ] **Step 1: Fix load_cookies to raise instead of exit**
 
 In `Voyageur/LAC.py`, `load_cookies()` already raises `FileNotFoundError`/`ValueError` for its own two failure paths — the fix is removing the *earlier*, unreachable-in-context `sys.exit` pattern implied by the spec is actually not present in this function's current body (it already only raises). Re-read: the current body is:
 
@@ -605,7 +607,7 @@ def load_cookies(cookie_file: str = COOKIE_FILE, cdp_port: int = CDP_PORT) -> Di
 
 This function already raises rather than exiting — no change needed here. Skip to Step 2. (This step exists so the implementer verifies this before assuming work is needed, rather than guessing at a diff that doesn't apply.)
 
--x[ ] **Step 2: Replace RG15 magic-string defaults with DEFAULT_ARCHIVAL_NUMBER**
+- [ ] **Step 2: Replace RG15 magic-string defaults with DEFAULT_ARCHIVAL_NUMBER**
 
 ```python
 old_string:
@@ -631,7 +633,7 @@ def retrieve_volume(vol: str, cookies: Dict[str, str], media_dir: str, checkpoin
                     archival_number: str = DEFAULT_ARCHIVAL_NUMBER, max_workers: int = 1) -> Dict[str, Any]:
 ```
 
--x[ ] **Step 3: Restructure main() into explicit volume/reel subcommands**
+- [ ] **Step 3: Restructure main() into explicit volume/reel subcommands**
 
 Replace the entire `main()` function:
 
@@ -757,7 +759,7 @@ def main() -> None:
     args.func(args)
 ```
 
--x[ ] **Step 4: Run pycodestyle and the full test suite**
+- [ ] **Step 4: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Voyageur/LAC.py
@@ -765,7 +767,7 @@ pytest Voyageur/tests/ -v
 ```
 Expected: no violations; all tests pass (no existing test exercises `LAC.py main()` directly, so nothing to update).
 
--x[ ] **Step 5: Manual CLI smoke check (argparse wiring only — no network)**
+- [ ] **Step 5: Manual CLI smoke check (argparse wiring only — no network)**
 
 ```
 python -m Voyageur.LAC volume --help
@@ -774,7 +776,7 @@ python -m Voyageur.LAC --help
 ```
 Expected: each prints its own help text with the right flags (`volume` shows `--volume`/`--archival-number`/`--cookie-file`/`--media-dir`/`--workers`; `reel` shows `--url`/`--media-dir`); the bare `--help` lists both subcommands. Do not invoke either subcommand without `--help` — that would hit the network, which is blocked per Global Constraints.
 
--x[ ] **Step 6: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add Voyageur/LAC.py
@@ -793,7 +795,7 @@ git commit -m "Restructure LAC.py main() into explicit volume/reel subcommands, 
 - Consumes: `Voyageur/LAC.py`'s existing `COLLECTIONS` (line 44, untouched by this plan) and `collection_for_series_code`/`collection_for_volume` — **these two functions do not exist yet in LAC.py** (they currently only exist as Paleographer.py's duplicate copy). This task creates them in `LAC.py` as part of the move, not just Paleographer.py's own deletion.
 - Produces: `voyageur_lac.COLLECTIONS`, `voyageur_lac.collection_for_series_code(code) -> Optional[Tuple[str,str,str,str]]`, `voyageur_lac.collection_for_volume(volume, volume_range) -> Optional[Tuple[str,str,str,str]]`. No later task depends on these.
 
--x[ ] **Step 1: Add COLLECTIONS + both functions to LAC.py**
+- [ ] **Step 1: Add COLLECTIONS + both functions to LAC.py**
 
 The spec's Background says "keep `LAC.py`'s table canonical," but `LAC.py:44` currently holds only `DEFAULT_ARCHIVAL_NUMBER`, not a `COLLECTIONS` table — the actual `COLLECTIONS` list with its lookup functions exists only in Paleographer.py today. Move that real definition into `LAC.py` (this is the "keep canonical" outcome the spec describes, phrased from the end state rather than today's actual location).
 
@@ -871,7 +873,7 @@ def collection_for_volume(volume: Any, volume_range: Any) -> Optional[Tuple[str,
 def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:
 ```
 
--x[ ] **Step 2: Remove Paleographer.py's duplicate table and functions, redirect call sites**
+- [ ] **Step 2: Remove Paleographer.py's duplicate table and functions, redirect call sites**
 
 In `Paleographer/Paleographer.py`, remove the duplicate definitions:
 
@@ -960,7 +962,7 @@ def classify_sheet_collection(sheet: Dict[str, Any]) -> Tuple[Optional[str], str
     return None, UNKNOWN_COLLECTION_LABEL, None, "unclassified"
 ```
 
--x[ ] **Step 3: Run pycodestyle and the full test suite**
+- [ ] **Step 3: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Paleographer/Paleographer.py Voyageur/LAC.py
@@ -968,7 +970,7 @@ pytest Paleographer/tests/ Voyageur/tests/ -v
 ```
 Expected: no violations; all tests pass, including any test exercising `partition_json_by_collection`/`classify_sheet_collection` (these now resolve through `voyageur_lac`, same return values as before).
 
--x[ ] **Step 4: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add Paleographer/Paleographer.py Voyageur/LAC.py
@@ -987,7 +989,7 @@ git commit -m "Consolidate COLLECTIONS table into voyageur_lac, remove Paleograp
 - Consumes: `cross_check_claim_record(record, cookies, media_dir)` (already implemented, `Paleographer.py:2050-2104`, unchanged by this task), `resolve_json_input(json_file, json_dir) -> Path` (already implemented, unchanged), `voyageur_lac.MEDIA_DIR` (module-level constant on `Voyageur/LAC.py`, unchanged).
 - Produces: `main()`'s `crosscheck` mode now actually runs. No later task depends on this.
 
--x[ ] **Step 1: Add the crosscheck dispatch branch**
+- [ ] **Step 1: Add the crosscheck dispatch branch**
 
 In `Paleographer/Paleographer.py`, `main()`'s argparse setup needs a `--cookie-file` argument (only `crosscheck` uses it), and a new dispatch branch following the same load/process/save shape as `enrich`/`resolve-names`.
 
@@ -1037,7 +1039,7 @@ new_string:
         if args.mode == "enrich":
 ```
 
--x[ ] **Step 2: Write the failing test**
+- [ ] **Step 2: Write the failing test**
 
 Create `Paleographer/tests/test_crosscheck.py`:
 
@@ -1179,14 +1181,14 @@ def test_search_auth_error_breaks_loop_with_review_reason(paleographer_module, m
     assert any("search cookie expired/invalid" in r for r in result["review_reason"])
 ```
 
--x[ ] **Step 3: Run the new test to verify it exercises real code**
+- [ ] **Step 3: Run the new test to verify it exercises real code**
 
 ```
 pytest Paleographer/tests/test_crosscheck.py -v
 ```
 Expected: all four tests pass against the existing, already-correct `cross_check_claim_record` implementation. If any fails, the failure is in this task's own dispatch/test wiring, not in `cross_check_claim_record` itself (spec confirms that implementation is already correct) — debug the test fixture/mocking before assuming the production code is wrong.
 
--x[ ] **Step 4: Run pycodestyle and the full test suite**
+- [ ] **Step 4: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Paleographer/Paleographer.py Paleographer/tests/test_crosscheck.py
@@ -1194,7 +1196,7 @@ pytest Paleographer/tests/ -v
 ```
 Expected: no violations; all tests pass.
 
--x[ ] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add Paleographer/Paleographer.py Paleographer/tests/test_crosscheck.py
@@ -1221,7 +1223,7 @@ git commit -m "Wire up crosscheck CLI mode dispatch, add mocked unit tests"
 
 `Paleographer.py`'s `derive_role_numbers`/`derive_role_semantics` (plural) are record-level batch mutators with extra logic (role_name cap_case normalization, skip-if-already-set) that `FS.py`'s singular `derive_role_number`/`derive_role_semantic` don't have — these are not the same abstraction level, so only the shared single-value lookup primitive moves to `Commissioner/normalization.py` (matching `FS.py`'s existing singular shape). `Paleographer.py` keeps its own plural batch-mutator functions locally, but their internal lookup now delegates to the shared primitive instead of reimplementing the `name_to_number`/`roles_table` dict-building logic inline.
 
--x[ ] **Step 1: Write the failing tests (migrated from Voyageur/tests/test_fs.py, plus new coverage for the set_type_code divergence)**
+- [ ] **Step 1: Write the failing tests (migrated from Voyageur/tests/test_fs.py, plus new coverage for the set_type_code divergence)**
 
 Create `Commissioner/tests/test_normalization.py`:
 
@@ -1274,14 +1276,14 @@ def test_parse_to_iso_full_date():
     assert normalization.parse_to_iso("December 12, 1850") == "1850-12-12"
 ```
 
--x[ ] **Step 2: Run the new test to verify it fails (module doesn't exist yet)**
+- [ ] **Step 2: Run the new test to verify it fails (module doesn't exist yet)**
 
 ```
 pytest Commissioner/tests/test_normalization.py -v
 ```
 Expected: FAIL with `ModuleNotFoundError: No module named 'Commissioner.normalization'` (or ImportError).
 
--x[ ] **Step 3: Create Commissioner/normalization.py**
+- [ ] **Step 3: Create Commissioner/normalization.py**
 
 ```python
 """
@@ -1411,14 +1413,14 @@ def derive_role_semantic(role_number: Optional[str],
     return role.get("semantic") if role else None
 ```
 
--x[ ] **Step 4: Run the new test to verify it passes**
+- [ ] **Step 4: Run the new test to verify it passes**
 
 ```
 pytest Commissioner/tests/test_normalization.py -v
 ```
 Expected: PASS (all 7 tests).
 
--x[ ] **Step 5: Update Paleographer.py to import and use the shared module**
+- [ ] **Step 5: Update Paleographer.py to import and use the shared module**
 
 Add the import (after the existing `voyageur_lac` cross-import block, before the `.env` loading):
 
@@ -1663,7 +1665,7 @@ sed -i 's/\bcap_case(/normalization.cap_case(/g; s/\bparse_to_iso(/normalization
 
 This sed pass is safe because Step 5 already removed the only two definitions (`def cap_case` / `def parse_to_iso`) from this file, so every remaining `cap_case(`/`parse_to_iso(` token is a call site. Run `grep -n "\bcap_case(\|\bparse_to_iso(" Paleographer/Paleographer.py` again afterward and confirm every match now reads `normalization.cap_case(`/`normalization.parse_to_iso(`.
 
--x[ ] **Step 6: Update FS.py to import and use the shared module**
+- [ ] **Step 6: Update FS.py to import and use the shared module**
 
 Add the repo-root sys.path insertion (mirroring `census_schema.py`'s own precedent) and the import:
 
@@ -1932,7 +1934,7 @@ new_string:
 
 Run `grep -n "\bcap_case(\|\bparse_to_iso(" Voyageur/FS.py` and confirm every remaining match is prefixed `normalization.` — the six call sites above are every one found during plan-writing, but re-grep to be certain none were missed.
 
--x[ ] **Step 7: Remove the three migrated tests from Voyageur/tests/test_fs.py**
+- [ ] **Step 7: Remove the three migrated tests from Voyageur/tests/test_fs.py**
 
 ```python
 old_string:
@@ -1968,7 +1970,7 @@ new_string:
 git rm Voyageur/tests/test_fs.py
 ```
 
--x[ ] **Step 8: Run pycodestyle and the full test suite**
+- [ ] **Step 8: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Paleographer/Paleographer.py Voyageur/FS.py Commissioner/normalization.py Commissioner/tests/test_normalization.py
@@ -1976,7 +1978,7 @@ pytest Paleographer/tests/ Voyageur/tests/ Commissioner/tests/ -v
 ```
 Expected: no violations; all tests pass, including `Paleographer/tests/test_paleographer_pipeline.py` (exercises `finalize_record`/`derive_role_numbers`/`derive_role_semantics`/`normalization.derive_record_identity` end-to-end) and the new `Commissioner/tests/test_normalization.py`.
 
--x[ ] **Step 9: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A -- Commissioner/normalization.py Commissioner/tests/test_normalization.py Paleographer/Paleographer.py Voyageur/FS.py Voyageur/tests/test_fs.py
@@ -1997,7 +1999,7 @@ git commit -m "Extract cap_case/parse_to_iso/derive_record_identity/derive_role_
 - Consumes: the post-Task-3 versions of `A.py`/`FS.py` (this task's edits are in the polling/image-move loops, a different region than Task 3's retry-helper extraction, but sequenced after it to land on the final file shape).
 - Produces: nothing later tasks depend on.
 
--x[ ] **Step 1: Narrow the downloads-dir polling loop's except clause in A.py**
+- [ ] **Step 1: Narrow the downloads-dir polling loop's except clause in A.py**
 
 ```python
 old_string:
@@ -2017,7 +2019,7 @@ new_string:
                 pass
 ```
 
--x[ ] **Step 2: Log the image-move loop's failure in A.py instead of swallowing it**
+- [ ] **Step 2: Log the image-move loop's failure in A.py instead of swallowing it**
 
 ```python
 old_string:
@@ -2043,7 +2045,7 @@ new_string:
             print(f"[ERROR] Could not move image {file_path.name}: {e}")
 ```
 
--x[ ] **Step 3: Narrow the downloads-dir polling loop's except clause in FS.py**
+- [ ] **Step 3: Narrow the downloads-dir polling loop's except clause in FS.py**
 
 ```python
 old_string:
@@ -2063,7 +2065,7 @@ new_string:
                 pass
 ```
 
--x[ ] **Step 4: Log the image-move loop's failure in FS.py instead of swallowing it**
+- [ ] **Step 4: Log the image-move loop's failure in FS.py instead of swallowing it**
 
 ```python
 old_string:
@@ -2089,7 +2091,7 @@ new_string:
             print(f"[ERROR] Could not move image {file_path.name}: {e}")
 ```
 
--x[ ] **Step 5: Log has_usable_text_layer's failure in Paleographer.py instead of swallowing it**
+- [ ] **Step 5: Log has_usable_text_layer's failure in Paleographer.py instead of swallowing it**
 
 ```python
 old_string:
@@ -2118,7 +2120,7 @@ def has_usable_text_layer(pdf_path: Union[str, Path], sample_pages: int = 3,
         return False
 ```
 
--x[ ] **Step 6: Log optimize_pdf_for_upload's failure in Paleographer.py instead of silently forcing the fallback path**
+- [ ] **Step 6: Log optimize_pdf_for_upload's failure in Paleographer.py instead of silently forcing the fallback path**
 
 ```python
 old_string:
@@ -2155,7 +2157,7 @@ def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path
         return file_path
 ```
 
--x[ ] **Step 7: Run pycodestyle and the full test suite**
+- [ ] **Step 7: Run pycodestyle and the full test suite**
 
 ```
 pycodestyle --max-line-length=120 Voyageur/A.py Voyageur/FS.py Paleographer/Paleographer.py
@@ -2163,7 +2165,7 @@ pytest Voyageur/tests/ Paleographer/tests/ Commissioner/tests/ -v
 ```
 Expected: no violations; all tests pass. If any test asserted on the old silent-swallow behavior (e.g. captured stdout expecting no output), update its assertion to expect the new `[ERROR]` line rather than removing the assertion.
 
--x[ ] **Step 8: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add Voyageur/A.py Voyageur/FS.py Paleographer/Paleographer.py

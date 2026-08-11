@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement Tasks 1-3 task-by-task. Tasks 4-5 are **not** implementer tasks — see their callouts. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
+
 **Goal:** Close out the three open GitHub issues on this repo (#3 Voyageur field-map normalization, #4 Archivist unified tree ingestion, #5 Scriptorium FIELD_REMAP relocation) by finishing the specific remaining gaps each issue's own comment thread already identifies, and fix a repo-hygiene bug where `docs/superpowers/` is gitignored locally but 25 files under it are already tracked and pushed to GitHub. Issue #81159 (the LAC.py/Claude-Desktop GPU-crash blocker) is explicitly out of scope — nothing here touches `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or the LAC site.
 
 **Architecture:** All three issues already have substantial progress landed (confirmed by reading their comment threads against the current code). What remains is: (1) a pure audit-and-close for #5, which is already done in code; (2) a small, testable extraction in Voyageur's census-gather orchestration to close #3's "no direct test coverage" gap; (3) wiring the already-existing generic `facts[]` fact vocabulary into Archivist's church-flavor GEDCOM renderer to close #4's "write-only for church records" gap; (4)-(5) two manual, non-automatable live-data verification checkpoints (#3's `familysearch_census.yaml` DRAFT status, and end-to-end real-gather verification for both #3 and #4) that require an actual live Ancestry/FamilySearch browser session and are the user's to run, not an implementer subagent's.
@@ -30,7 +32,7 @@
 
 `.gitignore` already has a `/docs/superpowers/` line (sitting as an uncommitted local edit — `git diff HEAD -- .gitignore` shows it, confirmed via `git log --all -S"/docs/superpowers/" -- .gitignore` returning zero commits, i.e. it was never actually committed by anyone). A gitignore rule only stops *new* untracked files from being added — it does nothing for files already tracked before the rule existed, which is exactly why these 25 files are still on GitHub despite the rule. This is the same bug already fixed once for `CLAUDE.md` (commit `d70813f`, "Untrack CLAUDE.md - keep it local, not committed") — apply the identical fix here.
 
--x[ ] **Step 1: Confirm the current tracked list and the uncommitted gitignore line**
+- [ ] **Step 1: Confirm the current tracked list and the uncommitted gitignore line**
 
 Run:
 ```bash
@@ -39,21 +41,21 @@ git ls-files docs/superpowers
 ```
 Expected: the diff shows the `+/docs/superpowers/` line; the file list shows every currently-tracked file under `docs/superpowers/plans/` and `docs/superpowers/specs/`.
 
--x[ ] **Step 2: Untrack the directory, keeping the files on disk**
+- [ ] **Step 2: Untrack the directory, keeping the files on disk**
 
 ```bash
 git rm -r --cached docs/superpowers
 ```
 Expected: `git status` now shows every previously-tracked file under `docs/superpowers/` as deleted-from-index (staged), while the files themselves remain unchanged on disk (verify with `ls docs/superpowers/plans/` — files still present).
 
--x[ ] **Step 3: Stage the gitignore line and commit**
+- [ ] **Step 3: Stage the gitignore line and commit**
 
 ```bash
 git add .gitignore
 git commit -m "Untrack docs/superpowers/ - keep it local, not committed"
 ```
 
--x[ ] **Step 4: Verify**
+- [ ] **Step 4: Verify**
 
 Run: `git ls-files docs/superpowers` → expect empty output.
 Run: `git status --short` → expect clean (or only unrelated pending changes).
@@ -69,7 +71,7 @@ Run: `git status --short` → expect clean (or only unrelated pending changes).
 - Consumes: nothing from other tasks.
 - Produces: nothing later tasks depend on.
 
--x[ ] **Step 1: Confirm the old mechanism is fully gone**
+- [ ] **Step 1: Confirm the old mechanism is fully gone**
 
 Run:
 ```bash
@@ -77,7 +79,7 @@ git grep -n "FIELD_REMAP\|_record_type_family\|_peek_record_family" -- '*.py'
 ```
 Expected: the only hit is a historical comment in `Voyageur/FS.py` referencing the old name for context (`# generalizes Scriptorium.py's existing _record_type_family() ...`). No live code defines or calls any of these three names anymore.
 
--x[ ] **Step 2: Confirm Scriptorium.py never computes a generic runtime setting itself**
+- [ ] **Step 2: Confirm Scriptorium.py never computes a generic runtime setting itself**
 
 Run:
 ```bash
@@ -85,14 +87,14 @@ grep -n "run_env\[" Scriptorium.py
 ```
 Expected: only `run_env['PYTHONUNBUFFERED']` and `run_env['PYTHONIOENCODING']` — process-level env vars, not app settings. Then read `Scriptorium.py`'s `_get_pmt_field_remap` method (currently around line 1614) and confirm its docstring and body: it only *reads* a `.pmt`'s `field_remap` table for the GUI's own display purposes (e.g. picking which image-dir field to browse from), and never writes a resolved generic key into the child process's `.env`. Confirm `Archivist/Archivist.py`'s `apply_record_type_field_remap` (around line 3519) and `Paleographer/engine.py`'s `resolve_setting`-equivalent mechanism are what actually resolve generic names — each script resolving its own settings from its own `.env`, independent of Scriptorium.
 
--x[ ] **Step 3: Post the audit findings and close the issue**
+- [ ] **Step 3: Post the audit findings and close the issue**
 
 This step is GitHub-visible — confirm with the human partner before running it. Once confirmed:
 ```bash
 gh issue close 5 --comment "Verified done: FIELD_REMAP/_record_type_family/_peek_record_family no longer exist anywhere in Scriptorium.py (confirmed via git grep). Scriptorium.py's _get_pmt_field_remap only reads a .pmt's field_remap table for its own display purposes; Archivist.py's apply_record_type_field_remap and Paleographer's own resolve_setting mechanism each resolve their own generic runtime settings from their own .env independently of Scriptorium. Landed across b43b33d (Paleographer + Archivist: resolve own settings from own .env via field_remap) and the Archivist/Paleographer structural work that followed it."
 ```
 
--x[ ] **Step 4: Nothing to commit** — this task changes no tracked files.
+- [ ] **Step 4: Nothing to commit** — this task changes no tracked files.
 
 ---
 
@@ -112,7 +114,7 @@ gh issue close 5 --comment "Verified done: FIELD_REMAP/_record_type_family/_peek
 
 This closes the gap named in issue #3's own progress comment: *"A.py/FS.py's own main() orchestration (the normalization call site) has no direct test coverage - only census_schema.py itself is unit-tested. main() is heavily I/O-bound (browser, filesystem polling), not trivially testable without significant mocking."* The fix is to pull the pure translation logic (deriving `collection_title`/`record_type_name` and calling normalize+validate) out of each `main()` into a small, I/O-free function that a test can call directly — leaving `main()` itself doing only file I/O around it.
 
--x[ ] **Step 1: Add the shared wrapper to `Voyageur/census_schema.py`**
+- [ ] **Step 1: Add the shared wrapper to `Voyageur/census_schema.py`**
 
 Add directly after `validate_against_commissioner`'s definition:
 
@@ -127,7 +129,7 @@ def normalize_and_validate_census(raw: dict, field_map_name: str, collection_tit
     return normalized
 ```
 
--x[ ] **Step 2: Write the failing tests for the wrapper**
+- [ ] **Step 2: Write the failing tests for the wrapper**
 
 Add to `Voyageur/tests/test_census_schema.py`:
 
@@ -147,17 +149,17 @@ def test_normalize_and_validate_census_returns_normalized_doc():
     assert len(doc["sheets"]) == 1
 ```
 
--x[ ] **Step 3: Run it to verify it fails**
+- [ ] **Step 3: Run it to verify it fails**
 
 Run: `pytest Voyageur/tests/test_census_schema.py::test_normalize_and_validate_census_returns_normalized_doc -v`
 Expected: FAIL with `AttributeError: module 'census_schema' has no attribute 'normalize_and_validate_census'`
 
--x[ ] **Step 4: Run it again after Step 1's implementation to verify it passes**
+- [ ] **Step 4: Run it again after Step 1's implementation to verify it passes**
 
 Run: `pytest Voyageur/tests/test_census_schema.py -v`
 Expected: all PASS, including the new test.
 
--x[ ] **Step 5: Extract and wire the A.py call site**
+- [ ] **Step 5: Extract and wire the A.py call site**
 
 Replace `Voyageur/A.py:98-110`:
 ```python
@@ -201,7 +203,7 @@ def normalize_ancestry_census_gather(raw_gather: dict) -> dict:
         raw_gather, "ancestry_census", collection_title, f"Census_{census_year_raw}")
 ```
 
--x[ ] **Step 6: Write the failing test for `A.normalize_ancestry_census_gather`**
+- [ ] **Step 6: Write the failing test for `A.normalize_ancestry_census_gather`**
 
 Create `Voyageur/tests/test_a.py`:
 ```python
@@ -230,12 +232,12 @@ def test_normalize_ancestry_census_gather_derives_title_and_record_type():
     assert len(normalized["sheets"]) == 1
 ```
 
--x[ ] **Step 7: Run it to verify it fails, then implement, then verify it passes**
+- [ ] **Step 7: Run it to verify it fails, then implement, then verify it passes**
 
 Run: `pytest Voyageur/tests/test_a.py -v` → FAIL (`normalize_ancestry_census_gather` not yet wired if Step 5 wasn't done first; do Step 5 before this if running strictly TDD-serially). After Step 5's code is in place:
 Run: `pytest Voyageur/tests/test_a.py -v` → PASS.
 
--x[ ] **Step 8: Extract and wire the FS.py call site**
+- [ ] **Step 8: Extract and wire the FS.py call site**
 
 Replace `Voyageur/FS.py:766-778`:
 ```python
@@ -277,7 +279,7 @@ def normalize_familysearch_census_gather(raw_census: dict, collection_title: str
         raw_census, "familysearch_census", collection_title, f"Census_{raw_census.get('census_year', '')}")
 ```
 
--x[ ] **Step 9: Write the failing test for `FS.normalize_familysearch_census_gather`**
+- [ ] **Step 9: Write the failing test for `FS.normalize_familysearch_census_gather`**
 
 Add to `Voyageur/tests/test_fs.py`:
 ```python
@@ -302,23 +304,23 @@ def test_normalize_familysearch_census_gather_derives_record_type():
     assert len(normalized["sheets"]) == 1
 ```
 
--x[ ] **Step 10: Run it to verify it fails, then verify it passes after Step 8**
+- [ ] **Step 10: Run it to verify it fails, then verify it passes after Step 8**
 
 Run: `pytest Voyageur/tests/test_fs.py -v` → PASS once Step 8's code is in place.
 
--x[ ] **Step 11: Run the full Voyageur suite**
+- [ ] **Step 11: Run the full Voyageur suite**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS, including the 3 new ones (`test_a.py`, plus the additions to `test_census_schema.py` and `test_fs.py`).
 
--x[ ] **Step 12: Commit**
+- [ ] **Step 12: Commit**
 
 ```bash
 git add Voyageur/census_schema.py Voyageur/A.py Voyageur/FS.py Voyageur/tests/test_census_schema.py Voyageur/tests/test_a.py Voyageur/tests/test_fs.py
 git commit -m "Voyageur: extract testable normalize-and-validate call sites for A.py/FS.py census gathers"
 ```
 
--x[ ] **Step 13: Post progress on Issue #3**
+- [ ] **Step 13: Post progress on Issue #3**
 
 GitHub-visible — confirm with the human partner before running:
 ```bash
@@ -339,7 +341,7 @@ gh issue comment 3 --body "Closes the test-coverage gap flagged in the earlier p
 
 This closes the exact gap named in issue #4's audit-comment: *"facts[] (the new generic per-participant fact array) has no consumer anywhere in Archivist.py yet... wire facts[] through the same FactTypes.json-driven generic rendering build_custom_fact_lines already uses for race/dit_name - otherwise the field is write-only and never reaches the GEDCOM."* Confirmed via code reading: `build_individual` (Archivist/Archivist.py:2880) is the **only** call site (line 3471), reached only from the church/general-flavor loop over `rec.get('participants', [])` directly — census never reaches `build_individual` at all (it has its own separate DataFrame-based rendering path via `build_dynamic_events_and_notes`, which already consumes `facts[]` via `FACT_TYPE_TO_COLUMN` before `build_individual` would ever see it). So this change is correctly scoped to church/general records only, with no risk of double-rendering a fact for census.
 
--x[ ] **Step 1: Write the failing test**
+- [ ] **Step 1: Write the failing test**
 
 Add to `Archivist/tests/test_archivist.py`:
 ```python
@@ -368,12 +370,12 @@ def test_build_individual_skips_unknown_fact_type_gracefully():
     assert "irrelevant" not in joined
 ```
 
--x[ ] **Step 2: Run to verify both fail**
+- [ ] **Step 2: Run to verify both fail**
 
 Run: `pytest Archivist/tests/test_archivist.py::test_build_individual_renders_generic_facts_via_fact_types Archivist/tests/test_archivist.py::test_build_individual_skips_unknown_fact_type_gracefully -v`
 Expected: first FAILs (`"1 EVEN Farmer"` not in output), second PASSes trivially already (nothing to fix — keep it as a regression guard).
 
--x[ ] **Step 3: Implement**
+- [ ] **Step 3: Implement**
 
 In `Archivist/Archivist.py`, insert immediately after the RESI block (currently ending at line 3061, right before the `if b_date or b_place:` BIRT block at line 3063):
 ```python
@@ -391,19 +393,19 @@ In `Archivist/Archivist.py`, insert immediately after the RESI block (currently 
                                             target_software, date=fact.get('date', ''), place=fact.get('place', '')))
 ```
 
--x[ ] **Step 4: Run to verify both pass**
+- [ ] **Step 4: Run to verify both pass**
 
 Run: `pytest Archivist/tests/test_archivist.py -v`
 Expected: all PASS (27+ existing tests plus the 2 new ones).
 
--x[ ] **Step 5: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add Archivist/Archivist.py Archivist/tests/test_archivist.py
 git commit -m "Archivist: consume facts[] generically in build_individual for church-flavor records"
 ```
 
--x[ ] **Step 6: Post progress on Issue #4**
+- [ ] **Step 6: Post progress on Issue #4**
 
 GitHub-visible — confirm with the human partner before running:
 ```bash
@@ -416,11 +418,11 @@ gh issue comment 4 --body "Closes the facts[] write-only gap flagged against the
 
 > This task requires an actual live FamilySearch browser session with real login credentials. No implementer subagent can execute this — it is the user's own step. Included here so the plan is complete and the issue has a concrete path to closing, not because an agent should attempt it.
 
--x[ ] Run a real FamilySearch census gather via `Voyageur/FS.py` for at least one census year not yet spot-checked.
--x[ ] Inspect the resulting normalized JSON's `sheets[].records[].participants[]` — specifically each participant's `type_specific_fields.unmapped` (per `census_schema.py`'s "never dropped or guessed, flagged for review" convention) — for any real FamilySearch column header text that `Voyageur/field_maps/familysearch_census.yaml` doesn't yet map.
--x[ ] Add any missing header mappings to `Voyageur/field_maps/familysearch_census.yaml`, following the existing entries' format.
--x[ ] Once a real gather round-trips with zero unmapped headers (or all remaining unmapped headers are genuinely source-specific noise, not missed real fields), remove the file's DRAFT status note.
--x[ ] Confirm with the human partner, then close out this portion via `gh issue comment 3 --body "familysearch_census.yaml confirmed against a live gather on <date> - DRAFT status removed."`
+- [ ] Run a real FamilySearch census gather via `Voyageur/FS.py` for at least one census year not yet spot-checked.
+- [ ] Inspect the resulting normalized JSON's `sheets[].records[].participants[]` — specifically each participant's `type_specific_fields.unmapped` (per `census_schema.py`'s "never dropped or guessed, flagged for review" convention) — for any real FamilySearch column header text that `Voyageur/field_maps/familysearch_census.yaml` doesn't yet map.
+- [ ] Add any missing header mappings to `Voyageur/field_maps/familysearch_census.yaml`, following the existing entries' format.
+- [ ] Once a real gather round-trips with zero unmapped headers (or all remaining unmapped headers are genuinely source-specific noise, not missed real fields), remove the file's DRAFT status note.
+- [ ] Confirm with the human partner, then close out this portion via `gh issue comment 3 --body "familysearch_census.yaml confirmed against a live gather on <date> - DRAFT status removed."`
 
 ---
 
@@ -428,9 +430,9 @@ gh issue comment 4 --body "Closes the facts[] write-only gap flagged against the
 
 > Also requires a live browser session. Depends on Task 4 landing first (or being run in the same session).
 
--x[ ] Run a full real gather (Ancestry or FamilySearch) through to a generated GEDCOM via Archivist, for at least one census year.
--x[ ] Confirm the household/relationship resolution (`parse_household`/`parse_household_relational`) produces correct `role_semantic` assignments against the real data — this exercises `build_census_dataframe_from_unified` (Archivist/Archivist.py) end-to-end for the first time against non-synthetic input.
--x[ ] Confirm with the human partner, then close both remaining issues:
+- [ ] Run a full real gather (Ancestry or FamilySearch) through to a generated GEDCOM via Archivist, for at least one census year.
+- [ ] Confirm the household/relationship resolution (`parse_household`/`parse_household_relational`) produces correct `role_semantic` assignments against the real data — this exercises `build_census_dataframe_from_unified` (Archivist/Archivist.py) end-to-end for the first time against non-synthetic input.
+- [ ] Confirm with the human partner, then close both remaining issues:
   ```bash
   gh issue close 3 --comment "Live-verified end-to-end on <date> against a real gather - closing."
   gh issue close 4 --comment "Live-verified end-to-end on <date> against a real gathered census file via #3's checkpoint - closing."

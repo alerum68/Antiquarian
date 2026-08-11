@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
+
 **Goal:** Make `Voyageur/Voyageur.py` a real ~30-line dispatcher that calls the maintained `A.py`/`FS.py`/`LAC.py` provider files instead of running its own 1300-line frozen fork, fix `Scriptorium.py`'s LAC dispatch so it reaches the real `LAC.py`'s `volume`/`reel` subcommands, and deduplicate the ~70-90 lines of gather boilerplate `A.py` and `FS.py` currently copy-paste between each other.
 
 **Architecture:** `Voyageur/_retry_utils.py` is renamed to `Voyageur/_gather_helpers.py` and gains five new shared functions (verbatim extractions of A.py/FS.py's duplicated download-wait/image-move/image-dir-resolution/Archivist-write-back logic). `A.py` and `FS.py` call into these instead of their own inline copies. `Voyageur.py` is rewritten to import and delegate to `A`/`FS`/`LAC`'s real `main()` based on `sys.argv[1]`. `Scriptorium.py`'s LAC dispatch branch gains the `volume`/`reel` subcommand token the real `LAC.py`'s argparse now requires.
@@ -38,13 +40,13 @@
   - `write_archivist_json_file(final_json_name: str) -> None`
   - Existing (unchanged): `move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None`, `cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float) -> None`
 
--x[ ] **Step 1: Rename the file with git**
+- [ ] **Step 1: Rename the file with git**
 
 ```bash
 git mv Voyageur/_retry_utils.py Voyageur/_gather_helpers.py
 ```
 
--x[ ] **Step 2: Write the failing tests for the five new functions**
+- [ ] **Step 2: Write the failing tests for the five new functions**
 
 Create `Voyageur/tests/test_gather_helpers.py`:
 
@@ -180,12 +182,12 @@ def test_write_archivist_json_file_writes_expected_key(monkeypatch):
     assert path.endswith(os.path.join("Archivist", ".env"))
 ```
 
--x[ ] **Step 3: Run the new tests to verify they fail**
+- [ ] **Step 3: Run the new tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_gather_helpers.py -v`
 Expected: FAIL — `_gather_helpers` has no attribute `launch_gather_browser` (etc.), since the module doesn't have these functions yet.
 
--x[ ] **Step 4: Add the five functions to `_gather_helpers.py`**
+- [ ] **Step 4: Add the five functions to `_gather_helpers.py`**
 
 Replace the full contents of `Voyageur/_gather_helpers.py` with:
 
@@ -312,12 +314,12 @@ def write_archivist_json_file(final_json_name: str) -> None:
     set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json_name)
 ```
 
--x[ ] **Step 5: Run the new tests to verify they pass**
+- [ ] **Step 5: Run the new tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_gather_helpers.py -v`
 Expected: PASS (8 tests)
 
--x[ ] **Step 6: Update A.py's and FS.py's import lines so they resolve against the renamed module**
+- [ ] **Step 6: Update A.py's and FS.py's import lines so they resolve against the renamed module**
 
 In `Voyageur/A.py`, change:
 ```python
@@ -339,12 +341,12 @@ new_string:
 from _gather_helpers import cleanup_checkpoint_files, move_with_retry
 ```
 
--x[ ] **Step 7: Run the full test suite to confirm nothing broke**
+- [ ] **Step 7: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS (existing `test_census_schema.py`, `test_fs.py`, `test_lac.py` unaffected; new `test_gather_helpers.py` passes).
 
--x[ ] **Step 8: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add Voyageur/_gather_helpers.py Voyageur/A.py Voyageur/FS.py Voyageur/tests/test_gather_helpers.py
@@ -364,7 +366,7 @@ git commit -m "Rename _retry_utils.py to _gather_helpers.py, add shared gather-b
 
 This task has no new tests of its own (this refactor doesn't change `A.py`'s untested `main()` in a way Task 1's helper tests don't already cover) — its test cycle is a compile check plus a full-suite regression run.
 
--x[ ] **Step 1: Update the import block**
+- [ ] **Step 1: Update the import block**
 
 In `Voyageur/A.py`, replace the full import block (lines 1-13) with:
 
@@ -408,7 +410,7 @@ from _gather_helpers import (
 )
 ```
 
--x[ ] **Step 2: Replace the browser-launch block**
+- [ ] **Step 2: Replace the browser-launch block**
 
 ```python
 old_string:
@@ -425,7 +427,7 @@ new_string:
     start_time = launch_gather_browser(url)
 ```
 
--x[ ] **Step 3: Replace the download-polling block**
+- [ ] **Step 3: Replace the download-polling block**
 
 ```python
 old_string:
@@ -469,7 +471,7 @@ new_string:
     json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "Final JSON")
 ```
 
--x[ ] **Step 4: Replace the Archivist `.env` write-back call**
+- [ ] **Step 4: Replace the Archivist `.env` write-back call**
 
 ```python
 old_string:
@@ -481,7 +483,7 @@ new_string:
     write_archivist_json_file(final_json.name)
 ```
 
--x[ ] **Step 5: Replace the image-directory resolution block**
+- [ ] **Step 5: Replace the image-directory resolution block**
 
 ```python
 old_string:
@@ -501,7 +503,7 @@ new_string:
     img_target_dir = resolve_census_image_dir(base_img_setting, program_dir, census_folder, location_folder)
 ```
 
--x[ ] **Step 6: Replace the image-move loop**
+- [ ] **Step 6: Replace the image-move loop**
 
 ```python
 old_string:
@@ -529,17 +531,17 @@ new_string:
     print(f"[System] Moved JSON and {img_count} images to Project folders.")
 ```
 
--x[ ] **Step 7: Compile-check the file**
+- [ ] **Step 7: Compile-check the file**
 
 Run: `python -m py_compile Voyageur/A.py`
 Expected: no output, exit code 0.
 
--x[ ] **Step 8: Run the full test suite to confirm nothing broke**
+- [ ] **Step 8: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS.
 
--x[ ] **Step 9: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add Voyageur/A.py
@@ -559,7 +561,7 @@ git commit -m "Consolidate A.py's gather boilerplate into _gather_helpers"
 
 Same test-cycle shape as Task 2: compile check plus full-suite regression (no new tests — `FS.py`'s `main()` has no existing test coverage of this logic, and this is a verbatim-lift refactor).
 
--x[ ] **Step 1: Update the import block**
+- [ ] **Step 1: Update the import block**
 
 ```python
 old_string:
@@ -610,7 +612,7 @@ from _gather_helpers import (
 
 Note: `time` stays imported — `_read_text_with_retry`/`_unlink_with_retry` (FS.py's own local retry helpers, not moved) still call `time.sleep(delay)`.
 
--x[ ] **Step 2: Replace the browser-launch block**
+- [ ] **Step 2: Replace the browser-launch block**
 
 ```python
 old_string:
@@ -627,7 +629,7 @@ new_string:
     start_time = launch_gather_browser(url)
 ```
 
--x[ ] **Step 3: Replace the download-polling block**
+- [ ] **Step 3: Replace the download-polling block**
 
 ```python
 old_string:
@@ -669,7 +671,7 @@ new_string:
     raw_json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "raw gather JSON")
 ```
 
--x[ ] **Step 4: Replace the Archivist `.env` write-back call**
+- [ ] **Step 4: Replace the Archivist `.env` write-back call**
 
 ```python
 old_string:
@@ -681,7 +683,7 @@ new_string:
     write_archivist_json_file(final_json.name)
 ```
 
--x[ ] **Step 5: Replace the image-directory resolution block**
+- [ ] **Step 5: Replace the image-directory resolution block**
 
 ```python
 old_string:
@@ -703,7 +705,7 @@ new_string:
     img_target_dir = resolve_census_image_dir(base_img_setting, program_dir, census_folder, location_folder)
 ```
 
--x[ ] **Step 6: Replace the image-move loop**
+- [ ] **Step 6: Replace the image-move loop**
 
 ```python
 old_string:
@@ -731,17 +733,17 @@ new_string:
     print(f"[System] Moved {img_count} image(s) to Project folder.")
 ```
 
--x[ ] **Step 7: Compile-check the file**
+- [ ] **Step 7: Compile-check the file**
 
 Run: `python -m py_compile Voyageur/FS.py`
 Expected: no output, exit code 0.
 
--x[ ] **Step 8: Run the full test suite to confirm nothing broke**
+- [ ] **Step 8: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS.
 
--x[ ] **Step 9: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add Voyageur/FS.py
@@ -760,7 +762,7 @@ git commit -m "Consolidate FS.py's gather boilerplate into _gather_helpers"
 - Consumes: `A.main()`, `FS.main()`, `LAC.main()` — no signature requirements, called with no arguments; each reads its own CLI args from `sys.argv`.
 - Produces: nothing consumed by later tasks. `Scriptorium.py` (Task 5) already launches `Voyageur/Voyageur.py` as a subprocess with the source code as its first CLI argument — that contract is unchanged, only what happens inside the subprocess changes.
 
--x[ ] **Step 1: Write the failing dispatcher tests**
+- [ ] **Step 1: Write the failing dispatcher tests**
 
 Create `Voyageur/tests/test_voyageur_dispatcher.py`:
 
@@ -805,12 +807,12 @@ def test_main_rejects_missing_source(monkeypatch, capsys):
     assert exc_info.value.code == 1
 ```
 
--x[ ] **Step 2: Run the new tests to verify they fail**
+- [ ] **Step 2: Run the new tests to verify they fail**
 
 Run: `pytest Voyageur/tests/test_voyageur_dispatcher.py -v`
 Expected: FAIL — `Voyageur.main()` currently dispatches via `_SOURCE_MAINS` without stripping `sys.argv[1]` first, and the old `Voyageur.py` still contains the full 1300-line fork (importing it directly executes all the folded-in module-level code, which is not itself a failure, but the mode-token-stripping assertion fails since the current `main()` never deletes `sys.argv[1]`).
 
--x[ ] **Step 3: Overwrite Voyageur.py entirely**
+- [ ] **Step 3: Overwrite Voyageur.py entirely**
 
 This is a full-file replacement (use the Write tool, not a targeted edit) — every
 folded-in section of the current ~1297-line file (shared utilities, census schema,
@@ -852,17 +854,17 @@ if __name__ == "__main__":
     main()
 ```
 
--x[ ] **Step 4: Run the new tests to verify they pass**
+- [ ] **Step 4: Run the new tests to verify they pass**
 
 Run: `pytest Voyageur/tests/test_voyageur_dispatcher.py -v`
 Expected: PASS (5 tests)
 
--x[ ] **Step 5: Run the full test suite to confirm nothing broke**
+- [ ] **Step 5: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS.
 
--x[ ] **Step 6: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add Voyageur/Voyageur.py Voyageur/tests/test_voyageur_dispatcher.py
@@ -882,7 +884,7 @@ git commit -m "Rewrite Voyageur.py as a thin dispatcher to A.py/FS.py/LAC.py"
 
 No existing automated test coverage exists for `Scriptorium.py` (a CustomTkinter GUI class with no test file). This task's test cycle is a compile check and full-suite regression; end-to-end correctness is verified manually in Task 6.
 
--x[ ] **Step 1: Update the LAC dispatch branch**
+- [ ] **Step 1: Update the LAC dispatch branch**
 
 ```python
 old_string:
@@ -909,17 +911,17 @@ new_string:
                     args.extend(["reel", "--url", url])
 ```
 
--x[ ] **Step 2: Compile-check the file**
+- [ ] **Step 2: Compile-check the file**
 
 Run: `python -m py_compile Scriptorium.py`
 Expected: no output, exit code 0.
 
--x[ ] **Step 3: Run the full test suite to confirm nothing broke**
+- [ ] **Step 3: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS (Scriptorium.py has no test file of its own to run).
 
--x[ ] **Step 4: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add Scriptorium.py
@@ -936,27 +938,27 @@ git commit -m "Fix LAC dispatch to send the volume/reel subcommand token LAC.py 
 
 This is the first time the GUI's A/FS/LAC buttons will run the maintained code path (Tasks 1-4) in production, and the first time the LAC subcommand fix (Task 5) is exercised against the real `LAC.py`. Per the spec's Testing section, this must be run manually, not automated.
 
--x[ ] **Step 1: Run the full automated suite one more time as a final gate**
+- [ ] **Step 1: Run the full automated suite one more time as a final gate**
 
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS.
 
--x[ ] **Step 2: Launch Scriptorium.py and run an Ancestry (A) gather against a real record**
+- [ ] **Step 2: Launch Scriptorium.py and run an Ancestry (A) gather against a real record**
 
 Set `CENSUS_URL` in the Toolbox settings to a real Ancestry census record URL, click the Ancestry gather button, and confirm: browser opens, JSON and images land in the expected project folders, and Archivist's `JSON_FILE` setting is updated. Confirm console output matches the existing `[System] ...` messages.
 
--x[ ] **Step 3: Run a FamilySearch (FS) gather against a real record**
+- [ ] **Step 3: Run a FamilySearch (FS) gather against a real record**
 
 Same as Step 2, using `FS_URL` and a real FamilySearch record page. Confirm both the census-family and non-census-family code paths still work if you have a record of each available.
 
--x[ ] **Step 4: Run an LAC volume harvest**
+- [ ] **Step 4: Run an LAC volume harvest**
 
 Set `LAC_HARVEST_VOLUME` to a real volume number, click the LAC harvest button, and confirm the subprocess receives `LAC volume --volume <number>` and the harvest completes (per the project's existing LAC-network guidance — do not run this if LAC.py/network access is currently blocked per Claude issue #81159; if blocked, defer this step and note it).
 
--x[ ] **Step 5: Run an LAC reel harvest**
+- [ ] **Step 5: Run an LAC reel harvest**
 
 Set `LAC_URL` to a real Canadiana IIIF URL (clear `LAC_HARVEST_VOLUME` first, since volume takes priority), click the LAC harvest button, and confirm the subprocess receives `LAC reel --url <url>` and the harvest completes. Same network-access caveat as Step 4.
 
--x[ ] **Step 6: Report results**
+- [ ] **Step 6: Report results**
 
 No commit for this task. If any manual check fails, stop and fix the regression as a new task before considering this plan complete — do not mark the branch ready to ship with a known-broken manual check.
