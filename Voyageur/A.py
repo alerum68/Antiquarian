@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 import census_schema
 from _gather_helpers import (
     cleanup_checkpoint_files,
+    cleanup_stale_gather_files,
     launch_gather_browser,
     move_downloaded_images,
     move_with_retry,
@@ -73,6 +74,7 @@ def main() -> Path:
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("A_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
+    on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
     # Matches Scriptorium.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
@@ -88,8 +90,6 @@ def main() -> Path:
 
     print(f"[System] Extracted -> DBID: {dbid} | Start ID: {start_id}")
 
-    start_time = launch_gather_browser(url)
-
     # Voyageur.js downloads via plain <a download> rather than GM_download (see CHANGELOG -
     # GM_download's permission grant proved unreliable). Chrome replaces "/" in a download
     # attribute with "_" instead of creating subfolders, so these land flat in the Downloads
@@ -99,6 +99,14 @@ def main() -> Path:
     downloads_dir = Path.home() / "Downloads"
     json_prefix = "TMP_A_"
     image_prefix = "TMP_A_Images_"
+    # A previous run that crashed/was killed mid-gather can leave same-named TMP_A_* files
+    # behind; if still present when the new download lands, Chrome renames it to
+    # "foo (1).json"/"foo (1).jpg" instead of overwriting, and that (1) survives into the
+    # final output name. Clearing them first removes the actual cause, not just a symptom.
+    cleanup_stale_gather_files(downloads_dir, json_prefix, image_prefix)
+
+    start_time = launch_gather_browser(url)
+
     json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "Final JSON")
 
     print("\n[System] Processing extracted files...")
@@ -107,18 +115,22 @@ def main() -> Path:
     json_target_dir.mkdir(parents=True, exist_ok=True)
 
     final_json = json_target_dir / json_file.name[len(json_prefix):]
-    move_with_retry(json_file, final_json)
+    json_status = move_with_retry(json_file, final_json, on_collision=on_collision)
     cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
 
     # Normalize at gather time: translate Ancestry's own raw column header text into the
     # shared record schema's field names via the declarative field map, so Archivist never
     # has to guess among several possible header spellings downstream. Overwrites the same
-    # file in place - Archivist still just reads whatever JSON_FILE points to.
-    with open(final_json, "r", encoding="utf-8") as f:
-        raw_gather = json.load(f)
-    normalized = normalize_ancestry_census_gather(raw_gather, dbid)
-    with open(final_json, "w", encoding="utf-8") as f:
-        json.dump(normalized, f, indent=2, ensure_ascii=False)
+    # file in place - Archivist still just reads whatever JSON_FILE points to. Skipped when
+    # json_status == "skipped": that means an existing final_json was kept as-is (collision
+    # policy), and it was already normalized whenever it was first produced - leaving it
+    # untouched is what "skip" is supposed to mean.
+    if json_status == "moved":
+        with open(final_json, "r", encoding="utf-8") as f:
+            raw_gather = json.load(f)
+        normalized = normalize_ancestry_census_gather(raw_gather, dbid)
+        with open(final_json, "w", encoding="utf-8") as f:
+            json.dump(normalized, f, indent=2, ensure_ascii=False)
 
     # Persist this as the JSON_FILE setting immediately, before anything below (the image
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
@@ -146,8 +158,12 @@ def main() -> Path:
     # directly by the user) is used as-is, never re-nested.
     img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
 
-    img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)
-    print(f"[System] Moved JSON and {img_count} images to Project folders.")
+    img_moved, img_skipped, img_failed = move_downloaded_images(
+        downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)
+    json_note = "moved" if json_status == "moved" else "kept existing (skipped)"
+    print(f"[System] JSON {json_note}; moved {img_moved} image(s)"
+          f"{f', skipped {len(img_skipped)}' if img_skipped else ''}"
+          f"{f', {len(img_failed)} FAILED' if img_failed else ''} to Project folders.")
     print(f"[System] Gather complete. Run Archivist's \"Generate GEDCOM\" when you're ready to "
           f"build the GEDCOM ({final_json.name}).")
 

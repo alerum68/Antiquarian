@@ -42,8 +42,8 @@ def test_voyageur_schema_matches_expected_shape():
 
     assert result == {
         "Gather Settings": {"VOYAGEUR_SOURCE": ""},
-        "Ancestry": {"A_URL": ""},
-        "FamilySearch": {"FS_URL": ""},
+        "Ancestry": {"A_URL": "", "GATHER_ON_COLLISION": "overwrite"},
+        "FamilySearch": {"FS_URL": "", "GATHER_ON_COLLISION": "overwrite"},
         "LAC": {
             "LAC_URL": "", "LAC_IMAGE_DIR": "LAC",
             "LAC_HARVEST_VOLUME": "", "LAC_ARCHIVAL_NUMBER": "RG15",

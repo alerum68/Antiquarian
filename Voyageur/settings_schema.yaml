@@ -7,10 +7,20 @@ sections:
     A_URL:
       default: ""
       tooltip: "The web address (URL) of the specific Ancestry.com census page you want to gather."
+    GATHER_ON_COLLISION:
+      default: "overwrite"
+      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file. Applies to both Ancestry and FamilySearch gathers."
+      widget: segmented
+      options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
   FamilySearch:
     FS_URL:
       default: ""
       tooltip: "The web address (URL) of the specific FamilySearch record page you want to gather."
+    GATHER_ON_COLLISION:
+      default: "overwrite"
+      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file. Applies to both Ancestry and FamilySearch gathers."
+      widget: segmented
+      options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
   LAC:
     LAC_URL:
       default: ""
@@ -80,6 +90,7 @@ sections:
       tooltip: "Base URL for the Archives of Manitoba Keystone database search."
 label_overrides:
   VOYAGEUR_SOURCE: "Gather From"
+  GATHER_ON_COLLISION: "On Existing File"
   A_URL: "Ancestry Census URL"
   LAC_URL: "Heritage Canadiana URL"
   FS_URL: "FamilySearch Record URL"

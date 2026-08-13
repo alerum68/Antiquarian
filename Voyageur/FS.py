@@ -37,6 +37,7 @@ from thefuzz import fuzz
 import census_schema
 from _gather_helpers import (
     cleanup_checkpoint_files,
+    cleanup_stale_gather_files,
     launch_gather_browser,
     move_downloaded_images,
     resolve_census_image_dir,
@@ -749,12 +750,11 @@ def main() -> None:
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("FS_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
+    on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
 
     if not url:
         print("[ERROR] Please enter a FamilySearch record URL in the Toolbox settings first.")
         sys.exit(1)
-
-    start_time = launch_gather_browser(url)
 
     # Voyageur.js used GM_download to land these in their own Downloads subfolder, but
     # confirmed live this was unreliable - GM_download's own "downloads" permission grant
@@ -770,6 +770,14 @@ def main() -> None:
     downloads_dir = Path.home() / "Downloads"
     json_prefix = "TMP_FS_"
     image_prefix = "TMP_FS_Images_"
+    # A previous run that crashed/was killed mid-gather can leave same-named TMP_FS_* files
+    # behind; if still present when the new download lands, Chrome renames it to
+    # "foo (1).json"/"foo (1).jpg" instead of overwriting, and that (1) survives into the
+    # final output name. Clearing them first removes the actual cause, not just a symptom.
+    cleanup_stale_gather_files(downloads_dir, json_prefix, image_prefix)
+
+    start_time = launch_gather_browser(url)
+
     raw_json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "raw gather JSON")
 
     raw_data = json.loads(_read_text_with_retry(raw_json_file))
@@ -800,7 +808,14 @@ def main() -> None:
     # all (e.g. a record with no state/county/city stated anywhere).
     out_name = clean_name or raw_json_file.name[len(json_prefix):]
     final_json = json_target_dir / out_name
-    final_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
+    # Unlike A.py, there's no separate downloaded file to move here - final_data was already
+    # built in Python, so a "skip" collision just means don't overwrite the existing file
+    # with this run's data (the raw scrape is still discarded either way, same as "moved").
+    if on_collision == "skip" and final_json.exists():
+        json_status = "skipped"
+    else:
+        final_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        json_status = "moved"
     _unlink_with_retry(raw_json_file)
     cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
 
@@ -818,8 +833,12 @@ def main() -> None:
     base_img_setting = "Census"
     img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
 
-    img_count = move_downloaded_images(downloads_dir, image_prefix, start_time, img_target_dir)
-    print(f"[System] Moved {img_count} image(s) to Project folder.")
+    img_moved, img_skipped, img_failed = move_downloaded_images(
+        downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)
+    json_note = "moved" if json_status == "moved" else "kept existing (skipped)"
+    print(f"[System] JSON {json_note}; moved {img_moved} image(s)"
+          f"{f', skipped {len(img_skipped)}' if img_skipped else ''}"
+          f"{f', {len(img_failed)} FAILED' if img_failed else ''} to Project folder.")
 
     # JSON_FILE is read by Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py),
     # so it's written to Archivist's own .env, not this script's own subfolder one -
