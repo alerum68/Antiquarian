@@ -29,6 +29,14 @@
 * ✅ Verified: `/global/health`, `/project`, `/project/current`, `/session` (200, auth required).
 * 📱 Phone client: OpenCode Mobile (Play Store) → `http://100.101.188.72:4096`, user `opencode`, pw in `.agent/.env`. If "no projects", refresh/reopen app.
 
+## Infra: SSH to Alienware (2026-08-11) - WORKING
+* ✅ OpenSSH server upgraded 9.5.5.1 → 10.0.0.0p2 (`C:\WINDOWS\System32\OpenSSH`, backup `OpenSSH.bak-9.5`); service `sshd` LocalSystem/Automatic, port 22; firewall `OpenSSH-Server-In-TCP`.
+* ✅ Local admin `remote` created (SSH-only) — key auth verified on localhost + Tailnet IP `100.89.32.37` (`Accepted publickey` in event log).
+* ✅ Root cause of "Unknown error [preauth]" after `Postponed publickey`: private key `id_ed25519_scriptorium` was **passphrase-encrypted**; BatchMode clients can't sign → client RST (10054) → server logs the crash. Server + S4U were healthy all along (proven via `-ddd` harness + 4624 audits).
+* ✅ Fix: new no-passphrase key `id_ed25519_remote` at `administrators_authorized_keys:2`; old key still works in interactive clients.
+* ✅ RDP dropped (Win11 Home can't host); SSH is the remote path; notes in `Working/remote-ssh.md` (gitignored).
+* ✅ JetBrains Gateway fixed (2026-08-11 eve): (1) `HKLM:\SOFTWARE\OpenSSH\DefaultShell` `cmd.exe`→`C:\Program Files\PowerShell\7\pwsh.exe` + sshd restart (Gateway needs PowerShell); (2) `remote` had no real profile (`USERPROFILE` fell back to `C:\WINDOWS`) — SSH session created `C:\Users\remote` hive files, manually added missing ProfileList entry (`...ProfileList\S-1-5-21-2115311038-1782867078-1966355712-1006`, Flags/State=0) + icacls grant. Verified: `USERPROFILE=C:\Users\remote`, HKCU loads, profile writable.
+
 ## Current Task: UI Cleanup - Auto Image Dirs & Tab Separation
 * ✅ Removed `CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` from Global Settings (`Scriptorium.py`).
 * ✅ Removed `*_IMAGE_DIR` (e.g. `CHURCH_IMAGE_DIR`, `SCRIP_IMAGE_DIR`) from `Paleographer/settings_schema.yaml` and `.pmt` field_remaps.
