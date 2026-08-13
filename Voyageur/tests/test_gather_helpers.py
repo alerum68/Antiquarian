@@ -210,6 +210,30 @@ def test_cleanup_stale_gather_files_leaves_other_prefixes_and_unrelated_files_al
     assert unrelated.exists()
 
 
+def test_atomic_write_bytes_writes_content_and_leaves_no_temp_file(tmp_path):
+    dest = tmp_path / "out.jpg"
+
+    gh.atomic_write_bytes(dest, b"hello")
+
+    assert dest.read_bytes() == b"hello"
+    assert not dest.with_suffix(".jpg.tmp").exists()
+
+
+def test_atomic_write_bytes_leaves_no_truncated_file_at_dest_on_failure(tmp_path, monkeypatch):
+    dest = tmp_path / "out.jpg"
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(gh.Path, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        gh.atomic_write_bytes(dest, b"hello")
+
+    assert not dest.exists()
+    assert not dest.with_suffix(".jpg.tmp").exists()
+
+
 def test_resolve_census_image_dir_absolute_base(tmp_path):
     abs_base = tmp_path / "AbsCensus"
 

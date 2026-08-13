@@ -18,6 +18,23 @@ from pathlib import Path
 from dotenv import set_key
 
 
+def atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Writes data to path via a temp file + atomic rename, so a crash/interruption
+    mid-write never leaves a truncated file sitting at the final path - a caller that
+    skips re-downloading an already-existing file would otherwise treat that truncated
+    file as complete forever. On any failure the temp file is removed and the original
+    exception re-raised; the final path is never touched unless the write fully
+    succeeded."""
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    try:
+        with open(tmp_path, "wb") as f:
+            f.write(data)
+        tmp_path.replace(path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def move_with_retry(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5,
                     on_collision: str = "overwrite") -> str:
     """Moves src to dst, retrying on transient Windows file-lock errors. Returns "moved" or

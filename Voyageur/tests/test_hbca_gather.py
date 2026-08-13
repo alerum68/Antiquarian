@@ -15,6 +15,8 @@ filter_entries_by_letter = _hbca_mod.filter_entries_by_letter
 load_checkpoint = _hbca_mod.load_checkpoint
 parse_biographical_index_html = _hbca_mod.parse_biographical_index_html
 save_checkpoint = _hbca_mod.save_checkpoint
+download_keystone_media = _hbca_mod.download_keystone_media
+gather_hbca_sheets = _hbca_mod.gather_hbca_sheets
 
 
 SAMPLE_INDEX_HTML = """
@@ -108,6 +110,160 @@ def test_checkpoint_roundtrip(tmp_path):
 
     loaded = load_checkpoint(cp_file)
     assert loaded == downloaded
+
+
+class _FakeKeystoneResponse:
+    def __init__(self, status_code, content=b""):
+        self.status_code = status_code
+        self.content = content
+
+
+class _FakeKeystoneSession:
+    def __init__(self, responses):
+        self._responses = responses
+
+    def get(self, url, headers=None, timeout=None):
+        return self._responses[url]
+
+
+def test_download_keystone_media_reports_non_200_response(tmp_path, capsys):
+    session = _FakeKeystoneSession({"https://example.com/missing.jpg": _FakeKeystoneResponse(404)})
+
+    result = download_keystone_media(["https://example.com/missing.jpg"], tmp_path, session=session)
+
+    assert result == []
+    assert not (tmp_path / "missing.jpg").exists()
+    out = capsys.readouterr().out
+    assert "WARN" in out
+    assert "404" in out
+
+
+def test_download_keystone_media_downloads_successful_url(tmp_path):
+    session = _FakeKeystoneSession({"https://example.com/page.jpg": _FakeKeystoneResponse(200, b"image-bytes")})
+
+    result = download_keystone_media(["https://example.com/page.jpg"], tmp_path, session=session)
+
+    assert result == [str(tmp_path / "page.jpg")]
+    assert (tmp_path / "page.jpg").read_bytes() == b"image-bytes"
+
+
+def test_download_keystone_media_leaves_no_truncated_file_on_write_failure(tmp_path, monkeypatch):
+    session = _FakeKeystoneSession({"https://example.com/page.jpg": _FakeKeystoneResponse(200, b"image-bytes")})
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_hbca_mod.Path, "replace", fail_replace)
+
+    result = download_keystone_media(["https://example.com/page.jpg"], tmp_path, session=session)
+
+    assert result == []
+    assert not (tmp_path / "page.jpg").exists()
+
+
+def test_gather_hbca_sheets_one_entry_failure_does_not_crash_the_batch(tmp_path, monkeypatch):
+    """Regression test: process_entry ran inside a ThreadPoolExecutor with no try/except
+    around its own download call, so one entry's network exception used to propagate out
+    of future.result() and crash the entire multi-threaded gather."""
+    index_html = (
+        '<html><body>'
+        '<a href="a/good.pdf">Good, Person</a>'
+        '<a href="a/bad.pdf">Bad, Person</a>'
+        '</body></html>'
+    )
+
+    class FakeIndexResponse:
+        text = index_html
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, headers=None, timeout=None):
+        return FakeIndexResponse()
+
+    monkeypatch.setattr(_hbca_mod.requests, "get", fake_get)
+
+    class FakeEntrySession:
+        def get(self, url, headers=None, timeout=None):
+            if "bad" in url:
+                raise ConnectionError("network down")
+            return _FakeKeystoneResponse(200, b"pdf-bytes")
+
+    monkeypatch.setattr(_hbca_mod.requests, "Session", lambda: FakeEntrySession())
+    monkeypatch.setattr(_hbca_mod, "extract_text_from_pdf", lambda path: "")
+
+    new_downloads = gather_hbca_sheets(
+        index_url="https://fake.url/",
+        image_dir=tmp_path / "images",
+        master_db_path=tmp_path / "MasterDB_HBCA.json",
+        checkpoint_dir=tmp_path / "checkpoint",
+        media_dir=tmp_path / "media",
+        resolve_keystone=False,
+        download_keystone=False,
+        max_workers=1,
+    )
+
+    assert new_downloads == 1
+    assert (tmp_path / "images" / "Bios" / "a" / "good.pdf").exists()
+    assert not (tmp_path / "images" / "Bios" / "a" / "bad.pdf").exists()
+
+
+def test_gather_hbca_sheets_one_entry_write_failure_does_not_crash_the_batch(tmp_path, monkeypatch):
+    """Regression test: the first fix round only wrapped the network GET in try/except,
+    leaving the atomic_write_bytes() call right below it unguarded - a write-side failure
+    (e.g. disk full) still propagated through future.result() and crashed the whole batch,
+    exactly the failure mode the GET-side fix claimed to have eliminated. Caught by
+    /code-review before this landed."""
+    index_html = (
+        '<html><body>'
+        '<a href="a/good.pdf">Good, Person</a>'
+        '<a href="a/bad.pdf">Bad, Person</a>'
+        '</body></html>'
+    )
+
+    class FakeIndexResponse:
+        text = index_html
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    def fake_get(url, headers=None, timeout=None):
+        return FakeIndexResponse()
+
+    monkeypatch.setattr(_hbca_mod.requests, "get", fake_get)
+
+    class FakeEntrySession:
+        def get(self, url, headers=None, timeout=None):
+            return _FakeKeystoneResponse(200, b"pdf-bytes")
+
+    monkeypatch.setattr(_hbca_mod.requests, "Session", lambda: FakeEntrySession())
+    monkeypatch.setattr(_hbca_mod, "extract_text_from_pdf", lambda path: "")
+
+    real_replace = _hbca_mod.Path.replace
+
+    def fail_replace_for_bad(self, target):
+        if "bad" in self.name:
+            raise OSError("disk full")
+        return real_replace(self, target)
+
+    monkeypatch.setattr(_hbca_mod.Path, "replace", fail_replace_for_bad)
+
+    new_downloads = gather_hbca_sheets(
+        index_url="https://fake.url/",
+        image_dir=tmp_path / "images",
+        master_db_path=tmp_path / "MasterDB_HBCA.json",
+        checkpoint_dir=tmp_path / "checkpoint",
+        media_dir=tmp_path / "media",
+        resolve_keystone=False,
+        download_keystone=False,
+        max_workers=1,
+    )
+
+    assert new_downloads == 1
+    assert (tmp_path / "images" / "Bios" / "a" / "good.pdf").exists()
+    assert not (tmp_path / "images" / "Bios" / "a" / "bad.pdf").exists()
 
 
 def test_parse_biographical_index_html_extracts_letter():

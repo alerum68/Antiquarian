@@ -29,6 +29,11 @@ try:
 except (ImportError, ValueError):
     import lac_client
 
+try:
+    from ._gather_helpers import atomic_write_bytes
+except (ImportError, ValueError):
+    from _gather_helpers import atomic_write_bytes
+
 
 # ==========================================
 # PATH & CONFIG SETUP
@@ -198,12 +203,14 @@ def download_manifest(manifest_url: str) -> Dict[str, Any]:
 
 
 def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
-                    master_db_path: str, document_type: str, collection_title: str) -> None:
+                    master_db_path: str, document_type: str, collection_title: str) -> Dict[str, str]:
     """Loops through the manifest canvases, downloads max-resolution files, and seeds
     Paleographer's own MASTER_DB with one Commissioner-shaped scaffold sheet per canvas -
     for both a freshly downloaded image and one already on disk from a prior run, so a
     MASTER_DB reset/first-time run still ends up fully seeded. See the
-    Voyageur-Parish-Scrip-scaffold design spec."""
+    Voyageur-Parish-Scrip-scaffold design spec. Returns a {canvas number: error} dict of
+    any canvases that failed to download - a failure is tracked and reported, not just
+    printed and forgotten, mirroring download_volume_assets's failed_pids."""
     from Commissioner.record_registry import build_empty_sheet
 
     if "sequences" in manifest_data and manifest_data["sequences"]:
@@ -223,6 +230,7 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
     print(f"[Info] Found {total} images to download.")
     session = requests.Session()
     master_data = load_master_db(master_db_path, collection_title, document_type)
+    failed: Dict[str, str] = {}
 
     for i, canvas in enumerate(canvases, 1):
         try:
@@ -256,8 +264,7 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
             if not os.path.exists(filepath):
                 img_resp = session.get(img_id, timeout=20)
                 img_resp.raise_for_status()
-                with open(filepath, 'wb') as f:
-                    f.write(img_resp.content)
+                atomic_write_bytes(Path(filepath), img_resp.content)
 
             new_sheet = build_empty_sheet(filename, "jpg", page_id=page_id)
             append_scaffold_sheets(master_data, [new_sheet])
@@ -266,8 +273,14 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
 
         except Exception as e:
             print(f"\n[Warning] Failed to download image {i}: {e}")
+            failed[str(i)] = str(e)
 
-    print(f"\n\n[System] LAC Download for {roll_num} completed successfully!")
+    if failed:
+        print(f"\n[Warning] {len(failed)} image(s) failed to download: {', '.join(sorted(failed))}")
+        print(f"\n\n[System] LAC Download for {roll_num} completed with {len(failed)} failure(s).")
+    else:
+        print(f"\n\n[System] LAC Download for {roll_num} completed successfully!")
+    return failed
 
 
 # ==========================================
@@ -293,7 +306,7 @@ def download_pid_bundle(pid: str, media_dir: str,
         file_path = pid_dir / f"{asset.asset_id}.{ext}"
         if not file_path.exists():
             data = lac_client.download_asset(asset.asset_id, asset.op)
-            file_path.write_bytes(data)
+            atomic_write_bytes(file_path, data)
 
         entries.append({
             "document_type": document_type_override or _document_type_for_asset(asset),

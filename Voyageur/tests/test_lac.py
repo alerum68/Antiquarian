@@ -296,6 +296,100 @@ def test_download_images_writes_scaffold_sheet_per_canvas(monkeypatch, tmp_path)
     assert master_data["sheets"][0]["page_id"] == "roll1_0001"
 
 
+def test_download_images_tracks_failure_and_continues_with_remaining_canvases(monkeypatch, tmp_path):
+    manifest_data = {
+        "sequences": [{"canvases": [
+            {"images": [{"resource": {"@id": "https://example.com/bad.jpg"}}]},
+            {"images": [{"resource": {"@id": "https://example.com/good.jpg"}}]},
+        ]}],
+    }
+
+    class FakeResponse:
+        content = b"fake-image-bytes"
+
+        def raise_for_status(self):
+            pass
+
+    class FakeSession:
+        def get(self, url, timeout=None):
+            if "bad" in url:
+                raise ConnectionError("network down")
+            return FakeResponse()
+
+    monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
+
+    out_dir = str(tmp_path / "images")
+    os.makedirs(out_dir, exist_ok=True)
+    master_db_path = str(tmp_path / "parish_register.json")
+
+    failed = LAC.download_images(manifest_data, out_dir, "roll1", master_db_path, "Parish", "Test Collection")
+
+    assert failed == {"1": "network down"}
+    master_data = LAC.load_master_db(master_db_path, "Test Collection", "Parish")
+    assert len(master_data["sheets"]) == 1
+    assert master_data["sheets"][0]["document_metadata"]["file_name"] == "roll1_0002.jpg"
+
+
+def test_download_images_does_not_claim_success_when_some_canvases_failed(monkeypatch, tmp_path, capsys):
+    """Caught by /code-review: the completion message printed unconditionally, right after
+    the failure warning, misleadingly claiming "completed successfully!" even when the
+    failed dict this same diff added already had the data to know better."""
+    manifest_data = {
+        "sequences": [{"canvases": [
+            {"images": [{"resource": {"@id": "https://example.com/bad.jpg"}}]},
+        ]}],
+    }
+
+    class FakeSession:
+        def get(self, url, timeout=None):
+            raise ConnectionError("network down")
+
+    monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
+
+    out_dir = str(tmp_path / "images")
+    os.makedirs(out_dir, exist_ok=True)
+    master_db_path = str(tmp_path / "parish_register.json")
+
+    LAC.download_images(manifest_data, out_dir, "roll1", master_db_path, "Parish", "Test Collection")
+
+    out = capsys.readouterr().out
+    assert "completed successfully" not in out
+
+
+def test_download_images_leaves_no_truncated_file_when_write_fails(monkeypatch, tmp_path):
+    manifest_data = {
+        "sequences": [{"canvases": [
+            {"images": [{"resource": {"@id": "https://example.com/img1.jpg"}}]},
+        ]}],
+    }
+
+    class FakeResponse:
+        content = b"fake-image-bytes"
+
+        def raise_for_status(self):
+            pass
+
+    class FakeSession:
+        def get(self, url, timeout=None):
+            return FakeResponse()
+
+    monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(LAC.Path, "replace", fail_replace)
+
+    out_dir = str(tmp_path / "images")
+    os.makedirs(out_dir, exist_ok=True)
+    master_db_path = str(tmp_path / "parish_register.json")
+
+    failed = LAC.download_images(manifest_data, out_dir, "roll1", master_db_path, "Parish", "Test Collection")
+
+    assert "1" in failed
+    assert not (Path(out_dir) / "roll1_0001.jpg").exists()
+
+
 def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch, tmp_path):
     manifest_data = {
         "sequences": [{"canvases": [

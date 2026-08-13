@@ -27,6 +27,11 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+try:
+    from ._gather_helpers import atomic_write_bytes
+except (ImportError, ValueError):
+    from _gather_helpers import atomic_write_bytes
+
 load_dotenv(_REPO_ROOT / ".env", override=False)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
 
@@ -577,8 +582,10 @@ def download_keystone_media(
             try:
                 resp = client.get(url, headers=headers, timeout=30)
                 if resp.status_code == 200:
-                    with open(dest_file, "wb") as f:
-                        f.write(resp.content)
+                    atomic_write_bytes(dest_file, resp.content)
+                else:
+                    print(f"[WARN] Failed to download media from {url}: HTTP {resp.status_code}")
+                    continue
             except Exception as e:
                 print(f"[WARN] Failed to download media from {url}: {e}")
                 continue
@@ -780,13 +787,20 @@ def gather_hbca_sheets(
         session = requests.Session()
         if not target_file.exists():
             log(f"Downloading {entry.file_name} from {entry.pdf_url}...")
-            pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)
-            if pdf_resp.status_code == 200:
-                with open(target_file, "wb") as f:
-                    f.write(pdf_resp.content)
-                log(f"Downloaded {entry.file_name} ({len(pdf_resp.content):,} bytes)")
-            else:
-                log(f"[WARN] Failed to download {entry.pdf_url}: HTTP {pdf_resp.status_code}")
+            try:
+                pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)
+                if pdf_resp.status_code == 200:
+                    atomic_write_bytes(target_file, pdf_resp.content)
+                    log(f"Downloaded {entry.file_name} ({len(pdf_resp.content):,} bytes)")
+                else:
+                    log(f"[WARN] Failed to download {entry.pdf_url}: HTTP {pdf_resp.status_code}")
+                    return False
+            except Exception as e:
+                # A single entry's network or write failure must not propagate out of
+                # this ThreadPoolExecutor task and crash the whole batch via
+                # future.result() - covers both the GET and the atomic_write_bytes call,
+                # not just the GET (a write-side failure used to still crash the batch).
+                log(f"[WARN] Failed to download {entry.pdf_url}: {e}")
                 return False
 
         raw_text = extract_text_from_pdf(target_file)
