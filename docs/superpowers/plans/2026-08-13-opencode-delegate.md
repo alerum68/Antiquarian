@@ -34,11 +34,11 @@
 **Interfaces:**
 - Produces: a verified fact that `opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent implementer|code-reviewer --format json "<prompt>"` runs the named agent directly (no silent fallback), which Task 2's subagent definition depends on.
 
-- [ ] **1a. Edit `.opencode/agents/implementer.md`:** change line 3 from `mode: subagent` to `mode: all`. No other change.
+- [x] **1a. Edit `.opencode/agents/implementer.md`:** change line 3 from `mode: subagent` to `mode: all`. No other change.
 
-- [ ] **1b. Edit `.opencode/agents/code-reviewer.md`:** change line 3 from `mode: subagent` to `mode: all`. No other change.
+- [x] **1b. Edit `.opencode/agents/code-reviewer.md`:** change line 3 from `mode: subagent` to `mode: all`. No other change.
 
-- [ ] **1c. Verify no silent fallback on `implementer`:**
+- [x] **1c. Verify no silent fallback on `implementer`:**
 
 Run:
 ```bash
@@ -47,7 +47,7 @@ opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent
 ```
 Expected: no `Falling back to default agent` line in the output; the JSON stream contains a `"type":"text"` part with `"text":"READY"`.
 
-- [ ] **1d. Verify no silent fallback on `code-reviewer`, and confirm it still cannot write:**
+- [x] **1d. Verify no silent fallback on `code-reviewer`, and confirm it still cannot write:**
 
 Run:
 ```bash
@@ -70,7 +70,7 @@ No commit — both files are gitignored (`.opencode/` is untracked per `.gitigno
 - Consumes: Task 1's verified fact that `implementer`/`code-reviewer` accept direct `--agent` invocation.
 - Produces: the subagent Claude Code will select when a task's description matches "free, key-less delegation via OpenCode/DeepSeek."
 
-- [ ] **2a. Write the file exactly as follows:**
+- [x] **2a. Write the file exactly as follows:**
 
 ```markdown
 ---
@@ -224,7 +224,7 @@ they may stall waiting for a file path that does not exist.
   interactively rather than retrying headless.
 ```
 
-- [ ] **2b. Verify the frontmatter is well-formed YAML with the required keys:**
+- [x] **2b. Verify the frontmatter is well-formed YAML with the required keys:**
 
 Run:
 ```bash
@@ -253,7 +253,7 @@ No commit — `.claude/` is gitignored (`.gitignore:12`).
 **Files:**
 - Modify: `.claude/CLAUDE.md`
 
-- [ ] **3a. Replace the existing section:**
+- [x] **3a. Replace the existing section:**
 
 Old text (verbatim, to locate and replace):
 ```markdown
@@ -272,7 +272,7 @@ New text:
 * **Protocol:** Inform the user when deploying Gemini or OpenCode. After the delegate completes, verify its work (run tests, review the diff) before treating it as done — a delegate's self-report is a claim, not evidence — then summarize briefly and implement/finalize.
 ```
 
-- [ ] **3b. Verify the edit landed:**
+- [x] **3b. Verify the edit landed:**
 
 Run:
 ```bash
@@ -294,7 +294,7 @@ No commit — `.claude/` is gitignored.
 - Consumes: Task 1's fixed invocation contract, Task 2's documented command syntax.
 - Produces: empirical proof the bridge works, before `opencode-delegate` is trusted in a real session.
 
-- [ ] **4a. Write-mode smoke test — dispatch:**
+- [x] **4a. Write-mode smoke test — dispatch:**
 
 Run:
 ```bash
@@ -303,7 +303,7 @@ opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent
 cat "$TEMP/opencode_smoke_write.json" | tail -c 2000
 ```
 
-- [ ] **4b. Independently verify — do not trust the reply:**
+- [x] **4b. Independently verify — do not trust the reply:**
 
 Run:
 ```bash
@@ -313,7 +313,7 @@ python -m pytest DEV/tests/test_opencode_smoke.py -q
 ```
 Expected: the `grep -c` prints `0` (no silent fallback); `pytest` shows `1 passed`. Also open the JSON file and confirm the last event is a `step_finish` with `"reason":"stop"` (a parseable final event, not a truncated/errored stream).
 
-- [ ] **4c. Delete the throwaway file:**
+- [x] **4c. Delete the throwaway file:**
 
 Run:
 ```bash
@@ -321,7 +321,7 @@ rm "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium/DEV/tests/test_opencode_
 ```
 No git revert needed — `/DEV/` is gitignored, so the file was never tracked.
 
-- [ ] **4d. Read-only smoke test — dispatch:**
+- [x] **4d. Read-only smoke test — dispatch:**
 
 Run:
 ```bash
@@ -330,7 +330,7 @@ opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent
 cat "$TEMP/opencode_smoke_review.json" | tail -c 2000
 ```
 
-- [ ] **4e. Independently verify:**
+- [x] **4e. Independently verify:**
 
 Run:
 ```bash
@@ -340,21 +340,21 @@ git status --short
 ```
 Expected: `grep -c` prints `0`; `git status --short` prints nothing (working tree unchanged — `code-reviewer` made no writes).
 
-- [ ] **4f. Update `docs/plans/task.md`:** add a dated entry under a new `## OpenCode Delegation Bridge (2026-08-13)` heading summarizing: the `mode: all` fix and why it was necessary (subagents can't be invoked directly, silent 0-exit fallback), the new `.claude/agents/opencode-delegate.md`, the `.claude/CLAUDE.md` update, and both smoke tests' pass/fail result. Do not commit — the user has not asked for a commit on this work.
+- [x] **4f. Update `docs/plans/task.md`:** add a dated entry under a new `## OpenCode Delegation Bridge (2026-08-13)` heading summarizing: the `mode: all` fix and why it was necessary (subagents can't be invoked directly, silent 0-exit fallback), the new `.claude/agents/opencode-delegate.md`, the `.claude/CLAUDE.md` update, and both smoke tests' pass/fail result. Do not commit — the user has not asked for a commit on this work.
 
 ---
 
 ## Verification
 
-- [ ] Task 1: both `.opencode/agents/*.md` files show `mode: all`; direct invocation of both produces no `Falling back to default agent` line; `code-reviewer` still refuses to write.
-- [ ] Task 2: `.claude/agents/opencode-delegate.md` exists, frontmatter parses with `python -c "...yaml.safe_load..."` above, `tools` excludes `Write`/`Edit`, no `hooks` key.
-- [ ] Task 3: `.claude/CLAUDE.md` contains the new three-way delegation section; old two-way section is gone.
-- [ ] Task 4: write-mode smoke test produced a real, passing pytest file (verified independently, not from the reply), then was deleted; read-only smoke test left `git status --short` empty; neither smoke test triggered the silent-fallback warning.
-- [ ] `docs/plans/task.md` updated.
+- [x] Task 1: both `.opencode/agents/*.md` files show `mode: all`; direct invocation of both produces no `Falling back to default agent` line; `code-reviewer` still refuses to write.
+- [x] Task 2: `.claude/agents/opencode-delegate.md` exists, frontmatter parses with `python -c "...yaml.safe_load..."` above, `tools` excludes `Write`/`Edit`, no `hooks` key.
+- [x] Task 3: `.claude/CLAUDE.md` contains the new three-way delegation section; old two-way section is gone.
+- [x] Task 4: write-mode smoke test produced a real, passing pytest file (verified independently, not from the reply), then was deleted; read-only smoke test left `git status --short` empty; neither smoke test triggered the silent-fallback warning.
+- [x] `docs/plans/task.md` updated.
 
 ## Success Criteria
 
-- [ ] Claude Code can delegate bulk/mechanical write-mode work to OpenCode/DeepSeek with no API key and no additional login, on a dedicated branch, with the diff reviewable before merge.
-- [ ] Claude Code can get a free, OpenCode-enforced read-only second opinion via `code-reviewer` with no risk of accidental writes.
-- [ ] Both paths fail loudly (not silently as `build`) on a bad `--agent` name or an un-fixed `mode: subagent` agent.
-- [ ] `.claude/CLAUDE.md` documents both delegation targets and when to pick each.
+- [x] Claude Code can delegate bulk/mechanical write-mode work to OpenCode/DeepSeek with no API key and no additional login, on a dedicated branch, with the diff reviewable before merge.
+- [x] Claude Code can get a free, OpenCode-enforced read-only second opinion via `code-reviewer` with no risk of accidental writes.
+- [x] Both paths fail loudly (not silently as `build`) on a bad `--agent` name or an un-fixed `mode: subagent` agent.
+- [x] `.claude/CLAUDE.md` documents both delegation targets and when to pick each.
