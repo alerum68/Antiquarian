@@ -1634,10 +1634,29 @@ class Scriptorium(ctk.CTk):
     def _voyageur_code_for_label(label: str) -> str:
         return next((c for c, lbl in VOYAGEUR_SOURCES if lbl == label), VOYAGEUR_SOURCES[0][0])
 
+    @staticmethod
+    def _voyageur_visible_sections(label: str) -> Dict[str, Dict[str, str]]:
+        """Fields shown for the given VOYAGEUR_SOURCE label: its own provider section
+        (first, so it's the one expanded by default) plus "Gather Settings", shown
+        regardless of which provider is selected - for settings that apply across
+        multiple/all providers rather than belonging to one source-specific section
+        (currently just VOYAGEUR_SOURCE itself, hidden by the caller's skip_keys; a
+        genuinely cross-provider setting has somewhere to live without being duplicated
+        into every section that happens to use it, the way GATHER_ON_COLLISION currently
+        has to be duplicated into Ancestry and FamilySearch since it's not universal to
+        every provider - LAC and HBCA don't read it)."""
+        result = {}
+        if label in VOYAGEUR_VARS:
+            result[label] = VOYAGEUR_VARS[label]
+        if "Gather Settings" in VOYAGEUR_VARS:
+            result["Gather Settings"] = VOYAGEUR_VARS["Gather Settings"]
+        return result
+
     def _on_voyageur_source_change(self, _value: Optional[str] = None):
         """Rebuilds the settings form and gather button to match the selected repository -
-        each source only shows its own settings section, mirroring how Paleographer's Record
-        Type dropdown filters its own form down to one .pmt's declared sections."""
+        each source shows its own settings section (mirroring how Paleographer's Record
+        Type dropdown filters its own form down to one .pmt's declared sections) plus the
+        always-shown "Gather Settings" section - see _voyageur_visible_sections."""
         label = self.string_vars["VOYAGEUR_SOURCE"].get() or VOYAGEUR_SOURCES[0][1]
         code = self._voyageur_code_for_label(label)
 
@@ -1657,7 +1676,7 @@ class Scriptorium(ctk.CTk):
         if hasattr(self, "voyageur_form_container"):
             for child in self.voyageur_form_container.winfo_children():
                 child.destroy()
-            filtered = {name: fields for name, fields in VOYAGEUR_VARS.items() if name == label}
+            filtered = self._voyageur_visible_sections(label)
             self._build_form_ui(self.voyageur_form_container, filtered, skip_keys={"VOYAGEUR_SOURCE"})
 
     def _build_tab_voyageur(self, frame: ctk.CTkFrame):
