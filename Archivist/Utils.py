@@ -36,13 +36,15 @@ def get_env_int(key: str, default: int) -> int:
 def safe_path(base: str, *parts: str) -> str:
     """Safely joins paths, allowing absolute paths to override the base. If every part is
     blank, returns "" rather than the bare base, so optional overrides (like
-    GEDCOM_OUTPUT_PATH left blank) can still signal "no override" to their callers."""
+    GEDCOM_OUTPUT_PATH left blank) can still signal "no override" to their callers.
+    Always joins with '/', not os.path.join's native separator - these paths end up
+    embedded in GEDCOM text output (FILE tags etc.), which must be OS-independent."""
     non_blank = [p for p in parts if p]
     if not non_blank:
         return ""
     res = base
     for p in non_blank:
-        res = p if os.path.isabs(p) else os.path.join(res, p)
+        res = p if os.path.isabs(p) else f"{res.rstrip('/\\')}/{p}"
     return res
 
 

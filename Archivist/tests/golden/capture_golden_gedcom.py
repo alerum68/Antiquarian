@@ -5,13 +5,15 @@ Task 6's regression test rebuilds the same fixtures through the post-split
 modules and diffs byte-for-byte against these files - run this script again,
 by hand, ONLY if a real (intentional) behavior change is made after the split;
 never re-run it to make a failing regression test pass."""
-import Scrip
-import General as arc
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+import Scrip  # noqa: E402
+import General as arc  # noqa: E402
+import Utils  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).resolve().parent
 
@@ -105,6 +107,9 @@ def _regenerate(fixture: dict, target_software: str, profile) -> str:
     arc.COLLECTION_NAME = ""
     arc.REPOSITORY = ""
     arc.REPOSITORY_LOC = ""
+    # Fixed, deterministic value so goldens don't depend on this machine's real
+    # GENEALOGY_DIR - must match test_archivist_dispatcher.py's own override.
+    arc.IMAGE_DIR = Utils.safe_path("C:/Users/Jason Cole/Documents/Genealogy", "Census")
     arc.GENERAL_CONFIG.clear()
     arc.GENERAL_CONFIG.update(DEFAULT_GENERAL_CONFIG)
     raw = arc.build_gedcom_from_general(fixture, target_software)

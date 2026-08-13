@@ -1086,7 +1086,7 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
         media_title = _ACTIVE_PROFILE.media_caption(sheet, vol, Utils.clean_val(meta.get('pages')))
 
         if media_uid not in printed_media:
-            file_path = os.path.join(IMAGE_DIR, file_name)
+            file_path = Utils.safe_path(IMAGE_DIR, file_name)
             form_type = Utils.clean_val(meta.get('file_type', 'jpg')).lower()
             if form_type == 'jpeg':
                 form_type = 'jpg'
