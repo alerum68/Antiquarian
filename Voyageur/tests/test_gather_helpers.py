@@ -35,7 +35,7 @@ def test_wait_for_final_json_event_detects_file_created_after_call(tmp_path):
 
     def create_after_delay():
         _time.sleep(0.2)
-        (tmp_path / "TMP_A_abc123_checkpoint_1.json").write_text("{}")
+        (tmp_path / "TMP_A_abc123_[checkpoint through page 1].json").write_text("{}")
         _time.sleep(0.1)
         (tmp_path / "TMP_A_abc123_final.json").write_text("{}")
 
@@ -46,11 +46,29 @@ def test_wait_for_final_json_event_detects_file_created_after_call(tmp_path):
     assert result.name == "TMP_A_abc123_final.json"
 
 
+def test_wait_for_final_json_event_detects_crdownload_rename_to_final(tmp_path):
+    import threading as _threading
+    import time as _time
+
+    def stage_then_rename():
+        _time.sleep(0.2)
+        staging = tmp_path / "TMP_A_abc123_final.json.crdownload"
+        staging.write_text("{}")
+        _time.sleep(0.1)
+        staging.replace(tmp_path / "TMP_A_abc123_final.json")
+
+    _threading.Thread(target=stage_then_rename, daemon=True).start()
+
+    result = gh.wait_for_final_json_event(tmp_path, "TMP_A_abc123_", "Final JSON")
+
+    assert result.name == "TMP_A_abc123_final.json"
+
+
 def test_wait_for_final_json_event_ignores_checkpoint_and_other_prefix_files(tmp_path):
     import threading as _threading
     import time as _time
 
-    (tmp_path / "TMP_A_abc123_checkpoint_1.json").write_text("{}")
+    (tmp_path / "TMP_A_abc123_[checkpoint through page 1].json").write_text("{}")
     (tmp_path / "TMP_FS_xyz789_final.json").write_text("{}")
 
     def create_real_final():

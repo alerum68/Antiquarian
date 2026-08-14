@@ -115,16 +115,28 @@ def wait_for_final_json_event(downloads_dir: Path, json_prefix: str, label: str)
 
     def matches(p: Path) -> bool:
         return (p.suffix.lower() == '.json' and p.name.startswith(json_prefix)
-                and 'checkpoint' not in p.name)
+                and '[checkpoint' not in p.name)
 
     class _FinalJsonHandler(FileSystemEventHandler):
-        def on_created(self, event):
-            if event.is_directory:
-                return
-            p = Path(event.src_path)
+        def _set_found_if_match(self, path: str) -> None:
+            p = Path(path)
             if matches(p):
                 found['path'] = p
                 ready.set()
+
+        def on_created(self, event):
+            if event.is_directory:
+                return
+            self._set_found_if_match(event.src_path)
+
+        def on_moved(self, event):
+            if event.is_directory:
+                return
+            # Chrome stages downloads to a .crdownload file (which only fires on_created
+            # for the staging name, never the final name) and then renames it to the
+            # final filename via a filesystem move - so the final file's arrival is only
+            # ever observed here, against dest_path (the new location), not src_path.
+            self._set_found_if_match(event.dest_path)
 
     observer = Observer()
     observer.schedule(_FinalJsonHandler(), str(downloads_dir), recursive=False)
