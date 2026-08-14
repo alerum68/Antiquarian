@@ -122,3 +122,38 @@ def test_build_census_json_accepts_household_view_row_shape():
     # J Baptiste Cardinal's household has no relationship data at all (the bare-"Primary"
     # case confirmed live) - the column must simply be absent, not fabricated as empty string.
     assert "Relationship to Head" not in people[4]["columns"]
+
+
+def test_convert_raw_gather_to_final_routes_census_collections_through_census_path():
+    raw = {
+        "collection_title": "United States, Census, 1880",
+        "items": [
+            {
+                "item_id": "abc",
+                "citation_text": (
+                    '"1880 Census," database with images, FamilySearch '
+                    '(https://familysearch.org/x : accessed 1 Jan 2026), Alabama > Autauga > '
+                    'image 1 of 1; citing NARA microfilm publication T9 (Washington D.C.: '
+                    'National Archives and Records Administration, n.d.).'
+                ),
+                "rows": [{"columns": {"Name": "John Smith"}, "person_ark": "ARK1"}],
+            }
+        ],
+    }
+
+    final_data, clean_name = FS.convert_raw_gather_to_final(raw)
+
+    assert "sheets" in final_data
+    assert clean_name is None or clean_name.endswith(".json")
+
+
+def test_convert_raw_gather_to_final_routes_non_census_collections_through_universal_path():
+    raw = {
+        "collection_title": "Quebec, Catholic Parish Registers",
+        "items": [{"item_id": "abc", "citation_text": "", "rows": []}],
+    }
+
+    final_data, clean_name = FS.convert_raw_gather_to_final(raw)
+
+    assert "sheets" in final_data
+    assert clean_name is None

@@ -26,6 +26,7 @@ import os
 import re
 import sys
 import time
+import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -37,11 +38,12 @@ from thefuzz import fuzz
 import census_schema
 from _gather_helpers import (
     cleanup_checkpoint_files,
-    cleanup_stale_gather_files,
+    find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
+    move_with_retry,
     resolve_census_image_dir,
-    wait_for_downloaded_json,
+    wait_for_final_json_event,
     write_archivist_json_file,
 )
 
@@ -738,6 +740,29 @@ def normalize_familysearch_census_gather(raw_census: dict, collection_title: str
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
+def convert_raw_gather_to_final(raw_data: dict) -> Tuple[dict, Optional[str]]:
+    """Converts a raw FamilySearch scrape dict into (final_data, clean_name) - clean_name is
+    None when no sheet/record carried enough location info to build one (see
+    build_clean_census_filename), in which case the caller falls back to a name derived from
+    the raw download's own filename instead. Pulled out of main() so the startup recovery
+    sweep can run the exact same conversion on a stale run's raw JSON, rather than
+    duplicating this logic."""
+    items_raw = raw_data.get("items", [])
+    catalog_items = dedup_catalog_items(items_raw)
+    record_family = detect_record_family_from_raw(raw_data, catalog_items)
+
+    if record_family == "census":
+        raw_census = build_census_json(raw_data, items_raw, catalog_items)
+        final_data = normalize_familysearch_census_gather(raw_census, raw_data.get("collection_title", ""))
+        clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
+    else:
+        final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
+        validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))
+        clean_name = None
+
+    return final_data, clean_name
+
+
 def main() -> None:
     print("========================================")
     print(" Voyageur (FS) - FamilySearch Gather Automation")
