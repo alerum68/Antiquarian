@@ -496,6 +496,55 @@ def _worker_download_loop(worker_id: int, task_queue: mp.Queue, result_queue: mp
                 result_queue.put(("FAIL", worker_id, pid, err_str))
 
 
+def _process_worker_messages(messages: List[tuple], active_workers: Dict[int, Dict[str, Any]],
+                             downloaded: set, failed: Dict[str, Any], pid_documents: Dict[str, Any],
+                             task_queue: Any, rate_lock: Any, current_delay: Any,
+                             append_scaffold: Any) -> Tuple[int, bool]:
+    """Applies one already-drained batch of result_queue messages to controller state, in
+    order. Kept pure (no queue draining, no time.time() calls, no disk writes) so the
+    property that matters for watchdog correctness - active_workers ends up reflecting the
+    LATEST message for a worker, never an intermediate one - is directly testable without
+    real or fake worker processes. This is the actual fix for the race #18 found: the old
+    code processed one message per loop iteration with a watchdog check before every fetch,
+    so if a worker sent SUCCESS(A) then immediately grabbed and started B, a controller that
+    fell behind draining (e.g. slow disk I/O) could still see worker.pid == A with A's OLD
+    start_time when the watchdog ran - timing the worker out over a task (A) it had already
+    finished, while B (what it was ACTUALLY doing) was silently killed with no requeue and
+    no failure record. Processing a full drained batch here, in order, before the caller's
+    watchdog check ever runs, means active_workers can never be staler than "the last
+    message this batch contained" - which is as fresh as draining can make it.
+    Returns (processed_delta, has_unflushed_changes)."""
+    processed_delta = 0
+    has_unflushed_changes = False
+    for msg in messages:
+        msg_type, wid, pid = msg[0], msg[1], msg[2]
+        if msg_type == "START":
+            active_workers[wid]["pid"] = pid
+            active_workers[wid]["start_time"] = msg[3]
+        elif msg_type == "SUCCESS":
+            active_workers[wid]["pid"] = None
+            downloaded.add(pid)
+            failed.pop(pid, None)
+            processed_delta += 1
+            bundle = msg[3]
+            source_documents = bundle.get("source_documents", [])
+            pid_documents[pid] = source_documents
+            append_scaffold(source_documents)
+            has_unflushed_changes = True
+            print(f"\rDownloaded PID {pid}", end="", flush=True)
+        elif msg_type == "403_ERROR":
+            active_workers[wid]["pid"] = None
+            with rate_lock:
+                current_delay.value = min(current_delay.value * 2.0, 5.0)
+            task_queue.put(pid)
+        elif msg_type == "FAIL":
+            active_workers[wid]["pid"] = None
+            failed[pid] = msg[3]
+            processed_delta += 1
+            has_unflushed_changes = True
+    return processed_delta, has_unflushed_changes
+
+
 def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoint_path: str,
                                        master_db_path: str, document_type: str, collection_title: str,
                                        max_workers: int = 4, base_delay: float = 0.3,
@@ -503,7 +552,13 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
     """Concurrent multi-worker PID downloading with watchdog timeout. Scaffold-sheet writes
     happen only in this controller loop (never inside a worker subprocess) after a SUCCESS
     message, mirroring the existing single-writer checkpoint pattern - see the
-    Voyageur-Parish-Scrip-scaffold design spec."""
+    Voyageur-Parish-Scrip-scaffold design spec. Disk writes (save_master_db/save_checkpoint)
+    are batched rather than done on every single success: save_master_db re-serializes the
+    ENTIRE master_data dict every call, so writing once per PID makes each write - and thus
+    each pass through the drain loop below - progressively more expensive as a long harvest
+    accumulates sheets, which is exactly the condition that let the watchdog race happen in
+    the first place. Batching keeps the drain loop cheap regardless of harvest size, and a
+    guaranteed final flush before returning means nothing is lost."""
     from Commissioner.record_registry import build_empty_sheet
 
     checkpoint = load_checkpoint(checkpoint_path)
@@ -511,7 +566,7 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
     failed = checkpoint.get("failed_pids", {})
     master_data = load_master_db(master_db_path, collection_title, document_type)
 
-    def write_scaffold(source_documents):
+    def append_scaffold_in_memory(source_documents):
         new_sheets = [
             build_empty_sheet(Path(entry["media_path"]).name,
                               Path(entry["media_path"]).suffix.lstrip("."),
@@ -520,12 +575,15 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
         ]
         append_scaffold_sheets(master_data, new_sheets)
         validate_master_db_against_commissioner(master_data, document_type, collection_title)
-        save_master_db(master_db_path, master_data)
 
     pid_documents = checkpoint.get("pid_documents", {})
+    reseeded_any = False
     for pid in pids:
         if pid in downloaded:
-            write_scaffold(pid_documents.get(pid, []))
+            append_scaffold_in_memory(pid_documents.get(pid, []))
+            reseeded_any = True
+    if reseeded_any:
+        save_master_db(master_db_path, master_data)
 
     pids_to_process = [p for p in pids if p not in downloaded]
     if not pids_to_process:
@@ -559,52 +617,90 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
     processed_count = 0
     total_target = len(pids_to_process)
 
-    while processed_count < total_target:
-        now = time.time()
-        for wid, worker in active_workers.items():
-            if worker["pid"] and (now - worker["start_time"] > timeout_seconds):
-                hung_pid = worker["pid"]
-                print(f"\n[Watchdog] Worker {wid} hung on PID {hung_pid}. Restarting worker...")
-                worker["process"].terminate()
-                worker["process"].join()
-                task_queue.put(hung_pid)
-                start_worker(wid)
+    FLUSH_EVERY_N = 10
+    FLUSH_INTERVAL_SECONDS = 5.0
+    has_unflushed_changes = False
+    unflushed_since_last = 0
+    last_flush_time = time.time()
 
-        try:
-            msg = result_queue.get(timeout=0.2)
-        except queue.Empty:
-            continue
+    def flush_pending():
+        nonlocal has_unflushed_changes, unflushed_since_last, last_flush_time
+        checkpoint["downloaded_pids"] = sorted(downloaded)
+        checkpoint["failed_pids"] = failed
+        checkpoint["pid_documents"] = pid_documents
+        save_checkpoint(checkpoint_path, checkpoint)
+        save_master_db(master_db_path, master_data)
+        has_unflushed_changes = False
+        unflushed_since_last = 0
+        last_flush_time = time.time()
 
-        msg_type, wid, pid = msg[0], msg[1], msg[2]
+    try:
+        while processed_count < total_target:
+            # Block briefly for at least one message (avoids busy-spinning when the queue
+            # is empty), then drain everything else already available before the watchdog
+            # check below runs - see _process_worker_messages' docstring for why this
+            # ordering is what actually closes the race.
+            try:
+                first_msg = result_queue.get(timeout=0.2)
+            except queue.Empty:
+                first_msg = None
 
-        if msg_type == "START":
-            active_workers[wid]["pid"] = pid
-            active_workers[wid]["start_time"] = msg[3]
-        elif msg_type == "SUCCESS":
-            active_workers[wid]["pid"] = None
-            downloaded.add(pid)
-            failed.pop(pid, None)
-            processed_count += 1
-            bundle = msg[3]
-            source_documents = bundle.get("source_documents", [])
-            pid_documents[pid] = source_documents
-            write_scaffold(source_documents)
-            checkpoint["downloaded_pids"] = sorted(downloaded)
-            checkpoint["failed_pids"] = failed
-            checkpoint["pid_documents"] = pid_documents
-            save_checkpoint(checkpoint_path, checkpoint)
-            print(f"\rDownloaded PID {pid} [{processed_count}/{total_target}]", end="", flush=True)
-        elif msg_type == "403_ERROR":
-            active_workers[wid]["pid"] = None
-            with rate_lock:
-                current_delay.value = min(current_delay.value * 2.0, 5.0)
-            task_queue.put(pid)
-        elif msg_type == "FAIL":
-            active_workers[wid]["pid"] = None
-            failed[pid] = msg[3]
-            processed_count += 1
-            checkpoint["failed_pids"] = failed
-            save_checkpoint(checkpoint_path, checkpoint)
+            if first_msg is not None:
+                messages = [first_msg]
+                while True:
+                    try:
+                        messages.append(result_queue.get_nowait())
+                    except queue.Empty:
+                        break
+
+                delta, changed = _process_worker_messages(
+                    messages, active_workers, downloaded, failed, pid_documents,
+                    task_queue, rate_lock, current_delay, append_scaffold_in_memory)
+                processed_count += delta
+                if changed:
+                    has_unflushed_changes = True
+                    unflushed_since_last += delta
+
+                if has_unflushed_changes and (
+                    unflushed_since_last >= FLUSH_EVERY_N
+                    or time.time() - last_flush_time >= FLUSH_INTERVAL_SECONDS
+                    or processed_count >= total_target
+                ):
+                    flush_pending()
+                if delta:
+                    print(f" [{processed_count}/{total_target}]", end="", flush=True)
+
+            now = time.time()
+            for wid, worker in active_workers.items():
+                if worker["pid"] and (now - worker["start_time"] > timeout_seconds):
+                    hung_pid = worker["pid"]
+                    print(f"\n[Watchdog] Worker {wid} hung on PID {hung_pid}. Restarting worker...")
+                    worker["process"].terminate()
+                    worker["process"].join()
+                    task_queue.put(hung_pid)
+                    start_worker(wid)
+    finally:
+        # Unconditional, not gated on has_unflushed_changes: if the loop above was
+        # interrupted by an exception or Ctrl-C partway through a batch,
+        # _process_worker_messages may have already mutated downloaded/master_data
+        # in-place for some messages before raising, without ever reaching the line that
+        # sets has_unflushed_changes - flushing unconditionally here is the only way to
+        # guarantee whatever progress happened before an abnormal exit is never lost.
+        # flush_pending() is idempotent, so a redundant call on normal completion costs
+        # nothing but a rewrite of already-correct data.
+        flush_pending()
+
+        # task_queue should be empty by now on a normal exit, so every worker should
+        # already be exiting on its own - but give any still-alive worker a moment to
+        # finish cleanly, then force it, rather than leaving an orphaned subprocess
+        # running after this function returns or raises.
+        for worker in active_workers.values():
+            process = worker["process"]
+            if process is not None and process.is_alive():
+                process.join(timeout=5.0)
+                if process.is_alive():
+                    process.terminate()
+                    process.join()
 
     print("\n[LAC Multi-Worker] Download run completed.")
     return checkpoint
