@@ -302,7 +302,8 @@ def test_call_agy_extract_chunked_falls_back_when_consolidation_fails(monkeypatc
     def fake_call_agy_extract(_images, _schema=None, _prompt_text=None, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(_all_sheets, _collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
+    def fake_consolidate(_all_sheets, _collection_title, _schema=None, _model=None,
+                         _cli_bin=None, _timeout_seconds=None):
         raise agy_client.AgyCallError("status SUCCESS but no structured_output")
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
