@@ -11,6 +11,7 @@ import sys
 import pytest
 
 
+# noinspection DuplicatedCode
 @pytest.fixture
 def minimal_paleographer_env(monkeypatch, tmp_path):
     program_dir = tmp_path / "program"

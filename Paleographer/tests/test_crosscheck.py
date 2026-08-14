@@ -10,6 +10,7 @@ import sys
 import pytest
 
 
+# noinspection DuplicatedCode
 @pytest.fixture
 def paleographer_module(monkeypatch, tmp_path):
     program_dir = tmp_path / "program"

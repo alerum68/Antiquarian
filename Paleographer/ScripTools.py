@@ -19,6 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
+# noinspection DuplicatedCode
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -28,9 +29,12 @@ if str(_REPO_ROOT) not in sys.path:
 
 try:
     from Voyageur import lac_client
+    # noinspection PyPep8Naming
     from Voyageur import LAC as voyageur_lac
 except (ImportError, ValueError):
+    # noinspection PyUnresolvedReferences
     import lac_client
+    # noinspection PyUnresolvedReferences,PyPep8Naming
     import LAC as voyageur_lac
 
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
@@ -47,7 +51,7 @@ _MOJIBAKE_MAP = {
     'ã‰': 'É', 'ãˆ': 'È', 'ãŠ': 'Ê', 'ã‹': 'Ë', 'ã€': 'À', 'ã‚': 'Â',
     'ãŽ': 'Î', 'ã”': 'Ô', 'ã™': 'Ù', 'ã›': 'Û', 'ã‡': 'Ç',
     'â€™': "'", 'â€˜': "'", 'â€œ': '"', 'â€\x9d': '"', 'â€"': '—',
-    'â€“': '–', 'ãfb': 'ï', 'ã\xaf': 'ï', 'ã\xad': 'í', 'ã\x89': 'É',
+    'â€“': '–', 'ãfb': 'ï', 'ã\xad': 'í', 'ã\x89': 'É',
     'ã\x88': 'È', 'ã\x8a': 'ê', 'ã\x8b': 'ë', 'ã\x80': 'À', 'ã\x82': 'Â',
     'Ã©': 'é', 'Ã¨': 'è', 'Ãª': 'ê', 'Ã«': 'ë', 'Ã ': 'à', 'Ã¢': 'â',
     'Ã®': 'î', 'Ã¯': 'ï', 'Ã´': 'ô', 'Ã¹': 'ù', 'Ã»': 'û', 'Ã§': 'ç',
@@ -238,7 +242,7 @@ def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") ->
     spouse = next((p for p in participants
                    if p.get("role_semantic") == "spouse" or str(p.get("role_number")) == "2"), None)
 
-    f_surname = (father.get("std_surname") or "").strip() if father else ""
+    f_surname = (father.get("std_surname") or "").strip() if isinstance(father, dict) else ""
     c_surname = (primary.get("std_surname") or "").strip()
     c_given = (primary.get("std_given") or "").strip()
     nee = (row_nee or "").strip().title()
@@ -255,7 +259,7 @@ def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") ->
     title_lower = (record.get("lac_catalog_title") or record.get("lac_catalog_title_live") or "").lower()
     is_female = (
         primary.get("sex") == "F"
-        or (spouse and spouse.get("sex") == "M")
+        or (isinstance(spouse, dict) and spouse.get("sex") == "M")
         or ("wife of" in title_lower)
         or ("widow of" in title_lower)
         or ("husband:" in title_lower)
@@ -266,7 +270,7 @@ def resolve_maiden_name_for_record(record: Dict[str, Any], row_nee: str = "") ->
         if primary.get("sex") != "F":
             primary["sex"] = "F"
             modified = True
-        if spouse and not spouse.get("sex"):
+        if isinstance(spouse, dict) and not spouse.get("sex"):
             spouse["sex"] = "M"
             modified = True
 
@@ -651,6 +655,7 @@ def main() -> None:
         print(f"Cross-check complete: {target}")
         return
 
+    # noinspection DuplicatedCode
     if args.mode == "enrich":
         target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
@@ -676,6 +681,7 @@ def main() -> None:
             print(f" - {k}: {p.name}")
         return
 
+    # noinspection DuplicatedCode
     if args.mode == "resolve-names":
         target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
                                     os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))

@@ -24,11 +24,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from dotenv import load_dotenv
+# noinspection PyUnresolvedReferences
 from google import genai
 
 # The Toolbox's own subprocess launcher sets PYTHONIOENCODING=utf-8, but this module also
 # supports being run directly (its debug mode), where stdout would otherwise fall back to
 # the system's default codepage and crash on emoji/checkmarks.
+# noinspection DuplicatedCode
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -126,7 +128,8 @@ def _label_for(record: Dict[str, Any]) -> str:
     if document_type:
         return normalization.cap_case(document_type)
     page = record.get("page")
-    return f"Page {str(page).strip()}" if page is not None and str(page).strip() else "Untitled section"
+    page_str = str(page).strip() if page is not None else ""
+    return f"Page {page_str}" if page_str else "Untitled section"
 
 
 def _source_document_entry(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -163,7 +166,7 @@ def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
     for participant in incoming.get("participants", []):
         key = _participant_key(participant)
         existing = by_key.get(key) if key != ("", "") else None
-        if existing is None:
+        if existing is None or not isinstance(existing, dict):
             base_participants.append(participant)
             continue
         for field, value in participant.items():
@@ -171,10 +174,11 @@ def _merge_record_into(base: Dict[str, Any], incoming: Dict[str, Any]) -> None:
                 continue
             if value and not existing.get(field):
                 existing[field] = value
-        existing_fields = existing.setdefault("type_specific_fields", {})
-        for tk, tv in (participant.get("type_specific_fields") or {}).items():
-            if tv and not existing_fields.get(tk):
-                existing_fields[tk] = tv
+        existing_fields: Dict[str, Any] = existing.setdefault("type_specific_fields", {})
+        if isinstance(existing_fields, dict):
+            for tk, tv in (participant.get("type_specific_fields") or {}).items():
+                if tv and not existing_fields.get(tk):
+                    existing_fields[tk] = tv
 
 
 def merge_same_claim_records(sheets: List[Dict[str, Any]]) -> None:
@@ -536,6 +540,8 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
         contents = [prompt, content_part]
 
         def call_fn() -> Any:
+            if client is None:
+                raise RuntimeError("API client is not initialized")
             response = client.models.generate_content(
                 model=MODEL_ID, contents=contents,
                 config=genai.types.GenerateContentConfig(**build_gen_config_kwargs(active_cache_name)),
@@ -565,6 +571,7 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
     return {"page_data": page_data, "usage_metadata": usage_metadata}
 
 
+# noinspection DuplicatedCode
 def pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """If the last record of the last sheet is flagged continues_on_next_image, pops it
     out and returns it. None if there's nothing pending."""

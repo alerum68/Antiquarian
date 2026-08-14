@@ -13,6 +13,7 @@ import fitz  # PyMuPDF
 import pytest
 from PIL import Image
 
+# noinspection PyUnresolvedReferences
 import agy_engine
 from ScriptoriumMCP import agy_client
 
@@ -37,7 +38,7 @@ def _make_image(color="white", size=(50, 50)):
 def test_call_agy_extract_stages_single_image_and_cleans_up(monkeypatch):
     captured = {}
 
-    def fake_call_agy_structured(*, workspace_dir, model, prompt, schema, cli_bin, timeout_seconds):
+    def fake_call_agy_structured(*, workspace_dir, model, prompt, **_kwargs):
         captured["workspace_dir"] = Path(workspace_dir)
         captured["staged_files"] = sorted(p.name for p in Path(workspace_dir).iterdir())
         captured["prompt"] = prompt
@@ -59,7 +60,7 @@ def test_call_agy_extract_stages_single_image_and_cleans_up(monkeypatch):
 def test_call_agy_extract_stages_multiple_images_in_order(monkeypatch):
     captured = {}
 
-    def fake_call_agy_structured(*, workspace_dir, model, prompt, schema, cli_bin, timeout_seconds):
+    def fake_call_agy_structured(*, workspace_dir, prompt, **_kwargs):
         captured["staged_files"] = sorted(p.name for p in Path(workspace_dir).iterdir())
         captured["prompt"] = prompt
         return _make_result()
@@ -76,7 +77,7 @@ def test_call_agy_extract_stages_multiple_images_in_order(monkeypatch):
 def test_call_agy_extract_cleans_up_scratch_dir_even_on_failure(monkeypatch):
     workspace_holder = {}
 
-    def fake_call_agy_structured(*, workspace_dir, **kwargs):
+    def fake_call_agy_structured(*, workspace_dir, **_kwargs):
         workspace_holder["dir"] = Path(workspace_dir)
         raise agy_client.AgyCallError("boom")
 
@@ -211,7 +212,7 @@ def _record(number, continues_on_next_image=False, continues_from_previous_image
 def test_call_agy_extract_chunked_delegates_when_under_chunk_size(monkeypatch):
     calls = []
 
-    def fake_call_agy_extract(imgs, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(imgs, _schema=None, _prompt_text=None, **_kwargs):
         calls.append(len(imgs))
         return _make_result({"collection_title": "T", "sheets": [_sheet("1", [_record("1")])]})
 
@@ -228,13 +229,13 @@ def test_call_agy_extract_chunked_splits_and_calls_consolidation(monkeypatch):
     extract_calls = []
     consolidate_calls = []
 
-    def fake_call_agy_extract(imgs, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(imgs, _schema=None, _prompt_text=None, **_kwargs):
         extract_calls.append(len(imgs))
         chunk_num = len(extract_calls)
         return _make_result({"collection_title": "Test Collection",
                              "sheets": [_sheet(f"chunk{chunk_num}", [_record(str(chunk_num))])]})
 
-    def fake_consolidate(all_sheets, collection_title, schema, model, cli_bin, timeout_seconds):
+    def fake_consolidate(all_sheets, collection_title, **_kwargs):
         consolidate_calls.append({"num_sheets": len(all_sheets), "collection_title": collection_title})
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
@@ -267,10 +268,11 @@ def test_call_agy_extract_chunked_threads_continuation_across_chunks(monkeypatch
         ])]},
     ]
 
-    def fake_call_agy_extract(_imgs, schema, prompt_text, **kwargs):
+    # noinspection DuplicatedCode
+    def fake_call_agy_extract(_imgs, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(all_sheets, collection_title, schema, model, cli_bin, timeout_seconds):
+    def fake_consolidate(all_sheets, collection_title, **_kwargs):
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
@@ -296,6 +298,7 @@ def test_call_agy_extract_chunked_falls_back_when_consolidation_fails(monkeypatc
         {"collection_title": "T", "sheets": [_sheet("c2", [_record("2")])]},
     ]
 
+    # noinspection DuplicatedCode
     def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
@@ -324,10 +327,11 @@ def test_call_agy_extract_chunked_saves_leftover_when_last_chunk_ends_mid_record
         ])]},
     ]
 
+    # noinspection DuplicatedCode
     def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(all_sheets, collection_title, _schema, _model, _cli_bin, _timeout_seconds):
+    def fake_consolidate(all_sheets, collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)

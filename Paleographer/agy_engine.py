@@ -59,6 +59,8 @@ def rasterize_pdf_to_images(pdf_path: Path, max_dimension: int = 2048,
     with pdfplumber.open(str(pdf_path)) as pdf:
         for page in pdf.pages:
             page_image = page.to_image(resolution=resolution)
+            if page_image.original is None:
+                continue
             img = page_image.original.convert("RGB")
             img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
             images.append(img)
@@ -123,6 +125,7 @@ def call_agy_extract(images: List[Image.Image], schema: Dict[str, Any], prompt_t
 DEFAULT_CHUNK_SIZE = 10
 
 
+# noinspection DuplicatedCode
 def _pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Same logic as Paleographer.py's own pop_trailing_cutoff_record, reimplemented
     here rather than imported to avoid a circular import (Paleographer.py imports this
@@ -251,8 +254,11 @@ def call_agy_extract_chunked(images: List[Image.Image], schema: Dict[str, Any], 
         )
         chunk_prompt += engine.build_continuation_context(pending_continuation)
 
-        def call_fn(imgs=chunk_images, prm=chunk_prompt) -> agy_client.AgyStructuredResult:
-            return call_agy_extract(imgs, schema, prm, model=model, cli_bin=cli_bin,
+        target_imgs = chunk_images
+        target_prm = chunk_prompt
+
+        def call_fn() -> agy_client.AgyStructuredResult:
+            return call_agy_extract(target_imgs, schema, target_prm, model=model, cli_bin=cli_bin,
                                     timeout_seconds=timeout_seconds)
 
         chunk_result = run_with_agy_retries(call_fn)
@@ -338,7 +344,8 @@ def run_with_agy_retries(call_fn: Callable[[], Any], max_retries: int = DEFAULT_
                 print(f"   [!] agy call failed (attempt {attempt}/{max_retries}): {e} "
                       f"Retrying in {wait:.0f}s...", flush=True)
                 time.sleep(wait)
-    raise RuntimeError(f"agy call failed after {max_retries} attempts: {last_error}") from last_error
+    err_str = str(last_error) if last_error is not None else "unknown error"
+    raise RuntimeError(f"agy call failed after {max_retries} attempts: {err_str}") from last_error
 
 
 # ==========================================

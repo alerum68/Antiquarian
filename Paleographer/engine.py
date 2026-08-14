@@ -26,8 +26,9 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import pdfplumber
 import yaml
 from PIL import Image
+# noinspection PyUnresolvedReferences
 from google import genai
-# noinspection unresolved-references
+# noinspection PyUnresolvedReferences
 from google.genai import types
 
 # PDFix lives in its own sibling tool folder, not an installed package - add the repo
@@ -384,6 +385,7 @@ def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path
         params = COMPRESSION_PARAMS.get(compression_level, COMPRESSION_PARAMS[2])
         optimize_pdf(str(tmp_path), params)
         return tmp_path
+    # noinspection PyBroadException
     except Exception:
         tmp_path.unlink(missing_ok=True)
         return file_path

@@ -3,7 +3,9 @@ from types import SimpleNamespace
 
 import pytest
 
+# noinspection PyUnresolvedReferences
 import engine
+# noinspection PyUnresolvedReferences
 from google.genai import errors
 
 
@@ -197,6 +199,7 @@ def test_load_event_types_flattens_person_and_family_buckets(tmp_path, monkeypat
 # ==========================================
 # build_merged_schema
 # ==========================================
+# noinspection DuplicatedCode
 def test_build_merged_schema_injects_extra_fields_without_mutating_core():
     core = {
         "properties": {
@@ -225,6 +228,7 @@ def test_build_merged_schema_injects_extra_fields_without_mutating_core():
     assert original_rec_props["type_specific_fields"]["properties"] == {}
 
 
+# noinspection DuplicatedCode
 def test_build_merged_schema_maps_dict_field_type_to_json_schema_object():
     """Census.pmt declares `unmapped: {type: dict}` - "dict" is not a valid JSON-Schema
     type (the correct token is "object"), so inject() must translate it rather than pass
@@ -370,6 +374,7 @@ def test_submit_batch_job_returns_job_name():
 
 
 def test_check_batch_jobs_splits_completed_and_pending():
+    # noinspection PyUnresolvedReferences
     from google.genai import types
 
     client = FakeClient()

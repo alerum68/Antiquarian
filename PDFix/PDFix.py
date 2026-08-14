@@ -20,6 +20,7 @@ from dotenv import load_dotenv
 
 # Global settings come from the project root's .env; this tool's own settings come from
 # its own subfolder's .env, so PDFix stays runnable standalone.
+# noinspection DuplicatedCode
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 
@@ -179,7 +180,7 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                     if os.path.exists(pdf_path):
                         file_size = os.path.getsize(pdf_path)
                         stats["optimized_size_bytes"] += file_size
-                except Exception:
+                except OSError:
                     pass
 
     stats["end_time"] = datetime.now()
@@ -228,7 +229,7 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
             print(f'Attempting to repair damaged PDF: {pdf_path}')
             result["repaired"] = True
             pdf_document = page_by_page_recovery(pdf_path)
-            if not pdf_document:
+            if not isinstance(pdf_document, fitz.Document):
                 raise Exception("PDF repair failed")
 
         if pdf_document.is_encrypted:
@@ -255,6 +256,7 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
             # The standard save failed - retry with the least aggressive settings that
             # still compress at all, before falling back to page-by-page reconstruction.
             print(f'Using safe mode to optimize problematic PDF: {pdf_path}')
+            # noinspection PyBroadException
             try:
                 pdf_document.save(
                     temp_optimized_pdf_path,
@@ -272,6 +274,7 @@ def optimize_pdf(pdf_path, params, repair_mode=False):
                 else:
                     raise Exception("Could not repair PDF even with page-by-page method")
 
+        # noinspection PyBroadException
         try:
             pdf_document.close()
         except Exception:
@@ -352,6 +355,7 @@ def page_by_page_recovery(pdf_path, output_path=None):
             new_doc = fitz.open()
 
             for page_num in range(src_doc.page_count):
+                # noinspection PyBroadException
                 try:
                     new_doc.insert_pdf(src_doc, from_page=page_num, to_page=page_num)
                 except Exception:
@@ -389,7 +393,7 @@ def page_by_page_recovery(pdf_path, output_path=None):
         if temp_file and os.path.exists(temp_file.name):
             try:
                 os.unlink(temp_file.name)
-            except Exception:
+            except OSError:
                 pass
 
     return None

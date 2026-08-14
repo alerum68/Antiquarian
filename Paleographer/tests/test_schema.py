@@ -11,6 +11,7 @@ from pathlib import Path
 
 import jsonschema
 
+# noinspection PyUnresolvedReferences
 import engine
 
 SCHEMA_PATH = Path(__file__).resolve().parent.parent / "schema.json"

@@ -18,7 +18,9 @@ from types import SimpleNamespace
 
 from PIL import Image
 
+# noinspection PyUnresolvedReferences
 import agy_engine
+# noinspection PyUnresolvedReferences
 import engine
 
 
@@ -61,6 +63,7 @@ class FakeClient:
     JSON parsing, cost tracking, context caching) runs unchanged against a canned
     response instead of a real network call."""
     last_instance = None
+    pending_page_data = None
 
     def __init__(self, *_args, **_kwargs):
         self.caches = FakeCaches()
@@ -91,6 +94,7 @@ def _media_type_name(env_overrides):
     return Path(record_type).stem
 
 
+# noinspection DuplicatedCode
 def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_data, argv=None,
                                image_filenames=("TestFile_00001.jpg",)):
     program_dir = tmp_path / "program"
@@ -356,6 +360,7 @@ def test_build_merged_schema_maps_dict_field_type_to_json_schema_object(tmp_path
         fake_page_data=PARISH_FAKE_RESPONSE,
     )
 
+    # noinspection DuplicatedCode
     core = {
         "properties": {
             "sheets": {"items": {"properties": {"records": {"items": {"properties": {
@@ -482,6 +487,7 @@ def test_page_continuation_merges_across_images_without_duplication(tmp_path, mo
         ]}],
     }
 
+    # noinspection DuplicatedCode
     module, master_db_path = _import_paleographer_fresh(
         monkeypatch, tmp_path,
         env_overrides={
@@ -522,6 +528,7 @@ def test_page_continuation_saves_leftover_when_nothing_continues_it(tmp_path, mo
         ]}],
     }
 
+    # noinspection DuplicatedCode
     module, master_db_path = _import_paleographer_fresh(
         monkeypatch, tmp_path,
         env_overrides={
@@ -549,6 +556,7 @@ def test_page_continuation_saves_leftover_when_nothing_continues_it(tmp_path, mo
 # orchestration (file classification, finalize_page_data, tag_document_metadata,
 # save_master_db, cost accounting) working correctly for the agy engine, for both an
 # image and a PDF input, exactly as it's already proven for the api engine above.
+# noinspection DuplicatedCode
 def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_structured_output,
                                    image_filenames=("TestFile_00001.jpg",), pdf_filenames=()):
     program_dir = tmp_path / "program"

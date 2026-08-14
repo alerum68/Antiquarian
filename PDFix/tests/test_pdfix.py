@@ -1,6 +1,6 @@
 import fitz
 
-from PDFix import PDFix as pdfix
+from PDFix import PDFix
 
 
 def _make_pdf(path, pages=2):
@@ -19,7 +19,7 @@ def test_page_by_page_recovery_returns_document_when_no_output_path(tmp_path):
     pdf_path = tmp_path / "sample.pdf"
     _make_pdf(pdf_path)
 
-    doc = pdfix.page_by_page_recovery(str(pdf_path))
+    doc = PDFix.page_by_page_recovery(str(pdf_path))
 
     assert doc is not None
     assert doc.page_count == 2
@@ -32,7 +32,7 @@ def test_page_by_page_recovery_writes_to_output_path_without_mutating_original(t
     _make_pdf(pdf_path)
     original_bytes = pdf_path.read_bytes()
 
-    result = pdfix.page_by_page_recovery(str(pdf_path), str(output_path))
+    result = PDFix.page_by_page_recovery(str(pdf_path), str(output_path))
 
     assert result is True
     assert output_path.exists()
@@ -61,7 +61,7 @@ def test_optimize_pdf_repair_mode_uses_page_by_page_fallback_without_typeerror(t
 
     monkeypatch.setattr(fitz.Document, "save", selective_fail_save)
 
-    result = pdfix.optimize_pdf(str(pdf_path), pdfix.COMPRESSION_PARAMS[1], repair_mode=True)
+    result = PDFix.optimize_pdf(str(pdf_path), PDFix.COMPRESSION_PARAMS[1], repair_mode=True)
 
     assert result["success"] is True
     assert result["repaired"] is True

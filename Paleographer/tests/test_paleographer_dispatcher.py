@@ -3,6 +3,7 @@ import types
 
 import pytest
 
+# noinspection PyUnresolvedReferences
 import Paleographer
 
 
