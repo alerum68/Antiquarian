@@ -3,6 +3,7 @@ import os
 import re
 import sys
 import urllib.parse
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -10,12 +11,12 @@ from dotenv import load_dotenv
 import census_schema
 from _gather_helpers import (
     cleanup_checkpoint_files,
-    cleanup_stale_gather_files,
+    find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
     move_with_retry,
     resolve_census_image_dir,
-    wait_for_downloaded_json,
+    wait_for_final_json_event,
     write_archivist_json_file,
 )
 
@@ -55,6 +56,48 @@ def normalize_ancestry_census_gather(raw_gather: dict, dbid: str = "") -> dict:
         for page in normalized.get("pages", []):
             page["apid_db"] = dbid
     return normalized
+
+
+def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target_dir: Path,
+                           genealogy_dir: str) -> None:
+    """Recovers gather output left behind by a previous run that had no watcher present to
+    collect it (e.g. a gather started via Voyageur.js's own manual "Start Auto-Batch" button
+    instead of through this script) - moves the JSON and images into their normal project
+    locations. The Ancestry-specific header-normalization/apid_db-tagging pass is skipped
+    for recovered runs: it needs the originating record's dbid, parsed from A_URL, which
+    isn't reliably known for a run this script didn't itself launch. An incomplete stale run
+    (checkpoints only, no final JSON - the browser gather itself never finished) is reported,
+    not guessed at."""
+    orphans = find_orphaned_gather_runs(downloads_dir, "TMP_A_", current_run_id)
+    if not orphans:
+        return
+
+    for run_id, group in orphans.items():
+        if group["final"] is None:
+            names = ", ".join(p.name for p in group["checkpoints"] + group["images"])
+            print(f"[WARN] Found an incomplete stale gather (run {run_id}) with no final JSON - "
+                  f"left in place for manual review: {names}")
+            continue
+
+        final_name = group["final"].name[len(f"TMP_A_{run_id}_"):]
+        recovered_json = json_target_dir / final_name
+        json_status = move_with_retry(group["final"], recovered_json, on_collision="skip")
+        if json_status == "skipped":
+            print(f"[System] Recovered run {run_id}: {final_name} already exists in Project folder, "
+                  f"discarding the stale copy (images below are still recovered).")
+
+        stem_parts = recovered_json.stem.split(' - ', 1)
+        census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
+        raw_location = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
+        location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
+        census_folder = f"{census_year} US Federal Census"
+        img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
+
+        img_moved, img_skipped, img_failed = move_downloaded_images(
+            downloads_dir, f"TMP_A_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
+        print(f"[System] Recovered stale run {run_id}: moved {final_name} and {img_moved} image(s) "
+              f"to Project folders. NOTE: header normalization was skipped for this recovered run - "
+              f"verify column names before relying on it.")
 
 
 # ==========================================
@@ -97,22 +140,23 @@ def main() -> Path:
     # that prefix is also what lets this scan pick its own files out from whatever else
     # happens to be in the Downloads root.
     downloads_dir = Path.home() / "Downloads"
-    json_prefix = "TMP_A_"
-    image_prefix = "TMP_A_Images_"
-    # A previous run that crashed/was killed mid-gather can leave same-named TMP_A_* files
-    # behind; if still present when the new download lands, Chrome renames it to
-    # "foo (1).json"/"foo (1).jpg" instead of overwriting, and that (1) survives into the
-    # final output name. Clearing them first removes the actual cause, not just a symptom.
-    cleanup_stale_gather_files(downloads_dir, json_prefix, image_prefix)
-
-    start_time = launch_gather_browser(url)
-
-    json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "Final JSON")
-
-    print("\n[System] Processing extracted files...")
-
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)
+
+    run_id = uuid.uuid4().hex[:8]
+    json_prefix = f"TMP_A_{run_id}_"
+    image_prefix = f"TMP_A_{run_id}_Images_"
+
+    # Recover anything a previous run left stranded before this run's own files - which use
+    # a fresh, guaranteed-unique run_id - are even downloaded. See the Downloads Handling
+    # Redesign spec (docs/superpowers/specs/2026-08-13-voyageur-downloads-handling-design.md).
+    _recover_orphaned_runs(downloads_dir, run_id, json_target_dir, genealogy_dir)
+
+    start_time = launch_gather_browser(url, run_id)
+
+    json_file = wait_for_final_json_event(downloads_dir, json_prefix, "Final JSON")
+
+    print("\n[System] Processing extracted files...")
 
     final_json = json_target_dir / json_file.name[len(json_prefix):]
     json_status = move_with_retry(json_file, final_json, on_collision=on_collision)
