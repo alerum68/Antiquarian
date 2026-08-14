@@ -235,7 +235,7 @@ def test_call_agy_extract_chunked_splits_and_calls_consolidation(monkeypatch):
         return _make_result({"collection_title": "Test Collection",
                              "sheets": [_sheet(f"chunk{chunk_num}", [_record(str(chunk_num))])]})
 
-    def fake_consolidate(all_sheets, collection_title, **_kwargs):
+    def fake_consolidate(all_sheets, collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
         consolidate_calls.append({"num_sheets": len(all_sheets), "collection_title": collection_title})
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
@@ -269,10 +269,10 @@ def test_call_agy_extract_chunked_threads_continuation_across_chunks(monkeypatch
     ]
 
     # noinspection DuplicatedCode
-    def fake_call_agy_extract(_imgs, **_kwargs):
+    def fake_call_agy_extract(_imgs, _schema=None, _prompt_text=None, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(all_sheets, collection_title, **_kwargs):
+    def fake_consolidate(all_sheets, collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
@@ -299,10 +299,10 @@ def test_call_agy_extract_chunked_falls_back_when_consolidation_fails(monkeypatc
     ]
 
     # noinspection DuplicatedCode
-    def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
+    def fake_call_agy_extract(_images, _schema=None, _prompt_text=None, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(_all_sheets, _collection_title, _schema, _model, _cli_bin, _timeout_seconds):
+    def fake_consolidate(_all_sheets, _collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
         raise agy_client.AgyCallError("status SUCCESS but no structured_output")
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
@@ -328,7 +328,7 @@ def test_call_agy_extract_chunked_saves_leftover_when_last_chunk_ends_mid_record
     ]
 
     # noinspection DuplicatedCode
-    def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
+    def fake_call_agy_extract(_images, _schema=None, _prompt_text=None, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
     def fake_consolidate(all_sheets, collection_title, _schema=None, _model=None, _cli_bin=None, _timeout_seconds=None):
