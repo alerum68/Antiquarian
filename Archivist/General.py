@@ -4,7 +4,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Dict, List, Optional, Protocol, Tuple, Union
+from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 import yaml
 
 import Utils
@@ -70,9 +70,9 @@ class Profile(Protocol):
     def default_gedcom_output_name(self) -> Optional[str]: ...
 
 
-def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                       vol: str, media_uid: str, target_software: str,
-                                       alt_names: list, raw_event_date: str, age: str) -> List[str]:
+def build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
+                                      vol: str, media_uid: str, target_software: str,
+                                      alt_names: list, raw_event_date: str, age: str) -> List[str]:
     """The non-Scrip primary-event GEDCOM block (today's `Archivist.py:3138-3158`
     else-branch). Exposed as a module function, not only a GeneralProfile method,
     because Scrip.ScripProfile.build_primary_event_lines also needs it verbatim for the
@@ -102,6 +102,9 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
     lines.extend(build_general_citation(rec, part, event_tag, vol, media_uid,
                                         Utils.get_proof_status(raw_event_date), target_software))
     return lines
+
+
+_build_generic_primary_event_lines = build_generic_primary_event_lines
 
 
 class GeneralProfile:
@@ -244,8 +247,8 @@ class GeneralProfile:
                                   vol: str, media_uid: str, target_software: str, _resi: str,
                                   alt_names: list, _scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
-        return _build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
-                                                  target_software, alt_names, raw_event_date, age)
+        return build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
+                                                 target_software, alt_names, raw_event_date, age)
 
     @staticmethod
     def volume_source_detail_fields(v_clause: str) -> List[str]:
@@ -340,7 +343,7 @@ def get_role_name(part: dict) -> str:
     return Utils.cap_case(part.get('role_name')) or GENERAL_CONFIG['role_default_witness']
 
 
-def resolve_family_links(rec: dict) -> Dict[str, object]:
+def resolve_family_links(rec: dict) -> Dict[str, Any]:
     """Works out this record's family structure purely from which family-position role semantics are present."""
     primary_forms_own_family = bool(get_by_semantic(rec, 'spouse') or get_all_by_semantic(rec, 'child'))
     return {
@@ -434,7 +437,7 @@ def generate_media_uid(meta: dict, vol: str) -> str:
         else:
             unique_string = file_name
     else:
-        pages: Optional[str] = meta.get('pages')
+        pages = Utils.clean_val(meta.get('pages'))
         unique_string = f"vol_{vol}_pages_{pages}"
 
     numeric_id = int(hashlib.md5(unique_string.encode('utf-8')).hexdigest(), 16) % (10 ** 10)
@@ -943,16 +946,16 @@ def build_family(rec: dict, vol: str, media_uid: str, target_software: str) -> l
 
     fams = []
 
-    def add_parent_family(parent_a: Optional[dict], parent_b: Optional[dict], suffix: str, child: dict) -> None:
-        if not (parent_a or parent_b):
+    def add_parent_family(p_a: Optional[dict], p_b: Optional[dict], suffix: str, ch: dict) -> None:
+        if not (p_a or p_b):
             return
-        husb, wife = assign_spouses_by_sex(parent_a, parent_b)
+        p_husb, p_wife = assign_spouses_by_sex(p_a, p_b)
         p_fam = [f"0 @F{fam_uid}{suffix}@ FAM"]
-        if husb:
-            p_fam.append(f"1 HUSB @I{generate_uid(rec, husb, vol)}@")
-        if wife:
-            p_fam.append(f"1 WIFE @I{generate_uid(rec, wife, vol)}@")
-        p_fam.append(f"1 CHIL @I{generate_uid(rec, child, vol)}@")
+        if p_husb:
+            p_fam.append(f"1 HUSB @I{generate_uid(rec, p_husb, vol)}@")
+        if p_wife:
+            p_fam.append(f"1 WIFE @I{generate_uid(rec, p_wife, vol)}@")
+        p_fam.append(f"1 CHIL @I{generate_uid(rec, ch, vol)}@")
         fams.append("\n".join(p_fam))
 
     parents = get_all_by_semantic(rec, ('father', 'mother'))
@@ -1211,8 +1214,8 @@ def apply_record_type_field_remap(record_type_name: str) -> None:
 def apply_extracted_parish_name(data: dict) -> None:
     for sheet in data.get("sheets", []):
         source_name = (sheet.get("document_metadata") or {}).get("source_name")
-        if source_name and source_name.strip():
-            GENERAL_CONFIG["parish_name"] = source_name.strip()
+        if source_name is not None and str(source_name).strip():
+            GENERAL_CONFIG["parish_name"] = str(source_name).strip()
             return
 
     if not GENERAL_CONFIG.get('parish_name') and data.get('record_type_name') == 'Scrip':
@@ -1231,15 +1234,15 @@ def apply_resolved_source_id(data: dict) -> None:
 
     citation = data.get("citation") or {}
     cc = citation.get("collection_id")
-    if cc:
-        GENERAL_CONFIG["register_source_id"] = str(cc)
-        GENERAL_CONFIG["platform_source_id"] = str(cc)
+    if cc is not None and str(cc).strip():
+        GENERAL_CONFIG["register_source_id"] = str(cc).strip()
+        GENERAL_CONFIG["platform_source_id"] = str(cc).strip()
         return
 
     apid = Utils.APID_DB or citation.get("apid_db")
-    if apid:
-        GENERAL_CONFIG["register_source_id"] = str(apid)
-        GENERAL_CONFIG["platform_source_id"] = str(apid)
+    if apid is not None and str(apid).strip():
+        GENERAL_CONFIG["register_source_id"] = str(apid).strip()
+        GENERAL_CONFIG["platform_source_id"] = str(apid).strip()
         return
 
     record_type_name = data.get("record_type_name") or "Church"

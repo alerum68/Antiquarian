@@ -126,7 +126,7 @@ def _label_for(record: Dict[str, Any]) -> str:
     if document_type:
         return normalization.cap_case(document_type)
     page = record.get("page")
-    return f"Page {page}" if page else "Untitled section"
+    return f"Page {str(page).strip()}" if page is not None and str(page).strip() else "Untitled section"
 
 
 def _source_document_entry(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -223,7 +223,7 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if EXTRACTION_ENGINE 
 # CONFIGURATION
 # ==========================================
 RECORD_TYPE_NAME = os.getenv("PALEOGRAPHER_RECORD_TYPE", "")
-COLLECTION_TITLE = os.getenv("VOLUME_TITLE")
+COLLECTION_TITLE = os.getenv("VOLUME_TITLE") or ""
 VOLUME_NUM = os.getenv("VOLUME_NUM", "")
 
 TYPE_CFG = engine.parse_type_config(engine.resolve_prompt_path(RECORD_TYPE_NAME))

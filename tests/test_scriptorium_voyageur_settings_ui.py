@@ -35,11 +35,12 @@ def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
 @pytest.fixture(scope="module")
 def app():
     import tkinter
-    if getattr(tkinter, "_default_root", None) is not None and isinstance(tkinter._default_root, ScriptoriumApp):
-        root = tkinter._default_root
+    default_root = getattr(tkinter, "_default_root", None)
+    if default_root is not None and isinstance(default_root, ScriptoriumApp):
+        root = default_root
     else:
         root = ScriptoriumApp()
-    root._switch_tab("Voyageur")
+    root.switch_tab("Voyageur")
     yield root
     root.withdraw()
 

@@ -200,7 +200,7 @@ class HBCAProfile:
         keystone_parts = []
         for code in (hbca_refs if isinstance(hbca_refs, list) else [hbca_refs]):
             entry = keystone_records.get(code)
-            if not entry:
+            if not isinstance(entry, dict):
                 continue
             meta = entry.get('metadata') or {}
             item_desc = meta.get('item_description')
@@ -208,7 +208,7 @@ class HBCAProfile:
             microfilm = meta.get('microfilm_no')
 
             if item_desc:
-                desc = item_desc
+                desc = str(item_desc)
                 if date_str:
                     desc += f", {date_str}"
                 desc += f" (Archives of Manitoba, HBCA {code}"
@@ -262,7 +262,7 @@ class HBCAProfile:
                                   vol: str, media_uid: str, target_software: str, _resi: str,
                                   alt_names: list, _scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
-        return General._build_generic_primary_event_lines(
+        return General.build_generic_primary_event_lines(
             rec, part, event_tag, witnesses, vol, media_uid, target_software,
             alt_names, raw_event_date, age
         )
@@ -277,7 +277,7 @@ class HBCAProfile:
         first_rec = next(iter(sheet.get('records', [])), {})
         tf = first_rec.get('type_specific_fields') or {}
         emp = tf.get('employee_name')
-        if emp:
+        if emp is not None and str(emp).strip():
             return f"HBCA Biographical Sheet - {emp}"
         pdf_url = meta.get('pdf_url', '')
         if pdf_url:

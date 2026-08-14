@@ -431,11 +431,11 @@ def test_download_volume_assets_multiworker_flushes_partial_progress_on_crash(mo
     real_append_scaffold_sheets = LAC.append_scaffold_sheets
     call_count = {"n": 0}
 
-    def crash_on_third_call(master_data, new_sheets):
+    def crash_on_third_call(m_data, new_sheets):
         call_count["n"] += 1
         if call_count["n"] == 3:
             raise RuntimeError("simulated crash mid-harvest")
-        real_append_scaffold_sheets(master_data, new_sheets)
+        real_append_scaffold_sheets(m_data, new_sheets)
     monkeypatch.setattr(LAC, "append_scaffold_sheets", crash_on_third_call)
 
     checkpoint_path = str(tmp_path / "checkpoint.json")
@@ -502,7 +502,7 @@ def test_download_volume_assets_multiworker_joins_still_alive_workers_on_exit(mo
 
 def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch, tmp_path):
     monkeypatch.setattr(LAC, "retrieve_volume_pids",
-                        lambda vol, cookies, checkpoint_path, archival_number: ["pid1"])
+                        lambda vol, cookies, cp_path, archival_number: ["pid1"])
     monkeypatch.setattr(LAC, "download_pid_bundle", lambda _pid, _media_dir: {
         "source_documents": [{"media_path": str(tmp_path / "asset1.jpg"), "lac_asset_id": "asset1"}],
     })

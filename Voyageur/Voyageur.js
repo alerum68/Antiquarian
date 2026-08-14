@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.6
+// @version      0.3.7
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -50,6 +50,60 @@
 
             const timer = setTimeout(() => finish(null, true), timeoutMs);
         });
+    }
+
+    // Shared by any gather's town/place-boundary stop condition (see runExtractionLoop
+    // below): true only when every one of these fields matches exactly. enumeration_district
+    // is included alongside city because some collections leave city blank/"Not Stated" for
+    // an entire roll - ED is the finer-grained boundary those records actually expose.
+    function placesMatch(a, b) {
+        return a.state === b.state && a.county === b.county && a.city === b.city
+            && a.enumeration_district === b.enumeration_district;
+    }
+
+    // Persists in-flight batch progress across a `location.reload()` triggered by the
+    // index-not-loaded retry (see runExtractionLoop). Tampermonkey re-runs this entire
+    // script from scratch on reload - without this, startBatch()'s reset of
+    // accumulatedPages/batchPageCounter/seenPids would silently discard every page
+    // gathered so far. sessionStorage (not GM_setValue) is deliberate: this only needs to
+    // survive a same-tab reload, not a browser restart, and needs no new script permissions.
+    const RELOAD_STATE_KEY = 'voyageur_a_reload_state';
+
+    function saveReloadState(state) {
+        sessionStorage.setItem(RELOAD_STATE_KEY, JSON.stringify({
+            pageUrl: window.location.href,
+            accumulatedPages: state.accumulatedPages,
+            batchPageCounter: state.batchPageCounter,
+            seenPids: Array.from(state.seenPids),
+            firstPagePlace: state.firstPagePlace,
+            indexReloadAttempts: state.indexReloadAttempts,
+        }));
+    }
+
+    // Returns null (rather than restoring) whenever the saved state doesn't obviously
+    // belong to the page we're now on - a real reload keeps the URL identical, so any
+    // mismatch means this is a different navigation, not the reload we saved this for.
+    function loadReloadState() {
+        const raw = sessionStorage.getItem(RELOAD_STATE_KEY);
+        if (!raw) return null;
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+        if (parsed.pageUrl !== window.location.href) return null;
+        return {
+            accumulatedPages: parsed.accumulatedPages || [],
+            batchPageCounter: parsed.batchPageCounter || 1,
+            seenPids: new Set(parsed.seenPids || []),
+            firstPagePlace: parsed.firstPagePlace || null,
+            indexReloadAttempts: parsed.indexReloadAttempts || 0,
+        };
+    }
+
+    function clearReloadState() {
+        sessionStorage.removeItem(RELOAD_STATE_KEY);
     }
 
     // Dispatch by hostname, the same way Voyageur.py's Python side dispatches by an explicit
@@ -125,6 +179,25 @@
         let batchPageCounter = 1;
         let seenPids = new Set();
         let lastPageSignature = "INITIAL_STATE_NOT_SET";
+        let firstPagePlace = null;
+        let indexReloadAttempts = 0;
+        const MAX_INDEX_RELOAD_ATTEMPTS = 3;
+
+        // A location.reload() triggered by the index-not-loaded retry (see
+        // runExtractionLoop) re-runs this whole script from scratch. Restore whatever was
+        // saved right before that reload so the batch resumes instead of startBatch()
+        // silently wiping every page gathered so far.
+        let resumingFromReload = false;
+        const resumedState = loadReloadState();
+        if (resumedState) {
+            accumulatedPages = resumedState.accumulatedPages;
+            batchPageCounter = resumedState.batchPageCounter;
+            seenPids = resumedState.seenPids;
+            firstPagePlace = resumedState.firstPagePlace;
+            indexReloadAttempts = resumedState.indexReloadAttempts;
+            resumingFromReload = true;
+            clearReloadState();
+        }
 
         const shouldAutoStart = window.location.href.includes('mgs_auto=1');
 
@@ -826,7 +899,21 @@
                 });
             }
 
+            const thisPlace = {
+                state: pageEntry.state, county: pageEntry.county,
+                city: pageEntry.city, enumeration_district: pageEntry.enumeration_district,
+            };
+            if (firstPagePlace === null) {
+                firstPagePlace = thisPlace;
+            } else if (!placesMatch(thisPlace, firstPagePlace)) {
+                // Crossed into a new town/ED - this page belongs to the next town, not the
+                // one this gather is for. Discard it entirely (the caller also skips this
+                // page's image download) and signal the loop to stop here.
+                return {placeBoundaryCrossed: true};
+            }
+
             accumulatedPages.push(pageEntry);
+            return {placeBoundaryCrossed: false};
         }
 
         async function downloadCurrentImage() {
@@ -1000,6 +1087,26 @@
                     }
                 }
 
+                // Ancestry sometimes fails to render the index on a genuinely indexed page
+                // while the script is running (confirmed live) - indistinguishable from a
+                // truly blank page by the toggleBtn check above. A reload recovers the
+                // former; a real blank page still shows unindexed after reloading too, so
+                // this can't tell the two apart on a single attempt - it can only bound how
+                // many times it's willing to guess "transient" before accepting "blank".
+                if (isUnindexed && indexReloadAttempts < MAX_INDEX_RELOAD_ATTEMPTS) {
+                    indexReloadAttempts++;
+                    if (window.showToast) {
+                        window.showToast(`No index detected - reloading (attempt ${indexReloadAttempts}/${MAX_INDEX_RELOAD_ATTEMPTS})...`, 'error', 2000);
+                    }
+                    saveReloadState({accumulatedPages, batchPageCounter, seenPids, firstPagePlace, indexReloadAttempts});
+                    location.reload();
+                    return;
+                }
+                // Either the index loaded, or every reload attempt still came back
+                // unindexed - the retry ceiling has been reached, so this page is now
+                // treated as genuinely blank. Reset for whichever page comes next.
+                indexReloadAttempts = 0;
+
                 if (!isUnindexed) {
                     const indexPanel = document.getElementById('indexPanel');
                     if (indexPanel && indexPanel.classList.contains('noDisplay')) {
@@ -1037,7 +1144,17 @@
                         debugLog("Timed out waiting for React table to update.");
                     } else if (rows && rows.length > 1) {
                         if (window.showToast) window.showToast(`Transcribing page ${batchPageCounter}...`, "success", 1500);
-                        await extractCurrentPageData(rows);
+                        const extractResult = await extractCurrentPageData(rows);
+                        if (extractResult && extractResult.placeBoundaryCrossed) {
+                            // This page belongs to the next town, not the one this gather
+                            // started on - it's already been excluded from accumulatedPages
+                            // by extractCurrentPageData. Don't download its image either,
+                            // and stop here rather than advancing past it.
+                            debugLog(`Place boundary crossed at page ${batchPageCounter}. Stopping and discarding this page.`);
+                            if (window.showToast) window.showToast("New town detected - stopping batch.", "error", 3000);
+                            stopBatch();
+                            break;
+                        }
                     }
                 }
 
@@ -1106,10 +1223,15 @@
 
         function startBatch() {
             isAutoExtracting = true;
-            accumulatedPages = [];
-            seenPids.clear();
-            batchPageCounter = 1;
-            lastPageSignature = "INITIAL_STATE_NOT_SET";
+            if (!resumingFromReload) {
+                accumulatedPages = [];
+                seenPids.clear();
+                batchPageCounter = 1;
+                firstPagePlace = null;
+                indexReloadAttempts = 0;
+                lastPageSignature = "INITIAL_STATE_NOT_SET";
+            }
+            resumingFromReload = false;
 
             if (window._startBtn) window._startBtn.style.display = 'none';
             if (window._stopBtn) window._stopBtn.style.display = 'block';
@@ -1799,6 +1921,13 @@
             initUI();
             if (shouldAutoStart && !isRunning) startBatch();
         }
+    }
+
+    // Test-only: exposes pure, DOM-free helpers for the Node test harness (see
+    // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
+    // there - the guard is load-bearing, not defensive boilerplate.
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = {placesMatch, saveReloadState, loadReloadState, clearReloadState};
     }
 
 })();

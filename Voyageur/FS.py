@@ -172,9 +172,9 @@ def sex_code(raw: str) -> str:
     return ""
 
 
-def build_participant(role_name: str, full_name: str, sex: str,
+def build_participant(role_name: str, raw_name: str, sex: str,
                       fsftid: str = "", person_ark: str = "") -> Dict[str, Any]:
-    given, surname, dit_name = split_name_and_dit(full_name)
+    given, surname, dit_name = split_name_and_dit(raw_name)
     type_specific_fields: Dict[str, Any] = {}
     if fsftid:
         type_specific_fields["fsftid"] = fsftid
@@ -569,15 +569,15 @@ def parse_catalog_roll(catalog_items: Dict[str, dict]) -> Dict[str, str]:
     return {"series": "", "roll": ""}
 
 
-def split_full_name(full_name: str) -> Tuple[str, str]:
+def split_full_name(raw_name: str) -> Tuple[str, str]:
     """Splits FamilySearch's single combined "Given Surname" Name field - unlike Ancestry's
     census index, which already exposes separate Given Name/Surname columns - into the same
     two-field shape, using the last whitespace-separated token as the surname. Same
     convention as Archivist.py's own split_full_name (used there for a different field, but
     the same "Given Surname" shape)."""
-    parts = full_name.strip().split()
+    parts = raw_name.strip().split()
     if len(parts) < 2:
-        return full_name.strip(), ""
+        return raw_name.strip(), ""
     return " ".join(parts[:-1]), parts[-1]
 
 

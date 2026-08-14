@@ -328,11 +328,11 @@ def build_continuation_context(pending_record: Optional[Dict[str, Any]]) -> str:
         record_number/year, and set that record's continues_from_previous_image: true. If
         nothing on this image continues it, ignore this block entirely.
 
-        record_number: {pending_record.get("record_number")}
-        year: {pending_record.get("year")}
-        event_type: {pending_record.get("event_type")}
-        transcription so far: {pending_record.get("citation_text")}
-        translation so far: {pending_record.get("citation_details")}
+        record_number: {pending_record.get("record_number") or ""}
+        year: {pending_record.get("year") or ""}
+        event_type: {pending_record.get("event_type") or ""}
+        transcription so far: {pending_record.get("citation_text") or ""}
+        translation so far: {pending_record.get("citation_details") or ""}
         participants captured so far: {json.dumps(participants_summary, ensure_ascii=False)}
     """)
 

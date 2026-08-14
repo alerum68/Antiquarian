@@ -197,7 +197,7 @@ FIELD_WIDGETS = {
 # ==========================================
 # PER-TOOL SETTINGS SCHEMA LOADER
 # ==========================================
-def _load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
+def load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
     """Loads one tool's settings_schema.yaml, returning the same {section: {key: default}}
     shape the hardcoded *_VARS dict literals used to provide directly. As a side effect,
     merges this tool's tooltips/widgets/pickers/label-overrides into the shared
@@ -251,7 +251,9 @@ def _load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]:
     return result
 
 
-ARCHIVIST_VARS = _load_tool_schema(BASE_DIR / "Archivist")
+_load_tool_schema = load_tool_schema
+
+ARCHIVIST_VARS = load_tool_schema(BASE_DIR / "Archivist")
 
 # ==========================================
 # VOYAGEUR SOURCES
@@ -265,16 +267,16 @@ VOYAGEUR_SOURCES = [
     ("HBCA", "HBCA / Manitoba Archives"),
 ]
 
-VOYAGEUR_VARS = _load_tool_schema(BASE_DIR / "Voyageur")
+VOYAGEUR_VARS = load_tool_schema(BASE_DIR / "Voyageur")
 
-PALEOGRAPHER_VARS = _load_tool_schema(BASE_DIR / "Paleographer")
+PALEOGRAPHER_VARS = load_tool_schema(BASE_DIR / "Paleographer")
 
-REGISTRAR_VARS = _load_tool_schema(BASE_DIR / "Registrar")
+REGISTRAR_VARS = load_tool_schema(BASE_DIR / "Registrar")
 
 
-GAZETTEER_VARS = _load_tool_schema(BASE_DIR / "Gazetteer")
+GAZETTEER_VARS = load_tool_schema(BASE_DIR / "Gazetteer")
 
-PDFIX_VARS = _load_tool_schema(BASE_DIR / "PDFix")
+PDFIX_VARS = load_tool_schema(BASE_DIR / "PDFix")
 
 
 # ==========================================
@@ -942,6 +944,8 @@ class Scriptorium(ctk.CTk):
             elif name != "Help":
                 btn.configure(fg_color="transparent", text_color=C_TEXT)
 
+    switch_tab = _switch_tab
+
     def _show_current_help(self):
         """The sidebar's single Help entry point - always shows whichever tab is actually
         on screen right now."""
@@ -1210,14 +1214,14 @@ class Scriptorium(ctk.CTk):
                                              placeholder_text="(intentionally blank)" if state == "blank" else "")
                         entry.pack(side="left", fill="x", expand=True, padx=5)
 
-                        def _on_edit(_name, _index, _mode, key=key, entry=entry):
+                        def _on_edit(_name, _index, _mode, k=key, e=entry):
                             # Once the user actually types something, this is no longer
                             # just a placeholder default sitting there unedited - promote
                             # it visually to a real, normal-colored value immediately, not
                             # just on next load.
-                            if self.field_state.get(key) == "default":
-                                self.field_state[key] = "user"
-                                entry.configure(text_color=None)
+                            if self.field_state.get(k) == "default":
+                                self.field_state[k] = "user"
+                                e.configure(text_color=None)
 
                         self.string_vars[key].trace_add("write", _on_edit)
 
@@ -1242,18 +1246,18 @@ class Scriptorium(ctk.CTk):
             # pass, so a closure that only *reads* them (rather than binding them as defaults
             # at definition time) would have every section's click handler end up acting on
             # whichever section happened to be built last.
-            def apply_expanded_state(expanded=expanded, arrow_lbl=arrow_lbl, content=content, header=header):
-                arrow_lbl.configure(text="▼" if expanded["state"] else "▶")
-                if expanded["state"]:
-                    content.pack(fill="x", after=header)
+            def apply_expanded_state(exp=expanded, arr_lbl=arrow_lbl, cnt=content, hdr=header):
+                arr_lbl.configure(text="▼" if exp["state"] else "▶")
+                if exp["state"]:
+                    cnt.pack(fill="x", after=hdr)
                 else:
-                    content.pack_forget()
+                    cnt.pack_forget()
                 # The canvas is sized to whatever's actually showing (see _resize_scroll
                 # above) - every collapse/expand changes that, so it has to be recomputed
                 # every time, not just once at initial build.
                 _resize_scroll()
 
-            def toggle(_event=None, expanded=expanded, apply_expanded_state=apply_expanded_state):
+            def toggle(_event=None, exp=expanded, fn_apply=apply_expanded_state):
                 # header/arrow_lbl/every header child are all bound to this same handler
                 # independently (see below) - confirmed live that the very first click of a
                 # fresh session (before the window has ever had real OS focus) gets
@@ -1263,11 +1267,11 @@ class Scriptorium(ctk.CTk):
                 # A short debounce swallows that duplicate without needing to touch
                 # window-activation/focus handling directly.
                 now = time.monotonic()
-                if now - expanded.get("_last_toggle", 0.0) < 0.2:
+                if now - exp.get("_last_toggle", 0.0) < 0.2:
                     return
-                expanded["_last_toggle"] = now
-                expanded["state"] = not expanded["state"]
-                apply_expanded_state()
+                exp["_last_toggle"] = now
+                exp["state"] = not exp["state"]
+                fn_apply()
 
             header.bind("<Button-1>", toggle)
             arrow_lbl.bind("<Button-1>", toggle)
@@ -1335,7 +1339,9 @@ class Scriptorium(ctk.CTk):
         # own value by default - this hijacks scrolling the settings page whenever the
         # cursor merely passes over a slider on the way down. No public API to disable it,
         # so unbind directly.
-        slider._canvas.unbind("<MouseWheel>")
+        canvas = getattr(slider, "_canvas", None)
+        if canvas is not None and hasattr(canvas, "unbind"):
+            canvas.unbind("<MouseWheel>")
 
     def _resolve_base_dir(self, base_dir_key: str) -> str:
         """Resolves a directory setting (like JSON_DIR) against GENEALOGY_DIR the same way

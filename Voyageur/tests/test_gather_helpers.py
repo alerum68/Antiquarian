@@ -255,7 +255,7 @@ def test_resolve_census_image_dir_relative_to_media_dir(tmp_path, monkeypatch):
 
 def test_write_archivist_json_file_writes_expected_key(monkeypatch):
     calls = []
-    monkeypatch.setattr(gh, "set_key", lambda path, key, value: calls.append((path, key, value)))
+    monkeypatch.setattr(gh, "set_key", lambda p, k, v: calls.append((p, k, v)))
 
     gh.write_archivist_json_file("1900 - Ohio.json")
 

@@ -460,11 +460,13 @@ def _query_keystone_with_browser(location_code: str, base_url: str = KEYSTONE_BA
 
             browser.close()
 
-            if fetch_result.get("status") != 200:
-                print(f"[WARN] Keystone browser POST returned HTTP {fetch_result.get('status')} for {location_code}")
+            if not isinstance(fetch_result, dict) or fetch_result.get("status") != 200:
+                status_code = fetch_result.get("status") if isinstance(fetch_result, dict) else "unknown"
+                print(f"[WARN] Keystone browser POST returned HTTP {status_code} for {location_code}")
                 return result
 
-            soup = BeautifulSoup(fetch_result["html"], "html.parser")
+            html_text = fetch_result.get("html") or ""
+            soup = BeautifulSoup(html_text, "html.parser")
             for a_tag in soup.find_all("a", href=True):
                 href: str = a_tag["href"]
                 href_lower = href.lower()

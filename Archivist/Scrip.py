@@ -267,7 +267,7 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
         s_id = f"@S{tid}@"
         display_name = (Utils.clean_val(tpl.get('source_description'))
                         or Utils.clean_val(tpl.get('website_collection'))
-                        or tpl['label'])
+                        or str(tpl['label']))
         commission = Utils.clean_val(tpl.get('department') or tpl.get('commission'))
         collection = Utils.clean_val(tpl.get('collection'))
         primary_creator = Utils.clean_val(tpl.get('primary_creator', 'Department of the Interior'))
@@ -410,7 +410,7 @@ class ScripProfile:
                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
         if event_tag != 'EVEN':
-            return General._build_generic_primary_event_lines(
+            return General.build_generic_primary_event_lines(
                 rec, part, event_tag, witnesses, vol, media_uid, target_software,
                 alt_names, raw_event_date, age)
 

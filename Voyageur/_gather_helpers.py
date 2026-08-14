@@ -141,10 +141,10 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     skipped = []
     failed = {}  # prefixed source name -> (file_path, final name) for files still pending
 
-    def attempt(file_path: Path) -> None:
-        final_name = file_path.name[len(image_prefix):]
+    def attempt(candidate_path: Path) -> None:
+        final_name = candidate_path.name[len(image_prefix):]
         final_img = img_target_dir / final_name
-        status = move_with_retry(file_path, final_img, on_collision=on_collision)
+        status = move_with_retry(candidate_path, final_img, on_collision=on_collision)
         (moved if status == "moved" else skipped).append(final_name)
 
     for file_path in image_candidates:

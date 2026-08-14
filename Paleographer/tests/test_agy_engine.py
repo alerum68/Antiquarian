@@ -211,8 +211,8 @@ def _record(number, continues_on_next_image=False, continues_from_previous_image
 def test_call_agy_extract_chunked_delegates_when_under_chunk_size(monkeypatch):
     calls = []
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
-        calls.append(len(images))
+    def fake_call_agy_extract(imgs, schema, prompt_text, **kwargs):
+        calls.append(len(imgs))
         return _make_result({"collection_title": "T", "sheets": [_sheet("1", [_record("1")])]})
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
@@ -228,8 +228,8 @@ def test_call_agy_extract_chunked_splits_and_calls_consolidation(monkeypatch):
     extract_calls = []
     consolidate_calls = []
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
-        extract_calls.append(len(images))
+    def fake_call_agy_extract(imgs, schema, prompt_text, **kwargs):
+        extract_calls.append(len(imgs))
         chunk_num = len(extract_calls)
         return _make_result({"collection_title": "Test Collection",
                              "sheets": [_sheet(f"chunk{chunk_num}", [_record(str(chunk_num))])]})
@@ -267,7 +267,7 @@ def test_call_agy_extract_chunked_threads_continuation_across_chunks(monkeypatch
         ])]},
     ]
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(_imgs, schema, prompt_text, **kwargs):
         return _make_result(chunk_responses.pop(0))
 
     def fake_consolidate(all_sheets, collection_title, schema, model, cli_bin, timeout_seconds):

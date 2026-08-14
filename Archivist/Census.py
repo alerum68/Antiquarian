@@ -320,9 +320,9 @@ def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.S
     unrelated: List[pd.Series] = []
     consumed = set()
 
-    def add_flag(person: pd.Series, flag_reason: str, flag_conf: float) -> None:
+    def add_flag(p: pd.Series, flag_reason: str, flag_conf: float) -> None:
         if flag_conf < REVIEW_THRESHOLD:
-            flags.append({'person': person, 'reason': flag_reason, 'confidence': flag_conf})
+            flags.append({'person': p, 'reason': flag_reason, 'confidence': flag_conf})
 
     for person in members:
         merge_reason = Utils.clean_val(person.get('_MergeReviewReason'))
@@ -602,17 +602,17 @@ def parse_household_relational(
             last_child_inlaw_unit = None
 
             if rel in REL_HEAD:
-                current_unit = cast(HouseholdUnit, current_unit)
-                head_parents_unit = cast(HouseholdUnit, head_parents_unit)
-                if get_gender(m) == 'F':
-                    current_unit['wife'] = m
-                else:
-                    current_unit['husband'] = m
+                if current_unit is not None:
+                    if get_gender(m) == 'F':
+                        current_unit['wife'] = m
+                    else:
+                        current_unit['husband'] = m
 
                 primary_head = m
-                head_children = head_parents_unit.get('children')
-                if isinstance(head_children, list):
-                    head_children.append(m)
+                if head_parents_unit is not None:
+                    head_children = head_parents_unit.get('children')
+                    if isinstance(head_children, list):
+                        head_children.append(m)
             else:
                 unrelated.append(m)
                 flags.append(
@@ -1473,10 +1473,10 @@ def run_census_flavor(data: dict) -> None:
     cc = citation.get("collection_id")
     apid = APID_DB or citation.get("apid_db")
 
-    if cc:
-        CENSUS_SOURCE_ID = str(cc)
-    elif apid:
-        CENSUS_SOURCE_ID = str(apid)
+    if cc is not None and str(cc).strip():
+        CENSUS_SOURCE_ID = str(cc).strip()
+    elif apid is not None and str(apid).strip():
+        CENSUS_SOURCE_ID = str(apid).strip()
     else:
         CENSUS_SOURCE_ID = Utils.resolve_source_id(record_type_name, COLLECTION_NAME)
 

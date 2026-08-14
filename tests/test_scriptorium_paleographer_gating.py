@@ -6,11 +6,12 @@ from Scriptorium import Scriptorium as ScriptoriumApp
 @pytest.fixture(scope="module")
 def app():
     import tkinter
-    if getattr(tkinter, "_default_root", None) is not None and isinstance(tkinter._default_root, ScriptoriumApp):
-        root = tkinter._default_root
+    default_root = getattr(tkinter, "_default_root", None)
+    if default_root is not None and isinstance(default_root, ScriptoriumApp):
+        root = default_root
     else:
         root = ScriptoriumApp()
-    root._switch_tab("Paleographer")
+    root.switch_tab("Paleographer")
     yield root
     root.withdraw()
 

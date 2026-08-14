@@ -433,12 +433,12 @@ def download_volume_assets(pids: List[str], media_dir: str, checkpoint_path: str
     pid_documents = checkpoint.get("pid_documents", {})
     master_data = load_master_db(master_db_path, collection_title, document_type)
 
-    def write_scaffold(source_documents):
+    def write_scaffold(src_docs):
         new_sheets = [
             build_empty_sheet(Path(entry["media_path"]).name,
                               Path(entry["media_path"]).suffix.lstrip("."),
                               page_id=entry.get("lac_asset_id"))
-            for entry in source_documents
+            for entry in src_docs
         ]
         append_scaffold_sheets(master_data, new_sheets)
         validate_master_db_against_commissioner(master_data, document_type, collection_title)
@@ -604,12 +604,12 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
 
     active_workers = {i: {"process": None, "pid": None, "start_time": 0} for i in range(max_workers)}
 
-    def start_worker(wid):
+    def start_worker(worker_id):
         p = mp.Process(target=_worker_download_loop,
-                       args=(wid, task_queue, result_queue, rate_lock, last_req_time, current_delay, media_dir))
+                       args=(worker_id, task_queue, result_queue, rate_lock, last_req_time, current_delay, media_dir))
         p.start()
-        active_workers[wid]["process"] = p
-        active_workers[wid]["pid"] = None
+        active_workers[worker_id]["process"] = p
+        active_workers[worker_id]["pid"] = None
 
     for wid in range(max_workers):
         start_worker(wid)
@@ -672,11 +672,12 @@ def download_volume_assets_multiworker(pids: List[str], media_dir: str, checkpoi
 
             now = time.time()
             for wid, worker in active_workers.items():
-                if worker["pid"] and (now - worker["start_time"] > timeout_seconds):
-                    hung_pid = worker["pid"]
+                hung_pid = worker["pid"]
+                if hung_pid and (now - worker["start_time"] > timeout_seconds):
                     print(f"\n[Watchdog] Worker {wid} hung on PID {hung_pid}. Restarting worker...")
-                    worker["process"].terminate()
-                    worker["process"].join()
+                    if worker["process"] is not None:
+                        worker["process"].terminate()
+                        worker["process"].join()
                     task_queue.put(hung_pid)
                     start_worker(wid)
     finally:

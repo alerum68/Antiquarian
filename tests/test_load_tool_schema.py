@@ -36,7 +36,7 @@ def test_load_tool_schema_basic_shape(tmp_path):
               default: 0.4
         """), encoding="utf-8")
 
-    result = Scriptorium._load_tool_schema(tmp_path)
+    result = Scriptorium.load_tool_schema(tmp_path)
 
     assert result == {"Section One": {"FIELD_A": "hello", "FIELD_B": "0.4"}}
 
@@ -53,7 +53,7 @@ def test_load_tool_schema_str_coerces_yaml_typed_defaults(tmp_path):
               default: 0.4
         """), encoding="utf-8")
 
-    result = Scriptorium._load_tool_schema(tmp_path)
+    result = Scriptorium.load_tool_schema(tmp_path)
 
     assert result == {"Section One": {"BOOL_FIELD": "True", "INT_FIELD": "3", "FLOAT_FIELD": "0.4"}}
     assert all(isinstance(v, str) for v in result["Section One"].values())
@@ -68,7 +68,7 @@ def test_load_tool_schema_merges_tooltip_into_shared_dict(tmp_path):
               tooltip: "Explains FIELD_A."
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Scriptorium.load_tool_schema(tmp_path)
 
     assert Scriptorium.TOOLTIP_DESCRIPTIONS["FIELD_A"] == "Explains FIELD_A."
 
@@ -90,7 +90,7 @@ def test_load_tool_schema_merges_widget_into_shared_dict(tmp_path):
               suffix: "s"
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Scriptorium.load_tool_schema(tmp_path)
 
     assert Scriptorium.FIELD_WIDGETS["LEVEL"] == {
         "type": "segmented",
@@ -116,7 +116,7 @@ def test_load_tool_schema_merges_picker_into_shared_dict(tmp_path):
                 filetypes: [["GEDCOM files", "*.ged"], ["All files", "*.*"]]
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Scriptorium.load_tool_schema(tmp_path)
 
     assert Scriptorium.PATH_PICKER_FIELDS["OUT_FILE"] == {
         "kind": "save",
@@ -136,28 +136,28 @@ def test_load_tool_schema_merges_label_overrides_into_shared_dict(tmp_path):
           SOME_FIELD: "A Nicer Label"
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Scriptorium.load_tool_schema(tmp_path)
 
     assert Scriptorium.CUSTOM_LABELS["SOME_FIELD"] == "A Nicer Label"
 
 
 def test_load_tool_schema_missing_file_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Scriptorium.load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_malformed_yaml_raises_runtime_error(tmp_path):
     (tmp_path / "settings_schema.yaml").write_text("sections: [this is not: valid: yaml", encoding="utf-8")
 
     with pytest.raises(RuntimeError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Scriptorium.load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_missing_sections_key_raises_value_error(tmp_path):
     (tmp_path / "settings_schema.yaml").write_text("foo: bar\n", encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Scriptorium.load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_section_not_a_mapping_raises_value_error(tmp_path):
@@ -167,7 +167,7 @@ def test_load_tool_schema_section_not_a_mapping_raises_value_error(tmp_path):
         """), encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Scriptorium.load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_field_missing_default_raises_value_error(tmp_path):
@@ -179,4 +179,4 @@ def test_load_tool_schema_field_missing_default_raises_value_error(tmp_path):
         """), encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Scriptorium.load_tool_schema(tmp_path)

@@ -39,7 +39,7 @@ def _global_keys() -> set:
 
 
 def _schema_keys(tool_dir: Path) -> set:
-    schema = Scriptorium._load_tool_schema(tool_dir)
+    schema = Scriptorium.load_tool_schema(tool_dir)
     keys = set()
     for fields in schema.values():
         keys.update(fields.keys())
