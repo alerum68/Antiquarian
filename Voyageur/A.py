@@ -81,7 +81,13 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
 
         final_name = group["final"].name[len(f"TMP_A_{run_id}_"):]
         recovered_json = json_target_dir / final_name
-        json_status = move_with_retry(group["final"], recovered_json, on_collision="skip")
+        # Deliberately hardcoded, not the run's own GATHER_ON_COLLISION setting: recovered data
+        # is best-effort, so defensively skip an existing file rather than overwrite it.
+        try:
+            json_status = move_with_retry(group["final"], recovered_json, on_collision="skip")
+        except OSError as e:
+            print(f"[WARN] Could not recover run {run_id}'s final JSON ({group['final'].name}): {e}")
+            continue
         if json_status == "skipped":
             print(f"[System] Recovered run {run_id}: {final_name} already exists in Project folder, "
                   f"discarding the stale copy (images below are still recovered).")
