@@ -6,15 +6,25 @@ import pytest
 import _gather_helpers as gh
 
 
+def test_build_gather_launch_url_appends_auto_and_run_id_with_existing_query():
+    result = gh.build_gather_launch_url("https://example.com/record?id=1", "abc123")
+    assert result == "https://example.com/record?id=1&mgs_auto=1&mgs_run=abc123"
+
+
+def test_build_gather_launch_url_appends_auto_and_run_id_with_no_existing_query():
+    result = gh.build_gather_launch_url("https://example.com/record", "abc123")
+    assert result == "https://example.com/record?mgs_auto=1&mgs_run=abc123"
+
+
 def test_launch_gather_browser_opens_url_and_returns_start_time(monkeypatch, capsys):
     opened = {}
     monkeypatch.setattr(gh.webbrowser, "open", lambda url: opened.setdefault("url", url))
     monkeypatch.setattr(gh.time, "time", lambda: 12345.0)
 
-    start_time = gh.launch_gather_browser("https://example.com/record?id=1")
+    start_time = gh.launch_gather_browser("https://example.com/record?id=1", "abc123")
 
     assert start_time == 12345.0
-    assert opened["url"] == "https://example.com/record?id=1&mgs_auto=1"
+    assert opened["url"] == "https://example.com/record?id=1&mgs_auto=1&mgs_run=abc123"
     captured = capsys.readouterr()
     assert "[System] Launching browser..." in captured.out
     assert "Waiting for Tampermonkey downloads" in captured.out

@@ -90,9 +90,19 @@ def cleanup_stale_gather_files(downloads_dir: Path, *prefixes: str) -> None:
                 pass
 
 
-def launch_gather_browser(url: str) -> float:
+def build_gather_launch_url(url: str, run_id: str) -> str:
+    """Appends the auto-start flag and this run's own unique ID to the gather URL so
+    Voyageur.js can read both from window.location.href: mgs_auto=1 starts the batch
+    automatically, mgs_run=<id> is embedded into every filename this run downloads so two
+    runs (even of the identical record) never produce colliding Downloads filenames - see
+    the Voyageur Downloads Handling Redesign spec."""
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}mgs_auto=1&mgs_run={run_id}"
+
+
+def launch_gather_browser(url: str, run_id: str) -> float:
     start_time = time.time()
-    auto_url = url + ("&mgs_auto=1" if "?" in url else "?mgs_auto=1")
+    auto_url = build_gather_launch_url(url, run_id)
     print("[System] Launching browser...")
     webbrowser.open(auto_url)
     print("\n[System] Waiting for Tampermonkey downloads (Auto-Batch will start automatically)...")
