@@ -84,9 +84,10 @@ def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
     whose name starts with source_prefix (the source's own fixed prefix, e.g.
     'TMP_A_' or 'TMP_FS_'); the run ID is the text between source_prefix and the next
     '_' (run IDs are plain hex so they never contain one themselves). A .jpg belongs in
-    'images'; a .json matching TMP_<source>_<runId>_final.json belongs in 'final' (at
-    most one per run); a .json whose remainder contains the literal 'checkpoint'
-    substring (e.g. ..._checkpoint_<N>.json) belongs in 'checkpoints'."""
+    'images'; a .json belongs in 'final' (the run's own final JSON - whichever .json is
+    not a checkpoint; at most one per run in practice); a .json whose remainder contains
+    the literal 'checkpoint' substring (e.g. ..._checkpoint_<N>.json) belongs in
+    'checkpoints'."""
     runs: dict = {}
     for p in downloads_dir.iterdir():
         if not p.is_file() or not p.name.startswith(source_prefix):
@@ -101,10 +102,10 @@ def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
         if p.suffix.lower() == '.jpg':
             entry['images'].append(p)
         elif p.suffix.lower() == '.json':
-            if remainder == 'final.json':
-                entry['final'] = p
-            elif 'checkpoint' in remainder:
+            if 'checkpoint' in remainder:
                 entry['checkpoints'].append(p)
+            else:
+                entry['final'] = p
     return runs
 
 

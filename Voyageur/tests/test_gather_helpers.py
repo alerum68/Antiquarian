@@ -232,17 +232,17 @@ def test_move_downloaded_images_reports_final_failures_after_retry(tmp_path, mon
 
 
 def test_find_orphaned_gather_runs_groups_by_run_id_and_finds_complete_run(tmp_path):
-    (tmp_path / "TMP_A_stale1_final.json").write_text("{}")
+    (tmp_path / "TMP_A_stale1_1880 - USA - Ohio - ANC.json").write_text("{}")
     (tmp_path / "TMP_A_stale1_Images_00130.jpg").write_text("x")
     (tmp_path / "TMP_A_stale1_Images_00131.jpg").write_text("x")
     (tmp_path / "TMP_A_stale2_checkpoint_20.json").write_text("{}")
-    (tmp_path / "TMP_A_current_final.json").write_text("{}")
+    (tmp_path / "TMP_A_current_1880 - USA - Ohio - ANC.json").write_text("{}")
     (tmp_path / "TMP_FS_other_final.json").write_text("{}")
 
     result = gh.find_orphaned_gather_runs(tmp_path, "TMP_A_", "current")
 
     assert set(result.keys()) == {"stale1", "stale2"}
-    assert result["stale1"]["final"] == tmp_path / "TMP_A_stale1_final.json"
+    assert result["stale1"]["final"] == tmp_path / "TMP_A_stale1_1880 - USA - Ohio - ANC.json"
     assert sorted(p.name for p in result["stale1"]["images"]) == [
         "TMP_A_stale1_Images_00130.jpg", "TMP_A_stale1_Images_00131.jpg"]
     assert result["stale2"]["final"] is None
@@ -250,11 +250,27 @@ def test_find_orphaned_gather_runs_groups_by_run_id_and_finds_complete_run(tmp_p
 
 
 def test_find_orphaned_gather_runs_returns_empty_dict_when_nothing_stale(tmp_path):
-    (tmp_path / "TMP_A_current_final.json").write_text("{}")
+    (tmp_path / "TMP_A_current_1880 - USA - Ohio - ANC.json").write_text("{}")
 
     result = gh.find_orphaned_gather_runs(tmp_path, "TMP_A_", "current")
 
     assert result == {}
+
+
+def test_find_orphaned_gather_runs_classifies_by_checkpoint_substring_not_name_shape(tmp_path):
+    (tmp_path / "TMP_A_stale1_1880 - checkpointed notes - ANC.json").write_text("{}")
+    (tmp_path / "TMP_A_stale2_FS - Some Family.json").write_text("{}")
+
+    result = gh.find_orphaned_gather_runs(tmp_path, "TMP_A_", "current")
+
+    assert set(result.keys()) == {"stale1", "stale2"}
+    assert result["stale1"]["final"] is None
+    assert [p.name for p in result["stale1"]["checkpoints"]] == [
+        "TMP_A_stale1_1880 - checkpointed notes - ANC.json"]
+    assert result["stale1"]["images"] == []
+    assert result["stale2"]["final"] == tmp_path / "TMP_A_stale2_FS - Some Family.json"
+    assert result["stale2"]["checkpoints"] == []
+    assert result["stale2"]["images"] == []
 
 
 def test_atomic_write_bytes_writes_content_and_leaves_no_temp_file(tmp_path):
