@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.8
+// @version      0.3.22
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -104,6 +104,53 @@
 
     function clearReloadState() {
         sessionStorage.removeItem(RELOAD_STATE_KEY);
+    }
+
+    // Same sessionStorage-survives-a-reload convention as RELOAD_STATE_KEY above, but keyed
+    // by runId (the gather's own mgs_run URL param, stable across every image in one run)
+    // rather than the exact page URL. Two distinct scenarios both need this to survive:
+    // (1) the explicit location.reload() from parseHouseholdSections' Names-tab-missing
+    // retry, and (2) confirmed live - a genuine, unexpected one: clicking FamilySearch's own
+    // "Next Image" button is a REAL page navigation, not client-side routing, so Tampermonkey
+    // re-injects this entire script from scratch on every single image. Keying by exact
+    // pageUrl (as originally written) meant loadFsReloadState() only ever matched case (1),
+    // where the URL happens to be identical before and after - it never matched case (2),
+    // where the URL legitimately changes to the next image's own ark. Without this fix,
+    // accumulatedItems silently reset to empty on every image after the first, and only the
+    // LAST scraped item ever survived to the final JSON - confirmed live: a real 3-image
+    // gather run's downloaded JSON contained exactly 1 item, not 3.
+    const FS_RELOAD_STATE_KEY = 'voyageur_fs_reload_state';
+
+    function saveFsReloadState(runId, state) {
+        sessionStorage.setItem(FS_RELOAD_STATE_KEY, JSON.stringify({
+            runId,
+            accumulatedItems: state.accumulatedItems,
+            seenItemIds: Array.from(state.seenItemIds),
+            itemsAtLastCheckpoint: state.itemsAtLastCheckpoint,
+            namesReloadAttempts: state.namesReloadAttempts,
+        }));
+    }
+
+    function loadFsReloadState(runId) {
+        const raw = sessionStorage.getItem(FS_RELOAD_STATE_KEY);
+        if (!raw) return null;
+        let parsed;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            return null;
+        }
+        if (parsed.runId !== runId) return null;
+        return {
+            accumulatedItems: parsed.accumulatedItems || [],
+            seenItemIds: new Set(parsed.seenItemIds || []),
+            itemsAtLastCheckpoint: parsed.itemsAtLastCheckpoint || 0,
+            namesReloadAttempts: parsed.namesReloadAttempts || 0,
+        };
+    }
+
+    function clearFsReloadState() {
+        sessionStorage.removeItem(FS_RELOAD_STATE_KEY);
     }
 
     // Dispatch by hostname, the same way Voyageur.py's Python side dispatches by an explicit
@@ -1283,9 +1330,30 @@
         let accumulatedItems = [];
         let seenItemIds = new Set();
         let itemsAtLastCheckpoint = 0;
+        let namesReloadAttempts = 0;
+        const MAX_NAMES_RELOAD_ATTEMPTS = 3;
 
         const shouldAutoStart = window.location.href.includes('mgs_auto=1');
         const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
+
+        // A location.reload() triggered by the Names-tab-missing retry, OR a genuine
+        // FamilySearch page navigation from clicking "Next Image" (see goToNextImage/
+        // FS_RELOAD_STATE_KEY's own note), both re-run this whole script from scratch -
+        // restore whatever was saved right before so the batch resumes instead of silently
+        // discarding every item gathered so far. Same convention as runAncestryGather's own
+        // resumedState handling. isResumingFsState is read by startBatch() below to skip
+        // its own unconditional reset, the same way runAncestryGather's resumingFromReload
+        // guards startBatch() there.
+        let isResumingFsState = false;
+        const resumedFsState = loadFsReloadState(runId);
+        if (resumedFsState) {
+            accumulatedItems = resumedFsState.accumulatedItems;
+            seenItemIds = resumedFsState.seenItemIds;
+            itemsAtLastCheckpoint = resumedFsState.itemsAtLastCheckpoint;
+            namesReloadAttempts = resumedFsState.namesReloadAttempts;
+            isResumingFsState = true;
+            clearFsReloadState();
+        }
 
         function debugLog(msg) {
             if (DEBUG_MODE) console.log(`[Voyageur FS] ${msg}`);
@@ -1446,7 +1514,32 @@
 
         async function parseHouseholdSections() {
             const ok = await clickTab('Names');
-            if (!ok) return [];
+            if (!ok) {
+                // The "Names" tab is gated behind a FamilySearch account-level feature flag
+                // that doesn't always apply on a fresh page load - confirmed live that the
+                // exact same URL rendered the old "Image Index" tab first, then "Names" on a
+                // later navigation with nothing else changed. A reload gives the flag another
+                // chance to apply before this image's household data is given up on.
+                if (namesReloadAttempts < MAX_NAMES_RELOAD_ATTEMPTS) {
+                    namesReloadAttempts++;
+                    if (window.fsShowToast) {
+                        window.fsShowToast(
+                            `Names view not loaded - reloading (attempt ${namesReloadAttempts}/${MAX_NAMES_RELOAD_ATTEMPTS})...`,
+                            'error', 2000);
+                    }
+                    saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint, namesReloadAttempts});
+                    location.reload();
+                    return [];
+                }
+                debugLog(`Names tab never appeared for item ${getItemId()} after `
+                    + `${MAX_NAMES_RELOAD_ATTEMPTS} reload attempts - continuing without household data.`);
+                if (window.fsShowToast) {
+                    window.fsShowToast('Names view unavailable - skipping household data for this image.',
+                        'error', 4000);
+                }
+                namesReloadAttempts = 0;
+                return [];
+            }
 
             // FamilySearch renders the "Names" panel shell immediately but fills in household
             // content a beat later (same skeleton-then-fill race already handled for the old
@@ -1547,8 +1640,12 @@
 
         function readRecordArkFromOpenPanel() {
             const aside = document.querySelector('aside');
+            // The panel's own heading reads "View {PersonName}" (confirmed live: "View JOHN
+            // DEERING", "View HANNAH E. FRANCIS") - the name is dynamic per person, not the
+            // fixed literal "View Name" this used to match, which never matched anything and
+            // made every scrapePersonDetail() call time out with blank data.
             const headingEl = aside && [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
-                .find(h => h.textContent.trim() === 'View Name');
+                .find(h => /^View\s+\S/.test(h.textContent.trim()));
             if (!headingEl) return null;
             const links = [...aside.querySelectorAll('a[href]')]
                 .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
@@ -1594,9 +1691,9 @@
 
             const aside = document.querySelector('aside');
             const headingEl = [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
-                .find(h => h.textContent.trim() === 'View Name');
+                .find(h => /^View\s+\S/.test(h.textContent.trim()));
             const fullText = aside.innerText;
-            const viewIdx = fullText.indexOf('View Name');
+            const viewIdx = fullText.indexOf(headingEl.textContent.trim());
             const panelText = fullText.slice(viewIdx);
 
             // "VIEW RECORD" always points at this specific indexed entry (record_ark, already
@@ -1604,7 +1701,7 @@
             // present, points at the real Family Tree person (person_ark == PID) via a DIFFERENT
             // href shape than the old UI used ("/en/tree/person/{PID}", no "/details/" segment -
             // confirmed live, the old "/tree/person/details/{PID}" regex no longer matches
-            // anything on this page). Scoped to links after the "View Name" heading so the
+            // anything on this page). Scoped to links after the "View {Name}" heading so the
             // still-present household list above it can't contribute a stray match.
             const links = [...aside.querySelectorAll('a[href]')]
                 .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
@@ -1725,6 +1822,113 @@
             debugLog(`Scraped item ${itemId}: ${rows.length} index rows.`);
         }
 
+        // FamilySearch's account-level "explore" record view (reached, confirmed live,
+        // after clicking a household member already attached to Family Tree mid-scrape)
+        // drops the dedicated Next Image button entirely - without this fallback, the batch
+        // silently stopped after exactly one image every time a household contained a
+        // tree-attached member.
+        //
+        // The "Enter Image number" input looked like an equivalent second control but is
+        // NOT real navigation - confirmed live, extensively: typing a new value and
+        // submitting it (even via a genuine trusted OS-level keypress, not just a synthetic
+        // dispatch()) updates the displayed number cosmetically while
+        // window.location.pathname never changes. scrapeCurrentImage() would then silently
+        // skip every subsequent image forever, since getItemId() parses the ark from that
+        // same unchanged pathname and seenItemIds already has it.
+        //
+        // The filmstrip's own "Go to image N" thumbnail buttons are genuine navigation -
+        // confirmed live that clicking one changes the ark (e.g. "...9YBZ-XVG" ->
+        // "...9YBZ-F86" on the same record). In the classic "index" view, the
+        // currently-viewed image's own neighbor is reliably already rendered in the
+        // (virtualized) filmstrip. In "explore" mode specifically, the filmstrip is often
+        // empty outright and this fallback can't reach it - see the KNOWN LIMITATION note
+        // inside advanceViaFilmstripThumbnail() below.
+        async function advanceViaFilmstripThumbnail() {
+            // KNOWN LIMITATION (not fully solved): in the "explore" view specifically, this
+            // filmstrip is a virtualized list that's frequently empty and never renders any
+            // "Go to image N" buttons at all - confirmed live across repeated attempts. A
+            // window resize event is a plausible nudge for this general class of
+            // virtualized-list bug (many such lists use a ResizeObserver), but it did NOT
+            // reliably fix this specific case in live testing - neither did toggling
+            // FamilySearch's own "View Grid" control. Left in as a cheap, harmless attempt
+            // rather than removed, since it's free and may help on some page states even
+            // though it isn't a confirmed fix. When this path exhausts its wait, the batch
+            // stops after the current image exactly like it did before this whole fallback
+            // existed - no worse than the prior behavior, just not the full fix. See
+            // GitHub issue tracking FamilySearch "explore" view multi-page continuation for
+            // follow-up.
+            let currentWait = await waitForCondition(() => [...document.querySelectorAll('button')]
+                .find(b => /^Go to image \d+, viewed$/.test(b.getAttribute('aria-label') || '')) || null,
+                {timeoutMs: 3000});
+            if (!currentWait.result) {
+                window.dispatchEvent(new Event('resize'));
+                currentWait = await waitForCondition(() => [...document.querySelectorAll('button')]
+                    .find(b => /^Go to image \d+, viewed$/.test(b.getAttribute('aria-label') || '')) || null,
+                    {timeoutMs: 10000});
+            }
+            const currentBtn = currentWait.result;
+            if (!currentBtn) {
+                debugLog(`advanceViaFilmstripThumbnail: no currently-viewed thumbnail found (${currentWait.elapsedMs}ms)`);
+                return {advanced: false, timedOut: false};
+            }
+            const current = parseInt(currentBtn.getAttribute('aria-label').match(/^Go to image (\d+)/)[1], 10);
+
+            const nextLabel = `Go to image ${current + 1}`;
+            const nextWait = await waitForCondition(() => [...document.querySelectorAll('button')]
+                .find(b => b.getAttribute('aria-label') === nextLabel) || null, {timeoutMs: 10000});
+            const nextThumb = nextWait.result;
+            if (!nextThumb) {
+                debugLog(`advanceViaFilmstripThumbnail: "${nextLabel}" thumbnail never found (${nextWait.elapsedMs}ms) `
+                    + '- likely the last image');
+                return {advanced: false, timedOut: false};
+            }
+
+            const prevUrl = window.location.href;
+            nextThumb.click();
+            const navWait = await waitForCondition(() => window.location.href !== prevUrl, {timeoutMs: 10000});
+            return {advanced: !navWait.timedOut, timedOut: navWait.timedOut};
+        }
+
+        // FamilySearch's own "Next Image" button (aria-label exactly "Next Image", matching
+        // nextBtnSelector below all along) genuinely exists in BOTH the classic "index" view
+        // and the "explore" view - it was never missing. It simply never mounts into the DOM
+        // until the mouse hovers over the image viewer, confirmed live via screen-share: a
+        // real hover made it visible where every automated DOM query had found nothing.
+        // Dispatching synthetic mouse hover events on the viewer's own wrapper element
+        // reliably mounts it without an actual OS-level mouse move - confirmed live
+        // (before: false, after: true on the same page, same session).
+        function triggerNextButtonHoverMount() {
+            const wrapper = document.querySelector('[class*="wrapperCss"]') || document.body;
+            ['mouseover', 'mouseenter', 'mousemove'].forEach(type => {
+                wrapper.dispatchEvent(new MouseEvent(type, {bubbles: true, cancelable: true, clientX: 900, clientY: 300}));
+            });
+        }
+
+        async function goToNextImage() {
+            triggerNextButtonHoverMount();
+
+            // Event-driven (see waitForCondition) rather than polling every 200ms for up
+            // to 5s.
+            const nextBtnSelector = 'button[aria-label="Next Image"], button[aria-label="Next image"], '
+                + '.pagination.right button.page, button[title="Next Image"]';
+            const nextBtnWait = await waitForCondition(() => document.querySelector(nextBtnSelector),
+                {timeoutMs: 5000});
+            const nextBtn = nextBtnWait.result;
+            const isDisabled = nextBtn && (nextBtn.disabled || nextBtn.getAttribute('aria-disabled') === 'true');
+
+            if (nextBtn && !isDisabled) {
+                const prevUrl = window.location.href;
+                nextBtn.click();
+                // No post-nav settle delay needed - scrapeCurrentImage's own downstream
+                // waits (scrapeNamesPanel/scrapeCitationAndCatalog) already handle "has the
+                // new page's content rendered yet" on their own terms.
+                const navWait = await waitForCondition(() => window.location.href !== prevUrl,
+                    {timeoutMs: 10000});
+                return {advanced: !navWait.timedOut, timedOut: navWait.timedOut};
+            }
+            return advanceViaFilmstripThumbnail();
+        }
+
         // ==========================================
         // BATCH LOOP
         // ==========================================
@@ -1738,29 +1942,18 @@
                     itemsAtLastCheckpoint = accumulatedItems.length;
                 }
 
-                // Event-driven (see waitForCondition) rather than polling every 200ms for up
-                // to 5s.
-                const nextBtnSelector = 'button[aria-label="Next Image"], button[aria-label="Next image"], '
-                    + '.pagination.right button.page, button[title="Next Image"]';
-                const nextBtnWait = await waitForCondition(() => document.querySelector(nextBtnSelector),
-                    {timeoutMs: 5000});
-                const nextBtn = nextBtnWait.result;
-                const isDisabled = nextBtn && (nextBtn.disabled || nextBtn.getAttribute('aria-disabled') === 'true');
+                // Saved before every advance attempt, not only the explicit Names-retry
+                // reload - see FS_RELOAD_STATE_KEY's own note: clicking "Next Image" is a
+                // real page navigation on FamilySearch, so this script re-runs from scratch
+                // on every single image regardless of whether goToNextImage() itself ever
+                // called location.reload(). Without this, accumulatedItems reset to empty on
+                // the next injection and only the LAST scraped item ever reached the final
+                // JSON - confirmed live.
+                saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint, namesReloadAttempts});
 
-                if (nextBtn && !isDisabled) {
-                    const prevUrl = window.location.href;
-                    nextBtn.click();
-                    // No post-nav settle delay needed - scrapeCurrentImage's own downstream
-                    // waits (scrapeNamesPanel/scrapeCitationAndCatalog) already handle "has the
-                    // new page's content rendered yet" on their own terms.
-                    const navWait = await waitForCondition(() => window.location.href !== prevUrl,
-                        {timeoutMs: 10000});
-                    if (navWait.timedOut) {
-                        if (window.fsShowToast) window.fsShowToast('Navigation timed out. Stopping.', 'error');
-                        stopBatch();
-                        break;
-                    }
-                } else {
+                const {advanced, timedOut} = await goToNextImage();
+                if (!advanced) {
+                    if (timedOut && window.fsShowToast) window.fsShowToast('Navigation timed out. Stopping.', 'error');
                     stopBatch();
                     break;
                 }
@@ -1890,9 +2083,15 @@
 
         function startBatch() {
             isRunning = true;
-            accumulatedItems = [];
-            seenItemIds.clear();
-            itemsAtLastCheckpoint = 0;
+            // Skipped when resuming (see isResumingFsState above) - the whole point of
+            // restoring saved state is to carry accumulatedItems across this exact reset,
+            // the same way runAncestryGather's resumingFromReload guards its own startBatch.
+            if (!isResumingFsState) {
+                accumulatedItems = [];
+                seenItemIds.clear();
+                itemsAtLastCheckpoint = 0;
+            }
+            isResumingFsState = false;
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'none';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'block';
             if (window._fsStatusLight) window._fsStatusLight.classList.add('running');
@@ -1907,6 +2106,7 @@
         function stopBatch() {
             if (!isRunning) return;
             isRunning = false;
+            clearFsReloadState();
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'block';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'none';
             if (window._fsStatusLight) window._fsStatusLight.classList.remove('running');
