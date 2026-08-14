@@ -2,6 +2,7 @@
 (mirroring Paleographer.py's own resolve_setting), load/save, and scaffold-sheet
 deduplicated append. See the Voyageur-Parish-Scrip-scaffold design spec."""
 from pathlib import Path
+import json
 import os
 
 import pytest
@@ -50,6 +51,70 @@ def test_save_and_load_master_db_round_trip(tmp_path):
     data = {"collection_title": "Test", "record_type_name": "Parish", "sheets": [{"page_id": "p1"}]}
     LAC.save_master_db(master_db_path, data)
     assert LAC.load_master_db(master_db_path, "Test", "Parish") == data
+
+
+def test_save_master_db_leaves_existing_file_untouched_on_write_failure(tmp_path, monkeypatch):
+    master_db_path = str(tmp_path / "parish_register.json")
+    LAC.save_master_db(master_db_path, {"sheets": ["original"]})
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(LAC.Path, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        LAC.save_master_db(master_db_path, {"sheets": ["new-data-that-should-not-land"]})
+
+    with open(master_db_path, "r", encoding="utf-8") as f:
+        assert json.load(f) == {"sheets": ["original"]}
+    assert not (tmp_path / "parish_register.tmp").exists()
+
+
+def test_load_master_db_falls_back_to_default_shape_on_malformed_json(tmp_path, capsys):
+    master_db_path = tmp_path / "parish_register.json"
+    master_db_path.write_text("{not valid json", encoding="utf-8")
+
+    data = LAC.load_master_db(str(master_db_path), "Test Collection", "Parish")
+
+    assert data == {
+        "collection_title": "Test Collection", "record_type_name": "Parish", "sheets": [],
+        "total_spent": 0.0, "total_pages_processed": 0, "pending_batch_jobs": [],
+    }
+    assert "[WARN]" in capsys.readouterr().out
+
+
+def test_save_and_load_checkpoint_round_trip(tmp_path):
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    data = {"pids": ["pid1"], "downloaded_pids": ["pid1"], "failed_pids": {}}
+    LAC.save_checkpoint(checkpoint_path, data)
+    assert LAC.load_checkpoint(checkpoint_path) == data
+
+
+def test_save_checkpoint_leaves_existing_file_untouched_on_write_failure(tmp_path, monkeypatch):
+    checkpoint_path = str(tmp_path / "checkpoint.json")
+    LAC.save_checkpoint(checkpoint_path, {"pids": ["original"]})
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(LAC.Path, "replace", fail_replace)
+
+    with pytest.raises(OSError):
+        LAC.save_checkpoint(checkpoint_path, {"pids": ["new-data-that-should-not-land"]})
+
+    with open(checkpoint_path, "r", encoding="utf-8") as f:
+        assert json.load(f) == {"pids": ["original"]}
+    assert not (tmp_path / "checkpoint.tmp").exists()
+
+
+def test_load_checkpoint_falls_back_to_default_shape_on_malformed_json(tmp_path, capsys):
+    checkpoint_path = tmp_path / "checkpoint.json"
+    checkpoint_path.write_text("{not valid json", encoding="utf-8")
+
+    data = LAC.load_checkpoint(str(checkpoint_path))
+
+    assert data == {"pids": [], "downloaded_pids": [], "failed_pids": {}}
+    assert "[WARN]" in capsys.readouterr().out
 
 
 def test_append_scaffold_sheets_adds_new_sheets():

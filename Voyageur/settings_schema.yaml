@@ -48,7 +48,9 @@ sections:
       tooltip: "Port used by the Chrome DevTools Protocol connection when driving the LAC harvest browser."
     LAC_RECORD_TYPE:
       default: ""
-      tooltip: "Record type identifier for LAC volume harvesting (e.g. 'Scrip')."
+      tooltip: "Record type for LAC volume harvesting - determines which Commissioner record type (Parish or Scrip) the harvested PIDs are scaffolded as."
+      widget: segmented
+      options: [["", "(unset)"], ["parish", "Parish"], ["scrip", "Scrip"]]
     LAC_VOLUME:
       default: ""
       tooltip: "Volume number alias for LAC harvesting."

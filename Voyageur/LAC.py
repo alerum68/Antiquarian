@@ -89,19 +89,30 @@ def resolve_master_db_path(document_type: str, program_dir: str) -> str:
 
 
 def load_master_db(master_db_path: str, collection_title: str, record_type_name: str) -> Dict[str, Any]:
-    if os.path.exists(master_db_path):
-        with open(master_db_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {
+    default = {
         "collection_title": collection_title, "record_type_name": record_type_name, "sheets": [],
         "total_spent": 0.0, "total_pages_processed": 0, "pending_batch_jobs": [],
     }
+    if os.path.exists(master_db_path):
+        try:
+            with open(master_db_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[WARN] Failed to read MASTER_DB {master_db_path}: {e}")
+            return default
+    return default
 
 
 def save_master_db(master_db_path: str, master_data: Dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(master_db_path) or ".", exist_ok=True)
-    with open(master_db_path, "w", encoding="utf-8") as f:
-        json.dump(master_data, f, indent=2, ensure_ascii=False)
+    tmp_path = Path(master_db_path).with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(master_data, f, indent=2, ensure_ascii=False)
+        tmp_path.replace(master_db_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def append_scaffold_sheets(master_data: Dict[str, Any], new_sheets: List[Dict[str, Any]]) -> None:
@@ -370,16 +381,27 @@ def collection_for_volume(volume: Any, volume_range: Any) -> Optional[Tuple[str,
 
 
 def load_checkpoint(checkpoint_path: str) -> Dict[str, Any]:
+    default = {"pids": [], "downloaded_pids": [], "failed_pids": {}}
     if os.path.exists(checkpoint_path):
-        with open(checkpoint_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"pids": [], "downloaded_pids": [], "failed_pids": {}}
+        try:
+            with open(checkpoint_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"[WARN] Failed to read checkpoint {checkpoint_path}: {e}")
+            return default
+    return default
 
 
 def save_checkpoint(checkpoint_path: str, data: Dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(checkpoint_path) or ".", exist_ok=True)
-    with open(checkpoint_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    tmp_path = Path(checkpoint_path).with_suffix(".tmp")
+    try:
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        tmp_path.replace(checkpoint_path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def retrieve_volume_pids(vol: str, cookies: Dict[str, str], checkpoint_path: str,
