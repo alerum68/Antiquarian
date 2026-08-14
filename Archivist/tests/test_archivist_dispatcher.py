@@ -5,13 +5,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "golden"))
 
+# noinspection PyUnresolvedReferences
 from capture_golden_gedcom import PARISH_FIXTURE, SCRIP_FIXTURE  # noqa: E402
+# noinspection PyUnresolvedReferences
 import Utils  # noqa: E402
+# noinspection PyUnresolvedReferences
 import General  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).resolve().parent / "golden"
 
 
+# noinspection DuplicatedCode
 DEFAULT_GENERAL_CONFIG = {
     'volume_num': '',
     'register_source_id': '1',
@@ -34,6 +38,7 @@ DEFAULT_GENERAL_CONFIG = {
 }
 
 
+# noinspection DuplicatedCode
 def _regenerate(fixture: dict, target_software: str, profile) -> str:
     General.set_active_profile(profile)
     General.CALL_NUMBER = ""
@@ -49,6 +54,7 @@ def _regenerate(fixture: dict, target_software: str, profile) -> str:
 
 
 def test_scrip_rm_matches_golden():
+    # noinspection PyUnresolvedReferences
     import Scrip
     actual = _regenerate(SCRIP_FIXTURE, "RM", Scrip.ScripProfile())
     expected = (GOLDEN_DIR / "scrip_rm.ged").read_text(encoding="utf-8")
@@ -56,6 +62,7 @@ def test_scrip_rm_matches_golden():
 
 
 def test_scrip_ftm_matches_golden():
+    # noinspection PyUnresolvedReferences
     import Scrip
     actual = _regenerate(SCRIP_FIXTURE, "FTM", Scrip.ScripProfile())
     expected = (GOLDEN_DIR / "scrip_ftm.ged").read_text(encoding="utf-8")

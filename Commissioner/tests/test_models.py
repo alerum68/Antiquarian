@@ -270,6 +270,7 @@ def test_participant_requires_role_name_key_but_allows_null():
 
 def test_participant_requires_std_given_is_priest_sex():
     with pytest.raises(ValidationError):
+        # noinspection PyArgumentList
         Participant(role_name="Other")
 
 

@@ -1,5 +1,7 @@
 import Archivist as arch_dispatcher
-import HBCA
+# noinspection PyUnresolvedReferences,PyPep8Naming
+import HBCA as HBCA
+# noinspection PyUnresolvedReferences
 import General
 import sys
 from pathlib import Path

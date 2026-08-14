@@ -7,7 +7,9 @@ get_census_era, etc.) are deliberately NOT changed by this rework - only what fe
 changed - so these tests confirm the adapter's column-naming/grouping produces input
 those functions still handle correctly, not that the functions themselves changed.
 """
+# noinspection PyUnresolvedReferences
 import Utils
+# noinspection PyUnresolvedReferences,PyPep8Naming
 import Census as arc
 import sys
 from pathlib import Path

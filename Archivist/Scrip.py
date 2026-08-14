@@ -267,7 +267,7 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
         s_id = f"@S{tid}@"
         display_name = (Utils.clean_val(tpl.get('source_description'))
                         or Utils.clean_val(tpl.get('website_collection'))
-                        or str(tpl['label']))
+                        or str(tpl.get('label', '')))
         commission = Utils.clean_val(tpl.get('department') or tpl.get('commission'))
         collection = Utils.clean_val(tpl.get('collection'))
         primary_creator = Utils.clean_val(tpl.get('primary_creator', 'Department of the Interior'))
@@ -285,6 +285,7 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
                 "1 _TMPLT",
                 f"2 TID {tid}",
             ]
+            # noinspection DuplicatedCode
             if primary_creator:
                 block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
             if commission:
@@ -350,6 +351,7 @@ class ScripProfile:
         role_label = "Personal" if part.get('role_semantic') == 'primary' else "Witness"
         return f"3 _TITL {std_s}, {std_g}: {'; '.join(ref_bits)} [{role_label} (\"{std_g}\", {std_s})]"
 
+    # noinspection DuplicatedCode
     @staticmethod
     def citation_page(rec: dict, _part: dict, _page: str) -> str:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'

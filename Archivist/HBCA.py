@@ -159,7 +159,7 @@ class HBCAProfile:
         archival_urls = []
         for code in (hbca_refs if isinstance(hbca_refs, list) else [hbca_refs]):
             entry = keystone_records.get(code)
-            if not entry:
+            if not isinstance(entry, dict):
                 continue
             meta = entry.get('metadata') or {}
             if meta.get('microfilm_no'):
@@ -207,13 +207,13 @@ class HBCAProfile:
             date_str = meta.get('date')
             microfilm = meta.get('microfilm_no')
 
-            if item_desc:
+            if item_desc is not None:
                 desc = str(item_desc)
-                if date_str:
-                    desc += f", {date_str}"
+                if date_str is not None:
+                    desc += f", {str(date_str)}"
                 desc += f" (Archives of Manitoba, HBCA {code}"
-                if microfilm:
-                    desc += f", Microfilm {microfilm}"
+                if microfilm is not None:
+                    desc += f", Microfilm {str(microfilm)}"
                 desc += ")"
                 keystone_parts.append(desc)
 
@@ -225,6 +225,7 @@ class HBCAProfile:
         norm_trans = re.sub(r'\s+', ' ', trans_val).strip().lower() if trans_val else trans_val
         same_text = orig_val and trans_val and norm_orig == norm_trans
         lines = []
+        # noinspection DuplicatedCode
         if same_text or not (orig_val and trans_val):
             single_text = Utils.wrap_text(trans_val or orig_val, '4 TEXT')
             if single_text:
@@ -278,10 +279,10 @@ class HBCAProfile:
         tf = first_rec.get('type_specific_fields') or {}
         emp = tf.get('employee_name')
         if emp is not None and str(emp).strip():
-            return f"HBCA Biographical Sheet - {emp}"
+            return f"HBCA Biographical Sheet - {str(emp)}"
         pdf_url = meta.get('pdf_url', '')
-        if pdf_url:
-            return f"HBCA Biographical Sheet - {Path(pdf_url).name}"
+        if pdf_url is not None and str(pdf_url).strip():
+            return f"HBCA Biographical Sheet - {Path(str(pdf_url)).name}"
         return f"HBCA Biographical Sheet - Page {pages or '1'}"
 
     @staticmethod

@@ -49,3 +49,4 @@ worktrees/
 /.gsd/
 /scripts/opencode-serve.log
 /scripts/opencode-serve.ps1
+/scripts/

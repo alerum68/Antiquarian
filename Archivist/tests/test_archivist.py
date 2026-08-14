@@ -6,9 +6,13 @@ is always the marriage bride, ...) with a small fixed role_semantic vocabulary
 participant, the same way for any record type.
 """
 
+# noinspection PyUnresolvedReferences
 import Utils
+# noinspection PyUnresolvedReferences
 import Scrip
+# noinspection PyUnresolvedReferences
 import General
+# noinspection PyUnresolvedReferences
 import Census
 import pandas as pd
 
@@ -274,7 +278,7 @@ def test_build_general_citation_media_only_entry_uses_its_own_path_derived_uid()
     assert "-- Scrip Certificate" in blocks[0]
 
 
-def test_build_gedcom_from_general_creates_separate_objE_for_commissioner_media():
+def test_build_gedcom_from_general_creates_separate_obje_for_commissioner_media():
     media_path = "C:/Media/Commissioner/1502999/e099999999.pdf"
     data = {
         "collection_title": "Test Scrip Collection", "record_type_name": "Scrip",
@@ -322,7 +326,8 @@ def test_build_general_citation_prefers_lac_asset_id_over_hashed_path():
     assert f"@{hashed_uid}@" not in blocks[0]
 
 
-def test_build_gedcom_from_general_uses_lac_asset_id_for_objE_when_present():
+# noinspection DuplicatedCode
+def test_build_gedcom_from_general_uses_lac_asset_id_for_obje_when_present():
     media_path = "C:/Media/Commissioner/1503710/e011359206.pdf"
     data = {
         "collection_title": "Test Scrip Collection", "record_type_name": "Scrip",
@@ -543,7 +548,7 @@ def test_build_individual_fsftid_gets_companion_fs_tree_weblink():
         make_participant("primary", given="Baptiste", surname="Ledoux"),
     ]}
     primary = dict(rec["participants"][0], type_specific_fields={"fsftid": "LZXY-ABC"})
-    rec["participants"][0] = primary
+    rec["participants"][0] = primary  # type: ignore
 
     rm_lines, _, _, _ = General.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
     joined_rm = "\n".join(rm_lines)
@@ -556,6 +561,7 @@ def test_build_individual_fsftid_gets_companion_fs_tree_weblink():
     assert "1 _LINK https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_ftm
 
 
+# noinspection DuplicatedCode
 def test_build_family_baptism_shape_single_famc_no_suffix():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1", "participants": [
         make_participant("primary", given="Baptiste", surname="Ledoux"),
@@ -647,7 +653,7 @@ def test_build_individual_race_uses_generic_custom_fact_not_bare_race_tag():
         make_participant("primary", given="Baptiste", surname="Ledoux"),
     ]}
     primary = rec["participants"][0]
-    primary["race"] = "Metis"
+    primary["race"] = "Metis"  # type: ignore
     lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
     assert "_RACE" not in joined
@@ -696,7 +702,7 @@ def test_build_individual_scrip_race_fact_gets_no_document_year_date():
         rec = {"event_type": "Scrip", "page": "1", "record_id": "SC-1", "year": "1901",
                "type_specific_fields": {}, "participants": [make_participant("primary")]}
         primary = rec["participants"][0]
-        primary["race"] = "Metis"
+        primary["race"] = "Metis"  # type: ignore
         lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
         joined = "\n".join(lines)
         race_block = joined.split("2 TYPE Race")[1].split("2 SOUR")[0]

@@ -104,6 +104,8 @@ def resolve_source_id(record_type_name: str, collection_name: str = "") -> int:
 
     try:
         registry = json.loads(SOURCE_ID_REGISTRY_PATH.read_text(encoding="utf-8"))
+        if not isinstance(registry, dict):
+            registry = {"next": NEXT_AUTO_SOURCE_ID, "entries": {}}
     except (FileNotFoundError, json.JSONDecodeError):
         registry = {"next": NEXT_AUTO_SOURCE_ID, "entries": {}}
 
@@ -165,6 +167,7 @@ _PLACE_QUALIFIER_RE = re.compile(
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
 
+# noinspection DuplicatedCode
 def _titlecase_callback(word: str, **_kwargs) -> Optional[str]:
     w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
     if w_clean.upper() in PRESERVED_ACRONYMS:

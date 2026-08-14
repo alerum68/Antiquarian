@@ -11,8 +11,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+# noinspection PyUnresolvedReferences,PyPep8Naming
 import Scrip  # noqa: E402
+# noinspection PyUnresolvedReferences,PyPep8Naming
 import General as arc  # noqa: E402
+# noinspection PyUnresolvedReferences,PyPep8Naming
 import Utils  # noqa: E402
 
 GOLDEN_DIR = Path(__file__).resolve().parent
@@ -78,6 +81,7 @@ def _normalize(text: str) -> str:
     return re.sub(r"1 DATE .*\r?\n2 TIME .*", "1 DATE 07 AUG 2026\n2 TIME 14:11:32", text)
 
 
+# noinspection DuplicatedCode
 DEFAULT_GENERAL_CONFIG = {
     'volume_num': '',
     'register_source_id': '1',
@@ -100,6 +104,7 @@ DEFAULT_GENERAL_CONFIG = {
 }
 
 
+# noinspection DuplicatedCode
 def _regenerate(fixture: dict, target_software: str, profile) -> str:
     arc.set_active_profile(profile)
     arc.CALL_NUMBER = ""

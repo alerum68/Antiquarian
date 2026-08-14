@@ -5,7 +5,7 @@ Census.py - Household-grouping and CSV-shaped GEDCOM pipeline for Archivist.
 import json
 import os
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as etree
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union, cast
 
@@ -104,6 +104,7 @@ def get_gender(val: Union[pd.Series, dict, CellValue]) -> str:
     return "U"
 
 
+# noinspection DuplicatedCode
 def evaluate_task_priority(task_note: str) -> tuple:
     """Evaluates task notes for keywords to assign a priority, color code, and dynamic folder name."""
     task_note_lower = f"{task_note}".lower()
@@ -133,7 +134,8 @@ def evaluate_task_priority(task_note: str) -> tuple:
     return 3, "3", "General Review"
 
 
-def _rmst_element_to_gedcom(elem: ET.Element) -> List[str]:
+# noinspection DuplicatedCode
+def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
     tid = elem.get("Id", "")
     name = (elem.findtext("Name") or "").strip()
@@ -195,12 +197,12 @@ def load_source_template_lines(template_id: int) -> List[str]:
                 if fname.endswith(".rmst"):
                     fpath = os.path.join(cdir, fname)
                     try:
-                        tree = ET.parse(fpath)
+                        tree = etree.parse(fpath)
                         root = tree.getroot()
                         elem = root.find(f".//Template[@Id='{template_id}']")
                         if elem is not None:
                             return _rmst_element_to_gedcom(elem)
-                    except Exception:
+                    except (etree.ParseError, OSError):
                         continue
     return _BUILTIN_SOURCE_TEMPLATES.get(template_id, [])
 
@@ -1473,10 +1475,13 @@ def run_census_flavor(data: dict) -> None:
     cc = citation.get("collection_id")
     apid = APID_DB or citation.get("apid_db")
 
-    if cc is not None and str(cc).strip():
-        CENSUS_SOURCE_ID = str(cc).strip()
-    elif apid is not None and str(apid).strip():
-        CENSUS_SOURCE_ID = str(apid).strip()
+    cc_val = str(cc) if cc is not None else ""
+    apid_val = str(apid) if apid is not None else ""
+
+    if cc_val.strip():
+        CENSUS_SOURCE_ID = cc_val.strip()
+    elif apid_val.strip():
+        CENSUS_SOURCE_ID = apid_val.strip()
     else:
         CENSUS_SOURCE_ID = Utils.resolve_source_id(record_type_name, COLLECTION_NAME)
 

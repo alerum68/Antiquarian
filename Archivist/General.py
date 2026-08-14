@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import os
 import re
-import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as etree
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
 import yaml
@@ -136,6 +136,7 @@ class GeneralProfile:
             titl += f" -- {Utils.cap_case(document_type)}"
         return titl
 
+    # noinspection DuplicatedCode
     @staticmethod
     def citation_page(rec: dict, _part: dict, page: str) -> str:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
@@ -169,6 +170,7 @@ class GeneralProfile:
             ]
         return [f"3 REFN {refn}", "3 QUAY 3"]
 
+    # noinspection DuplicatedCode
     @staticmethod
     def citation_detail_fields(rec: dict, part: dict, page: str, vol: str,
                                target_software: str) -> List[str]:
@@ -202,6 +204,7 @@ class GeneralProfile:
                 lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
         return lines
 
+    # noinspection DuplicatedCode
     @staticmethod
     def citation_text_block(_rec: dict, _part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
@@ -250,6 +253,7 @@ class GeneralProfile:
         return build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
                                                  target_software, alt_names, raw_event_date, age)
 
+    # noinspection DuplicatedCode
     @staticmethod
     def volume_source_detail_fields(v_clause: str) -> List[str]:
         tid = 10009
@@ -362,6 +366,7 @@ def assign_spouses_by_sex(a: Optional[dict], b: Optional[dict]) -> Tuple[Optiona
     return a, b
 
 
+# noinspection DuplicatedCode
 def evaluate_task_priority(task_note: str) -> tuple:
     """Evaluates task notes for keywords to assign a priority, color code, and dynamic folder name."""
     task_note_lower = f"{task_note}".lower()
@@ -456,7 +461,8 @@ def generate_media_uid_for_lac_asset(asset_id: str) -> str:
     return f"M{digits}"
 
 
-def _rmst_element_to_gedcom(elem: ET.Element) -> List[str]:
+# noinspection DuplicatedCode
+def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
     tid = elem.get("Id", "")
     name = (elem.findtext("Name") or "").strip()
@@ -518,12 +524,12 @@ def load_source_template_lines(template_id: int) -> List[str]:
                 if fname.endswith(".rmst"):
                     fpath = os.path.join(cdir, fname)
                     try:
-                        tree = ET.parse(fpath)
+                        tree = etree.parse(fpath)
                         root = tree.getroot()
                         elem = root.find(f".//Template[@Id='{template_id}']")
                         if elem is not None:
                             return _rmst_element_to_gedcom(elem)
-                    except Exception:
+                    except (etree.ParseError, OSError):
                         continue
     return _BUILTIN_SOURCE_TEMPLATES.get(template_id, [])
 
@@ -1214,8 +1220,9 @@ def apply_record_type_field_remap(record_type_name: str) -> None:
 def apply_extracted_parish_name(data: dict) -> None:
     for sheet in data.get("sheets", []):
         source_name = (sheet.get("document_metadata") or {}).get("source_name")
-        if source_name is not None and str(source_name).strip():
-            GENERAL_CONFIG["parish_name"] = str(source_name).strip()
+        source_val = str(source_name) if source_name is not None else ""
+        if source_val.strip():
+            GENERAL_CONFIG["parish_name"] = source_val.strip()
             return
 
     if not GENERAL_CONFIG.get('parish_name') and data.get('record_type_name') == 'Scrip':
@@ -1234,15 +1241,17 @@ def apply_resolved_source_id(data: dict) -> None:
 
     citation = data.get("citation") or {}
     cc = citation.get("collection_id")
-    if cc is not None and str(cc).strip():
-        GENERAL_CONFIG["register_source_id"] = str(cc).strip()
-        GENERAL_CONFIG["platform_source_id"] = str(cc).strip()
+    cc_val = str(cc) if cc is not None else ""
+    if cc_val.strip():
+        GENERAL_CONFIG["register_source_id"] = cc_val.strip()
+        GENERAL_CONFIG["platform_source_id"] = cc_val.strip()
         return
 
     apid = Utils.APID_DB or citation.get("apid_db")
-    if apid is not None and str(apid).strip():
-        GENERAL_CONFIG["register_source_id"] = str(apid).strip()
-        GENERAL_CONFIG["platform_source_id"] = str(apid).strip()
+    apid_val = str(apid) if apid is not None else ""
+    if apid_val.strip():
+        GENERAL_CONFIG["register_source_id"] = apid_val.strip()
+        GENERAL_CONFIG["platform_source_id"] = apid_val.strip()
         return
 
     record_type_name = data.get("record_type_name") or "Church"
