@@ -20,39 +20,58 @@ def test_launch_gather_browser_opens_url_and_returns_start_time(monkeypatch, cap
     assert "Waiting for Tampermonkey downloads" in captured.out
 
 
-def test_wait_for_downloaded_json_finds_newest_matching_file(tmp_path, capsys):
-    start_time = time_module.time()
+def test_wait_for_final_json_event_finds_already_existing_file(tmp_path, capsys):
+    (tmp_path / "TMP_A_abc123_final.json").write_text("{}")
 
-    old = tmp_path / "TMP_A_old.json"
-    old.write_text("{}")
-    os.utime(old, (start_time - 100, start_time - 100))
+    result = gh.wait_for_final_json_event(tmp_path, "TMP_A_abc123_", "Final JSON")
 
-    checkpoint = tmp_path / "TMP_A_run[checkpoint].json"
-    checkpoint.write_text("{}")
-    os.utime(checkpoint, (start_time + 1, start_time + 1))
-
-    wrong_prefix = tmp_path / "TMP_FS_other.json"
-    wrong_prefix.write_text("{}")
-    os.utime(wrong_prefix, (start_time + 1, start_time + 1))
-
-    newest = tmp_path / "TMP_A_final.json"
-    newest.write_text("{}")
-    os.utime(newest, (start_time + 2, start_time + 2))
-
-    result = gh.wait_for_downloaded_json(tmp_path, "TMP_A_", start_time, "Final JSON")
-
-    assert result == newest
-    assert "[System] Detected Final JSON: TMP_A_final.json" in capsys.readouterr().out
+    assert result.name == "TMP_A_abc123_final.json"
+    assert "[System] Detected Final JSON: TMP_A_abc123_final.json" in capsys.readouterr().out
 
 
-def test_wait_for_downloaded_json_keyboard_interrupt_exits(tmp_path, monkeypatch, capsys):
-    def raise_interrupt(_):
+def test_wait_for_final_json_event_detects_file_created_after_call(tmp_path):
+    import threading as _threading
+    import time as _time
+
+    def create_after_delay():
+        _time.sleep(0.2)
+        (tmp_path / "TMP_A_abc123_checkpoint_1.json").write_text("{}")
+        _time.sleep(0.1)
+        (tmp_path / "TMP_A_abc123_final.json").write_text("{}")
+
+    _threading.Thread(target=create_after_delay, daemon=True).start()
+
+    result = gh.wait_for_final_json_event(tmp_path, "TMP_A_abc123_", "Final JSON")
+
+    assert result.name == "TMP_A_abc123_final.json"
+
+
+def test_wait_for_final_json_event_ignores_checkpoint_and_other_prefix_files(tmp_path):
+    import threading as _threading
+    import time as _time
+
+    (tmp_path / "TMP_A_abc123_checkpoint_1.json").write_text("{}")
+    (tmp_path / "TMP_FS_xyz789_final.json").write_text("{}")
+
+    def create_real_final():
+        _time.sleep(0.2)
+        (tmp_path / "TMP_A_abc123_final.json").write_text("{}")
+
+    _threading.Thread(target=create_real_final, daemon=True).start()
+
+    result = gh.wait_for_final_json_event(tmp_path, "TMP_A_abc123_", "Final JSON")
+
+    assert result.name == "TMP_A_abc123_final.json"
+
+
+def test_wait_for_final_json_event_keyboard_interrupt_exits(tmp_path, monkeypatch, capsys):
+    def raise_interrupt(_ready):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(gh.time, "sleep", raise_interrupt)
+    monkeypatch.setattr(gh, "_block_until_ready", raise_interrupt)
 
     with pytest.raises(SystemExit) as exc_info:
-        gh.wait_for_downloaded_json(tmp_path, "TMP_A_", time_module.time(), "Final JSON")
+        gh.wait_for_final_json_event(tmp_path, "TMP_A_abc123_", "Final JSON")
 
     assert exc_info.value.code == 0
     assert "Operation cancelled by user" in capsys.readouterr().out

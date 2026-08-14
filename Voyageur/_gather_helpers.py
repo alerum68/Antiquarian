@@ -11,11 +11,14 @@ used to be duplicated between A.py and FS.py's own main().
 import os
 import shutil
 import sys
+import threading
 import time
 import webbrowser
 from pathlib import Path
 
 from dotenv import set_key
+from watchdog.events import FileSystemEventHandler
+from watchdog.observers import Observer
 
 
 def atomic_write_bytes(path: Path, data: bytes) -> None:
@@ -96,32 +99,55 @@ def launch_gather_browser(url: str) -> float:
     return start_time
 
 
-def wait_for_downloaded_json(downloads_dir: Path, prefix: str, start_time: float, label: str) -> Path:
-    json_file = None
-    try:
-        while True:
-            # noinspection broad-exception
-            try:
-                candidates = [
-                    p for p in downloads_dir.iterdir()
-                    if p.is_file() and p.suffix.lower() == '.json'
-                    and p.name.startswith(prefix)
-                    and p.stat().st_mtime >= start_time
-                    and '[checkpoint' not in p.name
-                ]
-                if candidates:
-                    json_file = max(candidates, key=lambda p: p.stat().st_mtime)
-                    print(f"[System] Detected {label}: {json_file.name}")
-            except OSError:
-                pass
+def _block_until_ready(ready: threading.Event) -> None:
+    ready.wait()
 
-            if json_file:
-                break
-            time.sleep(1)
+
+def wait_for_final_json_event(downloads_dir: Path, json_prefix: str, label: str) -> Path:
+    """State-based replacement for the old time.sleep(1) polling loop: blocks on a real
+    filesystem "file created" event for this run's own final JSON instead of waking up
+    once a second to re-scan the directory. No timeout, matching the polling loop's own
+    previous behavior (it never gave up on its own either) - just event-driven instead of
+    poll-driven, per project direction (prefer state-based waiting over timers wherever a
+    real event exists)."""
+    ready = threading.Event()
+    found: dict = {}
+
+    def matches(p: Path) -> bool:
+        return (p.suffix.lower() == '.json' and p.name.startswith(json_prefix)
+                and 'checkpoint' not in p.name)
+
+    class _FinalJsonHandler(FileSystemEventHandler):
+        def on_created(self, event):
+            if event.is_directory:
+                return
+            p = Path(event.src_path)
+            if matches(p):
+                found['path'] = p
+                ready.set()
+
+    observer = Observer()
+    observer.schedule(_FinalJsonHandler(), str(downloads_dir), recursive=False)
+    observer.start()
+    try:
+        # A file matching this run's own final-JSON pattern may already exist by the time
+        # the observer is attached (e.g. a very fast gather) - its on_created event would
+        # never fire since it already happened, so check directly before waiting.
+        existing = [p for p in downloads_dir.iterdir() if p.is_file() and matches(p)]
+        if existing:
+            found['path'] = max(existing, key=lambda p: p.stat().st_mtime)
+            ready.set()
+
+        _block_until_ready(ready)
     except KeyboardInterrupt:
         print("\n[System] Operation cancelled by user.")
         sys.exit(0)
-    return json_file
+    finally:
+        observer.stop()
+        observer.join()
+
+    print(f"[System] Detected {label}: {found['path'].name}")
+    return found['path']
 
 
 def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: float,
