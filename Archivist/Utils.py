@@ -70,7 +70,7 @@ GENEALOGY_DIR = os.getenv("GENEALOGY_DIR", "")
 RM_DIR = safe_path(GENEALOGY_DIR, os.getenv("RM_DIR", ""))
 FTM_DIR = safe_path(GENEALOGY_DIR, os.getenv("FTM_DIR", ""))
 GEDCOM_OUTPUT_PATH = safe_path(GENEALOGY_DIR, os.getenv("GEDCOM_OUTPUT_PATH", ""))
-GEDCOM_OUTPUT_NAME = os.getenv("GEDCOM_OUTPUT_NAME", "Family_Register.ged")
+GEDCOM_OUTPUT_NAME = os.getenv("GEDCOM_OUTPUT_NAME") or "Family_Register.ged"
 GEDCOM_OUTPUT_MODE = os.getenv("GEDCOM_OUTPUT_MODE", "Both").strip()
 
 CURRENT_DATE = datetime.datetime.now().strftime('%d %b %Y').upper()

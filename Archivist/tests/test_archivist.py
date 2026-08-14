@@ -1024,6 +1024,72 @@ def test_apply_record_type_field_remap_scrip_maps_scrip_gedcom_name(monkeypatch)
         Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
+def test_apply_record_type_field_remap_hbca_maps_image_dir(monkeypatch):
+    monkeypatch.setenv("HBCA_IMAGE_DIR", "HBCA")
+    orig_call = General.CALL_NUMBER
+    orig_url = General.COLLECTION_URL
+    orig_name = General.COLLECTION_NAME
+    orig_repo = General.REPOSITORY
+    orig_repo_loc = General.REPOSITORY_LOC
+    orig_image_dir = General.IMAGE_DIR
+    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
+    try:
+        General.apply_record_type_field_remap("HBCA")
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "HBCA")
+    finally:
+        General.CALL_NUMBER = orig_call
+        General.COLLECTION_URL = orig_url
+        General.COLLECTION_NAME = orig_name
+        General.REPOSITORY = orig_repo
+        General.REPOSITORY_LOC = orig_repo_loc
+        General.IMAGE_DIR = orig_image_dir
+        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
+
+
+def test_apply_record_type_field_remap_parish_maps_image_dir(monkeypatch):
+    monkeypatch.setenv("CHURCH_IMAGE_DIR", "Parish")
+    orig_call = General.CALL_NUMBER
+    orig_url = General.COLLECTION_URL
+    orig_name = General.COLLECTION_NAME
+    orig_repo = General.REPOSITORY
+    orig_repo_loc = General.REPOSITORY_LOC
+    orig_image_dir = General.IMAGE_DIR
+    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
+    try:
+        General.apply_record_type_field_remap("Parish")
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "Parish")
+    finally:
+        General.CALL_NUMBER = orig_call
+        General.COLLECTION_URL = orig_url
+        General.COLLECTION_NAME = orig_name
+        General.REPOSITORY = orig_repo
+        General.REPOSITORY_LOC = orig_repo_loc
+        General.IMAGE_DIR = orig_image_dir
+        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
+
+
+def test_apply_record_type_field_remap_scrip_maps_image_dir(monkeypatch):
+    monkeypatch.setenv("SCRIP_IMAGE_DIR", "Scrip Records/pdf_out")
+    orig_call = General.CALL_NUMBER
+    orig_url = General.COLLECTION_URL
+    orig_name = General.COLLECTION_NAME
+    orig_repo = General.REPOSITORY
+    orig_repo_loc = General.REPOSITORY_LOC
+    orig_image_dir = General.IMAGE_DIR
+    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
+    try:
+        General.apply_record_type_field_remap("Scrip")
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "Scrip Records/pdf_out")
+    finally:
+        General.CALL_NUMBER = orig_call
+        General.COLLECTION_URL = orig_url
+        General.COLLECTION_NAME = orig_name
+        General.REPOSITORY = orig_repo
+        General.REPOSITORY_LOC = orig_repo_loc
+        General.IMAGE_DIR = orig_image_dir
+        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
+
+
 def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
     monkeypatch.setattr(Utils, "resolve_gedcom_output_targets", lambda: [])
     monkeypatch.delenv("GEDCOM_OUTPUT_NAME", raising=False)

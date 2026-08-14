@@ -41,6 +41,7 @@ field_remap:
   HBCA_MASTER_DB_NAME: MASTER_DB_NAME
   HBCA_COLLECTION_NAME: COLLECTION_NAME
   HBCA_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
+  HBCA_IMAGE_DIR: IMAGE_DIR
 ---
 
 You are an expert archivist and genealogist specializing in Hudson's Bay Company (HBC) records and 
