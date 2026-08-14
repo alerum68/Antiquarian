@@ -200,6 +200,7 @@
         }
 
         const shouldAutoStart = window.location.href.includes('mgs_auto=1');
+        const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
 
         function debugLog(msg) {
             if (DEBUG_MODE) {
@@ -960,7 +961,7 @@
                     },
                     onload: function (response) {
                         if (response.status === 200) {
-                            triggerBlobDownload(response.response, imgFileName, 'A/Images');
+                            triggerBlobDownload(response.response, imgFileName, `A_${runId}/Images`);
                             if (window.showToast) window.showToast(`Image captured: ${imgFileName}`, 'success', 1000);
                         } else {
                             if (window.showToast) window.showToast(`Failed to fetch image. Status: ${response.status}`, 'error');
@@ -993,7 +994,7 @@
         }
 
         function triggerJsonDownload(jsonString, jsonFileName) {
-            triggerBlobDownload(new Blob([jsonString], {type: 'application/json;charset=utf-8;'}), jsonFileName, 'A');
+            triggerBlobDownload(new Blob([jsonString], {type: 'application/json;charset=utf-8;'}), jsonFileName, `A_${runId}`);
         }
 
         function downloadFinalJson() {
