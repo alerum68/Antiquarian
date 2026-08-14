@@ -9,6 +9,7 @@
 | 5 | ✅ | Fixed escaped triple-quote docstring in Voyageur/A.py |
 | 6 | ✅ | CHANGELOG.md updated with Added/Removed/Fixed entries |
 | 7 | ✅ | Debt plan written + fully executed: `docs/superpowers/plans/2026-08-11-resolve-reviewer-debt.md` (D1–D5 committed; D6/D7 ruled no-op) |
+| 8 | 🔄 | PyCharm Inspection Fixes plan in progress (`docs/plans/2026-08-13-pycharm-inspection-fixes.md`); Task 1 complete |
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
 * ✅ **D1 (HBCA_MAX_WORKERS)** — `Voyageur/HBCA.py:87` → `int(os.getenv("HBCA_MAX_WORKERS", "8"))`; schema default `"10"`→`"8"` (`7856b39`). Task-reviewer REQUIRED-ALL-MET/PASS.

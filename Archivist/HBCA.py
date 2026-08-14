@@ -17,7 +17,7 @@ Key genealogical rules:
 import datetime
 from pathlib import Path
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import General
 import Utils
@@ -297,7 +297,7 @@ class HBCAProfile:
         return block
 
     def repository_defaults(self) -> Tuple[str, str]:
-        return ("Hudson's Bay Company Archives, Archives of Manitoba", "Winnipeg, MB, Canada")
+        return "Hudson's Bay Company Archives, Archives of Manitoba", "Winnipeg, MB, Canada"
 
     def default_gedcom_output_name(self) -> Optional[str]:
         return "MasterDB_HBCA.ged"

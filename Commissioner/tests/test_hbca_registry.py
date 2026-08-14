@@ -1,4 +1,3 @@
-import pytest
 from Commissioner.record_registry import (
     get_document_types,
     get_valid_roles,

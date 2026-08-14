@@ -1880,7 +1880,6 @@ class Scriptorium(ctk.CTk):
 
         self._cancel_requested = False
         succeeded = False
-        status_msg = f"{script_name}: did not start"
         try:
             self.active_process = subprocess.Popen([sys.executable] + safe_cmd, stdin=subprocess.PIPE,
                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,

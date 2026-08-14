@@ -262,7 +262,7 @@ class GeneralProfile:
         return []
 
     def repository_defaults(self) -> Tuple[str, str]:
-        return ("FamilySearch.org", "Granite Mountain, UT")
+        return "FamilySearch.org", "Granite Mountain, UT"
 
     def default_gedcom_output_name(self) -> Optional[str]:
         return None
@@ -537,7 +537,6 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
                           citation_details: Optional[str] = None,
                           doc_media_uid: Optional[str] = None) -> str:
     page = Utils.clean_val(page if page is not None else rec.get('page')) or 'X'
-    rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
     year = Utils.clean_val(rec.get('year')) or 'Unknown'
 
     titl = _ACTIVE_PROFILE.citation_title(rec, part, tag_name, year, document_type)

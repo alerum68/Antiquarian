@@ -9,7 +9,6 @@ those functions still handle correctly, not that the functions themselves change
 """
 import Utils
 import Census as arc
-import pandas as pd
 import sys
 from pathlib import Path
 

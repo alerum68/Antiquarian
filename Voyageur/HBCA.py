@@ -11,7 +11,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
-from urllib.parse import quote, urljoin
+from urllib.parse import urljoin
 
 import requests
 from bs4 import BeautifulSoup

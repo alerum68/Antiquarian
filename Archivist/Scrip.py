@@ -464,7 +464,7 @@ class ScripProfile:
         return lines
 
     def repository_defaults(self) -> Tuple[str, str]:
-        return ("Library and Archives Canada", "Ottawa, ON")
+        return "Library and Archives Canada", "Ottawa, ON"
 
     def default_gedcom_output_name(self) -> Optional[str]:
         return "Scrip.ged"

@@ -1,6 +1,5 @@
 import importlib.util
 from pathlib import Path
-import pytest
 
 _hbca_path = Path(__file__).resolve().parents[1] / "HBCA.py"
 _spec = importlib.util.spec_from_file_location("voyageur_hbca", _hbca_path)

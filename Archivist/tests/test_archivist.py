@@ -723,7 +723,6 @@ def test_build_individual_scrip_witness_associations_exclude_nuclear_family():
                ]}
         primary = rec["participants"][0]
         lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "FTM")
-        joined = "\n".join(lines)
         witness_note = next(line for line in lines if line.startswith("2 NOTE Witnesses:"))
         assert "Louis" in witness_note and "Riel" in witness_note
         assert "Marie" not in witness_note
