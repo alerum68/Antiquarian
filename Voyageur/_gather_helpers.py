@@ -73,21 +73,39 @@ def cleanup_checkpoint_files(downloads_dir: Path, prefix: str, start_time: float
                 pass
 
 
-def cleanup_stale_gather_files(downloads_dir: Path, *prefixes: str) -> None:
-    """Deletes any leftover TMP_A_*/TMP_FS_* files in Downloads from a previous
-    incomplete/failed run, before a new gather starts - otherwise Chrome sees a same-named
-    file still sitting there and renames the new download to "foo (1).json"/"foo (1).jpg",
-    which then survives filename-prefix stripping into the final output name. Unlike
-    cleanup_checkpoint_files (which only removes the current run's own superseded
-    checkpoints), this is unconditional on mtime: anything left over here is by definition
-    from an earlier run, since it exists before this run's own start_time is even recorded.
-    Best-effort, same as cleanup_checkpoint_files."""
+def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
+                              current_run_id: str) -> dict:
+    """Returns the leftover TMP_<source>_<runId>_* files in downloads_dir grouped by
+    their embedded run ID, excluding the run that is still in progress. Each run's
+    entry is {'final': Path | None, 'checkpoints': [Path, ...], 'images': [Path, ...]}:
+    a run_id with 'final' set is a complete, recoverable gather; one with only
+    checkpoints/images never produced its final JSON and is reported as-is - no final
+    is ever guessed or synthesized. Only regular files are considered, and only those
+    whose name starts with source_prefix (the source's own fixed prefix, e.g.
+    'TMP_A_' or 'TMP_FS_'); the run ID is the text between source_prefix and the next
+    '_' (run IDs are plain hex so they never contain one themselves). A .jpg belongs in
+    'images'; a .json matching TMP_<source>_<runId>_final.json belongs in 'final' (at
+    most one per run); a .json whose remainder contains the literal 'checkpoint'
+    substring (e.g. ..._checkpoint_<N>.json) belongs in 'checkpoints'."""
+    runs: dict = {}
     for p in downloads_dir.iterdir():
-        if p.is_file() and p.name.startswith(prefixes):
-            try:
-                p.unlink(missing_ok=True)
-            except OSError:
-                pass
+        if not p.is_file() or not p.name.startswith(source_prefix):
+            continue
+        rest = p.name[len(source_prefix):]
+        if '_' not in rest:
+            continue
+        run_id, remainder = rest.split('_', 1)
+        if run_id == current_run_id:
+            continue
+        entry = runs.setdefault(run_id, {'final': None, 'checkpoints': [], 'images': []})
+        if p.suffix.lower() == '.jpg':
+            entry['images'].append(p)
+        elif p.suffix.lower() == '.json':
+            if remainder == 'final.json':
+                entry['final'] = p
+            elif 'checkpoint' in remainder:
+                entry['checkpoints'].append(p)
+    return runs
 
 
 def build_gather_launch_url(url: str, run_id: str) -> str:

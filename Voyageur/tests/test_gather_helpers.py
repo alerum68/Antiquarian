@@ -231,30 +231,30 @@ def test_move_downloaded_images_reports_final_failures_after_retry(tmp_path, mon
     assert "bad.jpg" in out
 
 
-def test_cleanup_stale_gather_files_removes_matching_prefix_regardless_of_age(tmp_path):
-    old_stale = tmp_path / "TMP_A_2026-08-01 - Ohio.json"
-    old_stale.write_text("{}")
-    os.utime(old_stale, (1000, 1000))
-    old_stale_image = tmp_path / "TMP_A_Images_page1.jpg"
-    old_stale_image.write_bytes(b"x")
-    os.utime(old_stale_image, (1000, 1000))
+def test_find_orphaned_gather_runs_groups_by_run_id_and_finds_complete_run(tmp_path):
+    (tmp_path / "TMP_A_stale1_final.json").write_text("{}")
+    (tmp_path / "TMP_A_stale1_Images_00130.jpg").write_text("x")
+    (tmp_path / "TMP_A_stale1_Images_00131.jpg").write_text("x")
+    (tmp_path / "TMP_A_stale2_checkpoint_20.json").write_text("{}")
+    (tmp_path / "TMP_A_current_final.json").write_text("{}")
+    (tmp_path / "TMP_FS_other_final.json").write_text("{}")
 
-    gh.cleanup_stale_gather_files(tmp_path, "TMP_A_")
+    result = gh.find_orphaned_gather_runs(tmp_path, "TMP_A_", "current")
 
-    assert not old_stale.exists()
-    assert not old_stale_image.exists()
+    assert set(result.keys()) == {"stale1", "stale2"}
+    assert result["stale1"]["final"] == tmp_path / "TMP_A_stale1_final.json"
+    assert sorted(p.name for p in result["stale1"]["images"]) == [
+        "TMP_A_stale1_Images_00130.jpg", "TMP_A_stale1_Images_00131.jpg"]
+    assert result["stale2"]["final"] is None
+    assert len(result["stale2"]["checkpoints"]) == 1
 
 
-def test_cleanup_stale_gather_files_leaves_other_prefixes_and_unrelated_files_alone(tmp_path):
-    other_tool = tmp_path / "TMP_FS_2026-08-01 - Ohio.json"
-    other_tool.write_text("{}")
-    unrelated = tmp_path / "vacation_photo.jpg"
-    unrelated.write_bytes(b"x")
+def test_find_orphaned_gather_runs_returns_empty_dict_when_nothing_stale(tmp_path):
+    (tmp_path / "TMP_A_current_final.json").write_text("{}")
 
-    gh.cleanup_stale_gather_files(tmp_path, "TMP_A_")
+    result = gh.find_orphaned_gather_runs(tmp_path, "TMP_A_", "current")
 
-    assert other_tool.exists()
-    assert unrelated.exists()
+    assert result == {}
 
 
 def test_atomic_write_bytes_writes_content_and_leaves_no_temp_file(tmp_path):
