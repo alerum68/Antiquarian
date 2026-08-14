@@ -47,6 +47,9 @@ worktrees/
 
 /.superpowers/
 /.gsd/
+/GSD-STYLE.md
+/PROJECT_RULES.md
+/model_capabilities.yaml
 /scripts/opencode-serve.log
 /scripts/opencode-serve.ps1
 /scripts/
