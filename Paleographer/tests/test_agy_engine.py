@@ -296,10 +296,10 @@ def test_call_agy_extract_chunked_falls_back_when_consolidation_fails(monkeypatc
         {"collection_title": "T", "sheets": [_sheet("c2", [_record("2")])]},
     ]
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(all_sheets, collection_title, schema, model, cli_bin, timeout_seconds):
+    def fake_consolidate(_all_sheets, _collection_title, _schema, _model, _cli_bin, _timeout_seconds):
         raise agy_client.AgyCallError("status SUCCESS but no structured_output")
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)
@@ -324,10 +324,10 @@ def test_call_agy_extract_chunked_saves_leftover_when_last_chunk_ends_mid_record
         ])]},
     ]
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(_images, _schema, _prompt_text, **_kwargs):
         return _make_result(chunk_responses.pop(0))
 
-    def fake_consolidate(all_sheets, collection_title, schema, model, cli_bin, timeout_seconds):
+    def fake_consolidate(all_sheets, collection_title, _schema, _model, _cli_bin, _timeout_seconds):
         return _make_result({"collection_title": collection_title, "sheets": all_sheets})
 
     monkeypatch.setattr(agy_engine, "call_agy_extract", fake_call_agy_extract)

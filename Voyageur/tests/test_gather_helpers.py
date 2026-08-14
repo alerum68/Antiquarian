@@ -167,7 +167,7 @@ def test_move_downloaded_images_reports_final_failures_after_retry(tmp_path, mon
     (downloads / "TMP_A_Images_bad.jpg").write_bytes(b"x")
     os.utime(downloads / "TMP_A_Images_bad.jpg", (start_time + 5, start_time + 5))
 
-    def fail_move(src, dst, *args, **kwargs):
+    def fail_move(_src, _dst, *_args, **_kwargs):
         raise OSError("locked")
 
     monkeypatch.setattr(gh, "move_with_retry", fail_move)
@@ -222,7 +222,7 @@ def test_atomic_write_bytes_writes_content_and_leaves_no_temp_file(tmp_path):
 def test_atomic_write_bytes_leaves_no_truncated_file_at_dest_on_failure(tmp_path, monkeypatch):
     dest = tmp_path / "out.jpg"
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(gh.Path, "replace", fail_replace)

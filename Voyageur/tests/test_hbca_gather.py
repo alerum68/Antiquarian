@@ -160,6 +160,7 @@ class _FakeKeystoneSession:
         self._responses = responses
 
     def get(self, url, headers=None, timeout=None):
+        _ = (headers, timeout)
         return self._responses[url]
 
 
@@ -187,7 +188,7 @@ def test_download_keystone_media_downloads_successful_url(tmp_path):
 def test_download_keystone_media_leaves_no_truncated_file_on_write_failure(tmp_path, monkeypatch):
     session = _FakeKeystoneSession({"https://example.com/page.jpg": _FakeKeystoneResponse(200, b"image-bytes")})
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(_hbca_mod.Path, "replace", fail_replace)
@@ -217,12 +218,14 @@ def test_gather_hbca_sheets_one_entry_failure_does_not_crash_the_batch(tmp_path,
             pass
 
     def fake_get(url, headers=None, timeout=None):
+        _ = (url, headers, timeout)
         return FakeIndexResponse()
 
     monkeypatch.setattr(_hbca_mod.requests, "get", fake_get)
 
     class FakeEntrySession:
         def get(self, url, headers=None, timeout=None):
+            _ = (headers, timeout)
             if "bad" in url:
                 raise ConnectionError("network down")
             return _FakeKeystoneResponse(200, b"pdf-bytes")
@@ -269,17 +272,19 @@ def test_gather_hbca_sheets_serializes_keystone_media_downloads_across_threads(t
         def raise_for_status(self):
             pass
 
-    monkeypatch.setattr(_hbca_mod.requests, "get", lambda url, headers=None, timeout=None: FakeIndexResponse())
+    monkeypatch.setattr(_hbca_mod.requests, "get", lambda *args, **kwargs: FakeIndexResponse())
 
     class FakeEntrySession:
         def get(self, url, headers=None, timeout=None):
+            _ = (url, headers, timeout)
             return _FakeKeystoneResponse(200, b"pdf-bytes")
 
     monkeypatch.setattr(_hbca_mod.requests, "Session", lambda: FakeEntrySession())
     monkeypatch.setattr(_hbca_mod, "extract_text_from_pdf", lambda path: "location code text")
     monkeypatch.setattr(_hbca_mod, "extract_hbca_location_codes", lambda text: ["CODE1"])
 
-    def fake_query_keystone_for_code(code, session=None):
+    def fake_query_keystone_for_code(_code, session=None):
+        _ = session
         return {"record_urls": [], "media_urls": ["https://keystone.example/shared.jpg"]}
 
     monkeypatch.setattr(_hbca_mod, "query_keystone_for_code", fake_query_keystone_for_code)
@@ -336,12 +341,14 @@ def test_gather_hbca_sheets_one_entry_write_failure_does_not_crash_the_batch(tmp
             pass
 
     def fake_get(url, headers=None, timeout=None):
+        _ = (url, headers, timeout)
         return FakeIndexResponse()
 
     monkeypatch.setattr(_hbca_mod.requests, "get", fake_get)
 
     class FakeEntrySession:
         def get(self, url, headers=None, timeout=None):
+            _ = (url, headers, timeout)
             return _FakeKeystoneResponse(200, b"pdf-bytes")
 
     monkeypatch.setattr(_hbca_mod.requests, "Session", lambda: FakeEntrySession())

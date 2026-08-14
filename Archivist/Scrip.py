@@ -311,7 +311,8 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
 
 
 class ScripProfile:
-    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+    @staticmethod
+    def dynamic_source_id(vol_digits: str, rec: Optional[dict] = None) -> str:
         if General.GENERAL_CONFIG.get("platform_source_id"):
             return f"@S{General.GENERAL_CONFIG['platform_source_id']}@"
         if rec:
@@ -320,20 +321,23 @@ class ScripProfile:
                 return f"@S{mikan}@"
         return f"@S{vol_digits.zfill(3)}@"
 
-    def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:
+    @staticmethod
+    def participant_uid(identity: str, role: str, occ: int) -> Optional[str]:
         if not identity:
             return None
         if role == '0' and occ == 0:
             return identity
         return f"{identity}_{role}_{occ}" if occ > 0 else f"{identity}_{role}"
 
-    def family_uid(self, identity: str) -> Optional[str]:
+    @staticmethod
+    def family_uid(identity: str) -> Optional[str]:
         if not identity:
             return None
         return f"FAM_{identity}"
 
-    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                       document_type: Optional[str]) -> str:
+    @staticmethod
+    def citation_title(rec: dict, part: dict, _tag_name: str, _year: str,
+                       _document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
         type_fields = rec.get('type_specific_fields') or {}
@@ -346,7 +350,8 @@ class ScripProfile:
         role_label = "Personal" if part.get('role_semantic') == 'primary' else "Witness"
         return f"3 _TITL {std_s}, {std_g}: {'; '.join(ref_bits)} [{role_label} (\"{std_g}\", {std_s})]"
 
-    def citation_page(self, rec: dict, part: dict, page: str) -> str:
+    @staticmethod
+    def citation_page(rec: dict, _part: dict, _page: str) -> str:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
         type_fields = rec.get('type_specific_fields') or {}
         claim_num = Utils.clean_val(type_fields.get('claim_number'))
@@ -355,14 +360,18 @@ class ScripProfile:
                                 f"Affdt {affdt_num}" if affdt_num else "") if b]
         return f"3 PAGE {'; '.join(ref_bits)}" if ref_bits else f"3 PAGE Record {rec_id}"
 
-    def citation_template_id(self, rec: dict, vol: str) -> Optional[int]:
+    @staticmethod
+    def citation_template_id(rec: dict, _vol: str) -> Optional[int]:
         return resolve_scrip_template_id(rec)
 
-    def citation_proof_status(self, computed_status: str) -> str:
+    @staticmethod
+    def citation_proof_status(_computed_status: str) -> str:
         return "proven"
 
-    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
+    @staticmethod
+    def citation_detail_fields(rec: dict, part: dict, page: str, vol: str,
                                target_software: str) -> List[str]:
+        _ = page
         if target_software != "RM":
             return []
         template_id = resolve_scrip_template_id(rec)
@@ -370,7 +379,8 @@ class ScripProfile:
             return []
         return get_scrip_citation_fields(template_id, rec, part, vol)
 
-    def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
+    @staticmethod
+    def citation_text_block(rec: dict, _part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         type_fields = rec.get('type_specific_fields') or {}
         lines = []
         orig_val = Utils.clean_val(raw_orig)
@@ -385,14 +395,17 @@ class ScripProfile:
                 lines.append(review_text)
         return lines
 
-    def citation_uses_source_documents(self, rec: dict) -> bool:
+    @staticmethod
+    def citation_uses_source_documents(_rec: dict) -> bool:
         return False
 
-    def primary_fact_date(self, rec: dict, is_primary: bool) -> str:
+    @staticmethod
+    def primary_fact_date(rec: dict, is_primary: bool) -> str:
         year = _scrip_record_year(rec)
         return str(year) if is_primary and year else ""
 
-    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
+    @staticmethod
+    def build_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
                                   vol: str, media_uid: str, target_software: str, resi: str,
                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
@@ -430,10 +443,12 @@ class ScripProfile:
         lines.extend(General.build_witness_links(rec, witnesses, vol, target_software))
         return lines
 
-    def volume_source_detail_fields(self, v_clause: str) -> List[str]:
+    @staticmethod
+    def volume_source_detail_fields(_v_clause: str) -> List[str]:
         return []
 
-    def media_caption(self, sheet: dict, vol: str, pages: str) -> str:
+    @staticmethod
+    def media_caption(sheet: dict, vol: str, pages: str) -> str:
         first_rec = next(iter(sheet.get('records', [])), {})
         primary = General.get_by_semantic(first_rec, 'primary') or {}
         scrip_tf = first_rec.get('type_specific_fields') or {}
@@ -449,7 +464,8 @@ class ScripProfile:
             return f"{media_std_s}, {media_std_g}: {'; '.join(media_ref_bits)}"
         return f"Scrip Records - Vol {vol or 'Unknown'} - Page {pages or 'X'}"
 
-    def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]:
+    @staticmethod
+    def resolve_source_templates(json_data: dict, target_software: str) -> List[str]:
         template_ids_used = set()
         for sheet in json_data.get('sheets', []):
             for rec in sheet.get('records', []):
@@ -463,8 +479,10 @@ class ScripProfile:
             lines = lines + General.get_source_templates(template_ids_used)
         return lines
 
-    def repository_defaults(self) -> Tuple[str, str]:
+    @staticmethod
+    def repository_defaults() -> Tuple[str, str]:
         return "Library and Archives Canada", "Ottawa, ON"
 
-    def default_gedcom_output_name(self) -> Optional[str]:
+    @staticmethod
+    def default_gedcom_output_name() -> Optional[str]:
         return "Scrip.ged"

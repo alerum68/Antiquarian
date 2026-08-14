@@ -455,7 +455,7 @@ def test_optimize_pdf_for_upload_falls_back_to_original_on_error(tmp_path, monke
     original = tmp_path / "source.pdf"
     _make_minimal_pdf(original)
 
-    def boom(*args, **kwargs):
+    def boom(*_args, **_kwargs):
         raise RuntimeError("optimize failed")
 
     monkeypatch.setattr(engine, "optimize_pdf", boom)

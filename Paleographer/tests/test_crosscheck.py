@@ -58,7 +58,8 @@ def _record(file_name="", **type_fields):
 def test_own_pid_resolution_succeeds_and_merges(paleographer_module, monkeypatch):
     module = paleographer_module
 
-    def fake_download(pid, media_dir, document_type_override=None):
+    def fake_download(pid, _media_dir, document_type_override=None):
+        _ = document_type_override
         assert pid == "1502188"
         return {
             "pid": pid,
@@ -69,7 +70,7 @@ def test_own_pid_resolution_succeeds_and_merges(paleographer_module, monkeypatch
         }
 
     monkeypatch.setattr(module.voyageur_lac, "download_pid_bundle", fake_download)
-    monkeypatch.setattr(module.lac_client, "search", lambda query, cookies: [])
+    monkeypatch.setattr(module.lac_client, "search", lambda _query, _cookies: [])
 
     record = _record(file_name="BAC-LAC_fonandcol_1502188.pdf")
     result = module.cross_check_claim_record(record, {"cookie": "value"}, "media")
@@ -84,11 +85,12 @@ def test_own_pid_resolution_succeeds_and_merges(paleographer_module, monkeypatch
 def test_own_pid_resolution_fails_appends_review_reason(paleographer_module, monkeypatch):
     module = paleographer_module
 
-    def fake_download(pid, media_dir, document_type_override=None):
+    def fake_download(pid, _media_dir, document_type_override=None):
+        _ = document_type_override
         raise module.lac_client.LacCallError(f"404 for {pid}")
 
     monkeypatch.setattr(module.voyageur_lac, "download_pid_bundle", fake_download)
-    monkeypatch.setattr(module.lac_client, "search", lambda query, cookies: [])
+    monkeypatch.setattr(module.lac_client, "search", lambda _query, _cookies: [])
 
     record = _record(file_name="BAC-LAC_fonandcol_1502188.pdf")
     result = module.cross_check_claim_record(record, {"cookie": "value"}, "media")
@@ -103,13 +105,14 @@ def test_related_pid_search_finds_results_and_appends_source_documents(paleograp
     related_entry = {"document_type": "Affidavit", "media_path": "media/999/asset1.pdf",
                      "lac_pid": "999", "lac_asset_id": "asset1", "source": "LAC"}
 
-    def fake_download(pid, media_dir, document_type_override=None):
+    def fake_download(pid, _media_dir, document_type_override=None):
+        _ = document_type_override
         assert pid == "999"
         return {"pid": pid, "lac_catalog_title": "Related", "reel_numbers": [],
                 "series_code": None, "source_documents": [related_entry]}
 
     monkeypatch.setattr(module.voyageur_lac, "download_pid_bundle", fake_download)
-    monkeypatch.setattr(module.lac_client, "search", lambda query, cookies: ["999"])
+    monkeypatch.setattr(module.lac_client, "search", lambda _query, _cookies: ["999"])
 
     record = _record(file_name="")  # no own PID - file_name doesn't match the PID convention
     result = module.cross_check_claim_record(record, {"cookie": "value"}, "media")
@@ -122,7 +125,7 @@ def test_search_auth_error_breaks_loop_with_review_reason(paleographer_module, m
     module = paleographer_module
     call_count = {"n": 0}
 
-    def fake_search(query, cookies):
+    def fake_search(_query, _cookies):
         call_count["n"] += 1
         raise module.lac_client.LacSearchAuthError("cookie expired")
 

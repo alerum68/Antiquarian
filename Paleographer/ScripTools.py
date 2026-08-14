@@ -218,7 +218,7 @@ def fix_all_participant_names_in_record(record: Dict[str, Any]) -> bool:
     return modified
 
 
-def build_composite_record_number(tf: Dict[str, Any], pid: str = "") -> str:
+def build_composite_record_number(tf: Dict[str, Any], _pid: str = "") -> str:
     """Builds standard composite key: [Claim Number]-[Allotment Number]-[Scrip Number]."""
     claim = (tf.get("claim_number") or "").strip() or "0"
     allotment = (tf.get("allotment_number") or "").strip() or "0"

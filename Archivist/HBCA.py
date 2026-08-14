@@ -26,7 +26,8 @@ HBCA_TEMPLATE_ID = 10009
 
 
 class HBCAProfile:
-    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+    @staticmethod
+    def dynamic_source_id(_vol_digits: str, rec: Optional[dict] = None) -> str:
         if General.GENERAL_CONFIG.get("platform_source_id"):
             return f"@S{General.GENERAL_CONFIG['platform_source_id']}@"
         if rec:
@@ -35,13 +36,16 @@ class HBCAProfile:
                 return f"@S{refd}@"
         return f"@S{HBCA_TEMPLATE_ID}@"
 
-    def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:
+    @staticmethod
+    def participant_uid(_identity: str, _role: str, _occ: int) -> Optional[str]:
         return None
 
-    def family_uid(self, identity: str) -> Optional[str]:
+    @staticmethod
+    def family_uid(_identity: str) -> Optional[str]:
         return None
 
-    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
+    @staticmethod
+    def citation_title(_rec: dict, part: dict, tag_name: str, year: str,
                        document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
@@ -52,7 +56,8 @@ class HBCAProfile:
             titl += " -- HBCA Biographical Sheet"
         return titl
 
-    def citation_page(self, rec: dict, part: dict, page: str) -> str:
+    @staticmethod
+    def citation_page(rec: dict, part: dict, page: str) -> str:
         tf = rec.get('type_specific_fields') or {}
         emp_name = Utils.clean_val(tf.get('employee_name'))
         if emp_name:
@@ -63,15 +68,18 @@ class HBCAProfile:
             return f"3 PAGE {std_s}, {std_g}".strip(", ")
         return f"3 PAGE Page {page}"
 
-    def citation_template_id(self, rec: dict, vol: str) -> Optional[int]:
+    @staticmethod
+    def citation_template_id(_rec: dict, _vol: str) -> Optional[int]:
         return HBCA_TEMPLATE_ID
 
-    def citation_proof_status(self, computed_status: str, rec: Optional[dict] = None) -> str:
+    @staticmethod
+    def citation_proof_status(_computed_status: str, rec: Optional[dict] = None) -> str:
         if rec and (rec.get("is_primary_source") or not rec.get("is_derivative", True)):
             return "proven"
         return "proposed"
 
-    def citation_quality_fields(self, rec: dict, part: dict, target_software: str) -> List[str]:
+    @staticmethod
+    def citation_quality_fields(rec: dict, _part: dict, target_software: str) -> List[str]:
         refn = Utils.clean_val(rec.get('record_number')) or Utils.clean_val(rec.get('record_id')) or 'HBCA'
         is_primary = bool(rec.get('is_primary_source') or not rec.get('is_derivative', True))
 
@@ -98,8 +106,10 @@ class HBCAProfile:
                 ]
             return [f"3 REFN {refn}", "3 QUAY 1"]
 
-    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
+    @staticmethod
+    def citation_detail_fields(rec: dict, part: dict, page: str, vol: str,
                                target_software: str) -> List[str]:
+        _ = vol
         if target_software != "RM":
             return []
 
@@ -178,7 +188,8 @@ class HBCAProfile:
                 lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
         return lines
 
-    def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
+    @staticmethod
+    def citation_text_block(rec: dict, _part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
         trans_val = Utils.clean_val(raw_trans)
 
@@ -238,25 +249,30 @@ class HBCAProfile:
                 lines.append(orig_text)
         return lines
 
-    def citation_uses_source_documents(self, rec: dict) -> bool:
+    @staticmethod
+    def citation_uses_source_documents(_rec: dict) -> bool:
         return True
 
-    def primary_fact_date(self, rec: dict, is_primary: bool) -> str:
+    @staticmethod
+    def primary_fact_date(rec: dict, is_primary: bool) -> str:
         return str(rec.get('year', '')) if is_primary and rec.get('year') else ""
 
-    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                  vol: str, media_uid: str, target_software: str, resi: str,
-                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+    @staticmethod
+    def build_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
+                                  vol: str, media_uid: str, target_software: str, _resi: str,
+                                  alt_names: list, _scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
         return General._build_generic_primary_event_lines(
             rec, part, event_tag, witnesses, vol, media_uid, target_software,
             alt_names, raw_event_date, age
         )
 
-    def volume_source_detail_fields(self, v_clause: str) -> List[str]:
+    @staticmethod
+    def volume_source_detail_fields(_v_clause: str) -> List[str]:
         return []
 
-    def media_caption(self, sheet: dict, vol: str, pages: str) -> str:
+    @staticmethod
+    def media_caption(sheet: dict, _vol: str, pages: str) -> str:
         meta = sheet.get('document_metadata') or {}
         first_rec = next(iter(sheet.get('records', [])), {})
         tf = first_rec.get('type_specific_fields') or {}
@@ -268,7 +284,8 @@ class HBCAProfile:
             return f"HBCA Biographical Sheet - {Path(pdf_url).name}"
         return f"HBCA Biographical Sheet - Page {pages or '1'}"
 
-    def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]:
+    @staticmethod
+    def resolve_source_templates(_json_data: dict, target_software: str) -> List[str]:
         display_name = "Hudson's Bay Company Archives: Biographical Sheets"
         abbr = "HBCA Biographical Sheets"
         repository = "Hudson's Bay Company Archives, Archives of Manitoba"
@@ -296,8 +313,10 @@ class HBCAProfile:
             block.extend(General.get_source_templates({HBCA_TEMPLATE_ID}))
         return block
 
-    def repository_defaults(self) -> Tuple[str, str]:
+    @staticmethod
+    def repository_defaults() -> Tuple[str, str]:
         return "Hudson's Bay Company Archives, Archives of Manitoba", "Winnipeg, MB, Canada"
 
-    def default_gedcom_output_name(self) -> Optional[str]:
+    @staticmethod
+    def default_gedcom_output_name() -> Optional[str]:
         return "MasterDB_HBCA.ged"

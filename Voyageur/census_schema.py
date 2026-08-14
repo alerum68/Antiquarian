@@ -37,7 +37,7 @@ if str(_REPO_ROOT) not in sys.path:
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
 
-def _titlecase_callback(word: str, **kwargs) -> str | None:
+def _titlecase_callback(word: str, **_kwargs) -> str | None:
     w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
     if w_clean.upper() in PRESERVED_ACRONYMS:
         return word.replace(w_clean, w_clean.upper())

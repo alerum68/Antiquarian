@@ -23,10 +23,12 @@ import engine
 
 
 class FakeCaches:
-    def create(self, **_kwargs):
+    @staticmethod
+    def create(**_kwargs):
         return SimpleNamespace(name="fake-cache-1")
 
-    def delete(self, **_kwargs):
+    @staticmethod
+    def delete(**_kwargs):
         pass
 
 
@@ -60,7 +62,7 @@ class FakeClient:
     response instead of a real network call."""
     last_instance = None
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *_args, **_kwargs):
         self.caches = FakeCaches()
         self.models = FakeModels(FakeClient.pending_page_data)
         FakeClient.last_instance = self
@@ -606,11 +608,11 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
     # agy_engine.rasterize_pdf_to_images(...)/agy_engine.call_agy_extract_chunked(...),
     # so the fakes are patched directly on agy_engine, not on the Extract module.
     monkeypatch.setattr(agy_engine, "rasterize_pdf_to_images",
-                        lambda pdf_path, **k: [Image.new("RGB", (10, 10), color="white")])
+                        lambda _pdf_path, **_k: [Image.new("RGB", (10, 10), color="white")])
 
     call_log = []
 
-    def fake_call_agy_extract(images, schema, prompt_text, **kwargs):
+    def fake_call_agy_extract(images, _schema, _prompt_text, **_kwargs):
         call_log.append({"num_images": len(images)})
         # A real agy call always returns a freshly-parsed dict (json.loads(stdout)) -
         # deep-copy here so tag_document_metadata's in-place mutation on one call can

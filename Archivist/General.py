@@ -105,7 +105,8 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
 
 
 class GeneralProfile:
-    def dynamic_source_id(self, vol_digits: str, rec: Optional[dict] = None) -> str:
+    @staticmethod
+    def dynamic_source_id(vol_digits: str, _rec: Optional[dict] = None) -> str:
         if GENERAL_CONFIG.get("platform_source_id"):
             return f"@S{GENERAL_CONFIG['platform_source_id']}@"
 
@@ -114,13 +115,16 @@ class GeneralProfile:
             base_id = base_id[:-3]
         return f"@S{base_id or '1'}{vol_digits.zfill(3)}@"
 
-    def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:
+    @staticmethod
+    def participant_uid(_identity: str, _role: str, _occ: int) -> Optional[str]:
         return None
 
-    def family_uid(self, identity: str) -> Optional[str]:
+    @staticmethod
+    def family_uid(_identity: str) -> Optional[str]:
         return None
 
-    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
+    @staticmethod
+    def citation_title(_rec: dict, part: dict, tag_name: str, year: str,
                        document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
@@ -129,7 +133,8 @@ class GeneralProfile:
             titl += f" -- {Utils.cap_case(document_type)}"
         return titl
 
-    def citation_page(self, rec: dict, part: dict, page: str) -> str:
+    @staticmethod
+    def citation_page(rec: dict, _part: dict, page: str) -> str:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
         type_fields = rec.get('type_specific_fields') or {}
         claim_num = Utils.clean_val(type_fields.get('claim_number'))
@@ -140,13 +145,17 @@ class GeneralProfile:
             return f"3 PAGE {'; '.join(ref_bits)}, Page {page}"
         return f"3 PAGE Page {page}, Record {rec_id}"
 
-    def citation_template_id(self, rec: dict, vol: str) -> Optional[int]:
+    @staticmethod
+    def citation_template_id(_rec: dict, _vol: str) -> Optional[int]:
         return None
 
-    def citation_proof_status(self, computed_status: str, rec: Optional[dict] = None) -> str:
+    @staticmethod
+    def citation_proof_status(computed_status: str, rec: Optional[dict] = None) -> str:
+        _ = rec
         return computed_status
 
-    def citation_quality_fields(self, rec: dict, part: dict, target_software: str) -> List[str]:
+    @staticmethod
+    def citation_quality_fields(rec: dict, _part: dict, target_software: str) -> List[str]:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
         refn = Utils.clean_val(rec.get('record_number')) or rec_id
         if target_software == "RM":
@@ -157,8 +166,10 @@ class GeneralProfile:
             ]
         return [f"3 REFN {refn}", "3 QUAY 3"]
 
-    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
+    @staticmethod
+    def citation_detail_fields(rec: dict, part: dict, page: str, vol: str,
                                target_software: str) -> List[str]:
+        _ = vol
         if target_software != "RM":
             return []
         std_g = Utils.clean_val(part.get('std_given'))
@@ -188,7 +199,8 @@ class GeneralProfile:
                 lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
         return lines
 
-    def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
+    @staticmethod
+    def citation_text_block(_rec: dict, _part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
         trans_val = Utils.clean_val(raw_trans)
         norm_orig = re.sub(r'\s+', ' ', orig_val).strip().lower() if orig_val else orig_val
@@ -219,20 +231,24 @@ class GeneralProfile:
                 lines.append(orig_text)
         return lines
 
-    def citation_uses_source_documents(self, rec: dict) -> bool:
+    @staticmethod
+    def citation_uses_source_documents(_rec: dict) -> bool:
         return True
 
-    def primary_fact_date(self, rec: dict, is_primary: bool) -> str:
+    @staticmethod
+    def primary_fact_date(_rec: dict, _is_primary: bool) -> str:
         return ""
 
-    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                  vol: str, media_uid: str, target_software: str, resi: str,
-                                  alt_names: list, scrip_fact_date: str, raw_event_date: str,
+    @staticmethod
+    def build_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
+                                  vol: str, media_uid: str, target_software: str, _resi: str,
+                                  alt_names: list, _scrip_fact_date: str, raw_event_date: str,
                                   age: str) -> List[str]:
         return _build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
                                                   target_software, alt_names, raw_event_date, age)
 
-    def volume_source_detail_fields(self, v_clause: str) -> List[str]:
+    @staticmethod
+    def volume_source_detail_fields(v_clause: str) -> List[str]:
         tid = 10009
         primary_creator = Utils.clean_val(GENERAL_CONFIG.get('parish_name'))
         dept = Utils.clean_val(GENERAL_CONFIG.get('diocese')) or Utils.clean_val(GENERAL_CONFIG.get('parish_location'))
@@ -253,18 +269,22 @@ class GeneralProfile:
             lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
         return lines
 
-    def media_caption(self, sheet: dict, vol: str, pages: str) -> str:
+    @staticmethod
+    def media_caption(_sheet: dict, vol: str, pages: str) -> str:
         return f"{GENERAL_CONFIG['parish_name_short']} - Vol {vol or 'Unknown'} - Page {pages or 'X'}"
 
-    def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]:
+    @staticmethod
+    def resolve_source_templates(_json_data: dict, target_software: str) -> List[str]:
         if target_software == "RM":
             return get_source_templates({10009})
         return []
 
-    def repository_defaults(self) -> Tuple[str, str]:
+    @staticmethod
+    def repository_defaults() -> Tuple[str, str]:
         return "FamilySearch.org", "Granite Mountain, UT"
 
-    def default_gedcom_output_name(self) -> Optional[str]:
+    @staticmethod
+    def default_gedcom_output_name() -> Optional[str]:
         return None
 
 

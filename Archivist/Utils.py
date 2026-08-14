@@ -165,7 +165,7 @@ _PLACE_QUALIFIER_RE = re.compile(
 PRESERVED_ACRONYMS = {"HBC", "NWT", "USA", "NWMP", "RCMP", "UK", "US", "ED", "PID", "RM", "FTM"}
 
 
-def _titlecase_callback(word: str, **kwargs) -> Optional[str]:
+def _titlecase_callback(word: str, **_kwargs) -> Optional[str]:
     w_clean = re.sub(r'^[^\w]+|[^\w]+$', '', word)
     if w_clean.upper() in PRESERVED_ACRONYMS:
         return word.replace(w_clean, w_clean.upper())

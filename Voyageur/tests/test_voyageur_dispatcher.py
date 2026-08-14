@@ -34,7 +34,7 @@ def test_main_rejects_invalid_source(monkeypatch, capsys):
     assert "[ERROR] Usage: python Voyageur.py <source>" in capsys.readouterr().out
 
 
-def test_main_rejects_missing_source(monkeypatch, capsys):
+def test_main_rejects_missing_source(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["Voyageur.py"])
 
     with pytest.raises(SystemExit) as exc_info:

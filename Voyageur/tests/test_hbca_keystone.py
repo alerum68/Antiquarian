@@ -164,7 +164,7 @@ def test_keystone_query_cache_write_is_atomic(tmp_path, requests_mock, monkeypat
         text=RECORD_PAGE_HTML,
     )
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(_hbca_mod.Path, "replace", fail_replace)

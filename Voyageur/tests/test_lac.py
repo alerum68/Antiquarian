@@ -83,7 +83,7 @@ def test_save_master_db_leaves_existing_file_untouched_on_write_failure(tmp_path
     master_db_path = str(tmp_path / "parish_register.json")
     LAC.save_master_db(master_db_path, {"sheets": ["original"]})
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(LAC.Path, "replace", fail_replace)
@@ -120,7 +120,7 @@ def test_save_checkpoint_leaves_existing_file_untouched_on_write_failure(tmp_pat
     checkpoint_path = str(tmp_path / "checkpoint.json")
     LAC.save_checkpoint(checkpoint_path, {"pids": ["original"]})
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(LAC.Path, "replace", fail_replace)
@@ -181,7 +181,7 @@ def test_resolve_record_type_exits_on_empty(capsys):
 
 
 def test_download_volume_assets_writes_one_scaffold_sheet_per_asset(monkeypatch, tmp_path):
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {
             "pid": pid, "lac_catalog_title": "Test", "reel_numbers": [], "series_code": "RG15-D-II-8-b",
             "source_documents": [
@@ -207,7 +207,7 @@ def test_download_volume_assets_writes_one_scaffold_sheet_per_asset(monkeypatch,
 def test_download_volume_assets_skips_already_downloaded_pid(monkeypatch, tmp_path):
     calls = []
 
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         calls.append(pid)
         return {"source_documents": []}
     monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
@@ -222,7 +222,7 @@ def test_download_volume_assets_skips_already_downloaded_pid(monkeypatch, tmp_pa
 
 
 def test_download_volume_assets_records_failure_without_writing_scaffold(monkeypatch, tmp_path):
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(_pid, _media_dir):
         raise lac_client.LacCallError("boom")
     monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
 
@@ -236,7 +236,7 @@ def test_download_volume_assets_records_failure_without_writing_scaffold(monkeyp
 
 
 def test_download_volume_assets_persists_source_documents_in_checkpoint(monkeypatch, tmp_path):
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {
             "source_documents": [
                 {"media_path": str(tmp_path / pid / "asset1.jpg"), "lac_asset_id": "asset1"},
@@ -260,7 +260,7 @@ def test_download_volume_assets_reseeds_scaffold_for_already_downloaded_pid_with
         "pid_documents": {"pid1": [{"media_path": str(tmp_path / "pid1" / "asset1.jpg"), "lac_asset_id": "asset1"}]},
     })
 
-    def fail_if_called(pid, media_dir):
+    def fail_if_called(_pid, _media_dir):
         raise AssertionError("should not re-fetch an already-downloaded pid")
     monkeypatch.setattr(LAC, "download_pid_bundle", fail_if_called)
 
@@ -303,7 +303,7 @@ def test_download_volume_assets_multiworker_reseeds_scaffold_for_already_downloa
 def test_download_volume_assets_multiworker_writes_scaffold_sheet_on_success(monkeypatch, tmp_path):
     monkeypatch.setattr(LAC.mp, "Process", _FakeProcess)
 
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {
             "source_documents": [
                 {"media_path": str(tmp_path / pid / "asset1.jpg"), "lac_asset_id": "asset1"},
@@ -382,7 +382,7 @@ def test_process_worker_messages_requeues_on_403_and_backs_off():
 def test_download_volume_assets_multiworker_batches_writes_and_flushes_before_returning(monkeypatch, tmp_path):
     monkeypatch.setattr(LAC.mp, "Process", _FakeProcess)
 
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {"source_documents": [
             {"media_path": str(tmp_path / pid / f"{pid}_asset1.jpg"), "lac_asset_id": "asset1"},
         ]}
@@ -422,7 +422,7 @@ def test_download_volume_assets_multiworker_flushes_partial_progress_on_crash(mo
     mutated before the raise; a bare "while ... finally: flush" must still persist it."""
     monkeypatch.setattr(LAC.mp, "Process", _FakeProcess)
 
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {"source_documents": [
             {"media_path": str(tmp_path / pid / f"{pid}_asset1.jpg"), "lac_asset_id": "asset1"},
         ]}
@@ -487,7 +487,7 @@ def test_download_volume_assets_multiworker_joins_still_alive_workers_on_exit(mo
 
     monkeypatch.setattr(LAC.mp, "Process", LingeringProcess)
 
-    def fake_download_pid_bundle(pid, media_dir):
+    def fake_download_pid_bundle(pid, _media_dir):
         return {"source_documents": [{"media_path": str(tmp_path / pid / "asset1.jpg"), "lac_asset_id": "asset1"}]}
     monkeypatch.setattr(LAC, "download_pid_bundle", fake_download_pid_bundle)
 
@@ -503,7 +503,7 @@ def test_download_volume_assets_multiworker_joins_still_alive_workers_on_exit(mo
 def test_retrieve_volume_threads_master_db_params_to_sequential_path(monkeypatch, tmp_path):
     monkeypatch.setattr(LAC, "retrieve_volume_pids",
                         lambda vol, cookies, checkpoint_path, archival_number: ["pid1"])
-    monkeypatch.setattr(LAC, "download_pid_bundle", lambda pid, media_dir: {
+    monkeypatch.setattr(LAC, "download_pid_bundle", lambda _pid, _media_dir: {
         "source_documents": [{"media_path": str(tmp_path / "asset1.jpg"), "lac_asset_id": "asset1"}],
     })
     checkpoint_path = str(tmp_path / "checkpoint.json")
@@ -530,6 +530,7 @@ def test_download_images_writes_scaffold_sheet_per_canvas(monkeypatch, tmp_path)
 
     class FakeSession:
         def get(self, url, timeout=None):
+            _ = (url, timeout)
             return FakeResponse()
 
     monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
@@ -562,6 +563,7 @@ def test_download_images_tracks_failure_and_continues_with_remaining_canvases(mo
 
     class FakeSession:
         def get(self, url, timeout=None):
+            _ = timeout
             if "bad" in url:
                 raise ConnectionError("network down")
             return FakeResponse()
@@ -592,6 +594,7 @@ def test_download_images_does_not_claim_success_when_some_canvases_failed(monkey
 
     class FakeSession:
         def get(self, url, timeout=None):
+            _ = (url, timeout)
             raise ConnectionError("network down")
 
     monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
@@ -621,11 +624,12 @@ def test_download_images_leaves_no_truncated_file_when_write_fails(monkeypatch, 
 
     class FakeSession:
         def get(self, url, timeout=None):
+            _ = (url, timeout)
             return FakeResponse()
 
     monkeypatch.setattr(LAC.requests, "Session", lambda: FakeSession())
 
-    def fail_replace(self, target):
+    def fail_replace(_self, _target):
         raise OSError("disk full")
 
     monkeypatch.setattr(LAC.Path, "replace", fail_replace)
@@ -650,7 +654,7 @@ def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch,
     os.makedirs(out_dir, exist_ok=True)
     (Path(out_dir) / "roll1_0001.jpg").write_bytes(b"already-downloaded")
 
-    def fail_if_called(*args, **kwargs):
+    def fail_if_called(*_args, **_kwargs):
         raise AssertionError("should not re-download an existing image")
     monkeypatch.setattr(LAC.requests, "Session", lambda: type("FakeSession", (), {"get": fail_if_called})())
 
