@@ -30,6 +30,7 @@ venv/
 Thumbs.db
 
 # Generated / downloaded data
+/RootsMagic 11/
 /Voyageur/manifest/
 /identifier.sqlite
 /Gazetteer/US_AtlasHCB_Counties/
