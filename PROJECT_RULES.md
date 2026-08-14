@@ -24,13 +24,13 @@
 
 Every change requires verification evidence:
 
-| Change Type | Required Proof |
-|-------------|----------------|
-| API endpoint | curl/HTTP response |
-| UI change | Screenshot |
-| Build/compile | Command output |
-| Test | Test runner output |
-| Config | Verification command |
+| Change Type   | Required Proof       |
+|---------------|----------------------|
+| API endpoint  | curl/HTTP response   |
+| UI change     | Screenshot           |
+| Build/compile | Command output       |
+| Test          | Test runner output   |
+| Config        | Verification command |
 
 **Never accept**: "It looks correct", "This should work", "I've done similar before".
 
@@ -59,11 +59,11 @@ Every change requires verification evidence:
 
 Plans are grouped into **waves** based on dependencies:
 
-| Wave | Characteristic | Execution |
-|------|----------------|-----------|
-| 1 | Foundation tasks, no dependencies | Run in parallel |
-| 2 | Depends on Wave 1 | Wait for Wave 1, then parallel |
-| 3 | Depends on Wave 2 | Wait for Wave 2, then parallel |
+| Wave | Characteristic                    | Execution                      |
+|------|-----------------------------------|--------------------------------|
+| 1    | Foundation tasks, no dependencies | Run in parallel                |
+| 2    | Depends on Wave 1                 | Wait for Wave 1, then parallel |
+| 3    | Depends on Wave 2                 | Wait for Wave 2, then parallel |
 
 **Wave Completion Protocol:**
 1. All tasks in wave verified
@@ -138,14 +138,14 @@ type(scope): description
 ```
 
 **Types:**
-| Type | Usage |
-|------|-------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation only |
+| Type       | Usage                                 |
+|------------|---------------------------------------|
+| `feat`     | New feature                           |
+| `fix`      | Bug fix                               |
+| `docs`     | Documentation only                    |
 | `refactor` | Code restructure (no behavior change) |
-| `test` | Adding/updating tests |
-| `chore` | Maintenance, dependencies |
+| `test`     | Adding/updating tests                 |
+| `chore`    | Maintenance, dependencies             |
 
 **Rules:**
 - One task = one commit
@@ -185,12 +185,12 @@ scripts/                  # Utility scripts
 
 **Context Quality Thresholds:**
 
-| Usage | Quality |
-|-------|---------|
-| 0-30% | **PEAK** — Comprehensive, thorough work |
-| 30-50% | **GOOD** — Solid, confident output |
-| 50-70% | **DEGRADING** — Efficiency mode |
-| 70%+ | **POOR** — Rushed, incomplete |
+| Usage  | Quality                                 |
+|--------|-----------------------------------------|
+| 0-30%  | **PEAK** — Comprehensive, thorough work |
+| 30-50% | **GOOD** — Solid, confident output      |
+| 50-70% | **DEGRADING** — Efficiency mode         |
+| 70%+   | **POOR** — Rushed, incomplete           |
 
 **Context Hygiene Rules:**
 - Keep plans under 50% context usage
@@ -206,20 +206,20 @@ scripts/                  # Utility scripts
 
 ### Loading Rules
 
-| Action | Rule |
-|--------|------|
-| Before reading file | Search first (grep, ripgrep) |
-| File >200 lines | Use outline, not full file |
+| Action                  | Rule                            |
+|-------------------------|---------------------------------|
+| Before reading file     | Search first (grep, ripgrep)    |
+| File >200 lines         | Use outline, not full file      |
 | File already understood | Reference summary, don't reload |
-| >5 files needed | Stop, reconsider approach |
+| >5 files needed         | Stop, reconsider approach       |
 
 ### Budget Thresholds
 
-| Usage | Action Required |
-|-------|-----------------|
-| 0-50% | Proceed normally |
-| 50-70% | Switch to outline mode, compress context |
-| 70%+ | State dump required, recommend fresh session |
+| Usage  | Action Required                              |
+|--------|----------------------------------------------|
+| 0-50%  | Proceed normally                             |
+| 50-70% | Switch to outline mode, compress context     |
+| 70%+   | State dump required, recommend fresh session |
 
 ### Compression Protocol
 

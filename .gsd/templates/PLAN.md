@@ -72,19 +72,19 @@ After all tasks complete, verify:
 
 ## Task Types
 
-| Type | Use For | Behavior |
-|------|---------|----------|
-| `auto` | Everything Claude can do independently | Fully autonomous |
-| `checkpoint:human-verify` | Visual/functional verification | Pauses for user |
-| `checkpoint:decision` | Implementation choices | Pauses for user |
+| Type                      | Use For                                | Behavior         |
+|---------------------------|----------------------------------------|------------------|
+| `auto`                    | Everything Claude can do independently | Fully autonomous |
+| `checkpoint:human-verify` | Visual/functional verification         | Pauses for user  |
+| `checkpoint:decision`     | Implementation choices                 | Pauses for user  |
 
 ## Wave Assignment
 
-| Wave | Use For |
-|------|---------|
-| 1 | Foundation (types, schemas, utilities) |
-| 2 | Core implementations |
-| 3 | Integration and validation |
+| Wave | Use For                                |
+|------|----------------------------------------|
+| 1    | Foundation (types, schemas, utilities) |
+| 2    | Core implementations                   |
+| 3    | Integration and validation             |
 
 Plans in the same wave can run in parallel.
 Later waves depend on earlier waves.
