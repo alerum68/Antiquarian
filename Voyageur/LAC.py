@@ -25,14 +25,14 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 try:
-    from . import lac_client
-except (ImportError, ValueError):
     import lac_client
+except ImportError:
+    from Voyageur import lac_client
 
 try:
-    from ._gather_helpers import atomic_write_bytes
-except (ImportError, ValueError):
     from _gather_helpers import atomic_write_bytes
+except ImportError:
+    from Voyageur._gather_helpers import atomic_write_bytes
 
 
 # ==========================================

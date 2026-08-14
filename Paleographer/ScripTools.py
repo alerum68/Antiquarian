@@ -30,12 +30,8 @@ try:
     from Voyageur import lac_client
     from Voyageur import LAC as voyageur_lac
 except (ImportError, ValueError):
-    try:
-        from . import lac_client
-        from . import LAC as voyageur_lac
-    except (ImportError, ValueError):
-        import lac_client
-        import LAC as voyageur_lac
+    import lac_client
+    import LAC as voyageur_lac
 
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(ROOT_ENV, override=True)

@@ -28,9 +28,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
 try:
-    from ._gather_helpers import atomic_write_bytes
-except (ImportError, ValueError):
     from _gather_helpers import atomic_write_bytes
+except ImportError:
+    from Voyageur._gather_helpers import atomic_write_bytes
 
 load_dotenv(_REPO_ROOT / ".env", override=False)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=False)
@@ -519,7 +519,7 @@ def query_keystone_for_code(
                     if name:
                         if input_tag.get("type") == "radio" and not input_tag.has_attr("checked"):
                             continue
-                        data[name] = input_tag.get("value", "")
+                        data[str(name)] = input_tag.get("value", "")
                 data["LOCATION_CODE"] = location_code
 
                 post_resp = client.post(

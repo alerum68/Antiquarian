@@ -338,8 +338,7 @@ def page_by_page_recovery(pdf_path, output_path=None):
     except Exception as e:
         print(f"Initial open failed: {e}")
 
-    # A normal open failed - rebuild the document page by page into a fresh one,
-    # skipping any individual page that can't be copied, rather than giving up entirely.
+    temp_file = None
     try:
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
         temp_file.close()
@@ -384,7 +383,7 @@ def page_by_page_recovery(pdf_path, output_path=None):
     except Exception as e:
         print(f"Recovery attempt failed: {e}")
     finally:
-        if os.path.exists(temp_file.name):
+        if temp_file and os.path.exists(temp_file.name):
             try:
                 os.unlink(temp_file.name)
             except Exception:

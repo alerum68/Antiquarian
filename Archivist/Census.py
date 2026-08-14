@@ -7,7 +7,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Tuple, TypedDict, Union, cast
+from typing import Any, Dict, List, Optional, Tuple, TypedDict, Union, cast
 
 import pandas as pd
 import Utils
@@ -510,10 +510,10 @@ def resolve_cross_family_links(
                 if other_unit is unit:
                     continue
 
-                parent_checks: List[Tuple[Literal['husband', 'wife'], Tuple[int, int]]] = [
-                    ('husband', HUSBAND_CHILD_AGE_GAP), ('wife', WIFE_CHILD_AGE_GAP)]
-                for parent_key, age_gap_range in parent_checks:
-                    pp = other_unit.get(parent_key)
+                for pp, age_gap_range in (
+                    (other_unit.get('husband'), HUSBAND_CHILD_AGE_GAP),
+                    (other_unit.get('wife'), WIFE_CHILD_AGE_GAP),
+                ):
                     if isinstance(pp, pd.Series):
                         pp_sur = Utils.clean_val(pp.get('Surname'))
                         pp_age = get_age(pp)
