@@ -140,7 +140,7 @@ def test_dispatch_by_record_type_name_not_shape():
     is_census's own logic (record_type_name-based, not a hardcoded shape guess) would
     route a Census_-prefixed document to the census flavor."""
     doc = _unified_doc("Census_1900", [_sheet([_record([_participant("Jean", "Gagnon", "M")])])])
-    assert doc.get("record_type_name", "").startswith("Census_")
+    assert doc.get("record_type_name", "").startswith("Census_")  # type: ignore
     assert "sheets" in doc
 
 

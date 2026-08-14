@@ -329,4 +329,4 @@ def test_full_collection_round_trips_minimal_payload():
             )
         ],
     )
-    assert collection.sheets[0].records[0].participants[0].facts[0].fact_type == "Birth"
+    assert collection.sheets[0].records[0].participants[0].facts[0].fact_type == "Birth"  # type: ignore

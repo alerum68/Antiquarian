@@ -39,9 +39,9 @@ def test_scrip_record_extra_fields_validate_and_coerce_types():
             "scrip_type": "Cash",
         },
     )
-    assert extra.claim_number == "5473"
-    assert extra.scrip_amount == "160"
-    assert extra.scrip_type == "Cash"
+    assert extra.claim_number == "5473"  # type: ignore
+    assert extra.scrip_amount == "160"  # type: ignore
+    assert extra.scrip_type == "Cash"  # type: ignore
 
 
 def test_scrip_record_extra_rejects_invalid_enum_choice():
@@ -54,8 +54,8 @@ def test_scrip_participant_extra_fields():
     extra = validate_participant_extra_fields(
         "Scrip", {"marital_status": "Married", "race_or_origin": "Metis"}
     )
-    assert extra.marital_status == "Married"
-    assert extra.race_or_origin == "Metis"
+    assert extra.marital_status == "Married"  # type: ignore
+    assert extra.race_or_origin == "Metis"  # type: ignore
 
 
 def test_unknown_document_type_raises():
@@ -84,17 +84,17 @@ def test_census_record_extra_fields_validate():
             "state": "Minnesota",
         },
     )
-    assert extra.family_number == "12"
-    assert extra.enumeration_district == "0042"
-    assert extra.state == "Minnesota"
+    assert extra.family_number == "12"  # type: ignore
+    assert extra.enumeration_district == "0042"  # type: ignore
+    assert extra.state == "Minnesota"  # type: ignore
 
 
 def test_census_participant_extra_fields_validate():
     extra = validate_participant_extra_fields(
         "Census", {"line_number": "7", "pid": "MXHY-ABC"}
     )
-    assert extra.line_number == "7"
-    assert extra.pid == "MXHY-ABC"
+    assert extra.line_number == "7"  # type: ignore
+    assert extra.pid == "MXHY-ABC"  # type: ignore
 
 
 def test_census_roles_are_restricted_to_family_relationships():

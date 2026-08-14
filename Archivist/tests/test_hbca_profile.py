@@ -74,7 +74,7 @@ def test_hbca_profile_proof_status_proposed_for_bio_sheet():
 
 def test_hbca_profile_source_quality_reduced_for_bio_sheet():
     profile = HBCA.HBCAProfile()
-    part = HBCA_SAMPLE_REC["participants"][0]
+    part = HBCA_SAMPLE_REC["participants"][0]  # type: ignore
 
     # Derivative bio sheet: QUAY 1, _SOUR D, _INFO S, _EVID I
     qual_lines = profile.citation_quality_fields(HBCA_SAMPLE_REC, part, "RM")
@@ -94,7 +94,7 @@ def test_hbca_profile_source_quality_reduced_for_bio_sheet():
 
 def test_hbca_profile_citation_detail_fields_rm():
     profile = HBCA.HBCAProfile()
-    part = HBCA_SAMPLE_REC["participants"][0]
+    part = HBCA_SAMPLE_REC["participants"][0]  # type: ignore
     fields = profile.citation_detail_fields(HBCA_SAMPLE_REC, part, "1", "1", "RM")
     fields_str = "\n".join(fields)
 
@@ -117,10 +117,13 @@ def test_hbca_profile_repository_and_gedcom_output_defaults():
     assert profile.default_gedcom_output_name() == "MasterDB_HBCA.ged"
 
 
+# noinspection PyUnresolvedReferences
 def test_hbca_archivist_dispatcher_resolves_hbca_profile():
+    # noinspection PyUnresolvedReferences
     profile = arch_dispatcher.resolve_profile("HBCA")
     assert isinstance(profile, HBCA.HBCAProfile)
 
+    # noinspection PyUnresolvedReferences
     profile_bio = arch_dispatcher.resolve_profile("HBCA_Bio")
     assert isinstance(profile_bio, HBCA.HBCAProfile)
 

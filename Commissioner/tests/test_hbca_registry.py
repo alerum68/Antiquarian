@@ -52,11 +52,11 @@ def test_hbca_record_extra_fields():
             "needs_llm_structured_review": False,
         },
     )
-    assert extra.parish_of_origin == "Birsay, Orkney"
-    assert extra.entered_service_year == "1821"
-    assert len(extra.service_history) == 1
-    assert len(extra.hbca_references) == 2
-    assert extra.needs_llm_structured_review is False
+    assert extra.parish_of_origin == "Birsay, Orkney"  # type: ignore
+    assert extra.entered_service_year == "1821"  # type: ignore
+    assert len(extra.service_history) == 1  # type: ignore
+    assert len(extra.hbca_references) == 2  # type: ignore
+    assert extra.needs_llm_structured_review is False  # type: ignore
 
 
 def test_hbca_participant_extra_fields():
@@ -68,8 +68,8 @@ def test_hbca_participant_extra_fields():
             "citations_text": "Search file; B.239/g/1",
         },
     )
-    assert extra.relationship_to_employee == "Self"
-    assert extra.vital_dates_summary == "b. ca. 1796, d. 1864"
+    assert extra.relationship_to_employee == "Self"  # type: ignore
+    assert extra.vital_dates_summary == "b. ca. 1796, d. 1864"  # type: ignore
 
 
 def test_hbca_parse_collection_end_to_end():

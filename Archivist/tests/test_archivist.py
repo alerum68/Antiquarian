@@ -1129,8 +1129,8 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
 def test_build_individual_renders_generic_facts_via_fact_types():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "REC-1", "event_place": "Quebec",
            "participants": [make_participant("primary", given="Jean", surname="Gagnon")]}
-    primary = rec["participants"][0]
-    primary["facts"] = [{"fact_type": "Occupation", "value": "Farmer"}]
+    primary = rec["participants"][0]  # type: ignore
+    primary["facts"] = [{"fact_type": "Occupation", "value": "Farmer"}]  # type: ignore
 
     lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
@@ -1142,8 +1142,8 @@ def test_build_individual_renders_generic_facts_via_fact_types():
 def test_build_individual_skips_unknown_fact_type_gracefully():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "REC-2", "event_place": "Quebec",
            "participants": [make_participant("primary", given="Marie", surname="Boucher")]}
-    primary = rec["participants"][0]
-    primary["facts"] = [{"fact_type": "", "value": "irrelevant"}]
+    primary = rec["participants"][0]  # type: ignore
+    primary["facts"] = [{"fact_type": "", "value": "irrelevant"}]  # type: ignore
 
     lines, _, _, _ = General.build_individual("I1", rec, primary, "1", "M0000000001", "26 JUL 2026", False, "RM")
     joined = "\n".join(lines)
