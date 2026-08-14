@@ -58,7 +58,7 @@ def _field_type_for(document_type: str, field: dict) -> Any:
         from typing import Literal
 
         choices = tuple(field["choices"])
-        return Literal[choices]
+        return Literal.__getitem__(choices)
     if type_name not in _PRIMITIVE_TYPE_MAP:
         raise UnknownFieldTypeError(
             f"{document_type}: unrecognized field type {type_name!r} for field {field['name']!r}"
@@ -73,7 +73,8 @@ def _build_extra_model(model_name: str, document_type: str, fields: List[dict]) 
     type_specific_fields dict, only to check it, so an undeclared key must fail loudly
     rather than be silently ignored (and thereby silently dropped)."""
     field_definitions = {
-        field["name"]: (Optional[_field_type_for(document_type, field)], None) for field in fields
+        field["name"]: (Optional.__getitem__(_field_type_for(document_type, field)), None)
+        for field in fields
     }
     return create_model(model_name, __config__=ConfigDict(extra="forbid"), **field_definitions)
 

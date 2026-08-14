@@ -154,9 +154,12 @@ def optimize_pdfs(directory, compression_level=1, backup=False, size_threshold_m
                     stats["optimized_files"] += 1
                     stats["optimized_size_bytes"] += result["new_size"]
 
-                    original_size = result["original_size"]
-                    new_size = result["new_size"]
-                    reduction_percent = ((original_size - new_size) / original_size * 100) if original_size > 0 else 0
+                    original_size = float(result["original_size"])
+                    new_size = float(result["new_size"])
+                    reduction_percent = (
+                        float((original_size - new_size) / original_size * 100)
+                        if original_size > 0 else 0.0
+                    )
 
                     print(f'Optimized: {pdf_path}')
                     print(
@@ -403,13 +406,14 @@ def print_summary(stats):
     print(f"Skipped: {stats['skipped_files']}")
     print(f"Failed: {stats['failed_files']}")
 
-    original_size_mb = stats["original_size_bytes"] / (1024 * 1024)
-    optimized_size_mb = stats["optimized_size_bytes"] / (1024 * 1024)
-    saved_mb = original_size_mb - optimized_size_mb
+    original_size_mb = float(stats["original_size_bytes"]) / (1024 * 1024)
+    optimized_size_mb = float(stats["optimized_size_bytes"]) / (1024 * 1024)
+    saved_mb = float(original_size_mb - optimized_size_mb)
+    overall_reduction = float(stats["overall_reduction_percent"])
 
     print(f"\nOriginal size: {original_size_mb:.2f} MB")
     print(f"Optimized size: {optimized_size_mb:.2f} MB")
-    print(f"Space saved: {saved_mb:.2f} MB ({stats['overall_reduction_percent']:.1f}%)")
+    print(f"Space saved: {saved_mb:.2f} MB ({overall_reduction:.1f}% reduction)")
     print(f"\nTime taken: {stats['duration']}")
     print("=" * 50)
 
