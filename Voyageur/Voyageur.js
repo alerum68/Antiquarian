@@ -1285,6 +1285,7 @@
         let itemsAtLastCheckpoint = 0;
 
         const shouldAutoStart = window.location.href.includes('mgs_auto=1');
+        const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
 
         function debugLog(msg) {
             if (DEBUG_MODE) console.log(`[Voyageur FS] ${msg}`);
@@ -1778,7 +1779,7 @@
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.setAttribute('href', url);
-            link.setAttribute('download', `TMP_FS_${jsonFileName}`);
+            link.setAttribute('download', `TMP_FS_${runId}_${jsonFileName}`);
             link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
@@ -1829,7 +1830,7 @@
                         const url = URL.createObjectURL(blob);
                         const link = document.createElement('a');
                         link.setAttribute('href', url);
-                        link.setAttribute('download', `TMP_FS_Images_${event.data.fileName}`);
+                        link.setAttribute('download', `TMP_FS_${runId}_Images_${event.data.fileName}`);
                         link.style.visibility = 'hidden';
                         document.body.appendChild(link);
                         link.click();
