@@ -1244,7 +1244,7 @@
             });
         }
 
-        async function stopBatch() {
+        function stopBatch() {
             if (!isAutoExtracting) return;
             isAutoExtracting = false;
             if (window._startBtn) window._startBtn.style.display = 'block';
@@ -1519,13 +1519,13 @@
             const nextHeading = headings[householdIndex + 1] || null;
             const listContainers = [...panel.querySelectorAll('[role="list"], ul, ol')];
             const inRange = (el) => {
-                const afterThis = heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING;
+                const afterThis = (heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
                 // Confirmed live: this must check that `el` PRECEDES nextHeading, not that it
                 // FOLLOWS it - the two are easy to invert since both read as "& FOLLOWING" from
                 // one comparison direction or the other. Getting this backwards makes every
                 // heading grab the *next* household's list instead of its own.
                 const beforeNext = !nextHeading
-                    || (nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING);
+                    || ((nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING) !== 0);
                 return afterThis && beforeNext;
             };
             return listContainers.find(inRange) || null;
@@ -1549,7 +1549,7 @@
                 .find(h => h.textContent.trim() === 'View Name');
             if (!headingEl) return null;
             const links = [...aside.querySelectorAll('a[href]')]
-                .filter(a => headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+                .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
             const recordArkLink = links.find(a => /ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/.test(a.getAttribute('href')));
             return recordArkLink
                 ? recordArkLink.getAttribute('href').match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/)[1]
@@ -1605,7 +1605,7 @@
             // anything on this page). Scoped to links after the "View Name" heading so the
             // still-present household list above it can't contribute a stray match.
             const links = [...aside.querySelectorAll('a[href]')]
-                .filter(a => headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING);
+                .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
             const personArkLink = links.find(a => /\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})(?:$|[/?])/.test(a.getAttribute('href')));
             const personArkMatch = personArkLink
                 && personArkLink.getAttribute('href').match(/\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
@@ -1628,8 +1628,8 @@
                     // "Household • Census\n{HeadName}" rather than a real relationship label.
                     const relPairs = [...householdMatch[1].matchAll(
                         /(Household\s*•\s*Census|Spouse|Child|Father|Mother|No Relation)\n(.+)/g)];
-                    householdRelationships = relPairs.map(([, label]) =>
-                        label.startsWith('Household') ? 'Head' : label);
+                    householdRelationships = relPairs.map(match =>
+                        match[1].startsWith('Household') ? 'Head' : match[1]);
                 }
             }
 

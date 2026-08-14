@@ -8,16 +8,28 @@
 // `require()` needs to reach the `module.exports` guard at the end of the file.
 'use strict';
 
-global.window = {location: {hostname: 'test.invalid', href: 'https://test.invalid/'}};
-global.document = {};
-global.sessionStorage = {
+/* global globalThis, window, document, sessionStorage, unsafeWindow, performance, GM_xmlhttpRequest, module, require */
+
+/** @type {Storage & {_store: Record<string, string>}} */
+const mockSessionStorage = {
     _store: {},
+    /** @param {string} key */
     getItem(key) { return Object.prototype.hasOwnProperty.call(this._store, key) ? this._store[key] : null; },
+    /** @param {string} key @param {*} value */
     setItem(key, value) { this._store[key] = String(value); },
+    /** @param {string} key */
     removeItem(key) { delete this._store[key]; },
+    get length() { return Object.keys(this._store).length; },
+    clear() { this._store = {}; },
+    /** @param {number} index */
+    key(index) { return Object.keys(this._store)[index] || null; },
 };
-global.unsafeWindow = undefined;
-global.performance = {now: () => Date.now()};
-global.GM_xmlhttpRequest = () => {};
+
+globalThis.window = {location: {hostname: 'test.invalid', href: 'https://test.invalid/'}};
+globalThis.document = {};
+globalThis.sessionStorage = mockSessionStorage;
+globalThis.unsafeWindow = undefined;
+globalThis.performance = {now: () => Date.now()};
+globalThis.GM_xmlhttpRequest = () => {};
 
 module.exports = require('../../Voyageur.js');

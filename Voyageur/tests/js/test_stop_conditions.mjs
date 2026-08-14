@@ -1,3 +1,4 @@
+/* global globalThis */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
@@ -24,14 +25,14 @@ test('placesMatch: different city does not match', () => {
 });
 
 test('reload state: loadReloadState returns null when nothing saved', () => {
-    global.sessionStorage._store = {};
-    global.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
+    globalThis.sessionStorage._store = {};
+    globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
     assert.equal(loadReloadState(), null);
 });
 
 test('reload state: save then load round-trips on the same page URL', () => {
-    global.sessionStorage._store = {};
-    global.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
+    globalThis.sessionStorage._store = {};
+    globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
 
     saveReloadState({
         accumulatedPages: [{page_number: 1}],
@@ -51,17 +52,17 @@ test('reload state: save then load round-trips on the same page URL', () => {
 });
 
 test('reload state: load returns null when the page URL has changed since saving', () => {
-    global.sessionStorage._store = {};
-    global.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
+    globalThis.sessionStorage._store = {};
+    globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
     saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, indexReloadAttempts: 1});
 
-    global.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00131';
+    globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00131';
     assert.equal(loadReloadState(), null);
 });
 
 test('reload state: clearReloadState removes saved state', () => {
-    global.sessionStorage._store = {};
-    global.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
+    globalThis.sessionStorage._store = {};
+    globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
     saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, indexReloadAttempts: 1});
 
     clearReloadState();
