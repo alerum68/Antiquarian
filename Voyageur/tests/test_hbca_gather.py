@@ -1,5 +1,7 @@
 import importlib.util
 import json
+import threading as _threading
+import time as _time
 from pathlib import Path
 import pytest
 
@@ -86,7 +88,7 @@ def test_build_hbca_scaffold_sheet():
 
     assert sheet["page_id"] == "adams_george.pdf"
     assert sheet["document_metadata"]["file_name"] == "adams_george.pdf"
-    assert sheet["document_metadata"]["document_type"] == "HBCA"
+    assert sheet["document_metadata"]["file_type"] == "pdf"
     assert (
         sheet["document_metadata"]["source_name"]
         == "Hudson's Bay Company Archives: Biographical Sheets"
@@ -95,10 +97,47 @@ def test_build_hbca_scaffold_sheet():
         sheet["document_metadata"]["source_location"]
         == "Archives of Manitoba, Winnipeg, Manitoba, Canada"
     )
-    assert sheet["document_metadata"]["employee_name"] == "Adams, George"
-    assert sheet["document_metadata"]["raw_text"] == raw_text
+    # document_metadata is Commissioner-shaped (build_empty_sheet's real fields only) -
+    # no document_type, no raw_text (write-only, nothing downstream ever reads it back -
+    # it's recomputed transiently from the PDF each run), no pdf_url (redundant, already
+    # in records[0].citation_text), no employee_name (moved to type_specific_fields).
+    assert "document_type" not in sheet["document_metadata"]
+    assert "raw_text" not in sheet["document_metadata"]
+    assert "pdf_url" not in sheet["document_metadata"]
+    assert "employee_name" not in sheet["document_metadata"]
+
+    record = sheet["records"][0]
+    assert record["citation_text"] == entry.pdf_url
+    assert record["type_specific_fields"]["employee_name"] == "Adams, George"
     assert len(sheet["records"]) == 1
     assert sheet["records"][0]["participants"] == []
+
+
+def test_build_hbca_scaffold_sheet_does_not_duplicate_keystone_urls():
+    entry = BioSheetEntry(
+        employee_name="Adams, George",
+        file_name="adams_george.pdf",
+        letter="a",
+        pdf_url="https://example.com/adams_george.pdf",
+    )
+    sheet = build_hbca_scaffold_sheet(entry, keystone_urls=["https://keystone.example/rec1"])
+
+    assert "keystone_urls" not in sheet["document_metadata"]
+    assert sheet["records"][0]["type_specific_fields"]["keystone_urls"] == ["https://keystone.example/rec1"]
+
+
+def test_hbca_image_dir_reads_from_env(monkeypatch):
+    """HBCA_IMAGE_DIR was a hardcoded literal, never actually read from the environment,
+    despite being exposed as a configurable setting in settings_schema.yaml - the GUI
+    control had no effect. Reloading the module fresh with the env var set is required
+    since HBCA_IMAGE_DIR is resolved once at import time, same as the file's other
+    module-level settings constants."""
+    monkeypatch.setenv("HBCA_IMAGE_DIR", "CustomHBCAFolder")
+    spec = importlib.util.spec_from_file_location("voyageur_hbca_reload", _hbca_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert module.HBCA_IMAGE_DIR == "CustomHBCAFolder"
 
 
 def test_checkpoint_roundtrip(tmp_path):
@@ -207,6 +246,75 @@ def test_gather_hbca_sheets_one_entry_failure_does_not_crash_the_batch(tmp_path,
     assert new_downloads == 1
     assert (tmp_path / "images" / "Bios" / "a" / "good.pdf").exists()
     assert not (tmp_path / "images" / "Bios" / "a" / "bad.pdf").exists()
+
+
+def test_gather_hbca_sheets_serializes_keystone_media_downloads_across_threads(tmp_path, monkeypatch):
+    """Two entries whose Keystone resolution names an overlapping media_url must not race
+    on the same destination file - download_keystone_media's existence-check-then-write
+    was not synchronized, unlike the correctly-locked MASTER_DB/checkpoint path. Proven via
+    a concurrency counter around the real download_keystone_media call: with two threads
+    both wanting to download the same media_url, the max-concurrent count must stay at 1 -
+    a real race (unsynchronized) would let both threads observe "not yet downloaded"
+    simultaneously and let the counter hit 2, since each call sleeps briefly to force
+    overlap if nothing is serializing them."""
+    index_html = (
+        '<html><body>'
+        '<a href="a/one.pdf">One, Person</a>'
+        '<a href="a/two.pdf">Two, Person</a>'
+        '</body></html>'
+    )
+
+    class FakeIndexResponse:
+        text = index_html
+        status_code = 200
+
+        def raise_for_status(self):
+            pass
+
+    monkeypatch.setattr(_hbca_mod.requests, "get", lambda url, headers=None, timeout=None: FakeIndexResponse())
+
+    class FakeEntrySession:
+        def get(self, url, headers=None, timeout=None):
+            return _FakeKeystoneResponse(200, b"pdf-bytes")
+
+    monkeypatch.setattr(_hbca_mod.requests, "Session", lambda: FakeEntrySession())
+    monkeypatch.setattr(_hbca_mod, "extract_text_from_pdf", lambda path: "location code text")
+    monkeypatch.setattr(_hbca_mod, "extract_hbca_location_codes", lambda text: ["CODE1"])
+
+    def fake_query_keystone_for_code(code, session=None):
+        return {"record_urls": [], "media_urls": ["https://keystone.example/shared.jpg"]}
+
+    monkeypatch.setattr(_hbca_mod, "query_keystone_for_code", fake_query_keystone_for_code)
+
+    concurrent = {"active": 0, "max_seen": 0}
+    counter_lock = _threading.Lock()
+    real_download_keystone_media = _hbca_mod.download_keystone_media
+
+    def tracking_download_keystone_media(media_urls, target_dir, session=None):
+        with counter_lock:
+            concurrent["active"] += 1
+            concurrent["max_seen"] = max(concurrent["max_seen"], concurrent["active"])
+        try:
+            _time.sleep(0.05)  # widen the window a real race would need to manifest in
+            return real_download_keystone_media(media_urls, target_dir, session=session)
+        finally:
+            with counter_lock:
+                concurrent["active"] -= 1
+
+    monkeypatch.setattr(_hbca_mod, "download_keystone_media", tracking_download_keystone_media)
+
+    gather_hbca_sheets(
+        index_url="https://fake.url/",
+        image_dir=tmp_path / "images",
+        master_db_path=tmp_path / "MasterDB_HBCA.json",
+        checkpoint_dir=tmp_path / "checkpoint",
+        media_dir=tmp_path / "media",
+        resolve_keystone=True,
+        download_keystone=True,
+        max_workers=2,
+    )
+
+    assert concurrent["max_seen"] == 1
 
 
 def test_gather_hbca_sheets_one_entry_write_failure_does_not_crash_the_batch(tmp_path, monkeypatch):

@@ -12,6 +12,7 @@ defaults:
     event_type: "Employment"
 extra_fields:
   record:
+    - {name: employee_name, type: string}
     - {name: parish_of_origin, type: string}
     - {name: entered_service_year, type: string}
     - {name: service_years_range, type: string}

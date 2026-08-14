@@ -145,6 +145,36 @@ def test_download_and_merge_keystone_media_combines_reels(tmp_path, requests_moc
     assert merged_path.exists()
 
 
+def test_keystone_query_cache_write_is_atomic(tmp_path, requests_mock, monkeypatch):
+    """A crash mid-write must never leave the cache file corrupted/truncated - same
+    atomic-write discipline as save_checkpoint/append_scaffold_sheet elsewhere in HBCA.py.
+    This path is unreachable in production today (gather_hbca_sheets never passes
+    cache_file to query_keystone_for_code), but is exercised directly by this test."""
+    if not query_keystone_for_code:
+        import pytest
+        pytest.fail("query_keystone_for_code missing")
+    cache_file = tmp_path / "keystone_cache.json"
+    cache_file.write_text('{"pre-existing": "data"}', encoding="utf-8")
+    requests_mock.get(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/144/PAM_LISTINGS?DIRECTSEARCH",
+        text=LANDING_PAGE_HTML,
+    )
+    requests_mock.post(
+        "https://pam.minisisinc.com/scripts/mwimain.dll/521745500/1/0",
+        text=RECORD_PAGE_HTML,
+    )
+
+    def fail_replace(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(_hbca_mod.Path, "replace", fail_replace)
+
+    query_keystone_for_code("B.239/k/3", cache_file=str(cache_file))
+
+    # The original content must survive untouched - not truncated, not partially written.
+    assert cache_file.read_text(encoding="utf-8") == '{"pre-existing": "data"}'
+
+
 def test_keystone_query_is_cached(tmp_path, requests_mock):
     if not query_keystone_for_code:
         import pytest

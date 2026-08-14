@@ -77,7 +77,7 @@ GENEALOGY_DIR = os.environ.get("GENEALOGY_DIR", "").strip()
 
 DEFAULT_INDEX_URL = "https://www.gov.mb.ca/chc/archives/hbca/biographical/index.html"
 INDEX_URL = os.environ.get("HBCA_INDEX_URL", DEFAULT_INDEX_URL).strip() or DEFAULT_INDEX_URL
-HBCA_IMAGE_DIR = "HBCA"
+HBCA_IMAGE_DIR = os.environ.get("HBCA_IMAGE_DIR", "HBCA").strip() or "HBCA"
 HBCA_MASTER_DB_NAME = resolve_generic_setting("HBCA", "MASTER_DB_NAME", "MasterDB_HBCA.json")
 CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("HBCA_CHECKPOINT_DIR", "Working/HBCA"))
 MEDIA_DIR = _safe_path(GENEALOGY_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
@@ -552,12 +552,15 @@ def query_keystone_for_code(
     if cache_file:
         try:
             cache = {}
-            if Path(cache_file).exists():
-                with open(cache_file, "r") as f:
+            cache_path = Path(cache_file)
+            if cache_path.exists():
+                with open(cache_path, "r") as f:
                     cache = json.load(f)
             cache[location_code] = result
-            with open(cache_file, "w") as f:
+            tmp_path = cache_path.with_suffix(".tmp")
+            with open(tmp_path, "w") as f:
                 json.dump(cache, f)
+            tmp_path.replace(cache_path)
         except Exception:
             pass
 
@@ -629,44 +632,30 @@ def build_hbca_scaffold_sheet(
     keystone_records: Optional[Dict[str, Any]] = None,
 ) -> dict:
     """Builds a Commissioner-compliant placeholder sheet dict for an HBCA bio sheet."""
+    from Commissioner.record_registry import build_empty_sheet
+
     codes = extract_hbca_location_codes(raw_text)
     parsed = parse_bio_sheet_text(raw_text)
-    scaffold = {
-        "page_id": entry.file_name,
-        "document_metadata": {
-            "file_name": entry.file_name,
-            "document_type": "HBCA",
-            "source_name": "Hudson's Bay Company Archives: Biographical Sheets",
-            "source_location": "Archives of Manitoba, Winnipeg, Manitoba, Canada",
+
+    scaffold = build_empty_sheet(entry.file_name, "pdf", page_id=entry.file_name)
+    scaffold["document_metadata"]["source_name"] = "Hudson's Bay Company Archives: Biographical Sheets"
+    scaffold["document_metadata"]["source_location"] = "Archives of Manitoba, Winnipeg, Manitoba, Canada"
+
+    record = scaffold["records"][0]
+    record.update({
+        "page": entry.file_name,
+        "record_number": "1",
+        "event_type": "Employment",
+        "citation_details": f"HBCA Biographical Sheet: {entry.employee_name}",
+        "citation_text": entry.pdf_url,
+        "type_specific_fields": {
             "employee_name": entry.employee_name,
-            "pdf_url": entry.pdf_url,
-            "raw_text": raw_text,
+            "hbca_references": codes,
             "keystone_urls": keystone_urls or [],
+            "keystone_records": keystone_records or {},
         },
-        "records": [
-            {
-                "record_id": None,
-                "page": entry.file_name,
-                "record_number": "1",
-                "event_type": "Employment",
-                "year": None,
-                "event_date": None,
-                "event_place": None,
-                "citation_details": f"HBCA Biographical Sheet: {entry.employee_name}",
-                "citation_text": entry.pdf_url,
-                "review": False,
-                "continues_on_next_image": False,
-                "continues_from_previous_image": False,
-                "type_specific_fields": {
-                    "hbca_references": codes,
-                    "keystone_urls": keystone_urls or [],
-                    "keystone_records": keystone_records or {},
-                },
-                "participants": [],
-            }
-        ],
-    }
-    scaffold["records"][0]["type_specific_fields"].update(parsed)
+    })
+    record["type_specific_fields"].update(parsed)
     return scaffold
 
 
@@ -754,23 +743,24 @@ def gather_hbca_sheets(
 
     downloaded_set = load_checkpoint(checkpoint_file)
 
-    print(f"Fetching HBCA biographical index from {index_url}...")
+    print(f"[System] Fetching HBCA biographical index from {index_url}...")
     headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Research Pipeline)"}
     resp = requests.get(index_url, headers=headers, timeout=30)
     resp.raise_for_status()
 
     entries = parse_biographical_index_html(resp.text, base_url=index_url)
-    print(f"Found {len(entries)} total biographical sheets in index.")
+    print(f"[System] Found {len(entries)} total biographical sheets in index.")
 
     filtered_entries = filter_entries_by_letter(entries, letter_filter)
     if letter_filter:
-        print(f"Filtered to {len(filtered_entries)} sheets matching letter(s): {letter_filter}")
+        print(f"[System] Filtered to {len(filtered_entries)} sheets matching letter(s): {letter_filter}")
 
     new_downloads = 0
     completed_count = 0
     total_entries = len(filtered_entries)
     db_lock = threading.Lock()
     print_lock = threading.Lock()
+    media_lock = threading.Lock()
 
     def log(message: str) -> None:
         with print_lock:
@@ -816,9 +806,13 @@ def gather_hbca_sheets(
                 keystone_records[code] = res
                 if download_keystone and res.get("media_urls"):
                     dest_media_dir = media_dir / "HBCA" / "Archives"
-                    downloaded_media = download_keystone_media(
-                        res["media_urls"], dest_media_dir, session=session
-                    )
+                    # Serialized: two threads' entries can name overlapping media_urls
+                    # (shared archival sources), and download_keystone_media's own
+                    # existence-check-then-write isn't safe to race on a shared dest_dir.
+                    with media_lock:
+                        downloaded_media = download_keystone_media(
+                            res["media_urls"], dest_media_dir, session=session
+                        )
                     log(f"  [{entry.file_name}] Archived {code}: "
                         f"{len(downloaded_media)} file(s) -> {dest_media_dir}")
 
@@ -846,7 +840,7 @@ def gather_hbca_sheets(
             if future.result():
                 new_downloads += 1
 
-    print(f"Gather complete. {new_downloads} new sheets downloaded and indexed.")
+    print(f"[System] Gather complete. {new_downloads} new sheets downloaded and indexed.")
     return new_downloads
 
 
