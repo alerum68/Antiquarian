@@ -763,6 +763,48 @@ def convert_raw_gather_to_final(raw_data: dict) -> Tuple[dict, Optional[str]]:
     return final_data, clean_name
 
 
+def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target_dir: Path,
+                           genealogy_dir: str, on_collision: str) -> None:
+    """Recovers gather output left behind by a previous run that had no watcher present to
+    collect it. Unlike A.py's recovery, this completes the FULL pipeline (including the
+    raw-to-final conversion) since FS's conversion needs nothing beyond the raw JSON itself -
+    no external context like A.py's dbid is required."""
+    orphans = find_orphaned_gather_runs(downloads_dir, "TMP_FS_", current_run_id)
+    if not orphans:
+        return
+
+    for run_id, group in orphans.items():
+        if group["final"] is None:
+            names = ", ".join(p.name for p in group["checkpoints"] + group["images"])
+            print(f"[WARN] Found an incomplete stale gather (run {run_id}) with no final JSON - "
+                  f"left in place for manual review: {names}")
+            continue
+
+        raw_data = json.loads(_read_text_with_retry(group["final"]))
+        final_data, clean_name = convert_raw_gather_to_final(raw_data)
+        out_name = clean_name or group["final"].name[len(f"TMP_FS_{run_id}_"):]
+        recovered_json = json_target_dir / out_name
+
+        if on_collision == "skip" and recovered_json.exists():
+            print(f"[System] Recovered run {run_id}: {out_name} already exists in Project folder, "
+                  f"discarding the stale copy (images below are still recovered).")
+        else:
+            recovered_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
+        _unlink_with_retry(group["final"])
+
+        stem = re.sub(r' - FS$', '', recovered_json.stem)
+        stem_parts = stem.split(' - ', 1)
+        census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
+        location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
+        census_folder = f"{census_year} US Federal Census"
+        img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
+
+        img_moved, img_skipped, img_failed = move_downloaded_images(
+            downloads_dir, f"TMP_FS_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
+        print(f"[System] Recovered stale run {run_id}: wrote {out_name} and moved {img_moved} image(s) "
+              f"to Project folders.")
+
+
 def main() -> None:
     print("========================================")
     print(" Voyageur (FS) - FamilySearch Gather Automation")
@@ -793,36 +835,25 @@ def main() -> None:
     # Voyageur.js) instead of a real subfolder - stripped back off below once found, since
     # it's not part of the actual desired filename.
     downloads_dir = Path.home() / "Downloads"
-    json_prefix = "TMP_FS_"
-    image_prefix = "TMP_FS_Images_"
-    # A previous run that crashed/was killed mid-gather can leave same-named TMP_FS_* files
-    # behind; if still present when the new download lands, Chrome renames it to
-    # "foo (1).json"/"foo (1).jpg" instead of overwriting, and that (1) survives into the
-    # final output name. Clearing them first removes the actual cause, not just a symptom.
-    cleanup_stale_gather_files(downloads_dir, json_prefix, image_prefix)
-
-    start_time = launch_gather_browser(url)
-
-    raw_json_file = wait_for_downloaded_json(downloads_dir, json_prefix, start_time, "raw gather JSON")
-
-    raw_data = json.loads(_read_text_with_retry(raw_json_file))
-    items_raw = raw_data.get("items", [])
-    catalog_items = dedup_catalog_items(items_raw)
-    record_family = detect_record_family_from_raw(raw_data, catalog_items)
-
-    clean_name = None
-    if record_family == "census":
-        print("\n[System] Converting raw scrape into census Gather JSON...")
-        raw_census = build_census_json(raw_data, items_raw, catalog_items)
-        final_data = normalize_familysearch_census_gather(raw_census, raw_data.get("collection_title", ""))
-        clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
-    else:
-        print("\n[System] Converting raw scrape into the universal Gather JSON...")
-        final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
-        validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))
-
     json_target_dir = Path(program_dir) / json_dir if program_dir else Path(json_dir)
     json_target_dir.mkdir(parents=True, exist_ok=True)
+
+    run_id = uuid.uuid4().hex[:8]
+    json_prefix = f"TMP_FS_{run_id}_"
+    image_prefix = f"TMP_FS_{run_id}_Images_"
+
+    # Recover anything a previous run left stranded before this run's own files - which use
+    # a fresh, guaranteed-unique run_id - are even downloaded. See the Downloads Handling
+    # Redesign spec (docs/superpowers/specs/2026-08-13-voyageur-downloads-handling-design.md).
+    _recover_orphaned_runs(downloads_dir, run_id, json_target_dir, genealogy_dir, on_collision)
+
+    start_time = launch_gather_browser(url, run_id)
+
+    raw_json_file = wait_for_final_json_event(downloads_dir, json_prefix, "raw gather JSON")
+
+    raw_data = json.loads(_read_text_with_retry(raw_json_file))
+    print("\n[System] Converting raw scrape into Gather JSON...")
+    final_data, clean_name = convert_raw_gather_to_final(raw_data)
 
     # The browser side names the raw download after document.title, which for a
     # FamilySearch collection page is often the full search-result title plus its own ark
