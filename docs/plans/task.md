@@ -14,6 +14,7 @@
 | 10 | ✅ | FS Orchestration API Task 1: Pure API-response parser (`docs/superpowers/plans/2026-08-14-fs-orchestration-api-extraction.md`, reviewed, fix round 1 closed clean) |
 | 11 | ✅ | FS Orchestration API Task 2: Interceptor and response-wait glue (reviewed, fix round 1 closed clean) |
 | 12 | ✅ | FS Orchestration API Task 3: Wired extraction into gather loop, removed old UI-scraping (reviewed, fix round 1 closed clean) — only Task 4 (live verification) remains |
+| 13 | ✅ | FS Image-Index Extraction (`docs/superpowers/plans/2026-08-14-fs-image-index-extraction.md`), a second extraction path for the Image Browser navigation gap Task 4 above uncovered — Tasks 1-5 complete, individually reviewed clean, final whole-plan review clean (no Critical/Important findings) — only Task 6 (live verification) remains |
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
 * ✅ **D1 (HBCA_MAX_WORKERS)** — `Voyageur/HBCA.py:87` → `int(os.getenv("HBCA_MAX_WORKERS", "8"))`; schema default `"10"`→`"8"` (`7856b39`). Task-reviewer REQUIRED-ALL-MET/PASS.
