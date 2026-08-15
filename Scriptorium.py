@@ -1634,7 +1634,12 @@ class Scriptorium(ctk.CTk):
         cookie_path.parent.mkdir(parents=True, exist_ok=True)
         if not cookie_path.is_file():
             cookie_path.write_text("", encoding="utf-8")
-        os.startfile(str(cookie_path))
+        if sys.platform == "win32":
+            os.startfile(str(cookie_path))
+        elif sys.platform == "darwin":
+            subprocess.call(["open", str(cookie_path)])
+        else:
+            subprocess.call(["xdg-open", str(cookie_path)])
 
     @staticmethod
     def _voyageur_code_for_label(label: str) -> str:
