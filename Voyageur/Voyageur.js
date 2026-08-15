@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.22
+// @version      0.3.23
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1507,6 +1507,67 @@
 
         function debugLog(msg) {
             if (DEBUG_MODE) console.log(`[Voyageur FS] ${msg}`);
+        }
+
+        // Confirmed live: FamilySearch's own client requests this endpoint automatically on
+        // every image's page load, no UI interaction required - installed here, as early as
+        // possible inside this function (before any async work), mirroring
+        // runAncestryGather's own __mgs_intercepted pattern (same fetch/XHR patch technique,
+        // different target URL/response shape). __voyageurFsApiResponses is keyed by ark so
+        // multiple in-flight requests (if FamilySearch ever prefetches adjacent images) don't
+        // collide with each other.
+        if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.__voyageurFsApiIntercepted) {
+            unsafeWindow.__voyageurFsApiIntercepted = true;
+            unsafeWindow.__voyageurFsApiResponses = {};
+
+            const FS_API_TARGET = '/service/records/volunteer/orchestration/sls/image/';
+
+            function fsApiArkFromUrl(url) {
+                const match = url.match(/\/image\/([^/?#]+)/);
+                return match ? decodeURIComponent(match[1]) : null;
+            }
+
+            function storeFsApiResponse(url, bodyText) {
+                const ark = fsApiArkFromUrl(url);
+                if (!ark) return;
+                try {
+                    unsafeWindow.__voyageurFsApiResponses[ark] = JSON.parse(bodyText);
+                } catch (e) {
+                    // Leave unset - waitForFsApiResponse() below times out the same as "never
+                    // arrived", which is the correct behavior for an unparseable response.
+                }
+            }
+
+            const origFsXhrOpen = unsafeWindow.XMLHttpRequest.prototype.open;
+            unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
+                this.__voyageurFsApiUrl = url;
+                this.addEventListener('load', function () {
+                    if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_API_TARGET)) {
+                        storeFsApiResponse(this.__voyageurFsApiUrl, this.responseText);
+                    }
+                });
+                return origFsXhrOpen.apply(this, arguments);
+            };
+
+            const origFsFetch = unsafeWindow.fetch;
+            unsafeWindow.fetch = async function (...args) {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const resp = await origFsFetch.apply(this, args);
+                if (url.includes(FS_API_TARGET)) {
+                    resp.clone().text().then((t) => storeFsApiResponse(url, t));
+                }
+                return resp;
+            };
+        }
+
+        // Instant resolution if the response already arrived before this was called (the API
+        // call fires on page load, which can beat the gather loop reaching this image);
+        // otherwise polls the shared store via the existing waitForCondition convention.
+        async function waitForFsApiResponse(ark, {timeoutMs = 15000} = {}) {
+            return waitForCondition(
+                () => (unsafeWindow.__voyageurFsApiResponses || {})[ark] || null,
+                {timeoutMs},
+            );
         }
 
         // ==========================================
