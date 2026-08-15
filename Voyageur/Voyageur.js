@@ -412,6 +412,70 @@
         return rows;
     }
 
+    // Prefers Township (the more common modern label) but falls back to MinorCivilDivision -
+    // confirmed live these are the same third-level-locality concept under two different type
+    // URIs depending on era/collection (1880 sample used Township, 1860 sample used
+    // MinorCivilDivision for an identically-shaped place). Matches FS.py's own
+    // parse_census_browse_path(), which reads browse-path segments positionally, not by an
+    // explicit state/county/township prefix - so segment ORDER here (state, county, township,
+    // then "ED n" appended last) must stay exactly this order.
+    function fsImageIndexBrowsePathSegments(censusFact) {
+        const placeFields = (censusFact && censusFact.place && censusFact.place.fields) || [];
+        const state = fsImageIndexFieldText(fsImageIndexFindByType(placeFields, 'http://gedcomx.org/State'));
+        const county = fsImageIndexFieldText(fsImageIndexFindByType(placeFields, 'http://gedcomx.org/County'));
+        const township = fsImageIndexFieldText(fsImageIndexFindByType(placeFields, 'http://gedcomx.org/Township'))
+            || fsImageIndexFieldText(fsImageIndexFindByType(placeFields, 'http://gedcomx.org/MinorCivilDivision'));
+        const district = fsImageIndexFieldText(fsImageIndexFindByType(placeFields, 'http://gedcomx.org/District'));
+        const segments = [state, county, township].filter(Boolean);
+        if (district) segments.push(district);
+        return segments;
+    }
+
+    // Builds the same prose citation_text string FS.py's parse_citation()/
+    // parse_nara_citing_clause() already regex-parse (Voyageur/FS.py CITATION_RE/
+    // NARA_CITING_RE) - entirely from JSON fields, so the Image-Index extraction path never
+    // depends on scrapeCitationAndCatalog()'s UI read. imageNumber/imageTotal come from the
+    // caller (the one remaining UI fallback in this whole plan - no JSON source for the total
+    // image count was found in this endpoint's response).
+    function fsBuildCitationTextFromImageIndexResponse(apiResponse, {imageNumber, imageTotal} = {}) {
+        const record = ((apiResponse && apiResponse.records) || [])[0];
+        if (!record) return '';
+        const headPerson = (record.persons || [])[0];
+        const recordFields = record.fields || [];
+        const personFields = headPerson ? (headPerson.fields || []) : [];
+
+        const collectionName = ((apiResponse.collections || [])[0]
+            && apiResponse.collections[0].collections
+            && apiResponse.collections[0].collections[0]
+            && apiResponse.collections[0].collections[0].title) || '';
+        const url = apiResponse.imageURL || '';
+        const date = new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'});
+
+        const censusFact = headPerson ? fsImageIndexFindByType(headPerson.facts || [], 'http://gedcomx.org/Census') : null;
+        const browsePath = fsImageIndexBrowsePathSegments(censusFact);
+        if (imageNumber && imageTotal) browsePath.push(`image ${imageNumber} of ${imageTotal}`);
+
+        const publication = fsImageIndexFieldText(fsImageIndexFindByType(recordFields, 'http://familysearch.org/types/fields/FilmNbr'))
+            || fsImageIndexFieldText(fsImageIndexFindByType(recordFields, 'http://familysearch.org/types/fields/DigitalFilmNbr'));
+        const rawRepoName = fsImageIndexFieldText(fsImageIndexFindByType(personFields, 'http://familysearch.org/types/fields/ExtRepositoryName'));
+        // Confirmed live: the real value carries a trailing "(NARA)" that would otherwise
+        // break NARA_CITING_RE's repo_name group ([^,()]+ - excludes parentheses).
+        const repoName = rawRepoName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        // NARA repository location - no matching JSON field found in either captured sample
+        // (see design spec's "Not yet verified" list). Hardcoded: every US census NARA
+        // microfilm citation this project has observed cites this same physical archive
+        // location regardless of the specific record.
+        const repoLoc = 'Washington D.C.';
+
+        let text = `"${collectionName}," database with images, FamilySearch (${url} : ${date}), ${browsePath.join(' > ')}`;
+        if (publication && repoName) {
+            text += `; citing NARA microfilm publication ${publication} (${repoLoc}: ${repoName}, n.d.).`;
+        } else {
+            text += '.';
+        }
+        return text;
+    }
+
 
     // Dispatch by hostname, the same way Voyageur.py's Python side dispatches by an explicit
     // source-code argument - adding a new Major Repository here is a new @match line above
@@ -2197,6 +2261,7 @@
             fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
             fsImageIndexFieldText, fsImageIndexFindByType,
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
+            fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
         };
     }
 
