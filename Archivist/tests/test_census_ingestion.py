@@ -491,3 +491,37 @@ def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
         assert any(ln == "3 _APID 1,2442::105307051" for ln in cit), f"{target}: missing real _APID: {cit}"
+
+
+def test_dynamic_occupation_template():
+    from Census import get_occupation_value
+
+    # Test Employed
+    row1 = pd.Series({
+        "Occupation": "Farmer",
+        "Employer": "Smith Farm",
+        "Industry": "Agriculture",
+        "Class of Worker": "W",
+        "Hours Worked": "40"
+    })
+    occ1, notes1 = get_occupation_value(row1)
+    assert occ1 == "Farmer at Smith Farm, working in Agriculture"
+    assert "Class of Worker: W" in notes1
+    assert "Hours Worked: 40" in notes1
+
+    # Test Unemployed override
+    row2 = pd.Series({
+        "Occupation": "Clerk",
+        "Employer": "Bank",
+        "Out Of Work": "Yes"
+    })
+    occ2, notes2 = get_occupation_value(row2)
+    assert occ2 == "Unemployed from Clerk at Bank"
+
+    # Test Usual Occupation priority
+    row3 = pd.Series({
+        "Occupation": "Laborer",
+        "Usual Occupation": "Carpenter"
+    })
+    occ3, notes3 = get_occupation_value(row3)
+    assert occ3 == "Carpenter"

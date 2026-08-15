@@ -855,7 +855,9 @@ def get_census_notes(row: pd.Series) -> List[str]:
 CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', 'birth month', 'month of birth', 'page',
                 'page_number', 'real page', 'real_page', 'family number', 'household number', 'family', 'household',
                 'dwelling number', 'dwelling', 'line number', 'line', 'household_id', 'row_index_id', 'birth place',
-                'birthplace', 'occupation', 'occupation category', 'industry', 'trade or profession', 'race', 'color',
+                'birthplace', 'occupation', 'occupation category', 'industry', 'trade or profession',
+                'usual occupation', 'employer', 'class of worker', 'hours worked', 'weeks worked',
+                'months unemployed past year', 'out of work', 'seeking work', 'race', 'color',
                 'attended school', 'highest grade of school completed', 'highest grade completed',
                 'married within year', 'relationship to head', 'relationship', 'relation to head', 'relation',
                 'quality', 'real estate value', 'personal estate value', 'cannot read, write', 'disability condition',
@@ -886,13 +888,47 @@ RESIDENCE_YEAR_PATTERN = re.compile(r'(1[89]\d{2})')
 RESIDENCE_RELATIVE_PATTERN = re.compile(r'(\d+)\s*year', re.I)
 
 
-def get_occupation_value(row: pd.Series) -> str:
-    parts = [Utils.clean_val(row[c]) for c in ('Occupation', 'Occupation Category', 'Trade or Profession') if
-             c in row and Utils.clean_val(row[c])]
-    if industry := Utils.clean_val(row.get('Industry', '')):
-        parts.append(f"({Utils.cap_case(industry)})")
-    res = " ".join(parts).strip()
-    return Utils.cap_case(res) if res else ""
+def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
+    # 1. Primary Selection
+    base_occ = Utils.clean_val(row.get('Usual Occupation'))
+    if not base_occ:
+        base_occ = Utils.clean_val(row.get('Occupation'))
+    if not base_occ:
+        base_occ = Utils.clean_val(row.get('Occupation Category'))
+    if not base_occ:
+        base_occ = Utils.clean_val(row.get('Trade or Profession'))
+
+    employer = Utils.clean_val(row.get('Employer'))
+    industry = Utils.clean_val(row.get('Industry'))
+
+    # 2. Unemployment Override
+    is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
+                     Utils.clean_val(row.get('Seeking Work')) == 'Yes')
+
+    # 3. Concatenation
+    occ_str = ""
+    if is_unemployed:
+        occ_str = "Unemployed"
+        if base_occ:
+            occ_str += f" from {base_occ}"
+    else:
+        occ_str = base_occ if base_occ else ""
+
+    if occ_str and employer:
+        occ_str += f" at {employer}"
+    if occ_str and industry:
+        occ_str += f", working in {industry}"
+
+    # 4. Notes
+    notes_parts = []
+    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Months Unemployed Past Year']:
+        val = Utils.clean_val(row.get(field))
+        if val:
+            notes_parts.append(f"{field}: {val}")
+
+    notes_str = "; ".join(notes_parts)
+
+    return occ_str, notes_str
 
 
 def get_education_value(row: pd.Series) -> Optional[str]:
@@ -1290,8 +1326,14 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
         alt_birth_places = parse_alternate_entries(row, 'AlternateBirthPlaces')
         ged.extend(build_alternate_birth_lines(alt_birth_places, birth_year, row, cit))
 
-        if occ := get_occupation_value(row):
-            ged.extend([f"1 OCCU {occ}", f"2 DATE {CENSUS_YEAR}", f"2 PLAC {row_loc}", "2 _PROOF proven"] + cit)
+        occ, occ_notes = get_occupation_value(row)
+        if occ:
+            occ_evt = [f"1 OCCU {occ}", f"2 DATE {CENSUS_YEAR}", f"2 PLAC {row_loc}"]
+            if occ_notes:
+                occ_evt.append(f"2 NOTE {occ_notes}")
+            occ_evt.extend(["2 _PROOF proven"] + cit)
+            ged.extend(occ_evt)
+
         if race := Utils.cap_case(row.get('Race', row.get('Color', ''))):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
         edu_val = get_education_value(row)
