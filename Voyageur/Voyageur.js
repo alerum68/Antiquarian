@@ -323,6 +323,95 @@
         return rows;
     }
 
+    // filmdatainfo/image-data parsing (the "Image Index" page's own data source, reached via
+    // Image Browser/township navigation - confirmed live to be a completely different
+    // endpoint from the orchestration API, never firing on the same page as it). Confirmed
+    // live against two real captures: records[] is one entry PER HOUSEHOLD, each holding
+    // {fields[] (record/citation-level admin data), persons[]}. Each person mixes two shapes:
+    // facts[] entries carry a convenience .value alongside their fuller .fields[].values[]
+    // backing data; fields[] entries (relationship, household id, parents' birthplace) have
+    // no .value shortcut and must be read via .values[], preferring Interpreted over Original.
+
+    // Prefers the FIRST Interpreted value when multiple exist - confirmed live this is
+    // correct, not an arbitrary choice: the head-of-household's own RelationshipToHead field
+    // carries a correction trail (Original "Self", then two Interpreted entries "Head" then
+    // "Self") where the first Interpreted entry is the right one.
+    function fsImageIndexFieldText(fieldOrFact) {
+        if (!fieldOrFact) return '';
+        if (typeof fieldOrFact.value === 'string') return fieldOrFact.value;
+        const values = fieldOrFact.values || [];
+        const interpreted = values.find((v) => v.type === 'http://gedcomx.org/Interpreted');
+        if (interpreted) return interpreted.text || '';
+        const original = values.find((v) => v.type === 'http://gedcomx.org/Original');
+        return original ? (original.text || '') : '';
+    }
+
+    function fsImageIndexFindByType(list, type) {
+        return (list || []).find((item) => item.type === type) || null;
+    }
+
+    function fsCanonicalFieldsFromImageIndexPerson(person) {
+        const facts = (person && person.facts) || [];
+        const fields = (person && person.fields) || [];
+
+        const nameForm = person && person.names && person.names[0] && person.names[0].nameForms && person.names[0].nameForms[0];
+        const parts = (nameForm && nameForm.parts) || [];
+        const surnamePart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Surname');
+        const givenPart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Given');
+
+        const genderType = person && person.gender && person.gender.type;
+        const sex = genderType === 'http://gedcomx.org/Male' ? 'M'
+            : genderType === 'http://gedcomx.org/Female' ? 'F' : '';
+
+        const birthFact = fsImageIndexFindByType(facts, 'http://gedcomx.org/Birth');
+        const birthPlaceField = birthFact && birthFact.place
+            ? fsImageIndexFindByType(birthFact.place.fields, 'http://gedcomx.org/Place') : null;
+
+        return {
+            givenName: givenPart ? (givenPart.value || '') : '',
+            surname: surnamePart ? (surnamePart.value || '') : '',
+            sex,
+            age: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/Age')),
+            birthplace: fsImageIndexFieldText(birthPlaceField),
+            // SourceHouseholdId and HouseholdId are confirmed distinct type URIs backing
+            // SOURCE_HOUSEHOLD_ID and FS_HOUSEHOLD_ID respectively - same precedence
+            // relationship as the orchestration API (see fsColumnsFromCanonicalFields).
+            householdIdSource: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/SourceHouseholdId')),
+            householdIdFs: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/HouseholdId')),
+            relationshipToHead: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/RelationshipToHead')),
+            maritalStatus: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/MaritalStatus')),
+            occupation: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Occupation')),
+            race: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Race')),
+            fatherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/FatherBirthPlace')),
+            motherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/MotherBirthPlace')),
+        };
+    }
+
+    function fsBuildRowsFromImageIndexResponse(apiResponse) {
+        const rows = [];
+        const records = (apiResponse && apiResponse.records) || [];
+        records.forEach((record, recordIndex) => {
+            (record.persons || []).forEach((person) => {
+                const canonicalFields = fsCanonicalFieldsFromImageIndexPerson(person);
+                const columns = fsColumnsFromCanonicalFields(canonicalFields, recordIndex + 1);
+
+                // identifiers[...][0] is a full URL (.../ark:/61903/1:1:XXXX-XXX) - extract
+                // just the "1:1:XXXX-XXX" segment to match the orchestration-API path's own
+                // person_ark convention (a bare ark, not a full URL).
+                const identifierUrl = (person.identifiers
+                    && person.identifiers['http://gedcomx.org/Persistent']
+                    && person.identifiers['http://gedcomx.org/Persistent'][0]) || '';
+                const arkMatch = identifierUrl.match(/(1:1:[A-Z0-9-]+)/);
+
+                // Tree-attachment link shape not yet confirmed against a real tree-attached
+                // person (see this plan's Task 2 notes) - left empty rather than guessed,
+                // same "don't fabricate" convention as everywhere else in this file.
+                rows.push({columns, person_ark: arkMatch ? arkMatch[1] : '', attached_fsftid: ''});
+            });
+        });
+        return rows;
+    }
+
 
     // Dispatch by hostname, the same way Voyageur.py's Python side dispatches by an explicit
     // source-code argument - adding a new Major Repository here is a new @match line above
@@ -2106,6 +2195,8 @@
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
             fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
             fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
+            fsImageIndexFieldText, fsImageIndexFindByType,
+            fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
         };
     }
 
