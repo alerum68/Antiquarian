@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.23
+// @version      0.3.24
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -108,17 +108,14 @@
 
     // Same sessionStorage-survives-a-reload convention as RELOAD_STATE_KEY above, but keyed
     // by runId (the gather's own mgs_run URL param, stable across every image in one run)
-    // rather than the exact page URL. Two distinct scenarios both need this to survive:
-    // (1) the explicit location.reload() from parseHouseholdSections' Names-tab-missing
-    // retry, and (2) confirmed live - a genuine, unexpected one: clicking FamilySearch's own
-    // "Next Image" button is a REAL page navigation, not client-side routing, so Tampermonkey
-    // re-injects this entire script from scratch on every single image. Keying by exact
-    // pageUrl (as originally written) meant loadFsReloadState() only ever matched case (1),
-    // where the URL happens to be identical before and after - it never matched case (2),
-    // where the URL legitimately changes to the next image's own ark. Without this fix,
-    // accumulatedItems silently reset to empty on every image after the first, and only the
-    // LAST scraped item ever survived to the final JSON - confirmed live: a real 3-image
-    // gather run's downloaded JSON contained exactly 1 item, not 3.
+    // rather than the exact page URL. Confirmed live, and unexpected at first: clicking
+    // FamilySearch's own "Next Image" button is a REAL page navigation, not client-side
+    // routing, so Tampermonkey re-injects this entire script from scratch on every single
+    // image. Keying by exact pageUrl (as originally written) never matched after such a
+    // navigation, since the URL legitimately changes to the next image's own ark. Without
+    // this fix, accumulatedItems silently reset to empty on every image after the first, and
+    // only the LAST scraped item ever survived to the final JSON - confirmed live: a real
+    // 3-image gather run's downloaded JSON contained exactly 1 item, not 3.
     const FS_RELOAD_STATE_KEY = 'voyageur_fs_reload_state';
 
     function saveFsReloadState(runId, state) {
@@ -127,7 +124,6 @@
             accumulatedItems: state.accumulatedItems,
             seenItemIds: Array.from(state.seenItemIds),
             itemsAtLastCheckpoint: state.itemsAtLastCheckpoint,
-            namesReloadAttempts: state.namesReloadAttempts,
         }));
     }
 
@@ -145,7 +141,6 @@
             accumulatedItems: parsed.accumulatedItems || [],
             seenItemIds: new Set(parsed.seenItemIds || []),
             itemsAtLastCheckpoint: parsed.itemsAtLastCheckpoint || 0,
-            namesReloadAttempts: parsed.namesReloadAttempts || 0,
         };
     }
 
@@ -1480,27 +1475,23 @@
         let accumulatedItems = [];
         let seenItemIds = new Set();
         let itemsAtLastCheckpoint = 0;
-        let namesReloadAttempts = 0;
-        const MAX_NAMES_RELOAD_ATTEMPTS = 3;
 
         const shouldAutoStart = window.location.href.includes('mgs_auto=1');
         const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
 
-        // A location.reload() triggered by the Names-tab-missing retry, OR a genuine
-        // FamilySearch page navigation from clicking "Next Image" (see goToNextImage/
-        // FS_RELOAD_STATE_KEY's own note), both re-run this whole script from scratch -
-        // restore whatever was saved right before so the batch resumes instead of silently
-        // discarding every item gathered so far. Same convention as runAncestryGather's own
-        // resumedState handling. isResumingFsState is read by startBatch() below to skip
-        // its own unconditional reset, the same way runAncestryGather's resumingFromReload
-        // guards startBatch() there.
+        // A genuine FamilySearch page navigation from clicking "Next Image" (see
+        // goToNextImage/FS_RELOAD_STATE_KEY's own note) re-runs this whole script from
+        // scratch - restore whatever was saved right before so the batch resumes instead of
+        // silently discarding every item gathered so far. Same convention as
+        // runAncestryGather's own resumedState handling. isResumingFsState is read by
+        // startBatch() below to skip its own unconditional reset, the same way
+        // runAncestryGather's resumingFromReload guards startBatch() there.
         let isResumingFsState = false;
         const resumedFsState = loadFsReloadState(runId);
         if (resumedFsState) {
             accumulatedItems = resumedFsState.accumulatedItems;
             seenItemIds = resumedFsState.seenItemIds;
             itemsAtLastCheckpoint = resumedFsState.itemsAtLastCheckpoint;
-            namesReloadAttempts = resumedFsState.namesReloadAttempts;
             isResumingFsState = true;
             clearFsReloadState();
         }
@@ -1752,305 +1743,22 @@
             return {citationText, catalogItems};
         }
 
-        async function parseHouseholdSections() {
-            const ok = await clickTab('Names');
-            if (!ok) {
-                // The "Names" tab is gated behind a FamilySearch account-level feature flag
-                // that doesn't always apply on a fresh page load - confirmed live that the
-                // exact same URL rendered the old "Image Index" tab first, then "Names" on a
-                // later navigation with nothing else changed. A reload gives the flag another
-                // chance to apply before this image's household data is given up on.
-                if (namesReloadAttempts < MAX_NAMES_RELOAD_ATTEMPTS) {
-                    namesReloadAttempts++;
-                    if (window.fsShowToast) {
-                        window.fsShowToast(
-                            `Names view not loaded - reloading (attempt ${namesReloadAttempts}/${MAX_NAMES_RELOAD_ATTEMPTS})...`,
-                            'error', 2000);
-                    }
-                    saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint, namesReloadAttempts});
-                    location.reload();
-                    return [];
-                }
-                debugLog(`Names tab never appeared for item ${getItemId()} after `
-                    + `${MAX_NAMES_RELOAD_ATTEMPTS} reload attempts - continuing without household data.`);
-                if (window.fsShowToast) {
-                    window.fsShowToast('Names view unavailable - skipping household data for this image.',
-                        'error', 4000);
-                }
-                namesReloadAttempts = 0;
-                return [];
-            }
-
-            // FamilySearch renders the "Names" panel shell immediately but fills in household
-            // content a beat later (same skeleton-then-fill race already handled for the old
-            // Image Index table and the citation panel) - wait for at least one household
-            // heading, or the panel's own "no names" state, before reading anything.
-            const namesWait = await waitForCondition(() => {
-                if (document.body.innerText.includes('No names have been indexed for this image')) {
-                    return {empty: true};
-                }
-                const heading = [...document.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-                    .find(h => /\sHousehold$/.test(h.textContent.trim()));
-                return heading ? {found: true} : null;
-            }, {timeoutMs: 15000});
-            if (!namesWait.result || namesWait.result.empty) return [];
-
-            // FamilySearch's own household heading level/tag isn't assumed stable (matches this
-            // file's own "don't trust FamilySearch's markup" convention) - collect every heading
-            // in document order and hand each one to findHouseholdContainer() by position.
-            const headings = getHouseholdHeadings();
-
-            const sections = [];
-            for (let i = 0; i < headings.length; i++) {
-                const container = findHouseholdContainer(i);
-                if (!container) continue;
-
-                const items = [...container.querySelectorAll('[role="listitem"], li')];
-                const members = items.map(item => {
-                    // The list item's own visible text is "{Name}\n{Role}" (confirmed live: e.g.
-                    // "Joseph Rolette\nPrimary | Spouse") - the accessible "Click to view {name}"
-                    // button is a second, separately-labeled element inside the same item, not the
-                    // one carrying the name/role text itself. Only name/roleHint are kept here -
-                    // NOT a reference to the button element itself. Confirmed live: FamilySearch
-                    // re-renders this list shortly after it first appears (still settling/loading),
-                    // which silently detaches any button reference captured this early - clicking a
-                    // detached button does nothing, no error, and every scrapePersonDetail() call
-                    // then times out waiting for a panel that never opens. Buttons are instead
-                    // re-located fresh at click time by locateMemberButton(), using this same
-                    // household-index + item-index addressing.
-                    const lines = item.innerText.split('\n').map(s => s.trim()).filter(Boolean);
-                    return {name: lines[0] || '', roleHint: lines[1] || ''};
-                });
-
-                sections.push({householdLabel: headings[i].textContent.trim(), members});
-            }
-            return sections;
-        }
-
-        // Scope to the Names panel's own <aside> (identified by its own "Names" heading) -
-        // confirmed live that document-wide list queries pick up unrelated <ul>s (e.g. the
-        // "Manage Indexes" dropdown menu) ahead of the real household lists.
-        function getNamesPanel() {
-            return [...document.querySelectorAll('aside')]
-                .find(a => [...a.querySelectorAll('h1,h2,h3,h4,h5,h6')].some(h => h.textContent.trim() === 'Names'));
-        }
-
-        function getHouseholdHeadings() {
-            const panel = getNamesPanel();
-            if (!panel) return [];
-            return [...panel.querySelectorAll('h1, h2, h3, h4, h5, h6')]
-                .filter(h => /\sHousehold$/.test(h.textContent.trim()));
-        }
-
-        // Re-run fresh every time a household's list container is needed (parsing AND clicking)
-        // rather than caching the result, since the panel keeps mutating after it first appears -
-        // see parseHouseholdSections()'s own note on why cached button references go stale.
-        function findHouseholdContainer(householdIndex) {
-            const panel = getNamesPanel();
-            if (!panel) return null;
-            const headings = getHouseholdHeadings();
-            const heading = headings[householdIndex];
-            if (!heading) return null;
-            const nextHeading = headings[householdIndex + 1] || null;
-            const listContainers = [...panel.querySelectorAll('[role="list"], ul, ol')];
-            const inRange = (el) => {
-                const afterThis = (heading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-                // Confirmed live: this must check that `el` PRECEDES nextHeading, not that it
-                // FOLLOWS it - the two are easy to invert since both read as "& FOLLOWING" from
-                // one comparison direction or the other. Getting this backwards makes every
-                // heading grab the *next* household's list instead of its own.
-                const beforeNext = !nextHeading
-                    || ((nextHeading.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_PRECEDING) !== 0);
-                return afterThis && beforeNext;
-            };
-            return listContainers.find(inRange) || null;
-        }
-
-        function locateMemberButton(householdIndex, memberIndex) {
-            const container = findHouseholdContainer(householdIndex);
-            if (!container) return null;
-            const items = [...container.querySelectorAll('[role="listitem"], li')];
-            const item = items[memberIndex];
-            if (!item) return null;
-            return [...item.querySelectorAll('button')].find(b => {
-                const label = b.getAttribute('aria-label') || b.textContent || '';
-                return label.trim().startsWith('Click to view');
-            }) || null;
-        }
-
-        function readRecordArkFromOpenPanel() {
-            const aside = document.querySelector('aside');
-            // The panel's own heading reads "View {PersonName}" (confirmed live: "View JOHN
-            // DEERING", "View HANNAH E. FRANCIS") - the name is dynamic per person, not the
-            // fixed literal "View Name" this used to match, which never matched anything and
-            // made every scrapePersonDetail() call time out with blank data.
-            const headingEl = aside && [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
-                .find(h => /^View\s+\S/.test(h.textContent.trim()));
-            if (!headingEl) return null;
-            const links = [...aside.querySelectorAll('a[href]')]
-                .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
-            const recordArkLink = links.find(a => /ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/.test(a.getAttribute('href')));
-            return recordArkLink
-                ? recordArkLink.getAttribute('href').match(/ark:\/61903\/1:1:([A-Z0-9]{4}-[A-Z0-9]{3,4})/)[1]
-                : null;
-        }
-
-        // includeHouseholdRelationships is only meaningful (and only reliable) when called for
-        // a household's own head/primary member (raw index 0) - confirmed live that FamilySearch's
-        // Household Details, viewed from a NON-head member's own panel, defaults every other
-        // member's relationship to "No Relation" instead of computing it (e.g. viewing a child's
-        // panel showed their own mother AND sibling both as "No Relation"). The head's panel is
-        // the only place this data is actually correct, so it's read once per household and
-        // applied by position to every member - see scrapeNamesPanel().
-        async function scrapePersonDetail(householdIndex, memberIndex, previousRecordArk, {includeHouseholdRelationships = false} = {}) {
-            // Re-located fresh right here rather than accepting a button reference from the
-            // caller - see parseHouseholdSections()'s note on why a reference captured earlier
-            // goes stale.
-            const viewButton = locateMemberButton(householdIndex, memberIndex);
-            if (!viewButton) {
-                debugLog(`scrapePersonDetail: could not locate household ${householdIndex} member ${memberIndex}`);
-                return {recordArk: '', personArk: '', given: '', surname: '', gender: '', age: '',
-                        householdRelationships: []};
-            }
-            viewButton.click();
-
-            // Wait for the record ark to actually CHANGE, not for the target name to appear in
-            // the panel - two people in the same household can share a name (confirmed live:
-            // this design's own reference record has a "Joseph Rolette" head and a "Joseph
-            // Rolette" child), so waiting on name text can resolve instantly against the
-            // still-open PREVIOUS person's panel before it re-renders.
-            const arkWait = await waitForCondition(() => {
-                const ark = readRecordArkFromOpenPanel();
-                return (ark && ark !== previousRecordArk) ? ark : null;
-            }, {timeoutMs: 10000});
-            if (!arkWait.result) {
-                debugLog(`scrapePersonDetail: record ark never changed from "${previousRecordArk}"`);
-                return {recordArk: '', personArk: '', given: '', surname: '', gender: '', age: '',
-                        householdRelationships: []};
-            }
-
-            const aside = document.querySelector('aside');
-            const headingEl = [...aside.querySelectorAll('h1,h2,h3,h4,h5,h6')]
-                .find(h => /^View\s+\S/.test(h.textContent.trim()));
-            const fullText = aside.innerText;
-            const viewIdx = fullText.indexOf(headingEl.textContent.trim());
-            const panelText = fullText.slice(viewIdx);
-
-            // "VIEW RECORD" always points at this specific indexed entry (record_ark, already
-            // captured above via readRecordArkFromOpenPanel) - the Tree Attachment section, when
-            // present, points at the real Family Tree person (person_ark == PID) via a DIFFERENT
-            // href shape than the old UI used ("/en/tree/person/{PID}", no "/details/" segment -
-            // confirmed live, the old "/tree/person/details/{PID}" regex no longer matches
-            // anything on this page). Scoped to links after the "View {Name}" heading so the
-            // still-present household list above it can't contribute a stray match.
-            const links = [...aside.querySelectorAll('a[href]')]
-                .filter(a => (headingEl.compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0);
-            const personArkLink = links.find(a => /\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})(?:$|[/?])/.test(a.getAttribute('href')));
-            const personArkMatch = personArkLink
-                && personArkLink.getAttribute('href').match(/\/tree\/person\/([A-Z0-9]{4}-[A-Z0-9]{3,4})/);
-            const personArk = personArkMatch ? personArkMatch[1] : '';
-
-            // Essential Information/Additional Facts render as "Heading\nLabel: Value\n..." blocks
-            // in the panel's own innerText (confirmed live) - parsed the same way
-            // scrapeCitationAndCatalog already parses the Citation panel's prose.
-            const givenMatch = panelText.match(/Given Name:\s*(.+)/);
-            const surnameMatch = panelText.match(/Surname:\s*(.+)/);
-            const sexMatch = panelText.match(/Sex:\s*(\w+)/);
-            const ageMatch = panelText.match(/Age:\s*(\d+)/);
-
-            let householdRelationships = [];
-            if (includeHouseholdRelationships) {
-                const householdMatch = panelText.match(/Household Details([\s\S]*?)(?:\n\n|Events\n|$)/);
-                if (householdMatch) {
-                    // Confirmed live shape: "{Relationship}\n{Name}" pairs, one per household
-                    // member INCLUDING the head themselves, whose own pair reads
-                    // "Household • Census\n{HeadName}" rather than a real relationship label.
-                    const relPairs = [...householdMatch[1].matchAll(
-                        /(Household\s*•\s*Census|Spouse|Child|Father|Mother|No Relation)\n(.+)/g)];
-                    householdRelationships = relPairs.map(match =>
-                        match[1].startsWith('Household') ? 'Head' : match[1]);
-                }
-            }
-
-            return {
-                recordArk: arkWait.result, personArk,
-                given: givenMatch ? givenMatch[1].trim() : '',
-                surname: surnameMatch ? surnameMatch[1].trim() : '',
-                gender: sexMatch ? sexMatch[1].trim().toUpperCase() : '',
-                age: ageMatch ? ageMatch[1].trim() : '',
-                householdRelationships,
-            };
-        }
-
-        async function scrapeNamesPanel() {
-            const sections = await parseHouseholdSections();
-            if (sections.length === 0) return [];
-
-            const rows = [];
-            let lastRecordArk = null;
-            for (let familyNumber = 0; familyNumber < sections.length; familyNumber++) {
-                const {members} = sections[familyNumber];
-                if (members.length === 0) continue;
-
-                // The head/primary is always the household's first-listed member (confirmed
-                // live) - their own Household Details panel is the only reliable source for
-                // every other member's relationship-to-head (see scrapePersonDetail's own
-                // note), so it's read once per household and applied by position below.
-                const headDetail = await scrapePersonDetail(familyNumber, 0, lastRecordArk,
-                    {includeHouseholdRelationships: true});
-                lastRecordArk = headDetail.recordArk;
-
-                // Confirmed live: a household where FamilySearch never indexed real
-                // relationships (every Names-list role reads bare "Primary") reports every
-                // member as "No Relation" rather than leaving the field blank - fabricating
-                // that as real data would be worse than omitting the column entirely, so the
-                // column is only populated when at least one member has an actual
-                // Spouse/Child/Father/Mother relationship recorded.
-                const rawRelationships = headDetail.householdRelationships;
-                const hasRealRelationshipData = rawRelationships.some(r => r !== 'Head' && r !== 'No Relation');
-                const relationships = hasRealRelationshipData ? rawRelationships : [];
-
-                // FamilySearch's own index can surface the same person twice within one
-                // household (confirmed live: "Josette Cardinal" and "J Baptiste Cardinal" both
-                // appeared twice under "J Baptiste Cardinal Household") - build_census_json()
-                // has no row-level dedup of its own, so a duplicate scraped here is a duplicate
-                // person in the final GEDCOM. Skip a repeat of the same name+role within the
-                // same household rather than scraping it a second time - relationship lookup
-                // still uses `idx`, the member's ORIGINAL position, since that's what stays
-                // aligned with `relationships`.
-                const seen = new Set();
-                for (let idx = 0; idx < members.length; idx++) {
-                    const member = members[idx];
-                    const key = `${member.name}|${member.roleHint}`;
-                    if (seen.has(key)) continue;
-                    seen.add(key);
-
-                    const detail = idx === 0 ? headDetail
-                        : await scrapePersonDetail(familyNumber, idx, lastRecordArk);
-                    lastRecordArk = detail.recordArk;
-
-                    const columns = {
-                        'Given Name': detail.given || member.name.split(' ').slice(0, -1).join(' '),
-                        'Surname': detail.surname || member.name.split(' ').slice(-1).join(' '),
-                        'Gender': detail.gender,
-                        'Age': detail.age,
-                        'Family Number': String(familyNumber + 1),
-                    };
-                    if (relationships[idx]) {
-                        columns['Relationship to Head'] = relationships[idx];
-                    }
-
-                    rows.push({columns, person_ark: detail.recordArk, attached_fsftid: detail.personArk});
-                }
-            }
-            return rows;
-        }
-
         async function scrapeCurrentImage() {
             const itemId = getItemId();
             if (!itemId || seenItemIds.has(itemId)) return;
 
-            const rows = await scrapeNamesPanel();
+            const apiWait = await waitForFsApiResponse(itemId);
+            let rows = [];
+            if (apiWait.result) {
+                rows = fsBuildRowsFromApiResponse(apiWait.result);
+            } else {
+                debugLog(`No orchestration-API response arrived for item ${itemId} after `
+                    + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
+                if (window.fsShowToast) {
+                    window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
+                }
+            }
+
             const {citationText, catalogItems} = await scrapeCitationAndCatalog();
             // Awaited before moving on to the next image, same convention as Ancestry's
             // own per-page image download.
@@ -2160,8 +1868,8 @@
                 const prevUrl = window.location.href;
                 nextBtn.click();
                 // No post-nav settle delay needed - scrapeCurrentImage's own downstream
-                // waits (scrapeNamesPanel/scrapeCitationAndCatalog) already handle "has the
-                // new page's content rendered yet" on their own terms.
+                // waits (waitForFsApiResponse/scrapeCitationAndCatalog) already handle "has
+                // the new page's content rendered yet" on their own terms.
                 const navWait = await waitForCondition(() => window.location.href !== prevUrl,
                     {timeoutMs: 10000});
                 return {advanced: !navWait.timedOut, timedOut: navWait.timedOut};
@@ -2182,14 +1890,13 @@
                     itemsAtLastCheckpoint = accumulatedItems.length;
                 }
 
-                // Saved before every advance attempt, not only the explicit Names-retry
-                // reload - see FS_RELOAD_STATE_KEY's own note: clicking "Next Image" is a
-                // real page navigation on FamilySearch, so this script re-runs from scratch
-                // on every single image regardless of whether goToNextImage() itself ever
-                // called location.reload(). Without this, accumulatedItems reset to empty on
-                // the next injection and only the LAST scraped item ever reached the final
-                // JSON - confirmed live.
-                saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint, namesReloadAttempts});
+                // Saved before every advance attempt - see FS_RELOAD_STATE_KEY's own note:
+                // clicking "Next Image" is a real page navigation on FamilySearch, so this
+                // script re-runs from scratch on every single image regardless of whether
+                // goToNextImage() itself ever called location.reload(). Without this,
+                // accumulatedItems reset to empty on the next injection and only the LAST
+                // scraped item ever reached the final JSON - confirmed live.
+                saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint});
 
                 const {advanced, timedOut} = await goToNextImage();
                 if (!advanced) {
