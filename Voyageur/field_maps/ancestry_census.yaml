@@ -33,6 +33,17 @@ participant_fields:
   "Relation": role_name
   "Line Number": type_specific_fields.line_number
   "Line": type_specific_fields.line_number
+  # "House Number" is deliberately NOT mapped here - it's already claimed below (record_fields)
+  # as an alias for dwelling_number (the census's own sequential dwelling-visited count), a
+  # different concept from a literal street house number - mapping the same raw header text
+  # to both would be a real ambiguity, not a genuine second meaning.
+  "Street": type_specific_fields.street
+  "Street Address": type_specific_fields.street
+  "Address": type_specific_fields.street
+  "Married within Year": type_specific_fields.married_within_year
+  "Married Within Year": type_specific_fields.married_within_year
+  "Birth Month": type_specific_fields.birth_month
+  "Marital Status": type_specific_fields.marital_status
 
 participant_facts:
   "Occupation": Occupation
@@ -64,6 +75,12 @@ participant_facts:
   "Mother Foreign Born": Miscellaneous
   "Male Citizen Over 21": Miscellaneous
   "Voting Rights Denied": Miscellaneous
+  "Months Not Employed": Miscellaneous
+  "Home Ownership": Miscellaneous
+  "Home Mortgaged": Miscellaneous
+  "Native Tongue": Miscellaneous
+  "Speaks English": Miscellaneous
+  "Employment Field": Miscellaneous
 
 record_fields:
   "Family Number": family_number
@@ -73,5 +90,3 @@ record_fields:
   "Dwelling Number": dwelling_number
   "Dwelling": dwelling_number
   "House Number": dwelling_number
-  "Married within Year": married_within_year
-  "Married Within Year": married_within_year

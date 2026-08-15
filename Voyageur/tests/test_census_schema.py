@@ -8,8 +8,9 @@ def _page(people, **overrides):
     page = {
         "page_number": 1, "image_id": "img1", "country": "USA", "state": "Minnesota",
         "county": "Ramsey", "city": "St. Paul", "place_details": "", "enumeration_district": "12",
-        "film_number": "", "roll_number": "T624_1", "apid_db": "", "repository": "Ancestry.com",
-        "repository_loc": "", "publisher": "", "pub_loc": "", "people": people,
+        "film_number": "", "roll_number": "T624_1", "apid_db": "", "collection_id": "",
+        "collection_name": "", "collection_url": "",
+        "repository": "Ancestry.com", "repository_loc": "", "publisher": "", "pub_loc": "", "people": people,
     }
     page.update(overrides)
     return page
@@ -56,6 +57,237 @@ def test_validate_against_commissioner_survives_broken_commissioner_import(capsy
     captured = capsys.readouterr()
     assert "[WARN]" in captured.out
     assert "Test Collection" in captured.out
+
+
+def test_citation_carries_collection_id_from_page_for_source_id_resolution():
+    """FS.py's build_census_json attaches the FamilySearch catalog collection number (the
+    'CC' from ?cc=<id> in the collection URL) as page['collection_id'] so Archivist's
+    Census.py can use it as CENSUS_SOURCE_ID instead of an auto-assigned registry id -
+    this dropped silently when the shared citation dict below didn't copy it over."""
+    raw = {
+        "census_year": "1860", "location": "Dakota Territory",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ], collection_id="1473181")],
+    }
+    doc = census_schema.normalize_census_pages(raw, "familysearch_census", "1860 US Census", "Census_1860")
+
+    assert doc["citation"]["collection_id"] == "1473181"
+
+
+def test_citation_prefers_parsed_collection_name_and_url_over_raw_document_title():
+    """FS.py's citation parser (parse_citation) produces a clean collection name/url from
+    FamilySearch's own generated citation prose - build_census_json now carries those onto
+    page['collection_name']/['collection_url']. This must win over the collection_title
+    param passed in here, which is the raw document.title (often 'Title; ark URL' shaped
+    on FamilySearch collection pages) - using it directly was the source of a corrupted
+    citation.collection_name in production."""
+    raw = {
+        "census_year": "1860", "location": "Dakota Territory",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ], collection_name="United States, Census, 1860",
+           collection_url="https://familysearch.org/ark:/61903/3:1:33S7-9YBJ-9PFZ")],
+    }
+    doc = census_schema.normalize_census_pages(
+        raw, "familysearch_census",
+        "United States, Census, 1860; https://familysearch.org/ark:/61903/3:1:33S7-9YBJ-9PFZ?cc=1473181",
+        "Census_1860")
+
+    assert doc["citation"]["collection_name"] == "United States, Census, 1860"
+    assert doc["citation"]["collection_url"] == "https://familysearch.org/ark:/61903/3:1:33S7-9YBJ-9PFZ"
+
+
+def test_document_metadata_file_name_sanitizes_familysearch_ark_image_id():
+    """Regression: document_metadata.file_name was hardcoded to '' - Archivist's
+    build_census_dataframe_from_unified reads exactly this field into the DataFrame's
+    Image_ID column (Census.py:1403), which then feeds the GEDCOM's '1 FILE' media path.
+    With it empty, every census GEDCOM (both sources) silently pointed OBJE records at a
+    filename that doesn't exist on disk (confirmed live: '_00001.jpg' instead of the real
+    saved '3_1_33S7-9YBJ-9PD7.jpg'/'4211353_00001.jpg') - RootsMagic/FTM would show every
+    census image as missing. FS's raw image_id is an unsanitized ark ('3:1:33S7-9YBJ-9PD7')
+    and must be sanitized the same way FS.py's own sanitize_item_id_filename does for the
+    non-census path, to match what's actually on disk."""
+    raw = {
+        "census_year": "1860", "location": "Dakota Territory",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ], image_id="3:1:33S7-9YBJ-9PD7")],
+    }
+    doc = census_schema.normalize_census_pages(raw, "familysearch_census", "1860 US Census", "Census_1860")
+
+    doc_meta = doc["sheets"][0]["document_metadata"]
+    assert doc_meta["file_name"] == "3_1_33S7-9YBJ-9PD7.jpg"
+    assert doc_meta["file_type"] == "jpg"
+
+
+def test_document_metadata_file_name_passes_through_already_clean_ancestry_image_id():
+    raw = {
+        "census_year": "1860", "location": "Dakota Territory",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ], image_id="4211353_00001")],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1860 US Census", "Census_1860")
+
+    assert doc["sheets"][0]["document_metadata"]["file_name"] == "4211353_00001.jpg"
+
+
+def test_type_specific_fields_carries_place_details_through():
+    """Regression: Ancestry's page-level place_details (leftover browsePath segments beyond
+    state/county/city/ED, e.g. a specific street/ward/precinct) was silently dropped by the
+    unified-schema path - present in page but never copied into type_specific_fields."""
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ], place_details="Ward 3")],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    record = doc["sheets"][0]["records"][0]
+    assert record["type_specific_fields"]["place_details"] == "Ward 3"
+
+
+def test_participant_carries_alternate_birth_places_through():
+    """Regression: Ancestry's per-person alternate_birth_places (real data - readPersonAlternates()
+    in Voyageur.js) was silently dropped - _normalize_participant's initial dict set
+    alternate_names at the top level (correctly read by Census.py's row['AlternateNames'])
+    but never set alternate_birth_places anywhere, even though Census.py's unified-path
+    adapter reads it from type_specific_fields (pts.get('alternate_birth_places', [])) -
+    build_alternate_birth_lines() silently never fired for any unified-path gather."""
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1",
+             "alternate_birth_places": [{"value": "Quebec, Canada"}]},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    assert participant["type_specific_fields"]["alternate_birth_places"] == [{"value": "Quebec, Canada"}]
+
+
+def test_married_within_year_is_a_per_participant_field_not_dropped_as_a_record_field():
+    """Regression: 'Married within Year' was categorized as a record_field in
+    ancestry_census.yaml, which only handles household/dwelling-grouping keys
+    (_household_key only reads family_number/dwelling_number targets) - its own value was
+    never actually copied anywhere, just marked 'consumed' so it wouldn't get flagged as
+    unmapped. Census.py's build_gedcom_from_census reads it PER PERSON (row.get('Married
+    within Year') on the head/wife rows specifically) to decide whether to emit a '1 MARR'
+    fact - it needed to be a participant_fields target, not a record_fields one."""
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Married within Year": "Yes"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    assert participant["type_specific_fields"]["married_within_year"] == "Yes"
+    assert not participant["review"], participant.get("review_reason")
+
+
+def test_ancestry_birth_month_and_marital_status_are_mapped_not_unmapped():
+    """Regression for the two new participant_fields entries this session's Ancestry
+    index-panel-data investigation surfaced (1880's SelfBirthMonth, 1880/1920's
+    SelfMaritalStatus) - confirms they land in type_specific_fields and do NOT trigger
+    the unmapped-column review flag."""
+    raw = {
+        "census_year": "1880", "location": "Dakota Territory",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Birth Month": "March", "Marital Status": "Married"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1880 US Census", "Census_1880")
+
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    assert participant["type_specific_fields"]["birth_month"] == "March"
+    assert participant["type_specific_fields"]["marital_status"] == "Married"
+    assert not participant["review"], participant.get("review_reason")
+
+
+def test_street_address_is_mapped_and_house_number_is_not_double_claimed():
+    """Regression: 'Street'/'Street Address'/'Address' were unmapped in
+    ancestry_census.yaml's participant_fields - Census.py's build_gedcom_from_census
+    already reads row['Street'] to build a CENS fact's '2 ADDR' line, but the raw value
+    never reached it. Deliberately NOT mapping 'House Number' to the same target here -
+    that header is already claimed by record_fields as a dwelling_number alias (a
+    different census concept, the sequential dwelling-visited count), so it must not also
+    resolve to a street value."""
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Street": "212 Main St", "House Number": "14"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    assert participant["type_specific_fields"]["street"] == "212 Main St"
+    assert doc["sheets"][0]["records"][0]["record_number"] == "14"
+    assert "unmapped" not in participant["type_specific_fields"]
+
+
+def test_citation_falls_back_to_raw_collection_title_when_no_parsed_name():
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    assert doc["citation"]["collection_name"] == "1900 US Census"
+
+
+def test_group_household_prefers_household_id_over_column_based_key():
+    """Ancestry's index-panel-data API supplies a real, stable household_id per person
+    (Task 1/2/3 of docs/superpowers/plans/2026-08-15-ancestry-index-panel-extraction.md) -
+    when present, it must win over the existing Family/Dwelling Number column-based
+    inference, since it's a direct signal from Ancestry itself rather than a guess from
+    column text that can vary or be absent by census year. Two people share a
+    household_id but have DIFFERENT Family Number column values (simulating a data
+    inconsistency) to prove household_id, not the column, decides the grouping."""
+    raw = {
+        "census_year": "1920", "location": "North Dakota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Mary", "Surname": "Darylus", "Gender": "F", "Age": "67",
+                        "Family Number": "1"}, "pid": "p1", "household_id": "79215820"},
+            {"columns": {"Given Name": "Helen", "Surname": "Darylus", "Gender": "F", "Age": "42",
+                        "Family Number": "2"}, "pid": "p2", "household_id": "79215820"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    records = doc["sheets"][0]["records"]
+    assert len(records) == 1, f"expected both people grouped into one household by household_id, got: {records}"
+    assert len(records[0]["participants"]) == 2
+
+
+def test_group_household_falls_back_to_column_based_key_when_household_id_absent():
+    """The DOM-table-scraping fallback path (Task 3) never sets household_id - confirms
+    the existing column-based grouping still works completely unchanged when it's
+    absent, matching every pre-existing test in this file."""
+    raw = {
+        "census_year": "1900", "location": "Minnesota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
+                        "Family Number": "5"}, "pid": "p1"},
+            {"columns": {"Given Name": "Marie", "Surname": "Gagnon", "Gender": "F", "Age": "38",
+                        "Family Number": "5"}, "pid": "p2"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
+
+    records = doc["sheets"][0]["records"]
+    assert len(records) == 1
+    assert records[0]["record_number"] == "5"
 
 
 def test_relationship_era_groups_household_and_maps_role_name():

@@ -97,6 +97,17 @@ def _parse_year(value: Any) -> int:
     return int(match.group(1)) if match else 0
 
 
+def _sanitize_image_filename(image_id: str) -> str:
+    """Mirrors FS.py's own sanitize_item_id_filename (duplicated rather than imported -
+    same reasoning as get_census_era above: FS.py imports census_schema, so importing back
+    would invert the dependency). Must match exactly what move_downloaded_images() actually
+    leaves on disk - FamilySearch's image_id is a raw ark (e.g. "3:1:33S7-9YBJ-9PD7") that
+    needs this substitution to become a real filename; Ancestry's own getBaseImageId() in
+    Voyageur.js already strips to [a-zA-Z0-9_-] before this ever runs, so this is a no-op
+    for that source's image_id."""
+    return re.sub(r'[^a-zA-Z0-9_-]', '_', str(image_id).strip()) + ".jpg" if image_id else ""
+
+
 def _household_key(columns: Dict[str, str], field_map: Dict[str, Dict[str, str]]) -> Optional[str]:
     """Finds this person's normalized family/dwelling number, if their source row has one
     at all - the grouping key for which record (household) they belong to. Falls back to
@@ -124,16 +135,18 @@ def _household_key(columns: Dict[str, str], field_map: Dict[str, Dict[str, str]]
 
 def _group_household(people: List[dict], field_map: Dict[str, Dict[str, str]]
                      ) -> List[Tuple[Optional[str], List[dict]]]:
-    """Groups people sharing the same family/dwelling number (or, failing that, the same
-    page-number fallback - see _household_key) into one household. A person with neither
-    at all becomes their own single-person group - there's genuinely nothing to group them
-    with."""
+    """Groups people sharing the same household_id (a real, stable identifier some
+    sources supply directly - e.g. Ancestry's index-panel-data API, see
+    docs/superpowers/specs/2026-08-15-ancestry-index-panel-extraction-design.md) when
+    present, or the same family/dwelling number (or, failing that, the same page-number
+    fallback - see _household_key) otherwise. A person with neither at all becomes their
+    own single-person group - there's genuinely nothing to group them with."""
     groups: Dict[Optional[str], List[dict]] = {}
     order: List[Optional[str]] = []
     fallback_counter = 0
     for person in people:
         columns = person.get("columns", {}) or {}
-        key = _household_key(columns, field_map)
+        key = person.get("household_id") or _household_key(columns, field_map)
         if key is None:
             fallback_counter += 1
             key = f"__ungrouped_{fallback_counter}"
@@ -194,7 +207,8 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
     # Whatever this person's own identifiers already carry (pid/fsftid/etc.) is preserved
     # as-is, not treated as an unmapped column - it never came from `columns` in the
     # first place.
-    for passthrough_key in ("pid", "extracted_url", "fsftid", "person_ark", "familysearch_url"):
+    for passthrough_key in ("pid", "extracted_url", "fsftid", "person_ark", "familysearch_url",
+                            "alternate_birth_places"):
         if person.get(passthrough_key):
             participant["type_specific_fields"][passthrough_key] = person[passthrough_key]
 
@@ -245,7 +259,7 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
                 type_specific["roll_number"] = page["roll_number"]
             if page.get("film_number"):
                 type_specific["film_number"] = page["film_number"]
-            for loc_key in ("state", "county", "city", "country", "apid_db"):
+            for loc_key in ("state", "county", "city", "country", "apid_db", "place_details"):
                 if page.get(loc_key):
                     type_specific[loc_key] = page[loc_key]
             if era == "pre1850" and len(participants) == 1:
@@ -266,10 +280,11 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
                 "participants": participants,
             })
 
+        file_name = _sanitize_image_filename(page.get("image_id", ""))
         sheets.append({
             "page_id": str(page.get("page_number", "")),
             "document_metadata": {
-                "file_name": "", "file_type": "", "volume": "",
+                "file_name": file_name, "file_type": "jpg" if file_name else "", "volume": "",
                 "pages": str(page.get("page_number", "")),
                 "source_name": page.get("repository", ""),
                 "source_location": ", ".join(filter(None, [page.get("state"), page.get("country")])),
@@ -279,10 +294,11 @@ def normalize_census_pages(raw: dict, field_map_name: str, collection_title: str
 
         if not citation:
             citation = {
-                "call_number": "", "collection_url": "", "collection_name": collection_title,
+                "call_number": "", "collection_url": page.get("collection_url", ""),
+                "collection_name": page.get("collection_name", "") or collection_title,
                 "repository": page.get("repository", ""), "repository_loc": page.get("repository_loc", ""),
                 "publisher": page.get("publisher", ""), "pub_loc": page.get("pub_loc", ""),
-                "apid_db": page.get("apid_db", ""),
+                "apid_db": page.get("apid_db", ""), "collection_id": page.get("collection_id", ""),
             }
 
     return {
