@@ -1519,6 +1519,11 @@
         if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.__voyageurFsApiIntercepted) {
             unsafeWindow.__voyageurFsApiIntercepted = true;
             unsafeWindow.__voyageurFsApiResponses = {};
+            // Per-ark resolver callbacks for waitForFsApiResponse() below. Storing a response
+            // sets a plain object property, not a DOM node - waitForCondition()'s
+            // MutationObserver would never see it, so waiters are notified directly here
+            // instead of relying on that helper's DOM-mutation-driven re-checks.
+            unsafeWindow.__voyageurFsApiWaiters = {};
 
             const FS_API_TARGET = '/service/records/volunteer/orchestration/sls/image/';
 
@@ -1531,7 +1536,10 @@
                 const ark = fsApiArkFromUrl(url);
                 if (!ark) return;
                 try {
-                    unsafeWindow.__voyageurFsApiResponses[ark] = JSON.parse(bodyText);
+                    const parsed = JSON.parse(bodyText);
+                    unsafeWindow.__voyageurFsApiResponses[ark] = parsed;
+                    const waiter = unsafeWindow.__voyageurFsApiWaiters[ark];
+                    if (waiter) waiter(parsed);
                 } catch (e) {
                     // Leave unset - waitForFsApiResponse() below times out the same as "never
                     // arrived", which is the correct behavior for an unparseable response.
@@ -1561,13 +1569,34 @@
         }
 
         // Instant resolution if the response already arrived before this was called (the API
-        // call fires on page load, which can beat the gather loop reaching this image);
-        // otherwise polls the shared store via the existing waitForCondition convention.
+        // call fires on page load, which can beat the gather loop reaching this image).
+        // Deliberately does NOT go through waitForCondition() - that helper only re-checks its
+        // condition on MutationObserver-observed DOM mutations, and storeFsApiResponse() above
+        // sets a plain object property that never touches the DOM, so it would never reliably
+        // trigger a re-check. Instead, storeFsApiResponse() resolves the matching waiter
+        // directly by ark; this only falls back to a timer if the response never arrives.
         async function waitForFsApiResponse(ark, {timeoutMs = 15000} = {}) {
-            return waitForCondition(
-                () => (unsafeWindow.__voyageurFsApiResponses || {})[ark] || null,
-                {timeoutMs},
-            );
+            const startedAt = performance.now();
+            const existing = (unsafeWindow.__voyageurFsApiResponses || {})[ark];
+            if (existing) {
+                return {result: existing, elapsedMs: 0, timedOut: false};
+            }
+            return new Promise((resolve) => {
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    delete unsafeWindow.__voyageurFsApiWaiters[ark];
+                    resolve({result: null, elapsedMs: Math.round(performance.now() - startedAt), timedOut: true});
+                }, timeoutMs);
+                unsafeWindow.__voyageurFsApiWaiters[ark] = (result) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    delete unsafeWindow.__voyageurFsApiWaiters[ark];
+                    resolve({result, elapsedMs: Math.round(performance.now() - startedAt), timedOut: false});
+                };
+            });
         }
 
         // ==========================================
