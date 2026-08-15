@@ -169,19 +169,32 @@ test('fsBuildRowsFromApiResponse: 1850-style person omits Relationship to Head e
     assert.ok(!('Relationship to Head' in rowB.columns));
 });
 
-test('fsBuildRowsFromApiResponse: Family Number prefers SOURCE_HOUSEHOLD_ID over SOURCE_HOUSE_NBR when both exist', () => {
+test('fsBuildRowsFromApiResponse: Family Number falls back to FS_HOUSEHOLD_ID when SOURCE_HOUSE_NBR exists', () => {
     const data = makeApiResponse();
-    // Give PERSON-B both fields to prove the preference order, not just "whichever exists".
+    // Give PERSON-B both FS_HOUSEHOLD_ID and the pre-existing SOURCE_HOUSE_NBR to prove
+    // FS_HOUSEHOLD_ID is used and is not overridden/blocked by SOURCE_HOUSE_NBR.
     data.elements.push(
         {elementType: 'FIELD', id: 'field-fshouseholdid-b', fieldType: 'FS_HOUSEHOLD_ID', fieldValues: [{normalizedValues: [{text: '999'}]}]},
     );
     data.elements.find(e => e.id === '1:1:PERSON-B').subElements.push({id: 'field-fshouseholdid-b'});
     const rows = fsBuildRowsFromApiResponse(data);
     const rowB = rows.find(r => r.person_ark === '1:1:PERSON-B');
-    // SOURCE_HOUSE_NBR ("12") is a dwelling number, not a family number - FS_HOUSEHOLD_ID
-    // ("999") should NOT win over it either, since SOURCE_HOUSE_NBR was already present;
-    // this only proves FS_HOUSEHOLD_ID doesn't wrongly override an already-present value.
+    // SOURCE_HOUSE_NBR ("12") is a dwelling number, not a family number - it is never
+    // consulted by fsFamilyNumber. FS_HOUSEHOLD_ID ("999") is used as the family number.
     assert.equal(rowB.columns['Family Number'], '999');
+});
+
+test('fsBuildRowsFromApiResponse: Family Number prefers SOURCE_HOUSEHOLD_ID over FS_HOUSEHOLD_ID when both exist', () => {
+    const data = makeApiResponse();
+    // Give PERSON-A (who already has SOURCE_HOUSEHOLD_ID '90') an additional FS_HOUSEHOLD_ID field of '999'.
+    data.elements.push(
+        {elementType: 'FIELD', id: 'field-fshouseholdid-a', fieldType: 'FS_HOUSEHOLD_ID', fieldValues: [{normalizedValues: [{text: '999'}]}]},
+    );
+    data.elements.find(e => e.id === '1:1:PERSON-A').subElements.push({id: 'field-fshouseholdid-a'});
+    const rows = fsBuildRowsFromApiResponse(data);
+    const rowA = rows.find(r => r.person_ark === '1:1:PERSON-A');
+    // SOURCE_HOUSEHOLD_ID ("90") should win over FS_HOUSEHOLD_ID ("999").
+    assert.equal(rowA.columns['Family Number'], '90');
 });
 
 test('fsBuildRowsFromApiResponse: Family Number falls back to a sequential per-household counter when no household-id field exists at all', () => {

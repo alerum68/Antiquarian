@@ -270,9 +270,6 @@
             || String(sequentialFallback);
     }
 
-    // Omitted entirely (not set to '') when absent - matches the old UI-scraper's
-    // own "don't fabricate data" convention, and is how the 1850-1870 era
-    // boundary is handled: no special-case branching, just field-absence.
     function fsBuildRowsFromApiResponse(apiResponse) {
         const byId = buildFsElementIndex(apiResponse);
         const rows = [];
