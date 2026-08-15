@@ -743,6 +743,20 @@ def get_row_val(r: pd.Series, cols: List[str], default: str) -> str:
     return ""
 
 
+ARK_TYPE_PREFIX_RE = re.compile(r'^\d+:\d+:')
+
+
+def strip_ark_type_prefix(value: str) -> str:
+    """Strips a leading GEDCOM X type/version prefix (e.g. '1:1:' on a FamilySearch person
+    ark, '3:1:' on a page-level record ark) for display in fields where only the bare
+    identifier reads cleanly (REFN, a citation-level FSFTID) - the prefix is still required
+    where it's functionally load-bearing (the clickable FamilySearch URL itself, and the
+    media FILE path, which must match the real saved filename) and those call sites must
+    NOT use this. A no-op on values with no such prefix (e.g. Ancestry's own numeric/
+    synthesized rec_id), so it's safe to apply without checking the source first."""
+    return ARK_TYPE_PREFIX_RE.sub('', str(value or ''))
+
+
 def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str, target_software: str,
                           row_town: str, row_county: str, row_state: str, row_roll: str, row_film: str,
                           row_ed: str = "") -> List[str]:
@@ -755,9 +769,16 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
     fsftid = get_row_val(row, ['FSFTID'], '')
     fs_url = get_row_val(row, ['FamilySearch_URL'], '')
+    # A genuinely tree-attached FSFTID always wins; otherwise, only for a row we already
+    # know is FamilySearch-sourced (fs_url present), fall back to this record's own person
+    # ark as the citation's FamilySearch identifier - bare, not the URL-required "1:1:"-
+    # prefixed form (that prefix belongs only in the actual clickable weblink below, never
+    # in a displayed identifier). Never fabricated for Ancestry-only rows (no fs_url).
+    citation_fsftid = fsftid or (strip_ark_type_prefix(rec_id) if fs_url else '')
 
-    ancestry_url = get_row_val(row, ['Extracted_URL'], '') or \
+    ancestry_url = get_row_val(row, ['Extracted_URL'], '') or (
         f"https://www.ancestry.com/search/collections/{APID_DB}/records/{rec_id}"
+        if (APID_DB and rec_id) else "")
 
     cit = [f"2 SOUR @S{CENSUS_SOURCE_ID}@"]
 
@@ -780,7 +801,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             ("Location", row_loc),
             ("CensusED", row_ed),
             ("HouseholdID", f"dwelling {dwell_num}, family {fam_num}" if (dwell_num and fam_num)
-             else (f"family {fam_num}" if fam_num else (f"dwelling {dwell_num}" if dwell_num else ""))),
+             else (fam_num or dwell_num)),
             ("Repository", "Ancestry.com" if not fs_url else "FamilySearch"),
             ("URL", ancestry_url),
             ("RefNumber", f"APID 1,{APID_DB}::{rec_id}" if (APID_DB and rec_id) else ""),
@@ -789,11 +810,13 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             if f_val:
                 cit.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
 
-        cit.extend(["3 DATA", f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
-                    f"4 NAME Anc- {collection_title}",
-                    f"4 URL {ancestry_url}"])
-        if fsftid:
-            cit.append(f"3 _FSFTID {fsftid}")
+        cit.append("3 DATA")
+        if APID_DB and rec_id:
+            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
+                        f"4 NAME Anc- {collection_title}",
+                        f"4 URL {ancestry_url}"])
+        if citation_fsftid:
+            cit.append(f"3 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME FS- {collection_title}",
@@ -802,13 +825,14 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         cit.append(f"3 OBJE {m_id}")
     else:
         link_url = ancestry_url
-        cit.extend(
-            [f"3 PAGE {person_str}; p. {real_page}, dwell. {dwell_num}, fam. {fam_num}; {row_town}{ed_suffix}; "
-             f"{row_county}; {row_state}; Roll {row_roll}; Film {row_film}",
-                "3 QUAY 3", f"3 _APID 1,{APID_DB}::{rec_id}",
-                f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
-        if fsftid:
-            cit.append(f"3 _FSFTID {fsftid}")
+        cit.append(
+            f"3 PAGE {person_str}; p. {real_page}, dwell. {dwell_num}, fam. {fam_num}; {row_town}{ed_suffix}; "
+            f"{row_county}; {row_state}; Roll {row_roll}; Film {row_film}")
+        cit.append("3 QUAY 3")
+        if APID_DB and rec_id:
+            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
+        if citation_fsftid:
+            cit.append(f"3 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend([f"3 _LINK {fs_url}", f"3 NOTE {fs_url}"])
         cit.append(f"3 OBJE {m_id}")
@@ -959,7 +983,8 @@ def build_census_task(rec_id: str, giv: str, sur: str, record_label: str, reason
 
     task_records = [f"0 {task_id} _TASK",
                     f"1 DESC {sur or '[No Surname]'}, {giv or '[No Given Name]'} ({record_label}): {summary}",
-                    f"1 REFN {rec_id}", f"1 _LINK @I{rec_id}@", "1 TYPE 2", f"1 DATE {Utils.CURRENT_DATE}",
+                    f"1 REFN {strip_ark_type_prefix(rec_id)}", f"1 _LINK @I{rec_id}@", "1 TYPE 2",
+                    f"1 DATE {Utils.CURRENT_DATE}",
                     f"1 _LDATE {Utils.CURRENT_DATE}", f"1 NOTE {summary}", "1 STAT NEW", f"1 PRTY {priority}",
                     f"1 _COLOR {Utils.REVIEW_COLOR}"] + weblink + task_citation + [
         "1 OBJE", f"2 FILE {media_path}", "2 FORM jpg", f"2 TITL {media_title}", "2 _TYPE PHOTO"]
@@ -1219,7 +1244,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
                                             "FamilySearch Family Tree", target_software)
                         if row_fsftid else [])
         ged.extend(
-            [f"0 @I{rec_id}@ INDI", f"1 REFN {rec_id}"]
+            [f"0 @I{rec_id}@ INDI", f"1 REFN {strip_ark_type_prefix(rec_id)}"]
             + ([f"1 _FSFTID {row_fsftid}"] if row_fsftid else [])
             + fs_tree_link
             + [f"1 NAME {giv} /{sur}/"] + cit +
@@ -1399,6 +1424,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                 'Page_Number': sheet.get('page_id', ''), 'Image_ID': doc_meta.get('file_name', ''),
                 'Country': ts.get('country', ''), 'State': ts.get('state', ''),
                 'County': ts.get('county', ''), 'City': ts.get('city', ''),
+                'Place_Details': ts.get('place_details', ''),
                 'Enumeration_District': ts.get('enumeration_district', ''),
                 'Film': ts.get('film_number', ''), 'Roll': ts.get('roll_number', ''),
                 'APID_DB': ts.get('apid_db', '') or citation.get('apid_db', ''),
@@ -1418,6 +1444,10 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Relationship to Head'] = p['role_name']
                 if pts.get('line_number'):
                     row['Line Number'] = pts['line_number']
+                if pts.get('married_within_year'):
+                    row['Married within Year'] = pts['married_within_year']
+                if pts.get('street'):
+                    row['Street'] = pts['street']
                 if p.get('birth_place'):
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):

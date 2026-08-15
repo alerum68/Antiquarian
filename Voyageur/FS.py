@@ -640,14 +640,22 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
                 columns["Surname"] = surname
 
             # Archivist's census-flavor loop uses 'pid' directly as this person's REFN/@I@ id
-            # and folds it into the _APID citation tag (see build_census_citation) - it needs
-            # to be one clean identifier, not a compound one. This used to be
+            # - it needs to be one clean identifier, not a compound one. This used to be
             # "{item_id}-{row_index}" (item_id is itself a full page-level ARK, e.g.
             # "3:1:33S7-9YBJ-9PD7"), which read as two identifiers glued together once
             # rendered ("3:1:33S7-9YBJ-9PD7-1"). person_ark is this row's own real,
-            # already-distinct per-person FamilySearch identifier (e.g. "MF36-Z6D") - use that
-            # instead, falling back to the old compound form only on the rare row where
-            # person_ark itself is missing.
+            # already-distinct per-person FamilySearch identifier (already carries its own
+            # "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D" - both JS extraction paths
+            # produce it in this same shape, confirmed live) - use that instead, falling
+            # back to the old compound form only on the rare row where person_ark itself is
+            # missing. It is NOT an Ancestry APID and must never feed Archivist's _APID
+            # GEDCOM tag (that's Ancestry-specific citation-linking syntax) - Census.py
+            # guards that tag on real Ancestry data now. It must ALSO never feed 'fsftid':
+            # that field drives a "familysearch.org/tree/person/details/<id>" weblink,
+            # which is specifically a Family Tree PROFILE id (a different, unrelated ID
+            # namespace with no "1:1:" prefix, only obtained via genuine tree-attachment) -
+            # person_ark is this historical record's own persona id, not a tree profile id,
+            # and belongs only in familysearch_url's ark-based citation link below.
             person_ark = row.get("person_ark", "")
             people.append({
                 "columns": columns,
@@ -658,7 +666,10 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
                 # MergedCensus.py uses for a merged person) - without it, an FS-only
                 # (non-merged) census run had no FamilySearch web link on its citation
                 # at all, even though person_ark was already right here to build one.
-                "familysearch_url": f"https://www.familysearch.org/ark:/61903/1:1:{person_ark}" if person_ark else "",
+                # person_ark already carries its own "1:1:" prefix (see above) - do not
+                # prepend a second one here (confirmed live: doing so produced a broken
+                # ".../ark:/61903/1:1:1:1:MF36-Z6D" URL).
+                "familysearch_url": f"https://www.familysearch.org/ark:/61903/{person_ark}" if person_ark else "",
             })
 
         pages.append({
@@ -674,6 +685,8 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             "roll_number": roll_number,
             "apid_db": "",
             "collection_id": citation.get("collection_id", ""),
+            "collection_name": citation.get("collection_name", ""),
+            "collection_url": citation.get("collection_url", ""),
             "repository": citation.get("repository", ""),
             "repository_loc": citation.get("repository_loc", ""),
             "publisher": publisher,

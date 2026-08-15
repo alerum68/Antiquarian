@@ -94,19 +94,19 @@ def test_build_census_json_accepts_household_view_row_shape():
         "rows": [
             {"columns": {"Given Name": "Joseph", "Surname": "Rolette", "Gender": "M", "Age": "35",
                          "Relationship to Head": "Head", "Family Number": "1"},
-             "person_ark": "MZ2Z-WM4", "attached_fsftid": "9CJG-851"},
+             "person_ark": "1:1:MZ2Z-WM4", "attached_fsftid": "9CJG-851"},
             {"columns": {"Given Name": "Angelic", "Surname": "Rolette", "Gender": "F", "Age": "30",
                          "Relationship to Head": "Spouse", "Family Number": "1"},
-             "person_ark": "MZ2Z-WM5", "attached_fsftid": ""},
+             "person_ark": "1:1:MZ2Z-WM5", "attached_fsftid": ""},
             {"columns": {"Given Name": "Joseph", "Surname": "Rolette", "Gender": "M", "Age": "9",
                          "Relationship to Head": "Child", "Family Number": "1"},
-             "person_ark": "MZ2Z-WM6", "attached_fsftid": ""},
+             "person_ark": "1:1:MZ2Z-WM6", "attached_fsftid": ""},
             {"columns": {"Given Name": "George", "Surname": "Monison", "Gender": "M", "Age": "22",
                          "Relationship to Head": "No Relation", "Family Number": "1"},
-             "person_ark": "MZ2Z-WM7", "attached_fsftid": ""},
+             "person_ark": "1:1:MZ2Z-WM7", "attached_fsftid": ""},
             {"columns": {"Given Name": "J Baptiste", "Surname": "Cardinal", "Gender": "M", "Age": "40",
                          "Family Number": "2"},
-             "person_ark": "MZ2Z-XX1", "attached_fsftid": ""},
+             "person_ark": "1:1:MZ2Z-XX1", "attached_fsftid": ""},
         ],
     }]
 
@@ -114,8 +114,8 @@ def test_build_census_json_accepts_household_view_row_shape():
 
     people = result["pages"][0]["people"]
     assert len(people) == 5
-    assert people[0]["pid"] == "MZ2Z-WM4"
-    assert people[0]["person_ark"] == "MZ2Z-WM4"
+    assert people[0]["pid"] == "1:1:MZ2Z-WM4"
+    assert people[0]["person_ark"] == "1:1:MZ2Z-WM4"
     assert people[0]["fsftid"] == "9CJG-851"
     assert people[0]["familysearch_url"] == "https://www.familysearch.org/ark:/61903/1:1:MZ2Z-WM4"
     assert people[0]["columns"]["Relationship to Head"] == "Head"
