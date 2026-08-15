@@ -36,11 +36,11 @@
 - Consumes: `ANCESTRY_INDEX_FIELD_TO_COLUMN` as left by the original plan's Task 1 (must already contain the ~42 entries listed in that plan — verify by opening the file and confirming `SelfMaritalStatus: 'Marital Status',` is present before starting).
 - Produces: nothing new for other tasks — this is a data-only extension.
 
-- [ ] **Step 1: Locate the constant**
+- [x] **Step 1: Locate the constant**
 
 Open `Voyageur/Voyageur.js`. Find `const ANCESTRY_INDEX_FIELD_TO_COLUMN = {` (search by that exact text). Find its closing `};`.
 
-- [ ] **Step 2: Add these new entries immediately before the closing `};`**
+- [x] **Step 2: Add these new entries immediately before the closing `};`**
 
 Every target string on the right below is a column header that ALREADY exists as a key in `field_maps/ancestry_census.yaml` after the original plan's Task 4 (verify each one is present in that file before adding — if any target string below is NOT found in the current YAML, STOP and report it rather than adding the entry, since that would violate this plan's alias-only constraint):
 
@@ -68,12 +68,12 @@ Every target string on the right below is a column header that ALREADY exists as
     SelfResidenceMonthsAtSchool: 'Attended School', // 1890/1901 - numeric months-attended aliased onto the existing boolean/text Attended School fact
 ```
 
-- [ ] **Step 3: Run `node --check` to verify no syntax errors**
+- [x] **Step 3: Run `node --check` to verify no syntax errors**
 
 Run: `node --check Voyageur/Voyageur.js` (from repo root)
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Add tests proving the new aliases resolve correctly**
+- [x] **Step 4: Add tests proving the new aliases resolve correctly**
 
 Open `Voyageur/tests/js/test_ancestry_index_panel_parser.mjs`. Add these tests at the end of the file (after the last existing `test(...)` block, still inside the same file, no new imports needed):
 
@@ -150,17 +150,17 @@ test('ancestryColumnsFromIndexPanelRecord: 1890 fragment fields (numbered HomeMo
 });
 ```
 
-- [ ] **Step 5: Run the new tests to verify they pass**
+- [x] **Step 5: Run the new tests to verify they pass**
 
 Run: `node --test Voyageur/tests/js/test_ancestry_index_panel_parser.mjs` (from repo root)
 Expected: all tests PASS (9 pre-existing + 3 new = 9 total from the original plan's file plus these 3, i.e. the file's total test count grows by exactly 3).
 
-- [ ] **Step 6: Run the full existing JS suite to confirm no regressions**
+- [x] **Step 6: Run the full existing JS suite to confirm no regressions**
 
 Run: `node --test Voyageur/tests/js/` (from repo root)
 Expected: all pre-existing tests still pass, plus the 3 new ones.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js Voyageur/tests/js/test_ancestry_index_panel_parser.mjs
@@ -181,12 +181,12 @@ git commit -m "feat(voyageur): alias 1870/1890/1930/1940 Ancestry index-panel fi
 - Consumes: nothing from Task 1.
 - Produces: nothing further downstream in this plan.
 
-- [ ] **Step 1: Confirm `Religion` and `Nationality` are real fact types**
+- [x] **Step 1: Confirm `Religion` and `Nationality` are real fact types**
 
 Run: `python -c "import json; d=json.load(open('Commissioner/FactTypes.json', encoding='utf-8')); print('Religion' in d['person'], 'Nationality' in d['person'])"` (from repo root)
 Expected: `True True`. If either is `False`, STOP — do not proceed with this task, report the discrepancy instead (this plan was written against a live check of this exact file; a `False` result means something changed and the rest of this task's assumptions may not hold).
 
-- [ ] **Step 2: Add the two new `participant_facts` entries to `ancestry_census.yaml`**
+- [x] **Step 2: Add the two new `participant_facts` entries to `ancestry_census.yaml`**
 
 Open `Voyageur/field_maps/ancestry_census.yaml`. Find this exact line under `participant_facts:` (it's the last line of that block, right before the blank line and `record_fields:`):
 
@@ -202,7 +202,7 @@ Replace it with (adds two new lines immediately after, keeps the existing line u
   "Nationality": Nationality
 ```
 
-- [ ] **Step 3: Add the corresponding fieldName aliases to `ANCESTRY_INDEX_FIELD_TO_COLUMN`**
+- [x] **Step 3: Add the corresponding fieldName aliases to `ANCESTRY_INDEX_FIELD_TO_COLUMN`**
 
 In `Voyageur/Voyageur.js`, inside `ANCESTRY_INDEX_FIELD_TO_COLUMN` (same constant Task 1 extended), add these entries immediately before the closing `};` (after Task 1's additions):
 
@@ -216,12 +216,12 @@ In `Voyageur/Voyageur.js`, inside `ANCESTRY_INDEX_FIELD_TO_COLUMN` (same constan
     SelfResidenceNationality: 'Nationality', // alternate naming variant, not yet observed but kept consistent with the SelfX/SelfResidenceX pairing pattern seen for every other duplicated field name across years - if this specific spelling is never actually emitted by any real collection, it is a harmless unused entry, not a risk
 ```
 
-- [ ] **Step 4: Run `node --check` to verify no syntax errors**
+- [x] **Step 4: Run `node --check` to verify no syntax errors**
 
 Run: `node --check Voyageur/Voyageur.js`
 Expected: no output, exit code 0.
 
-- [ ] **Step 5: Add JS tests for the Religion/Nationality aliases**
+- [x] **Step 5: Add JS tests for the Religion/Nationality aliases**
 
 Append to `Voyageur/tests/js/test_ancestry_index_panel_parser.mjs`:
 
@@ -255,12 +255,12 @@ test('ancestryColumnsFromIndexPanelRecord: Canadian Religion/Nationality fieldNa
 });
 ```
 
-- [ ] **Step 6: Run the new test to verify it passes**
+- [x] **Step 6: Run the new test to verify it passes**
 
 Run: `node --test Voyageur/tests/js/test_ancestry_index_panel_parser.mjs`
 Expected: all tests PASS, including the new one.
 
-- [ ] **Step 7: Write a Python test proving Religion/Nationality land in `participants[].facts`, not flagged as unmapped**
+- [x] **Step 7: Write a Python test proving Religion/Nationality land in `participants[].facts`, not flagged as unmapped**
 
 Open `Voyageur/tests/test_census_schema.py`. Find `def test_ancestry_birth_month_and_marital_status_are_mapped_not_unmapped():` (this test comes from the original plan's Task 4, Step 7 — it must already exist; if it doesn't, the original plan's Task 4 has not been run and you should stop and run it first). Insert this new test immediately after its closing (before the next `def`):
 
@@ -287,12 +287,12 @@ def test_ancestry_religion_and_nationality_are_mapped_facts_not_unmapped():
     assert not participant["review"], participant.get("review_reason")
 ```
 
-- [ ] **Step 8: Run the new test to verify it passes**
+- [x] **Step 8: Run the new test to verify it passes**
 
 Run: `cd Voyageur && python -m pytest tests/test_census_schema.py -k "religion_and_nationality" -v`
 Expected: PASS.
 
-- [ ] **Step 9: Run the full Voyageur and Archivist Python test suites**
+- [x] **Step 9: Run the full Voyageur and Archivist Python test suites**
 
 Run: `cd Voyageur && python -m pytest tests/ -v`
 Expected: all tests pass.
@@ -300,7 +300,7 @@ Expected: all tests pass.
 Run: `cd Archivist && python -m pytest tests/ -v`
 Expected: all tests pass (this task doesn't touch Archivist, this is a pure regression check).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add Voyageur/field_maps/ancestry_census.yaml Voyageur/Voyageur.js Voyageur/tests/js/test_ancestry_index_panel_parser.mjs Voyageur/tests/test_census_schema.py
@@ -317,23 +317,23 @@ git commit -m "feat(voyageur): map Religion/Nationality to real FactTypes.json f
 
 **Why this task exists separately from the original plan's Task 5:** that task only verified against US `dbId`s (1850/1860/1880/1920) — no Canadian collection has ever been live-verified end-to-end through this code path. Canada is where this plan's only new GEDCOM targets (Religion/Nationality) actually get exercised.
 
-- [ ] **Step 1: Run a real gather against a confirmed-live Canadian record**
+- [x] **Step 1: Run a real gather against a confirmed-live Canadian record**
 
 Using the same isolated-output-directory technique already established this session, run `python Voyageur/A.py` against the 1871 Canada test record confirmed live this session: `dbId=1578`, `imageId=4396761_00576` (Donald MacDonald / Pictou, Nova Scotia — from `docs/superpowers/specs/2026-08-15-census-field-coverage-research.md`'s Canadian research table).
 
-- [ ] **Step 2: Confirm Religion/Nationality actually appear in the output**
+- [x] **Step 2: Confirm Religion/Nationality actually appear in the output**
 
 Inspect the resulting JSON output's per-person `facts` array (or `type_specific_fields`, depending on where `normalize_census_pages` places them) for `Religion` and `Nationality` entries with real values ("C Of Scotland" / "Scotch" for this specific test record, or whatever real values this collection's actual current data shows — Ancestry collections are occasionally re-indexed, so an exact-value mismatch against this plan's numbers is not itself a failure, only a genuinely EMPTY or MISSING field is).
 
-- [ ] **Step 3: Confirm no new "unmapped column" review flags appeared for Religion/Nationality specifically**
+- [x] **Step 3: Confirm no new "unmapped column" review flags appeared for Religion/Nationality specifically**
 
 Check the output for any `review`/`review_reason` flag mentioning "Religion" or "Nationality" as an unmapped column. Their presence would mean Task 2 didn't take effect — re-check the YAML and JS constant changes actually saved and the running code picked them up (a stale Tampermonkey cache is the most likely cause; force-reload the userscript).
 
-- [ ] **Step 4: Generate the GEDCOM and spot-check**
+- [x] **Step 4: Generate the GEDCOM and spot-check**
 
 Run `Archivist.py` against the isolated JSON output (same isolated-output-directory technique). Confirm the resulting `.ged` file has `2 RELI` (or whatever tag `Religion` maps to in this project's fact-to-GEDCOM-tag table — check `Archivist/Census.py` or the shared fact-mapping code if unsure of the exact tag) and a nationality-bearing note/fact line for Donald MacDonald.
 
-- [ ] **Step 5: Report results**
+- [x] **Step 5: Report results**
 
 Document what was confirmed: real Religion/Nationality values seen in JSON and GEDCOM output, no spurious review flags. If anything didn't work as expected, that's a genuine finding worth reporting honestly — do not claim success without having actually observed the real output.
 
@@ -344,4 +344,12 @@ Document what was confirmed: real Religion/Nationality values seen in JSON and G
 - **Spec coverage:** Task 1 covers the safe cross-year field aliases identified from the full research pass (US years). Task 2 covers the two new Canadian-specific fact types this session confirmed are real and pre-existing. Task 3 covers live verification specifically on Canadian data, which no prior plan touched.
 - **Deliberately NOT covered by this plan** (see the top-level scope-exclusion list): income/earnings, radio ownership, class-of-worker, employer name, usual-occupation, 1940's 5-years-ago-residence structure, tribe/clan/reservation-schedule fields, homestead land-survey grid fields, livestock/agricultural-schedule fields, insurance costs, home construction/room-count details, marriage-age, weeks/hours-worked, and the ambiguous numbered-duplicate field pairs (`Widowed`/`Widowed1` etc.) seen in 1851/1861/1911 Ancestry Canadian data. All of these remain visible via the existing passthrough-to-raw-label behavior and are exactly the "unknown fields" the user's own planned joint mapping-review session will go through — this plan must not preempt that session's decisions.
 - **1916 Canada and Ancestry's 1881 index-only collection are out of scope for this plan entirely** — 1916 has no Ancestry index-panel-data at all (confirmed, `isIndexPanelVisible: false`), so there is nothing for this JS-side plan to extend for that year; 1881's Ancestry collection is genuinely thin (9 fields, already fully covered by the original plan's generic passthrough) with no new aliasable concepts. Both years are FamilySearch-primary per the research doc — that's a different code path (`Voyageur.js`'s FS orchestration-API extraction, already implemented, self-describing, not year-branched) with no equivalent plan needed.
-- **FamilySearch side needs no equivalent plan.** Per the research doc's confirmed finding, FS's orchestration-API parser is self-describing (reads whatever `fieldTypes` the API returns dynamically, no per-year `fieldName`-to-column hardcoding like Ancestry's DOM-table-legacy schema requires) — there is no FS-side equivalent of this plan's Task 1/2 to write.
+- **FamilySearch side needs no equivalent plan.** Per the research doc's confirmed finding, FS's orchestration-API parser is self-describing (reads whatever `fieldTypes` the API returns dynamically, no per-year `fieldName`-to-column hardcoding like Ancestry's DOM-table-legacy schema requires) — there is no FS-side equivalent of this plan's Task 1/2 to write. **Caveat found in a later review pass:** self-describing extraction is not the same as the extracted fields actually reaching `columns` — `fsColumnsFromCanonicalFields()` deliberately drops several canonical fields FS's own API already exposes (marital status, occupation, race, birthplace, parents' birthplace) before they ever become a mapped column. Tracked as a real, separate gap in the next plan, not a contradiction of this note's original claim (which was true for the extraction layer, just not the whole pipeline).
+
+## Status: COMPLETE (2026-08-15)
+
+All 3 tasks done. Task 3 live-verified against a real Canadian record (dbId `1578`, imageId `4396761_00576` — Ontario, Frontenac County, "Rockwood Lunatic Asylum" sub-collection; the plan's own "Donald MacDonald/Pictou, Nova Scotia" description turned out to be for a different image on the same dbId, not this one, but the same dbId/imageId pair the plan specified was used). Confirmed: 316 participants, 249 real `Religion` facts (e.g. "Weslyan Methodist", "Roman Catholic") correctly emitted as `1 RELI <value>` in the generated GEDCOM; 0 `Nationality` facts (this specific sub-collection doesn't expose that field — not a failure, per the plan's own Step 2 guidance). Only one unmapped/review-flagged column across the entire gather: `Widowed` (108/316 participants) — genuinely unmapped as designed, a real candidate for the planned Marriage Details fact type.
+
+**Review findings from this pass** (see the commit for exact fixes):
+- Fixed as part of this plan's completion: a separate, adjacent "Complex Field Integration" plan (`docs/superpowers/plans/2026-08-15-complex-field-integration.md`, already committed) had (1) no Canadian provinces/territories in `is_foreign_birthplace()`'s allowlist — misclassifying every Canadian-born ancestor as "foreign" for `NATI` purposes, a serious bug given this project's core Canadian/Métis/HBCA subject base; (2) dropped `cap_case()` normalization in `get_occupation_value()`'s refactor; (3) guessed `"Widowed1"` onto `marital_status` in direct contradiction of this plan's own "numbered-duplicate fields - do not guess" rule, with a real silent-overwrite risk since `participant_fields` is a flat assignment, not a combine. All three fixed and tested.
+- **Found but NOT fixed here** (out of this plan's scope, carried to the next plan): live output showed `"country": "USA"` and `collection_title: "1871 US Federal Census - Ontario..."` for this Canadian record - `Voyageur.js`'s Ancestry gather hardcodes `country = "USA"` with no Canada detection, and `A.py`/`Archivist/Census.py` both have their own independent `"US Federal Census"`/`"United States Federal Census"` hardcoded fallback strings (the latter also drives the on-disk image folder name). Also confirmed live: Commissioner's `CensusParticipantExtra` Pydantic model rejects `marital_status` outright (`extra_forbidden`) even though `ancestry_census.yaml` has mapped it since the original plan's Task 4 - Commissioner was never extended to match.
