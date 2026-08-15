@@ -858,7 +858,7 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'birthplace', 'occupation', 'occupation category', 'industry', 'trade or profession',
                 'usual occupation', 'employer', 'class of worker', 'hours worked', 'weeks worked',
                 'months unemployed past year', 'out of work', 'seeking work', 'race', 'color',
-                'attended school', 'highest grade of school completed', 'highest grade completed',
+                'nationality', 'attended school', 'highest grade of school completed', 'highest grade completed',
                 'married within year', 'relationship to head', 'relationship', 'relation to head', 'relation',
                 'quality', 'real estate value', 'personal estate value', 'cannot read, write', 'disability condition',
                 'deaf dumb blind insane', 'idiotic pauper convict', 'father foreign born', 'mother foreign born',
@@ -886,6 +886,38 @@ MONTH_ABBR = {'1': 'JAN', '01': 'JAN', 'JAN': 'JAN', 'JANUARY': 'JAN', '2': 'FEB
               'NOVEMBER': 'NOV', '12': 'DEC', 'DEC': 'DEC', 'DECEMBER': 'DEC'}
 RESIDENCE_YEAR_PATTERN = re.compile(r'(1[89]\d{2})')
 RESIDENCE_RELATIVE_PATTERN = re.compile(r'(\d+)\s*year', re.I)
+
+US_STATES_AND_TERRITORIES = {
+    "al", "ak", "az", "ar", "ca", "co", "ct", "de", "fl", "ga", "hi", "id", "il", "in", "ia", "ks", "ky", "la",
+    "me", "md", "ma", "mi", "mn", "ms", "mo", "mt", "ne", "nv", "nh", "nj", "nm", "ny", "nc", "nd", "oh", "ok",
+    "or", "pa", "ri", "sc", "sd", "tn", "tx", "ut", "vt", "va", "wa", "wv", "wi", "wy", "dc",
+    "alabama", "alaska", "arizona", "arkansas", "california", "colorado", "connecticut", "delaware",
+    "florida", "georgia", "hawaii", "idaho", "illinois", "indiana", "iowa", "kansas", "kentucky",
+    "louisiana", "maine", "maryland", "massachusetts", "michigan", "minnesota", "mississippi", "missouri",
+    "montana", "nebraska", "nevada", "new hampshire", "new jersey", "new mexico", "new york", "north carolina",
+    "north dakota", "ohio", "oklahoma", "oregon", "pennsylvania", "rhode island", "south carolina",
+    "south dakota", "tennessee", "texas", "utah", "vermont", "virginia", "washington", "west virginia",
+    "wisconsin", "wyoming", "district of columbia",
+    "dakota territory", "minnesota territory", "illinois territory", "indiana territory", "michigan territory",
+    "wisconsin territory", "iowa territory", "missouri territory", "northwest territory", "oregon territory",
+    "washington territory", "utah territory", "new mexico territory", "nebraska territory", "kansas territory",
+    "colorado territory", "nevada territory", "idaho territory", "arizona territory", "montana territory",
+    "wyoming territory", "hawaii territory", "alaska territory", "indian territory",
+    "united states", "united states of america", "usa", "u.s.a.", "us", "u.s.",
+}
+
+
+def is_foreign_birthplace(birth_place: str) -> bool:
+    if not birth_place:
+        return False
+    parts = [p.strip().lower() for p in birth_place.split(",") if p.strip()]
+    if not parts:
+        return False
+    if parts[-1] in {"unknown", "at sea", "not stated", "none", "n/a", "?"}:
+        return False
+    if parts[-1] in US_STATES_AND_TERRITORIES or parts[0] in US_STATES_AND_TERRITORIES:
+        return False
+    return True
 
 
 def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
@@ -1336,7 +1368,15 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         if race := Utils.cap_case(row.get('Race', row.get('Color', ''))):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
+
+        nat_val = Utils.clean_val(row.get('Nationality'))
+        if not nat_val and birth_place and is_foreign_birthplace(birth_place):
+            nat_val = birth_place
+        if nat_val:
+            ged.extend([f"1 NATI {nat_val}", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
+
         edu_val = get_education_value(row)
+
         if edu_val is not None:
             ged.extend(["1 EDUC" + (f" {edu_val}" if edu_val else ""), f"2 DATE {CENSUS_YEAR}", f"2 PLAC {row_loc}",
                         "2 _PROOF proven"] + cit)
@@ -1437,6 +1477,7 @@ FACT_TYPE_TO_COLUMN = {
     "Immigration": "Immigration Year", "Naturalization": "Naturalization Status",
     "Military": "Military Service", "Residence": "Residence", "Religion": "Religion",
     "Property": "Real Estate Value", "Miscellaneous": "Miscellaneous Note",
+    "Nationality": "Nationality",
 }
 
 

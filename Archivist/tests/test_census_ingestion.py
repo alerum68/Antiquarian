@@ -525,3 +525,52 @@ def test_dynamic_occupation_template():
     })
     occ3, notes3 = get_occupation_value(row3)
     assert occ3 == "Carpenter"
+
+
+def test_foreign_birthplace_as_nationality(tmp_path, monkeypatch):
+    row_foreign = pd.Series({
+        "Given Name": "Patrick",
+        "Surname": "O'Connor",
+        "Gender": "M",
+        "Age": "35",
+        "Birth Place": "Ireland",
+        "Family Number": "1",
+        "Line Number": "1",
+    })
+    row_us = pd.Series({
+        "Given Name": "John",
+        "Surname": "Smith",
+        "Gender": "M",
+        "Age": "30",
+        "Birth Place": "Minnesota",
+        "Family Number": "2",
+        "Line Number": "2",
+    })
+    row_explicit_nat = pd.Series({
+        "Given Name": "Hans",
+        "Surname": "Schmidt",
+        "Gender": "M",
+        "Age": "45",
+        "Birth Place": "Germany",
+        "Nationality": "Prussian",
+        "Family Number": "3",
+        "Line Number": "3",
+    })
+    df = pd.DataFrame([row_foreign, row_us, row_explicit_nat])
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", 1900)
+    monkeypatch.setattr(arc, "CENSUS_ERA", "relationship")
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    # Ireland birthplace without nationality emits 1 NATI Ireland
+    assert "1 NATI Ireland" in lines
+    # Minnesota birthplace does not emit 1 NATI Minnesota
+    assert "1 NATI Minnesota" not in lines
+    # Explicit Nationality Prussian is preserved
+    assert "1 NATI Prussian" in lines
