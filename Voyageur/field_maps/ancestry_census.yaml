@@ -44,7 +44,16 @@ participant_fields:
   "Married Within Year": type_specific_fields.married_within_year
   "Birth Month": type_specific_fields.birth_month
   "Marital Status": type_specific_fields.marital_status
-  "Widowed1": type_specific_fields.marital_status
+  # "Widowed1" is deliberately NOT mapped here - it's one of the ambiguous
+  # numbered-duplicate fields (Widowed/Widowed1, seen in 1851/1861/1911 Ancestry
+  # Canadian data) the original field-coverage-extension plan explicitly flagged as
+  # "genuinely unclear whether this is the same question asked twice or a different
+  # sub-question - do not guess" (docs/superpowers/plans/2026-08-15-ancestry-index-panel-
+  # field-coverage-extension.md). Guessing it onto marital_status risks silently
+  # overwriting a genuine "Marital Status" column's value (participant_fields is a flat
+  # overwrite, not a combine, when both are present on the same record) with an
+  # unconfirmed value shape. Likely belongs under a future Marriage Details fact type
+  # instead, once one exists - not force-fit into marital_status now.
 
 participant_facts:
   "Occupation": Occupation

@@ -906,6 +906,23 @@ US_STATES_AND_TERRITORIES = {
     "united states", "united states of america", "usa", "u.s.a.", "us", "u.s.",
 }
 
+# This project's core subjects are overwhelmingly Canadian/Métis/HBCA-region families
+# (see Gazetteer.CA_PROVINCE_NAMES, the same modern province names reused here), so a
+# Canadian or historical fur-trade-region birthplace must be excluded from "foreign" the
+# same as a US one - confirmed live this gap existed: "Hudsen Bay Ter T"/"Rupert's Land"/
+# any Canadian province would otherwise have been misclassified as foreign and dumped
+# verbatim into a NATI tag.
+CANADIAN_PROVINCES_AND_TERRITORIES = {
+    "alberta", "british columbia", "manitoba", "new brunswick", "newfoundland",
+    "nova scotia", "northwest territories", "north-west territories", "ontario",
+    "prince edward island", "quebec", "saskatchewan", "yukon", "nunavut",
+    "canada", "rupert's land", "ruperts land", "red river settlement", "red river",
+    "assiniboia", "hudson's bay territory", "hudsons bay territory", "hudson bay territory",
+    "north west territory",
+}
+
+NON_FOREIGN_BIRTHPLACES = US_STATES_AND_TERRITORIES | CANADIAN_PROVINCES_AND_TERRITORIES
+
 
 def is_foreign_birthplace(birth_place: str) -> bool:
     if not birth_place:
@@ -915,23 +932,28 @@ def is_foreign_birthplace(birth_place: str) -> bool:
         return False
     if parts[-1] in {"unknown", "at sea", "not stated", "none", "n/a", "?"}:
         return False
-    if parts[-1] in US_STATES_AND_TERRITORIES or parts[0] in US_STATES_AND_TERRITORIES:
+    if parts[-1] in NON_FOREIGN_BIRTHPLACES or parts[0] in NON_FOREIGN_BIRTHPLACES:
         return False
     return True
 
 
 def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
     # 1. Primary Selection
-    base_occ = Utils.clean_val(row.get('Usual Occupation'))
+    # cap_case (not clean_val alone) on every raw-sourced piece here - a real census
+    # source can hand back ALL-CAPS or lowercase text, and every other proper-noun-like
+    # census field in this module (race, birth_place, occupation itself pre-refactor)
+    # already normalizes to Title Case. The connector words this function assembles
+    # itself ("at"/"working in") are left alone - they're ours, not sourced data.
+    base_occ = Utils.cap_case(row.get('Usual Occupation'))
     if not base_occ:
-        base_occ = Utils.clean_val(row.get('Occupation'))
+        base_occ = Utils.cap_case(row.get('Occupation'))
     if not base_occ:
-        base_occ = Utils.clean_val(row.get('Occupation Category'))
+        base_occ = Utils.cap_case(row.get('Occupation Category'))
     if not base_occ:
-        base_occ = Utils.clean_val(row.get('Trade or Profession'))
+        base_occ = Utils.cap_case(row.get('Trade or Profession'))
 
-    employer = Utils.clean_val(row.get('Employer'))
-    industry = Utils.clean_val(row.get('Industry'))
+    employer = Utils.cap_case(row.get('Employer'))
+    industry = Utils.cap_case(row.get('Industry'))
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or

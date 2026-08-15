@@ -493,6 +493,22 @@ def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
         assert any(ln == "3 _APID 1,2442::105307051" for ln in cit), f"{target}: missing real _APID: {cit}"
 
 
+def test_dynamic_occupation_template_normalizes_raw_case():
+    """Regression: get_occupation_value's 2026-08-15 refactor dropped the cap_case
+    normalization the pre-refactor version applied to its assembled result - real census
+    source text can come back ALL-CAPS or lowercase, unlike this test file's other
+    already-Title-Case fixtures."""
+    from Census import get_occupation_value
+
+    row = pd.Series({
+        "Occupation": "FARMER",
+        "Employer": "SMITH FARM",
+        "Industry": "agriculture",
+    })
+    occ, _ = get_occupation_value(row)
+    assert occ == "Farmer at Smith Farm, working in Agriculture"
+
+
 def test_dynamic_occupation_template():
     from Census import get_occupation_value
 
@@ -574,3 +590,19 @@ def test_foreign_birthplace_as_nationality(tmp_path, monkeypatch):
     assert "1 NATI Minnesota" not in lines
     # Explicit Nationality Prussian is preserved
     assert "1 NATI Prussian" in lines
+
+
+def test_canadian_and_historical_hbc_birthplaces_are_not_foreign():
+    """Regression: this project's core subjects are Canadian/Métis/HBCA-region families
+    (see Gazetteer.CA_PROVINCE_NAMES) - is_foreign_birthplace()'s original
+    US_STATES_AND_TERRITORIES allowlist had no Canadian entries at all, so every
+    Canadian- or Rupert's-Land-born ancestor would have had their raw birthplace text
+    dumped verbatim into a NATI tag as if it were a foreign nationality."""
+    from Census import is_foreign_birthplace
+
+    assert is_foreign_birthplace("Ontario") is False
+    assert is_foreign_birthplace("Manitoba") is False
+    assert is_foreign_birthplace("Rupert's Land") is False
+    assert is_foreign_birthplace("Red River Settlement") is False
+    assert is_foreign_birthplace("Pembina, Dakota Territory") is False
+    assert is_foreign_birthplace("Ireland") is True
