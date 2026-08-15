@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.26
+// @version      0.3.27
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -582,6 +582,38 @@
         if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.__mgs_intercepted) {
             unsafeWindow.__mgs_intercepted = true;
             unsafeWindow.__mgs_pids = [];
+            // State for the index-panel-data interceptor below - separate from __mgs_pids
+            // since this captures the FULL per-person field response, not just a PID list.
+            unsafeWindow.__voyageurAncestryIndexPanelResponses = {};
+            // Per-"dbId:imageId" resolver callbacks for waitForAncestryIndexPanelResponse()
+            // below - same waiter-map pattern as FS's __voyageurFsApiWaiters elsewhere in
+            // this file. Storing a response sets a plain object property, not a DOM node -
+            // waitForCondition()'s MutationObserver would never see it, so waiters are
+            // notified directly here instead.
+            unsafeWindow.__voyageurAncestryIndexPanelWaiters = {};
+
+            const ANCESTRY_INDEX_PANEL_TARGET = '/imageviewer/api/record/index-panel-data';
+
+            function ancestryIndexPanelKeyFromUrl(url) {
+                const dbMatch = url.match(/[?&]dbId=([^&]+)/);
+                const imgMatch = url.match(/[?&]imageId=([^&]+)/);
+                if (!dbMatch || !imgMatch) return null;
+                return `${decodeURIComponent(dbMatch[1])}:${decodeURIComponent(imgMatch[1])}`;
+            }
+
+            function storeAncestryIndexPanelResponse(url, bodyText) {
+                const key = ancestryIndexPanelKeyFromUrl(url);
+                if (!key) return;
+                try {
+                    const parsed = JSON.parse(bodyText);
+                    unsafeWindow.__voyageurAncestryIndexPanelResponses[key] = parsed;
+                    const waiter = unsafeWindow.__voyageurAncestryIndexPanelWaiters[key];
+                    if (waiter) waiter(parsed);
+                } catch (e) {
+                    // Leave unset - waitForAncestryIndexPanelResponse() below times out the
+                    // same as "never arrived", the correct behavior for an unparseable body.
+                }
+            }
 
             function extractPidsFromText(text) {
                 try {
@@ -612,10 +644,16 @@
 
             const origFetch = unsafeWindow.fetch;
             unsafeWindow.fetch = async function (...args) {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
                 const response = await origFetch.apply(this, args);
                 try {
                     const clone = response.clone();
-                    clone.text().then(text => extractPidsFromText(text)).catch(() => {
+                    clone.text().then(text => {
+                        extractPidsFromText(text);
+                        if (url.includes(ANCESTRY_INDEX_PANEL_TARGET)) {
+                            storeAncestryIndexPanelResponse(url, text);
+                        }
+                    }).catch(() => {
                     });
                 } catch (e) {
                 }
@@ -626,9 +664,42 @@
             unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
                 this.addEventListener('load', function () {
                     extractPidsFromText(this.responseText);
+                    if (url && url.includes(ANCESTRY_INDEX_PANEL_TARGET)) {
+                        storeAncestryIndexPanelResponse(url, this.responseText);
+                    }
                 });
                 origOpen.apply(this, arguments);
             };
+        }
+
+        // Instant resolution if the response already arrived before this was called (the
+        // API call fires on page load, same as the DOM table's own data source - by the
+        // time extractCurrentPageData's caller has already confirmed the DOM table
+        // populated, this response has almost always already arrived too). Falls back to a
+        // bounded timer only when the API genuinely never fires for this collection/page.
+        async function waitForAncestryIndexPanelResponse(dbId, imageId, {timeoutMs = 8000} = {}) {
+            const key = `${dbId}:${imageId}`;
+            const startedAt = performance.now();
+            const existing = (unsafeWindow.__voyageurAncestryIndexPanelResponses || {})[key];
+            if (existing) {
+                return {result: existing, elapsedMs: 0, timedOut: false};
+            }
+            return new Promise((resolve) => {
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    delete unsafeWindow.__voyageurAncestryIndexPanelWaiters[key];
+                    resolve({result: null, elapsedMs: Math.round(performance.now() - startedAt), timedOut: true});
+                }, timeoutMs);
+                unsafeWindow.__voyageurAncestryIndexPanelWaiters[key] = (result) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    delete unsafeWindow.__voyageurAncestryIndexPanelWaiters[key];
+                    resolve({result, elapsedMs: Math.round(performance.now() - startedAt), timedOut: false});
+                };
+            });
         }
 
         function initUI() {
@@ -1135,6 +1206,32 @@
             };
             let columnNames = [];
 
+            // Try the index-panel-data API first (Task 1/2) - if it already fired for this
+            // exact image (the common case: it's the same page load that populated the DOM
+            // table extractCurrentPageData's caller already confirmed), this resolves
+            // instantly. Only pays the bounded timeout when the API genuinely never fires
+            // for this collection/page, in which case the DOM-table loop below (completely
+            // unmodified) is the fallback. dbid/imageId were both already computed above in
+            // this same function.
+            const dbIdForApi = (dbid && dbid !== "0") ? dbid : null;
+            let apiSourcedPeople = null;
+            if (dbIdForApi && imageId) {
+                const apiWait = await waitForAncestryIndexPanelResponse(dbIdForApi, imageId, {timeoutMs: 8000});
+                if (!apiWait.timedOut && apiWait.result && Array.isArray(apiWait.result.records) && apiWait.result.records.length > 0) {
+                    apiSourcedPeople = ancestryRowsFromIndexPanelResponse(apiWait.result).filter((p) => {
+                        if (p.pid && seenPids.has(p.pid)) return false;
+                        if (p.pid) seenPids.add(p.pid);
+                        return true;
+                    });
+                    debugLog(`Ancestry index-panel-data API: ${apiSourcedPeople.length} people (of ${apiWait.result.records.length} total, ${apiWait.elapsedMs}ms) - using API data, skipping DOM table scrape for this page.`);
+                } else {
+                    debugLog(`Ancestry index-panel-data API ${apiWait.timedOut ? 'timed out' : 'returned no records'} after ${apiWait.elapsedMs}ms - falling back to DOM table scrape.`);
+                }
+            }
+
+            if (apiSourcedPeople) {
+                pageEntry.people.push(...apiSourcedPeople);
+            } else {
             for (const row of rows) {
                 const isHeader = row.classList.contains('indexPanelHeaderRow') || row.querySelectorAll('th, [role="columnheader"]').length > 0;
 
@@ -1269,6 +1366,7 @@
                     columns: columns, pid: rowPid, extracted_url: rowUrl,
                     alternate_names: alternateNames, alternate_birth_places: alternateBirthPlaces
                 });
+            }
             }
 
             const thisPlace = {
@@ -2380,6 +2478,121 @@
     // Test-only: exposes pure, DOM-free helpers for the Node test harness (see
     // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
     // there - the guard is load-bearing, not defensive boilerplate.
+// Ancestry's imageviewer/api/record/index-panel-data endpoint uses a stable, self-
+// describing fieldName vocabulary that does NOT change across census years (only which
+// fields are present varies) - confirmed live against real 1850, 1860, 1880, and 1920
+// Ancestry census data (Pembina, ND / Minnesota Territory / Dakota Territory), see
+// docs/superpowers/specs/2026-08-15-ancestry-index-panel-extraction-design.md for the
+// full real field tables this was built from. Maps each known fieldName to the SAME
+// column header text the existing DOM-table scraper already produces (e.g. "Given
+// Name", "Surname") so field_maps/ancestry_census.yaml needs no changes for any field
+// already listed here - this is a drop-in second producer of the exact same `columns`
+// shape, not a new schema.
+const ANCESTRY_INDEX_FIELD_TO_COLUMN = {
+    LineNumber: 'Line Number',
+    SourceDwellingNumber: 'Dwelling Number',
+    HouseNumber: 'Dwelling Number', // 1920's fieldName for the same concept as SourceDwellingNumber - confirmed the two never co-occur on the same collection/year
+    Famnum: 'Family Number',
+    SelfGivenName: 'Given Name',
+    SelfSurname: 'Surname',
+    SelfResidenceAge: 'Age',
+    SelfBirthYear: 'Birth Year',
+    SelfBirthMonth: 'Birth Month',
+    SelfGender: 'Gender',
+    SelfRace: 'Race',
+    SelfResidenceOccupation: 'Occupation',
+    SelfResidenceIndustry: 'Industry',
+    SelfResidenceRealEstateValue: 'Real Estate Value',
+    SelfResidencePersonalEstateValue: 'Personal Estate Value',
+    SelfBirthPlace: 'Birth Place',
+    SelfResidenceMarriedWithinYear: 'Married within Year',
+    SelfResidenceAttendedSchool: 'Attended School',
+    SelfResidenceCannotRead: 'Cannot Read, Write',
+    SelfResidenceCannotWrite: 'Cannot Read, Write',
+    SelfResidenceCanRead: 'Cannot Read, Write',
+    SelfResidenceCanWrite: 'Cannot Read, Write',
+    SelfResidenceDisabilityCondition: 'Disability Condition',
+    SelfResidenceIsMaimed: 'Disability Condition',
+    SelfResidenceIsSick: 'Disability Condition',
+    SelfResidenceIsBlind: 'Disability Condition',
+    SelfResidenceIsDeafDumb: 'Deaf Dumb Blind Insane',
+    SelfResidenceIsInsane: 'Deaf Dumb Blind Insane',
+    SelfResidenceIsIdiotic: 'Idiotic Pauper Convict',
+    SelfResidenceStreetAddress: 'Street',
+    SelfRelationToHead: 'Relationship to Head',
+    SelfMaritalStatus: 'Marital Status',
+    FatherBirthPlace: 'Father Foreign Born',
+    MotherBirthPlace: 'Mother Foreign Born',
+    SelfResidenceMonthsUnEmployedPastYear: 'Months Not Employed',
+    SelfResidenceHomeOwnership: 'Home Ownership',
+    SelfResidenceHomeMortgaged: 'Home Mortgaged',
+    SelfArrivalYear: 'Immigration Year',
+    SelfResidenceNaturalizationStatus: 'Naturalization Status',
+    SelfNaturalizationYear: 'Year of Naturalization',
+    SelfResidenceLanguageSpoken: 'Native Tongue',
+    SelfResidenceAbleToSpeakEnglish: 'Speaks English',
+    SelfResidenceIsEmployed: 'Employment Field',
+};
+
+// Converts one index-panel-data record (one person) into the same {columnHeader:
+// value} shape the DOM-table scraper produces. Empty-string values are skipped
+// entirely (never fabricate a blank column, matching how downstream unmapped-column
+// detection already treats blank values as absent). When two different API fieldNames
+// map to the SAME target column (e.g. 1880's SelfResidenceIsSick and
+// SelfResidenceIsBlind both feed "Disability Condition"), their values are combined
+// with "; " rather than the second silently overwriting the first - confirmed live
+// this collision is real (1880 exposes 6 separate boolean disability flags, this
+// project's existing schema only has one combined "Disability Condition" column). An
+// unrecognized fieldName (a field this map hasn't been extended to cover yet) is
+// passed through under its own human-readable label (from fieldLabelsByName) when
+// available, or its raw fieldName otherwise - never dropped. This exact case (a new,
+// not-yet-mapped fieldName) is expected to happen on census years beyond the 4
+// confirmed here; downstream census_schema.py already flags any unrecognized column
+// as "unmapped" for manual review - no new review-flagging logic is needed in this
+// function, it just needs to not lose the data.
+function ancestryColumnsFromIndexPanelRecord(record, fieldLabelsByName) {
+    const columns = {};
+    (record.recordFields || []).forEach((f) => {
+        const value = (f.value == null ? '' : String(f.value)).trim();
+        if (!value) return;
+        const target = ANCESTRY_INDEX_FIELD_TO_COLUMN[f.fieldName] || fieldLabelsByName[f.fieldName] || f.fieldName;
+        columns[target] = columns[target] ? `${columns[target]}; ${value}` : value;
+    });
+    return columns;
+}
+
+// Converts a full index-panel-data API response into the same row-array shape
+// extractCurrentPageData()'s DOM-table loop already produces for pageEntry.people:
+// [{columns, pid, extracted_url, alternate_names, alternate_birth_places}], plus a new
+// household_id field census_schema.py's _group_household() will prefer when present
+// (see Task 4). record.pid is Ancestry's own real, stable numeric person ID -
+// confirmed live this is the exact same identifier this project's DOM-scraper already
+// extracts from an <a href="...records/{pid}"> link, just delivered directly instead
+// of scraped. Synthesizes "Line Number" from array position (1-based) when the API
+// response doesn't expose that field at all - confirmed live 1860 exposes no
+// LineNumber field, matching the DOM-scraper's own existing "not every census year's
+// index exposes a Line Number column" fallback for the same reason.
+function ancestryRowsFromIndexPanelResponse(apiResponse) {
+    const fieldLabelsByName = {};
+    (apiResponse.fieldLabels || []).forEach((fl) => {
+        fieldLabelsByName[fl.fieldName] = fl.labelText;
+    });
+    return (apiResponse.records || []).map((record, idx) => {
+        const columns = ancestryColumnsFromIndexPanelRecord(record, fieldLabelsByName);
+        if (!columns['Line Number']) {
+            columns['Line Number'] = String(idx + 1);
+        }
+        return {
+            columns: columns,
+            pid: record.pid != null ? String(record.pid) : '',
+            household_id: record.householdId ? String(record.householdId) : '',
+            extracted_url: '',
+            alternate_names: [],
+            alternate_birth_places: [],
+        };
+    });
+}
+
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             placesMatch, saveReloadState, loadReloadState, clearReloadState,
@@ -2389,6 +2602,7 @@
             fsImageIndexFieldText, fsImageIndexFindByType,
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
+            ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
         };
     }
 
