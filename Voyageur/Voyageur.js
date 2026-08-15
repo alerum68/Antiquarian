@@ -1770,11 +1770,10 @@
             debugLog(`Scraped item ${itemId}: ${rows.length} index rows.`);
         }
 
-        // FamilySearch's account-level "explore" record view (reached, confirmed live,
-        // after clicking a household member already attached to Family Tree mid-scrape)
-        // drops the dedicated Next Image button entirely - without this fallback, the batch
-        // silently stopped after exactly one image every time a household contained a
-        // tree-attached member.
+        // FamilySearch's account-level "explore" record view (reached, confirmed live, via
+        // some FamilySearch navigation paths) drops the dedicated Next Image button entirely
+        // - without this fallback, the batch silently stopped after exactly one image
+        // whenever that view was reached.
         //
         // The "Enter Image number" input looked like an equivalent second control but is
         // NOT real navigation - confirmed live, extensively: typing a new value and
