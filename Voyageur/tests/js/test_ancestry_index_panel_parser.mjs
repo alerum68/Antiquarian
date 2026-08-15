@@ -222,3 +222,75 @@ test('ancestryRowsFromIndexPanelResponse: 1920 real fields (HouseNumber, no Sour
     assert.equal(rows[0].columns['Speaks English'], 'Yes');
     assert.equal(rows[0].household_id, '79215820');
 });
+
+test('ancestryColumnsFromIndexPanelRecord: 1870 real vitals-plus-voting-rights fields map onto existing targets', () => {
+    // Real fieldName vocabulary confirmed live for 1870 (dbId 7163, imageId 4263342_00170).
+    const record = {
+        pid: 1, householdId: '1', fullName: 'Test Person',
+        recordFields: [
+            {fieldName: 'SelfOccupation', value: 'Farmer', correctedValue: null},
+            {fieldName: 'SelfResidenceFatherForeignBirth', value: 'Y', correctedValue: null},
+            {fieldName: 'SelfResidenceMotherForeignBirth', value: 'Y', correctedValue: null},
+            {fieldName: 'SelfResidenceMaleCitizenOverTwentyone', value: 'Y', correctedValue: null},
+            {fieldName: 'SelfResidenceDeniedVotingRights', value: 'N', correctedValue: null},
+        ],
+        citation: null, isUserCreated: false,
+    };
+
+    const columns = ancestryColumnsFromIndexPanelRecord(record, {});
+
+    assert.equal(columns['Occupation'], 'Farmer');
+    assert.equal(columns['Father Foreign Born'], 'Y');
+    assert.equal(columns['Mother Foreign Born'], 'Y');
+    assert.equal(columns['Male Citizen Over 21'], 'Y');
+    assert.equal(columns['Voting Rights Denied'], 'N');
+});
+
+test('ancestryColumnsFromIndexPanelRecord: 1930 combined Can-Read-Write and value-of-home fields map onto existing targets', () => {
+    // Real fieldName vocabulary confirmed live for 1930 (dbId 6224, imageId 4547413_00007).
+    const record = {
+        pid: 1, householdId: '1', fullName: 'Test Person',
+        recordFields: [
+            {fieldName: 'SelfResidenceCanReadWrite', value: 'Yes', correctedValue: null},
+            {fieldName: 'SelfResidenceValueOfHome', value: '2500', correctedValue: null},
+            {fieldName: 'SelfResidenceWar', value: 'WW', correctedValue: null},
+            {fieldName: 'SelfIndustry', value: 'Retail', correctedValue: null},
+        ],
+        citation: null, isUserCreated: false,
+    };
+
+    const columns = ancestryColumnsFromIndexPanelRecord(record, {});
+
+    assert.equal(columns['Cannot Read, Write'], 'Yes');
+    assert.equal(columns['Real Estate Value'], '2500');
+    assert.equal(columns['Which War'], 'WW');
+    assert.equal(columns['Industry'], 'Retail');
+});
+
+test('ancestryColumnsFromIndexPanelRecord: 1890 fragment fields (numbered HomeMortgaged variant, grade, months-at-school) map onto existing targets', () => {
+    // Real fieldName vocabulary confirmed live for 1890 Fragment (dbId 5445, imageId 4376858-00418).
+    const record = {
+        pid: 1, householdId: '1', fullName: 'Test Person',
+        recordFields: [
+            {fieldName: 'SelfResidenceMaritalStatus', value: 'Married', correctedValue: null},
+            {fieldName: 'SelfResidence1HomeMortgaged', value: 'Y', correctedValue: null},
+            {fieldName: 'SelfResidenceGradeCompleted', value: '6', correctedValue: null},
+            {fieldName: 'SelfResidenceMonthsAtSchool', value: '4', correctedValue: null},
+            {fieldName: 'SelfResidenceVeteran', value: 'Y', correctedValue: null},
+            {fieldName: 'SelfResidenceMilitaryService', value: 'Union Army', correctedValue: null},
+            {fieldName: 'SelfResidenceNativeLanguageCode', value: 'GER', correctedValue: null},
+        ],
+        citation: null, isUserCreated: false,
+    };
+
+    const columns = ancestryColumnsFromIndexPanelRecord(record, {});
+
+    assert.equal(columns['Marital Status'], 'Married');
+    assert.equal(columns['Home Mortgaged'], 'Y');
+    assert.equal(columns['Highest Grade Completed'], '6');
+    assert.equal(columns['Attended School'], '4');
+    assert.equal(columns['Veteran Status'], 'Y');
+    assert.equal(columns['Military Service'], 'Union Army');
+    assert.equal(columns['Native Tongue'], 'GER');
+});
+

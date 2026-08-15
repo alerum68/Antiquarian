@@ -2532,6 +2532,27 @@ const ANCESTRY_INDEX_FIELD_TO_COLUMN = {
     SelfResidenceLanguageSpoken: 'Native Tongue',
     SelfResidenceAbleToSpeakEnglish: 'Speaks English',
     SelfResidenceIsEmployed: 'Employment Field',
+    // --- Extension: aliases confirmed live across the full 22-year US+Canadian
+    // research pass (docs/superpowers/specs/2026-08-15-census-field-coverage-research.md).
+    // Every target below already exists in field_maps/ancestry_census.yaml (as left by
+    // the original plan's Task 4) - these are ONLY new fieldName spellings for concepts
+    // this project already understands, never new GEDCOM targets.
+    SelfOccupation: 'Occupation', // 1870/1871/1930's no-"Residence"-infix naming variant
+    SelfIndustry: 'Industry', // 1930's naming variant of SelfResidenceIndustry
+    SelfResidenceFatherForeignBirth: 'Father Foreign Born', // 1870 - boolean flag, not a place
+    SelfResidenceMotherForeignBirth: 'Mother Foreign Born', // 1870
+    SelfResidenceMaleCitizenOverTwentyone: 'Male Citizen Over 21', // 1870
+    SelfResidenceDeniedVotingRights: 'Voting Rights Denied', // 1870
+    SelfResidenceCanReadWrite: 'Cannot Read, Write', // 1930's single combined Can-Read-Write field
+    SelfResidenceVeteran: 'Veteran Status', // 1900/1910/1920/1930/1940
+    SelfResidenceWar: 'Which War', // 1930 - which war served in
+    SelfResidenceMilitaryService: 'Military Service', // 1940
+    SelfResidenceValueOfHome: 'Real Estate Value', // 1930/1940 - value-of-home aliased onto the existing Real Estate Value / Property fact
+    SelfResidenceNativeLanguageCode: 'Native Tongue', // 1910's coded variant of SelfResidenceLanguageSpoken
+    SelfResidenceMaritalStatus: 'Marital Status', // 1890's "Residence"-infixed naming variant of SelfMaritalStatus
+    SelfResidence1HomeMortgaged: 'Home Mortgaged', // 1890's numbered-variant naming of SelfResidenceHomeMortgaged (this ONE numbered variant is a confirmed like-for-like alias, unlike the ambiguous numbered-duplicate PAIRS noted in this plan's scope-exclusion list - it's the only field of its kind in the 1890 collection, no sibling "HomeMortgaged" to be confused with)
+    SelfResidenceGradeCompleted: 'Highest Grade Completed', // 1890
+    SelfResidenceMonthsAtSchool: 'Attended School', // 1890/1901 - numeric months-attended aliased onto the existing boolean/text Attended School fact
 };
 
 // SelfGender's own value is the full word ("Male"/"Female"), unlike the DOM table's
