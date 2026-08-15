@@ -77,7 +77,7 @@ All captured live, this session, against real Ancestry data. `fieldName` is the 
 | `SelfGender` | `"Male"` | `Gender` |
 | `SelfRace` | `"White"` | `Race` |
 | `SelfResidenceOccupation` | `"Clerk"` | `Occupation` |
-| `SelfResidenceIndustry` | `"Not Specified Retail Trade"` | `Industry` *(new — see New Fields below)* |
+| `SelfResidenceIndustry` | `"Not Specified Retail Trade"` | `Industry` *(already an existing `ancestry_census.yaml` target — `"Industry": Occupation` in `participant_facts`, confirmed present in the file before this plan; no YAML change needed for this field, just a JS-side `fieldName → "Industry"` mapping entry)* |
 | `SelfResidenceRealEstateValue` | `""` | `Real Estate Value` |
 | `SelfBirthPlace` | (not captured in sample, field present) | `Birth Place` |
 | `SelfResidenceMarriedWithinYear` | `""` | `Married within Year` |
@@ -89,7 +89,7 @@ All captured live, this session, against real Ancestry data. `fieldName` is the 
 
 ### 1860 (dbId `7667`, `imageId` `4211353_00001`, Joseph Kosses household, Dakota Territory — the collection this project's other live-verification testing already uses)
 
-17 fields (same shape as 1850, minus `LineNumber`/`Industry`, plus `PersonalEstateValue` — matches real US census history: personal estate value was added as a census question starting 1860). Real sample (Joseph Kosses, dwelling 1):
+17 fields (same shape as 1850, minus `LineNumber`/`SelfResidenceIndustry`, plus `SelfResidencePersonalEstateValue` — matches real US census history: personal estate value was added as a census question starting 1860). Real sample (Joseph Kosses, dwelling 1):
 
 `SourceDwellingNumber:"1"`, `Famnum:"1"`, `SelfSurname:"Kosses"`, `SelfGivenName:"Joseph"`, `SelfResidenceAge:"32"`, `SelfBirthYear:"1828"`, `SelfGender:"Male"`, `SelfRace:"White"`, `SelfResidenceOccupation:"Hunter"`, `SelfResidenceRealEstateValue:""`, `SelfResidencePersonalEstateValue:"300"`, `SelfBirthPlace:"Hudsen Bay Ter T"`, `SelfResidenceMarriedWithinYear:""`, `SelfResidenceAttendedSchool:""`, `SelfResidenceCannotRead:""`, `SelfResidenceDisabilityCondition:""`.
 
@@ -151,7 +151,7 @@ New fields vs. 1880/1850, mapping targets:
 | `SelfResidenceCanWrite` | *new* → same as above |
 | `SelfResidenceLanguageSpoken` | *new* → `Native Tongue` (Miscellaneous fact) |
 | `SelfResidenceAbleToSpeakEnglish` | *new* → `Speaks English` (Miscellaneous fact) |
-| `SelfResidenceIndustry` | *new* → `Industry` (Miscellaneous fact — same target as 1850's `SelfResidenceIndustry`) |
+| `SelfResidenceIndustry` | → `Industry` *(same existing target as 1850's `SelfResidenceIndustry` — already `"Industry": Occupation` in `participant_facts`, no YAML change needed)* |
 | `SelfResidenceIsEmployed` | *new* → `Employment Field` (Miscellaneous fact) |
 
 ## Architecture
@@ -179,11 +179,10 @@ Add these `participant_facts` entries (target: `Miscellaneous` fact-type bucket,
   "Home Mortgaged": Miscellaneous
   "Native Tongue": Miscellaneous
   "Speaks English": Miscellaneous
-  "Industry": Miscellaneous
   "Employment Field": Miscellaneous
 ```
 
-`Sick`/`Blind`/`Disability Condition` reuse the existing `Disability Condition` → `Miscellaneous` mapping already present. `Deaf Dumb Blind Insane`/`Idiotic Pauper Convict`/`Father Foreign Born`/`Mother Foreign Born` reuse existing entries already present (all already `Miscellaneous`-mapped). No changes needed for those — they're listed in the field-set tables above only to document which API `fieldName` feeds them.
+`Industry` needs NO change — confirmed already present in the current file (`"Industry": Occupation` in `participant_facts`). `Sick`/`Blind`/`Disability Condition` reuse the existing `Disability Condition` → `Miscellaneous` mapping already present. `Deaf Dumb Blind Insane`/`Idiotic Pauper Convict`/`Father Foreign Born`/`Mother Foreign Born`/`Cannot Read, Write`/`Naturalization Status`/`Year of Naturalization`/`Immigration Year` reuse existing entries already present in the file today. No changes needed for those — they're listed in the field-set tables above only to document which API `fieldName` feeds them.
 
 ## Scope decisions
 
