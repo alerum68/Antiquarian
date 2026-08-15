@@ -153,6 +153,159 @@
         sessionStorage.removeItem(FS_RELOAD_STATE_KEY);
     }
 
+    // FamilySearch orchestration-API graph traversal - confirmed live (see
+    // docs/superpowers/specs/2026-08-14-fs-orchestration-api-extraction-design.md) that
+    // FamilySearch's own client fires GET .../orchestration/sls/image/{ark} automatically on
+    // page load, returning a flat `elements` array cross-referenced by UUID/ark via
+    // subElements/superElements - not a nested tree. These are pure, DOM-free functions:
+    // build the {id: element} index once per response, then walk it.
+    function buildFsElementIndex(apiResponse) {
+        const byId = {};
+        (apiResponse.elements || []).forEach((e) => { byId[e.id] = e; });
+        return byId;
+    }
+
+    function fsFieldText(fieldElement) {
+        const fv = fieldElement && fieldElement.fieldValues && fieldElement.fieldValues[0];
+        if (!fv) return '';
+        if (fv.normalizedValues && fv.normalizedValues[0]) return fv.normalizedValues[0].text || '';
+        if (fv.origValue) return fv.origValue.text || '';
+        return '';
+    }
+
+    function fsFindChild(byId, subElements, elementType) {
+        if (!subElements) return null;
+        for (const ref of subElements) {
+            const el = byId[ref.id];
+            if (el && el.elementType === elementType) return el;
+        }
+        return null;
+    }
+
+    // Direct indirection: PERSON -> FIELD (matching fieldType) -> text. Confirmed live for
+    // RELATIONSHIP_TO_HEAD, MARITAL_STATUS, OCCUPATION, RACE_OR_COLOR, FTHR_BIR_PLACE,
+    // MTHR_BIR_PLACE, SEX_CODE, SOURCE_HOUSEHOLD_ID, FS_HOUSEHOLD_ID, SOURCE_HOUSE_NBR - these
+    // FIELD elements are direct children of PERSON, no wrapper element in between. Returns ''
+    // when the field is genuinely absent (the 1850-1870 era case - not an error, just no such
+    // question on that year's questionnaire).
+    function fsPersonFieldText(byId, person, fieldType) {
+        if (!person || !person.subElements) return '';
+        for (const ref of person.subElements) {
+            const el = byId[ref.id];
+            if (el && el.elementType === 'FIELD' && el.fieldType === fieldType) return fsFieldText(el);
+        }
+        return '';
+    }
+
+    // Two-level indirection: PERSON -> {wrapperElementType, e.g. AGE} -> FIELD -> text.
+    // Confirmed live for AGE - unlike the direct fields above, AGE is its own wrapping
+    // element type, not a bare FIELD child of PERSON.
+    function fsWrappedFieldText(byId, person, wrapperElementType) {
+        const wrapper = fsFindChild(byId, person && person.subElements, wrapperElementType);
+        if (!wrapper) return '';
+        const field = fsFindChild(byId, wrapper.subElements, 'FIELD');
+        return field ? fsFieldText(field) : '';
+    }
+
+    // Three-level indirection: PERSON -> NAME -> NAME_GIVEN/NAME_SURNAME -> FIELD -> text.
+    // A person can have more than one NAME (multiple indexed variants, confirmed live: 101
+    // NAME elements for 42 PERSON elements on one 1850 image) - prefers the one marked
+    // primary, same convention already used for PERSON itself in this file, falling back to
+    // the first NAME found when none is marked primary.
+    function fsPersonName(byId, person) {
+        const names = (person && person.subElements || [])
+            .map((ref) => byId[ref.id])
+            .filter((el) => el && el.elementType === 'NAME');
+        const nameEl = names.find((n) => n.primary) || names[0];
+        if (!nameEl) return {given: '', surname: ''};
+        const givenEl = fsFindChild(byId, nameEl.subElements, 'NAME_GIVEN');
+        const surnameEl = fsFindChild(byId, nameEl.subElements, 'NAME_SURNAME');
+        const givenField = givenEl ? fsFindChild(byId, givenEl.subElements, 'FIELD') : null;
+        const surnameField = surnameEl ? fsFindChild(byId, surnameEl.subElements, 'FIELD') : null;
+        return {
+            given: givenField ? fsFieldText(givenField) : '',
+            surname: surnameField ? fsFieldText(surnameField) : '',
+        };
+    }
+
+    // PERSON -> EVENT(eventType=BIRTH) -> PLACE -> FIELD -> text. Confirmed live: the CENSUS
+    // event's PLACE is residence, not birthplace - only the BIRTH-type event's PLACE is
+    // birthplace, and it's absent entirely when FamilySearch's indexing didn't derive one.
+    function fsPersonBirthPlace(byId, person) {
+        const events = (person && person.subElements || [])
+            .map((ref) => byId[ref.id])
+            .filter((el) => el && el.elementType === 'EVENT');
+        const birthEvent = events.find((e) => e.eventType === 'BIRTH');
+        if (!birthEvent) return '';
+        const placeEl = fsFindChild(byId, birthEvent.subElements, 'PLACE');
+        if (!placeEl) return '';
+        const field = fsFindChild(byId, placeEl.subElements, 'FIELD');
+        return field ? fsFieldText(field) : '';
+    }
+
+    // RECORD.subElements directly lists the household's PERSON arks - confirmed live, no
+    // separate id-matching needed the way the old UI-scraper had to reconstruct household
+    // membership from DOM position.
+    function fsHouseholds(apiResponse, byId) {
+        return (apiResponse.elements || [])
+            .filter((e) => e.elementType === 'RECORD')
+            .map((record) => ({
+                recordId: record.id,
+                personIds: (record.subElements || [])
+                    .map((ref) => ref.id)
+                    .filter((id) => byId[id] && byId[id].elementType === 'PERSON'),
+            }));
+    }
+
+    // Prefers the sheet-printed family number (SOURCE_HOUSEHOLD_ID), falling back to
+    // FamilySearch's own system-generated id (FS_HOUSEHOLD_ID) when the original indexer
+    // didn't record one - confirmed live these two are exact complements on a real image (35
+    // + 7 = 42 of 42 persons). SOURCE_HOUSE_NBR is a dwelling number, not a family number
+    // (a dwelling can hold multiple families) - deliberately not used here. Falls back to a
+    // sequential per-household counter only if neither field exists at all, matching the old
+    // UI-scraper's own behavior for collections this rich data isn't available on.
+    function fsFamilyNumber(byId, person, sequentialFallback) {
+        return fsPersonFieldText(byId, person, 'SOURCE_HOUSEHOLD_ID')
+            || fsPersonFieldText(byId, person, 'FS_HOUSEHOLD_ID')
+            || String(sequentialFallback);
+    }
+
+    // Omitted entirely (not set to '') when absent - matches the old UI-scraper's
+    // own "don't fabricate data" convention, and is how the 1850-1870 era
+    // boundary is handled: no special-case branching, just field-absence.
+    function fsBuildRowsFromApiResponse(apiResponse) {
+        const byId = buildFsElementIndex(apiResponse);
+        const rows = [];
+        let householdIndex = 0;
+        for (const household of fsHouseholds(apiResponse, byId)) {
+            householdIndex++;
+            for (const personId of household.personIds) {
+                const person = byId[personId];
+                if (!person) continue;
+
+                const {given, surname} = fsPersonName(byId, person);
+                const sex = fsPersonFieldText(byId, person, 'SEX_CODE');
+                const columns = {
+                    'Given Name': given,
+                    'Surname': surname,
+                    'Gender': sex ? sex.toUpperCase() : '',
+                    'Age': fsWrappedFieldText(byId, person, 'AGE'),
+                    'Family Number': fsFamilyNumber(byId, person, householdIndex),
+                };
+
+                // Omitted entirely (not set to '') when absent - matches the old UI-scraper's
+                // own "don't fabricate data" convention, and is how the 1850-1870 era
+                // boundary is handled: no special-case branching, just field-absence.
+                const relationshipToHead = fsPersonFieldText(byId, person, 'RELATIONSHIP_TO_HEAD');
+                if (relationshipToHead) columns['Relationship to Head'] = relationshipToHead;
+
+                rows.push({columns, person_ark: person.id, attached_fsftid: ''});
+            }
+        }
+        return rows;
+    }
+
+
     // Dispatch by hostname, the same way Voyageur.py's Python side dispatches by an explicit
     // source-code argument - adding a new Major Repository here is a new @match line above
     // plus a new runXGather() function below, nothing else touched.
@@ -2129,7 +2282,11 @@
     // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
     // there - the guard is load-bearing, not defensive boilerplate.
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = {placesMatch, saveReloadState, loadReloadState, clearReloadState};
+        module.exports = {
+            placesMatch, saveReloadState, loadReloadState, clearReloadState,
+            buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
+            fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
+        };
     }
 
 })();
