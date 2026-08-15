@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.27
+// @version      0.3.28
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -2534,6 +2534,20 @@ const ANCESTRY_INDEX_FIELD_TO_COLUMN = {
     SelfResidenceIsEmployed: 'Employment Field',
 };
 
+// SelfGender's own value is the full word ("Male"/"Female"), unlike the DOM table's
+// single-letter "Gender" column text - confirmed live this session (Task 5 live
+// verification of the Ancestry index-panel-data plan). Normalized to the same M/F/U
+// literal Commissioner's schema (and every other sex-bearing field in this codebase,
+// e.g. Census.py's get_gender()) already expects, so the two sources produce an
+// identical shape rather than relying on every downstream consumer to re-normalize a
+// full word on its own.
+function ancestryNormalizeGender(value) {
+    const upper = value.toUpperCase();
+    if (upper.startsWith('M')) return 'M';
+    if (upper.startsWith('F')) return 'F';
+    return 'U';
+}
+
 // Converts one index-panel-data record (one person) into the same {columnHeader:
 // value} shape the DOM-table scraper produces. Empty-string values are skipped
 // entirely (never fabricate a blank column, matching how downstream unmapped-column
@@ -2556,7 +2570,8 @@ function ancestryColumnsFromIndexPanelRecord(record, fieldLabelsByName) {
         const value = (f.value == null ? '' : String(f.value)).trim();
         if (!value) return;
         const target = ANCESTRY_INDEX_FIELD_TO_COLUMN[f.fieldName] || fieldLabelsByName[f.fieldName] || f.fieldName;
-        columns[target] = columns[target] ? `${columns[target]}; ${value}` : value;
+        const normalizedValue = f.fieldName === 'SelfGender' ? ancestryNormalizeGender(value) : value;
+        columns[target] = columns[target] ? `${columns[target]}; ${normalizedValue}` : normalizedValue;
     });
     return columns;
 }

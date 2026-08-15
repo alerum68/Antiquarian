@@ -72,7 +72,7 @@ test('ancestryColumnsFromIndexPanelRecord: 1850 real Joseph Rolette record maps 
     assert.equal(columns['Surname'], 'Rolette');
     assert.equal(columns['Age'], '28');
     assert.equal(columns['Birth Year'], '1822');
-    assert.equal(columns['Gender'], 'Male');
+    assert.equal(columns['Gender'], 'M');
     assert.equal(columns['Race'], 'White');
     assert.equal(columns['Occupation'], 'Clerk');
     assert.equal(columns['Industry'], 'Not Specified Retail Trade');
@@ -102,6 +102,23 @@ test('ancestryColumnsFromIndexPanelRecord: 1880 disability sub-flags combine int
     const columns = ancestryColumnsFromIndexPanelRecord(record, {});
 
     assert.equal(columns['Disability Condition'], 'X; X');
+});
+
+test('ancestryColumnsFromIndexPanelRecord: SelfGender normalizes Male/Female/unrecognized to M/F/U', () => {
+    // Confirmed live (Task 5 verification): the API's SelfGender value is a full word,
+    // unlike the DOM table's single-letter form - normalized to the M/F/U literal every
+    // other sex-bearing field in this codebase (and Commissioner's schema) expects.
+    const male = ancestryColumnsFromIndexPanelRecord(
+        {recordFields: [{fieldName: 'SelfGender', value: 'Male', correctedValue: null}]}, {});
+    assert.equal(male['Gender'], 'M');
+
+    const female = ancestryColumnsFromIndexPanelRecord(
+        {recordFields: [{fieldName: 'SelfGender', value: 'Female', correctedValue: null}]}, {});
+    assert.equal(female['Gender'], 'F');
+
+    const unknown = ancestryColumnsFromIndexPanelRecord(
+        {recordFields: [{fieldName: 'SelfGender', value: 'Unknown', correctedValue: null}]}, {});
+    assert.equal(unknown['Gender'], 'U');
 });
 
 test('ancestryColumnsFromIndexPanelRecord: unrecognized fieldName passes through under its label, never dropped', () => {

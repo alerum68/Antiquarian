@@ -35,11 +35,11 @@
 - Produces: `ANCESTRY_INDEX_FIELD_TO_COLUMN` (object constant), `ancestryColumnsFromIndexPanelRecord(record, fieldLabelsByName)` (function, returns object), `ancestryRowsFromIndexPanelResponse(apiResponse)` (function, returns array of `{columns, pid, household_id, extracted_url, alternate_names, alternate_birth_places}` objects) — all three must be added to `module.exports` at the bottom of `Voyageur.js` (see Step 5).
 - Consumes: nothing from other tasks.
 
-- [ ] **Step 1: Locate the insertion point**
+- [x] **Step 1: Locate the insertion point**
 
 Open `Voyageur/Voyageur.js`. Find the function `async function extractCurrentPageData(rows) {` (search for that exact text — do not rely on a line number, other tasks in this plan may shift line numbers before you get to this file). Note the line number just ABOVE that function declaration — you will insert the new code from this task immediately before it, so it's defined before it's used.
 
-- [ ] **Step 2: Add the field-name-to-column mapping constant**
+- [x] **Step 2: Add the field-name-to-column mapping constant**
 
 Insert this constant immediately before `async function extractCurrentPageData(rows) {`:
 
@@ -101,7 +101,7 @@ const ANCESTRY_INDEX_FIELD_TO_COLUMN = {
 };
 ```
 
-- [ ] **Step 3: Add the two pure parser functions**
+- [x] **Step 3: Add the two pure parser functions**
 
 Insert immediately after the constant from Step 2 (still before `extractCurrentPageData`):
 
@@ -166,12 +166,12 @@ function ancestryRowsFromIndexPanelResponse(apiResponse) {
 }
 ```
 
-- [ ] **Step 4: Run `node --check` to verify no syntax errors**
+- [x] **Step 4: Run `node --check` to verify no syntax errors**
 
 Run: `node --check Voyageur/Voyageur.js` (from the repo root, i.e. `Scriptorium/`)
 Expected: no output, exit code 0.
 
-- [ ] **Step 5: Export the two new functions**
+- [x] **Step 5: Export the two new functions**
 
 Find `module.exports = {` near the bottom of the file (inside the `if (typeof module !== 'undefined' && module.exports) {` block). Add the two new function names to the existing list (do not remove or reorder any existing entries):
 
@@ -188,7 +188,7 @@ Find `module.exports = {` near the bottom of the file (inside the `if (typeof mo
         };
 ```
 
-- [ ] **Step 6: Write the test file with real fixture data from all 4 confirmed census years**
+- [x] **Step 6: Write the test file with real fixture data from all 4 confirmed census years**
 
 Create `Voyageur/tests/js/test_ancestry_index_panel_parser.mjs`:
 
@@ -402,17 +402,17 @@ test('ancestryRowsFromIndexPanelResponse: 1920 real fields (HouseNumber, no Sour
 });
 ```
 
-- [ ] **Step 7: Run the new tests to verify they pass**
+- [x] **Step 7: Run the new tests to verify they pass**
 
 Run: `node --test Voyageur/tests/js/test_ancestry_index_panel_parser.mjs` (from repo root)
 Expected: all tests PASS (6 tests total).
 
-- [ ] **Step 8: Run the full existing JS suite to confirm no regressions**
+- [x] **Step 8: Run the full existing JS suite to confirm no regressions**
 
 Run: `node --test Voyageur/tests/js/` (from repo root)
 Expected: all pre-existing tests still pass, plus the 6 new ones.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js Voyageur/tests/js/test_ancestry_index_panel_parser.mjs
@@ -430,7 +430,7 @@ git commit -m "feat(voyageur): add Ancestry index-panel-data field map and parse
 - Consumes: nothing from Task 1 directly (this task is independent JS in a different part of the file).
 - Produces: `waitForAncestryIndexPanelResponse(dbId, imageId, {timeoutMs})` (async function, resolves to `{result, elapsedMs, timedOut}`) — Task 3 calls this.
 
-- [ ] **Step 1: Locate the existing Ancestry interceptor block**
+- [x] **Step 1: Locate the existing Ancestry interceptor block**
 
 In `Voyageur/Voyageur.js`, find this exact block (search for `__mgs_intercepted`):
 
@@ -488,7 +488,7 @@ In `Voyageur/Voyageur.js`, find this exact block (search for `__mgs_intercepted`
         }
 ```
 
-- [ ] **Step 2: Replace that exact block with this extended version**
+- [x] **Step 2: Replace that exact block with this extended version**
 
 This is the SAME block with three additions: (a) two new `unsafeWindow` state objects, (b) a URL-key helper and a store function for `index-panel-data`, (c) both the `fetch` and `XMLHttpRequest.open` overrides now also check for and store `index-panel-data` responses. `extractPidsFromText` itself is untouched.
 
@@ -617,17 +617,17 @@ This is the SAME block with three additions: (a) two new `unsafeWindow` state ob
         }
 ```
 
-- [ ] **Step 3: Run `node --check` to verify no syntax errors**
+- [x] **Step 3: Run `node --check` to verify no syntax errors**
 
 Run: `node --check Voyageur/Voyageur.js`
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: Run the full JS test suite to confirm no regressions**
+- [x] **Step 4: Run the full JS test suite to confirm no regressions**
 
 Run: `node --test Voyageur/tests/js/` (from repo root)
 Expected: all tests still pass (this task adds no new tests of its own - `waitForAncestryIndexPanelResponse` is network/timer-driven and not practically unit-testable in the Node harness the same way the pure Task 1 functions are; it gets exercised by Task 5's live verification instead).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js
@@ -645,7 +645,7 @@ git commit -m "feat(voyageur): intercept Ancestry index-panel-data responses"
 - Consumes: `ancestryRowsFromIndexPanelResponse` (Task 1), `waitForAncestryIndexPanelResponse` (Task 2).
 - Produces: nothing new for later tasks - this is the final wiring point for Voyageur.js in this plan.
 
-- [ ] **Step 1: Locate the exact insertion point inside `extractCurrentPageData`**
+- [x] **Step 1: Locate the exact insertion point inside `extractCurrentPageData`**
 
 Find `async function extractCurrentPageData(rows) {` again (line numbers have shifted since Tasks 1-2 added code above it - search by name, not line number). Inside it, find this exact line:
 
@@ -659,7 +659,7 @@ Immediately followed by:
             for (const row of rows) {
 ```
 
-- [ ] **Step 2: Insert the API-first branch between those two lines**
+- [x] **Step 2: Insert the API-first branch between those two lines**
 
 The line `let columnNames = [];` stays exactly where it is. Immediately after it, and immediately BEFORE `for (const row of rows) {`, insert:
 
@@ -693,7 +693,7 @@ The line `let columnNames = [];` stays exactly where it is. Immediately after it
             } else {
 ```
 
-- [ ] **Step 3: Close the new `else` branch after the existing loop**
+- [x] **Step 3: Close the new `else` branch after the existing loop**
 
 Find the existing loop's closing brace - it's the `}` that immediately follows the line `pageEntry.people.push({... alternate_names: alternateNames, alternate_birth_places: alternateBirthPlaces});` and precedes the blank line before `const thisPlace = {`. That closing `}` currently closes the `for` loop. Add ONE more closing brace right after it, to close the new `else` block from Step 2:
 
@@ -722,7 +722,7 @@ After:
 
 (The DOM-table loop body between `for (const row of rows) {` and this closing brace is UNCHANGED - do not edit anything inside it. Only the brace structure around it changed: one new `if (apiSourcedPeople) { ... } else {` wraps the whole thing, needing one extra closing `}`.)
 
-- [ ] **Step 4: Bump the version number**
+- [x] **Step 4: Bump the version number**
 
 Find `// @version      0.3.26` near the top of the file (line 4) and change it to:
 
@@ -730,17 +730,17 @@ Find `// @version      0.3.26` near the top of the file (line 4) and change it t
 // @version      0.3.27
 ```
 
-- [ ] **Step 5: Run `node --check` to verify no syntax errors**
+- [x] **Step 5: Run `node --check` to verify no syntax errors**
 
 Run: `node --check Voyageur/Voyageur.js`
 Expected: no output, exit code 0. If this fails with a brace-mismatch error, re-check Step 3 carefully - it's the step most likely to introduce an unbalanced brace.
 
-- [ ] **Step 6: Run the full JS test suite to confirm no regressions**
+- [x] **Step 6: Run the full JS test suite to confirm no regressions**
 
 Run: `node --test Voyageur/tests/js/` (from repo root)
 Expected: all tests still pass. This step doesn't add new tests (this wiring is only exercisable live, in a real browser with a real network response - Task 5 covers that).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add Voyageur/Voyageur.js
@@ -760,7 +760,7 @@ git commit -m "feat(voyageur): wire Ancestry index-panel-data as a fallback pair
 - Consumes: the `household_id` key Task 1's `ancestryRowsFromIndexPanelResponse` sets on each person row (already documented above - this task's Python tests construct that key directly in fixtures, no need to run any JS).
 - Produces: nothing further downstream in this plan.
 
-- [ ] **Step 1: Write the failing test for household_id preference**
+- [x] **Step 1: Write the failing test for household_id preference**
 
 Open `Voyageur/tests/test_census_schema.py`. Find the `def test_relationship_era_groups_household_and_maps_role_name():` function (search by name). Insert this new test immediately before it:
 
@@ -809,12 +809,12 @@ def test_group_household_falls_back_to_column_based_key_when_household_id_absent
     assert records[0]["record_number"] == "5"
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+- [x] **Step 2: Run the new tests to verify they fail**
 
 Run: `cd Voyageur && python -m pytest tests/test_census_schema.py -k "household_id" -v` (adjust the `python` command to `python3`/`py -3` if that's what this machine uses - check with `python --version` first if unsure)
 Expected: `test_group_household_prefers_household_id_over_column_based_key` FAILS (grouping not yet implemented), `test_group_household_falls_back_to_column_based_key_when_household_id_absent` PASSES (this behavior already exists, this test just documents/locks it in before the change).
 
-- [ ] **Step 3: Implement `household_id` preference in `_group_household`**
+- [x] **Step 3: Implement `household_id` preference in `_group_household`**
 
 Open `Voyageur/census_schema.py`. Find this exact function (search for `def _group_household`):
 
@@ -856,17 +856,17 @@ def _group_household(people: List[dict], field_map: Dict[str, Dict[str, str]]
 
 (Everything below this point in the function - the `fallback_counter` handling, the `groups`/`order` bookkeeping, the `return` statement - is unchanged. Only the `key = ...` line itself changes, from `key = _household_key(columns, field_map)` to `key = person.get("household_id") or _household_key(columns, field_map)`.)
 
-- [ ] **Step 4: Run the tests again to verify they pass**
+- [x] **Step 4: Run the tests again to verify they pass**
 
 Run: `cd Voyageur && python -m pytest tests/test_census_schema.py -k "household_id" -v`
 Expected: both tests PASS.
 
-- [ ] **Step 5: Run the full `census_schema.py` test suite to confirm no regressions**
+- [x] **Step 5: Run the full `census_schema.py` test suite to confirm no regressions**
 
 Run: `cd Voyageur && python -m pytest tests/test_census_schema.py -v`
 Expected: all tests pass (should be 22 total: 20 pre-existing + 2 new from this task).
 
-- [ ] **Step 6: Add the new field-map entries to `ancestry_census.yaml`**
+- [x] **Step 6: Add the new field-map entries to `ancestry_census.yaml`**
 
 Open `Voyageur/field_maps/ancestry_census.yaml`. Find this exact block under `participant_fields:`:
 
@@ -912,7 +912,7 @@ Replace it with (adds six new entries, keeps the existing two unchanged):
 
 Do NOT add an "Industry" entry anywhere in this file - it already exists (`"Industry": Occupation` under `participant_facts`, confirmed present before this task). Do NOT add a "House Number" entry under `participant_fields` - it's deliberately absent there (already exists under `record_fields` as a `dwelling_number` alias; the existing comment in the file explains why it must not also appear under `participant_fields`).
 
-- [ ] **Step 7: Write a test proving the two new `participant_fields` mappings work**
+- [x] **Step 7: Write a test proving the two new `participant_fields` mappings work**
 
 In `Voyageur/tests/test_census_schema.py`, find `def test_married_within_year_is_a_per_participant_field_not_dropped_as_a_record_field():` (search by name) and insert this new test immediately after its closing (before the next `def`):
 
@@ -937,12 +937,12 @@ def test_ancestry_birth_month_and_marital_status_are_mapped_not_unmapped():
     assert not participant["review"], participant.get("review_reason")
 ```
 
-- [ ] **Step 8: Run the new test to verify it passes**
+- [x] **Step 8: Run the new test to verify it passes**
 
 Run: `cd Voyageur && python -m pytest tests/test_census_schema.py -k "birth_month_and_marital_status" -v`
 Expected: PASS.
 
-- [ ] **Step 9: Run the full Voyageur and Archivist Python test suites**
+- [x] **Step 9: Run the full Voyageur and Archivist Python test suites**
 
 Run: `cd Voyageur && python -m pytest tests/ -v`
 Expected: all tests pass.
@@ -950,7 +950,7 @@ Expected: all tests pass.
 Run: `cd Archivist && python -m pytest tests/ -v`
 Expected: all tests pass (this task doesn't touch Archivist, this is a pure regression check).
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add Voyageur/census_schema.py Voyageur/field_maps/ancestry_census.yaml Voyageur/tests/test_census_schema.py
@@ -965,23 +965,23 @@ git commit -m "feat(voyageur): prefer household_id for grouping, map new Ancestr
 
 **Interfaces:** N/A.
 
-- [ ] **Step 1: Run a real 3-page Ancestry gather**
+- [x] **Step 1: Run a real 3-page Ancestry gather**
 
 Using the same isolated-output-directory technique already established this session (env var overrides `JSON_DIR`/`MEDIA_DIR`/`GENEALOGY_DIR`, never touching the user's real `.env`-configured output paths), run `python Voyageur/A.py` against one of the four already-confirmed test URLs from the design spec (1850 `dbId=8054`/`imageId=4195937-00039`, 1860 `dbId=7667`/`imageId=4211353_00001`, 1880 `dbId=6742`/`imageId=4240106-00102`, or 1920 `dbId=6061`/`imageId=4383784_00215` - any one is a valid live test; the 1860 one is this project's own long-standing default test record, referenced throughout this repo's own prior session history).
 
-- [ ] **Step 2: Confirm the API path actually fired, not just the DOM fallback**
+- [x] **Step 2: Confirm the API path actually fired, not just the DOM fallback**
 
 Inspect the resulting JSON output's `citation` block and per-person `type_specific_fields` for a `pid` value shaped like Ancestry's real numeric person IDs (confirmed live examples: `17613762`, `79215820`, `3325109`), and for a `household_id` field being present (only the API path sets this - the DOM-table fallback never does). If `household_id` is absent on every person, the API path did not fire for this run - re-check the interceptor is actually installed and firing (Tampermonkey's own console log, `DEBUG_MODE` toggled on in `Voyageur.js`, should show either "using API data" or "falling back to DOM table scrape" per page - see Task 3 Step 2's `debugLog` calls).
 
-- [ ] **Step 3: Generate the GEDCOM and confirm households grouped correctly**
+- [x] **Step 3: Generate the GEDCOM and confirm households grouped correctly**
 
 Run `Archivist.py` against the isolated JSON output (same isolated-output-directory technique). Open the resulting `.ged` file and spot-check that people confirmed live to share a household (e.g., for the 1860 test record: Joseph Kosses/Mary Kosses/Julia Kosses, household 1; John May/Nena May, household 2 - see this session's own earlier live-verification report for the full household list) are grouped into the same `0 @F...@ FAM` record.
 
-- [ ] **Step 4: Confirm the DOM-table fallback still works**
+- [x] **Step 4: Confirm the DOM-table fallback still works**
 
 This is harder to force live (the API path will usually succeed when it's genuinely available), but at minimum confirm via code review that Task 3's `else` branch is reachable and its body is byte-for-byte identical to the pre-Task-3 DOM-scraping loop (diff `git show <Task-3-commit>^:Voyageur/Voyageur.js` against the current file's DOM-loop section, or just re-read Task 3 Step 3 above and confirm the wrapped loop body wasn't edited).
 
-- [ ] **Step 5: Report results**
+- [x] **Step 5: Report results**
 
 Document in this plan's own SDD ledger (or directly to the user, if not running under SDD) what was confirmed: real `pid`/`household_id` values seen, household grouping correctness, GEDCOM output sanity. If the API path did NOT fire during this live test, that's a genuine finding worth reporting honestly - do not claim success without having actually observed `household_id` populated in real output.
 
@@ -992,3 +992,11 @@ Document in this plan's own SDD ledger (or directly to the user, if not running 
 - **Spec coverage:** Task 1 covers the field-map/parser (spec's Architecture items 2-3). Task 2 covers the interceptor (spec's Architecture item 1). Task 3 covers the fallback wiring (spec's Architecture item 4). Task 4 covers household_id preference (spec's Architecture item 5) and the field-map YAML changes (spec's "Field-map changes required" section). Task 5 covers the spec's "Not yet verified" items 1 (household grouping via household_id in practice).
 - **Not covered by this plan, intentionally** (per the spec's own Scope Decisions): `collections/collection-text` interception, `correctedValue` handling, State/Canadian/other-census-year coverage - all tracked under GitHub issue #24.
 - **Waiter-map key collision risk** (spec's "Not yet verified" item 2): not addressed by this plan's tests - genuinely requires live, rapid-navigation testing beyond what Task 5 covers. If it becomes a real problem in production use, that's a fast-follow bug fix, not a blocker for this plan.
+
+## Status: COMPLETE (2026-08-15)
+
+All 5 tasks done, Task 5 live-verified against the 1860 Dakota Territory test record (dbId `7667`/imageId `4211353_00001`): real Ancestry `pid`s and `household_id`-driven grouping confirmed in the API path's output, correct household grouping in the generated GEDCOM (Kosses, May), DOM-table fallback branch confirmed byte-for-byte unchanged.
+
+Tasks 1-3 (`Voyageur.js`) had been implemented and tested but never committed - committed post-hoc (`fbcc2b5`). One post-verification fix: `SelfGender` returns the full word ("Male"/"Female"), unlike the DOM table's single-letter form, which tripped Commissioner's soft schema validation - `ancestryColumnsFromIndexPanelRecord()` now normalizes it to M/F/U via `ancestryNormalizeGender()`, matching every other sex-bearing field in this codebase.
+
+Follow-on tracked separately: [issue #25](https://github.com/alerum68/Scriptorium/issues/25) (eliminate the remaining FS Information-tab dependency, found during this plan's live verification but out of this plan's own scope).
