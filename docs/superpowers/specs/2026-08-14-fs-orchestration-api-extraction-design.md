@@ -1,11 +1,11 @@
 # FamilySearch Orchestration-API Extraction — Design
 
 **Status:** Draft, pending user review
-**Related:** GitHub issue #23 (originating discovery), issue #22 (superseded by this design's navigation approach), issue #21 (the UI-scraping bug this design ultimately replaces the fix for)
+**Related:** GitHub issue #23 (originating discovery), issue #22 (navigation problem this design's data-extraction change sidesteps for the "Names" UI path, but see the open old-style-page question below), issue #21 (the UI-scraping bug this design ultimately replaces the fix for)
 
 ## Goal
 
-Replace `Voyageur.js`'s FamilySearch UI-scraping (Names-panel clicking, person-detail-panel clicking) with direct extraction from FamilySearch's own internal orchestration API, and move the FS gather off the Tampermonkey/`webbrowser.open()` architecture onto a Python/Playwright-driven one. Ancestry's gather (`A.py`/`runAncestryGather()`) is unaffected — this is FS-only.
+Replace `Voyageur.js`'s FamilySearch UI-scraping *for household/citation data* (Names-panel clicking, person-detail-panel clicking) with direct extraction from FamilySearch's own internal orchestration API — **delivered via the existing Tampermonkey userscript**, not a new automation stack. Ancestry's gather (`A.py`/`runAncestryGather()`) is unaffected — this is FS-only.
 
 ## Background: what was tried before, and why it wasn't enough
 
@@ -15,53 +15,30 @@ Investigating *why* that navigation broke led to discovering that FamilySearch's
 
 ## Architecture
 
-The gather no longer treats the FamilySearch record viewer as a UI to click through. Per image:
+The gather no longer treats the FamilySearch record viewer's "Names" panel as a UI to click through for *data*. Navigation between images stays as-is (the existing Tampermonkey `goToNextImage()`/hover-mount fixes from #21). Per image:
 
-1. Navigate to the image (Playwright `page.goto()`/click, not Tampermonkey DOM interaction).
+1. Navigate to the image (existing Tampermonkey navigation logic, unchanged).
 2. FamilySearch's own client automatically fires `GET sg30p0.familysearch.org/service/records/volunteer/orchestration/sls/image/{ark}` — confirmed live, no UI interaction required to trigger it.
-3. Playwright's native `page.on("response")` captures that response — no `unsafeWindow.fetch`/`XMLHttpRequest.prototype` patching needed (that was a Tampermonkey-specific workaround; Playwright observes network traffic directly via CDP).
+3. The userscript's own `unsafeWindow.fetch`/`XMLHttpRequest.prototype.open` patch (same pattern already used elsewhere in this file for Ancestry's PID capture) intercepts that response.
 4. A parser builds a `{id: element}` index from the response's flat `elements` array once, then extracts household/person/citation data via typed traversal functions (below).
 5. That structured data replaces what `scrapeNamesPanel()`/`scrapeCitationAndCatalog()` currently produce for FS — same downstream shape (`{item_id, citation_text, catalog_items, rows}`), new source.
-6. Advance to the next image.
+6. Advance to the next image via the existing navigation logic.
 
-**This entire class of navigation problem (issue #22) becomes moot as a side effect.** The "explore" view was only ever triggered by clicking into an already-tree-attached person's own detail panel — a UI interaction this design never performs. Only plain image-to-image navigation remains, which Playwright's CDP-level clicks handle more reliably than the DOM-dispatch tricks that failed in Tampermonkey (confirmed live during this investigation: a genuine trusted click succeeded where synthetic `dispatchEvent` calls did not).
+For records where clicking into a household member triggers the "explore" view (issue #22), this design's data path no longer needs to make that click at all — the API is read directly, without opening any person's detail panel. Whether image-to-image *navigation* on such records still needs the #22 fixes depends on the open question below (does an old-style "Image Index" page, or a page that later routes to "explore", still fire the same API automatically on load).
 
-## Why Playwright, not Tampermonkey
+## Why Tampermonkey, not Playwright — reversed decision, confirmed live
 
-The interception technique doesn't need Tampermonkey at all — `unsafeWindow.fetch` patching was only ever a workaround for not having native network access from inside a userscript. Playwright has that natively. Moving off Tampermonkey also removes an entire class of fragility this investigation ran into repeatedly (JS-realm event-dispatch failures, DOM-based navigation controls that don't mount reliably, `@run-at document-start` re-injection races).
-
-The current FS launch mechanism (`Voyageur/_gather_helpers.py`'s `launch_gather_browser()`, via `webbrowser.open()`) opens a URL in the user's already-running, already-logged-in Chrome. That mechanism is being replaced for FS specifically with a Playwright-driven browser instance.
-
-## Headless: not viable — confirmed live, with important caveats
-
-The original ask was full headless operation. Confirmed live, decisively:
+**This design originally proposed moving to Playwright, specifically to enable headless operation. That direction was tested live and abandoned.** Kept here as a record of what was tried, since it's directly relevant to why Tampermonkey was the right call after all:
 
 - Playwright's bundled Chromium gets blocked (403, Imperva Incapsula bot-detection challenge page) regardless of headless/headed.
-- Launching the user's **real installed Chrome** via Playwright's `channel="chrome"` option, in **headed** (visible) mode, loaded cleanly with no challenge on one test.
-- The same `channel="chrome"` in **headless** mode still got the Incapsula 403 challenge. Headless itself is a detected signal, independent of which browser binary is used.
-- **Headed real Chrome is therefore a hard requirement, not a preference.** A gather run needs a visible browser window.
+- Real installed Chrome via `channel="chrome"`, headed, loaded the plain portal page cleanly across multiple independent attempts (fresh, cache-empty contexts each time).
+- The same config in **headless** mode still got the Incapsula 403 challenge — headless itself is a detected signal, independent of browser binary.
+- **Critically: the actual sign-in flow itself got blocked (Error 15) even under headed real Chrome**, despite the plain portal page loading fine. Automating login is the part that actually matters for a working design, and it's exactly the part that failed, consistently, regardless of configuration tweaks (fresh context, real Chrome binary, cache clearing).
+- Active headless-evasion techniques (`--headless=new`, `navigator.webdriver` patching, stealth plugins) were deliberately **not pursued** — real risk to the user's own FamilySearch account, not just an IP, for uncertain and likely temporary payoff against an actively-maintained anti-bot vendor.
 
-Active headless-evasion techniques (`--headless=new`, `navigator.webdriver` patching, stealth plugins) were deliberately **not pursued** — they cross from automating a browser into actively defeating FamilySearch's security measures, with real risk to the user's own FamilySearch account (not just an anonymous IP), and no guarantee of continued effectiveness against an actively-maintained anti-bot vendor.
+The deciding insight: `claude-in-chrome` (also automated, also CDP-adjacent) has been completely reliable against FamilySearch all session — because it drives the user's real, already-authenticated, human-operated browser, not a freshly-spawned automation profile attempting to authenticate itself. Tampermonkey has exactly that same property. The orchestration-API interception technique never actually needed Playwright — `unsafeWindow.fetch` patching inside the existing userscript does the identical job, and was already confirmed live to work cleanly (captured real 1850 and 1880 data, zero blocks) well before Playwright was ever introduced into this design. Playwright was pursued purely to chase headless operation; with headless confirmed non-viable regardless of implementation, there's no remaining reason to leave the proven, already-working Tampermonkey delivery mechanism.
 
-### Open risk: possible rate/frequency-based escalation — UNRESOLVED
-
-While testing the headed-Chrome approach across several consecutive launches in a short window, results were inconsistent: one clean success, then an explicit Incapsula block on a near-identical config, then a hard connection timeout that didn't even reach a challenge page. This pattern is consistent with **frequency-based escalation** (repeated automated-looking traffic from the same session/IP triggering progressively stricter detection), not a static per-request check.
-
-This was **not resolved** before pausing — live testing was deliberately stopped to avoid compounding whatever block/rate-limit state might already be active, rather than continuing to probe blind. This is the single most important open question before this design can be trusted for real production use: **does repeated, spaced-out gather usage (the actual intended use pattern) stay reliable, or does automated traffic volume itself eventually get penalized regardless of headed/real-Chrome precautions?**
-
-This must be re-tested — after an unknown cooldown period — with deliberate spacing between requests, before committing further implementation effort. Findings from that retest may change the headless/auth conclusions above.
-
-## Session/login handling
-
-FamilySearch login cannot be automated (credential-entry rule — the user logs in manually). Design:
-
-1. First run (or whenever the session is no longer valid): launch headed real Chrome, user logs in manually, save `context.storage_state()` (cookies + localStorage) to a local file.
-2. Subsequent runs: launch headed real Chrome, load the saved `storage_state`, check for a definitive logged-in signal before proceeding.
-3. If the saved session is no longer valid (expired, logged out elsewhere), fall back to step 1.
-
-**Confirmed-good, reusable detection technique:** a login-completion check must use a *positive* signal (an element that only exists when authenticated), checked only after the page has had a real chance to render. The `"Sign In"-text-absent` check tried first is a trap — it false-positives immediately, before the logged-out page has even finished mounting its own "Sign In" element, since "not yet rendered" and "genuinely absent" are indistinguishable to a naive absence check. The confirmed-working positive signal: `button[aria-label^="Account: "]` (FamilySearch's account-menu button), present only once actually logged in — verified against the real live site.
-
-**Not yet tested:** whether a saved `storage_state` from one headed-Chrome session actually stays valid and gets accepted on a *separate* later headed-Chrome launch (the original ask that started this whole investigation, before it detoured into headless testing). This needs its own dedicated test pass, ideally as part of the same re-test that addresses the rate-limiting question above.
+**Net effect on the design:** no new browser automation stack, no session/login-persistence problem to solve (the user's existing, real, logged-in browser session is used, exactly as today), no headless capability (never achievable here). Everything else — the API, the parser, the confirmed data — carries over unchanged.
 
 ## Confirmed response shape
 
@@ -173,13 +150,12 @@ Target output shape is unchanged from what `scrapeNamesPanel()`/`scrapeCitationA
 
 ## Not yet verified — must be tested before implementation is trusted
 
-1. **Rate/frequency-based escalation** (see "Open risk" above) — the single biggest unresolved question.
-2. **`storage_state` persistence across separate headed-Chrome launches** — the original question that started this whole line of investigation; got sidetracked into headless testing before being answered.
-3. **`DATE` element text decoding** — structure confirmed, never actually resolved to a value.
-4. **Verification across collection types beyond US census** (church records, other countries) — everything confirmed so far is US census 1850/1880 only.
-5. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — real design work, not yet started.
-6. **Location field (`STATE`/`COUNTY`/`TOWN`) proper scoping** for citation purposes.
+1. **Does the orchestration API fire on the old-style "Image Index" page too, not just the "Names" panel UI?** The single biggest open question now. Every confirmed capture so far happened on records already showing the newer "Names" UI. If the API fires identically regardless of which UI FamilySearch renders for a given account/collection, this design needs **zero** UI-style detection logic at all — just navigate and read the API, full stop, and issue #22's "explore" vs "index" distinction becomes irrelevant to data extraction entirely (navigation between images may still need it, but not data). If it does NOT fire on the old-style page, the design needs an old-style fallback path after all. Testing in progress: the user is logging into a second account that hasn't been switched to the "Names" UI, specifically to check this.
+2. **`DATE` element text decoding** — structure confirmed, never actually resolved to a value.
+3. **Verification across collection types beyond US census** (church records, other countries) — everything confirmed so far is US census 1850/1880 only.
+4. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — real design work, not yet started.
+5. **Location field (`STATE`/`COUNTY`/`TOWN`) proper scoping** for citation purposes.
 
 ## Next steps
 
-Given the unresolved rate-limiting question in particular, this design should not proceed to an implementation plan until that's re-tested (after a cooldown period) and the `storage_state` persistence question is answered. Both are cheap, focused spikes — not architectural questions — but they gate whether headed-Playwright is actually viable for real production use, which everything else in this design depends on.
+Check the old-style-page question live once the user's second account is ready — it's the one item that changes the shape of the implementation plan (whether any UI-style branching is needed at all), so it should be resolved before writing that plan. The remaining open items (DATE decoding, non-census collections, relationship mapping, location scoping) can reasonably be resolved during implementation rather than blocking it, since none of them changes the overall architecture the way the old-style-page question could.
