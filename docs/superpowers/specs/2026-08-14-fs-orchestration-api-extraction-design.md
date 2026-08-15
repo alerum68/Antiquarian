@@ -1,7 +1,7 @@
 # FamilySearch Orchestration-API Extraction — Design
 
-**Status:** Draft, pending user review
-**Related:** GitHub issue #23 (originating discovery), issue #22 (navigation problem this design's data-extraction change sidesteps for the "Names" UI path, but see the open old-style-page question below), issue #21 (the UI-scraping bug this design ultimately replaces the fix for)
+**Status:** Design settled, ready for implementation planning
+**Related:** GitHub issue #23 (originating discovery), issue #22 (navigation problem this design's data-extraction path avoids triggering in the first place, since it never opens a person's detail panel), issue #21 (the UI-scraping bug this design ultimately replaces the fix for)
 
 ## Goal
 
@@ -24,7 +24,7 @@ The gather no longer treats the FamilySearch record viewer's "Names" panel as a 
 5. That structured data replaces what `scrapeNamesPanel()`/`scrapeCitationAndCatalog()` currently produce for FS — same downstream shape (`{item_id, citation_text, catalog_items, rows}`), new source.
 6. Advance to the next image via the existing navigation logic.
 
-For records where clicking into a household member triggers the "explore" view (issue #22), this design's data path no longer needs to make that click at all — the API is read directly, without opening any person's detail panel. Whether image-to-image *navigation* on such records still needs the #22 fixes depends on the open question below (does an old-style "Image Index" page, or a page that later routes to "explore", still fire the same API automatically on load).
+For records where clicking into a household member triggers the "explore" view (issue #22), this design's data path no longer needs to make that click at all — the API is read directly, without opening any person's detail panel. Image-to-image *navigation* still uses the existing #22 fixes if a gather happens to land on the "explore" view for other reasons, but the data-extraction path itself never triggers that view in the first place.
 
 ## Why Tampermonkey, not Playwright — reversed decision, confirmed live
 
@@ -148,14 +148,17 @@ Target output shape is unchanged from what `scrapeNamesPanel()`/`scrapeCitationA
 - **Parser targets the existing downstream contract first** (Given Name/Surname/Age/Sex/Family Number/Relationship-to-head), with the richer data (birthplace, exact relationships, dwelling number) captured as a genuine upgrade since the schema already has slots (`birth_place`, `occupation`, `residence`, etc.) that have always been null from FamilySearch gathers specifically.
 - **Citation data**: film/publication/repository fields via the same API; location fields (state/county/town) need further scoping work before being trusted — flagged above, not yet solved.
 
+## Old-style "Image Index" page — resolved, treated as unreachable
+
+Checked live on a second account specifically to test this: the older table-style "Image Index" UI was not reachable there either — only the "Names" panel UI, same as the primary account (the presentation *within* the Names panel varies, not whether it's present at all). Combined with the earlier session finding that FamilySearch's "updated look" flag applies retroactively and persistently once triggered, this is treated as **the only UI style in practice going forward** — no old-style fallback path, no UI-style branching logic needed anywhere in this design. If a genuinely old-style page turns up in the future (a different account that's never triggered the flag, or a collection FamilySearch hasn't migrated), that's a new, separate problem to solve then, not a condition this design needs to handle now.
+
 ## Not yet verified — must be tested before implementation is trusted
 
-1. **Does the orchestration API fire on the old-style "Image Index" page too, not just the "Names" panel UI?** The single biggest open question now. Every confirmed capture so far happened on records already showing the newer "Names" UI. If the API fires identically regardless of which UI FamilySearch renders for a given account/collection, this design needs **zero** UI-style detection logic at all — just navigate and read the API, full stop, and issue #22's "explore" vs "index" distinction becomes irrelevant to data extraction entirely (navigation between images may still need it, but not data). If it does NOT fire on the old-style page, the design needs an old-style fallback path after all. Testing in progress: the user is logging into a second account that hasn't been switched to the "Names" UI, specifically to check this.
-2. **`DATE` element text decoding** — structure confirmed, never actually resolved to a value.
-3. **Verification across collection types beyond US census** (church records, other countries) — everything confirmed so far is US census 1850/1880 only.
-4. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — real design work, not yet started.
-5. **Location field (`STATE`/`COUNTY`/`TOWN`) proper scoping** for citation purposes.
+1. **`DATE` element text decoding** — structure confirmed, never actually resolved to a value.
+2. **Verification across collection types beyond US census** (church records, other countries) — everything confirmed so far is US census 1850/1880 only.
+3. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — real design work, not yet started.
+4. **Location field (`STATE`/`COUNTY`/`TOWN`) proper scoping** for citation purposes.
 
 ## Next steps
 
-Check the old-style-page question live once the user's second account is ready — it's the one item that changes the shape of the implementation plan (whether any UI-style branching is needed at all), so it should be resolved before writing that plan. The remaining open items (DATE decoding, non-census collections, relationship mapping, location scoping) can reasonably be resolved during implementation rather than blocking it, since none of them changes the overall architecture the way the old-style-page question could.
+None of the remaining open items changes the overall architecture the way the old-style-page question could have — they're implementation-detail items (date parsing, relationship mapping, location scoping) reasonable to resolve during implementation rather than blocking it. This design is ready to move toward an implementation plan.
