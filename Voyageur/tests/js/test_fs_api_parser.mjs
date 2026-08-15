@@ -7,6 +7,7 @@ const require = createRequire(import.meta.url);
 const {
     buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
     fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
+    fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
 } = require('./harness.js');
 
 // Fixture shape matches the confirmed live structure exactly: a flat `elements`
@@ -212,4 +213,85 @@ test('fsBuildRowsFromApiResponse: Family Number falls back to a sequential per-h
     };
     const rows = fsBuildRowsFromApiResponse(data);
     assert.equal(rows[0].columns['Family Number'], '1');
+});
+
+test('fsCanonicalFieldsFromApiPerson: extracts every canonical field for an 1880-style person', () => {
+    const data = makeApiResponse();
+    const byId = buildFsElementIndex(data);
+    const person = byId['1:1:PERSON-A'];
+    const fields = fsCanonicalFieldsFromApiPerson(byId, person);
+    assert.deepEqual(fields, {
+        givenName: 'ELIZA M.', surname: 'FISK', sex: 'F', age: '38',
+        birthplace: 'Maine, United States',
+        householdIdSource: '90', householdIdFs: '',
+        relationshipToHead: 'Head', maritalStatus: 'Married', occupation: 'Farmer',
+        race: 'White', fatherBirthplace: 'Germany', motherBirthplace: 'Vermont, United States',
+    });
+});
+
+test('fsCanonicalFieldsFromApiPerson: era-absent fields come back as empty strings, not thrown errors', () => {
+    const data = makeApiResponse();
+    const byId = buildFsElementIndex(data);
+    const person = byId['1:1:PERSON-B'];
+    const fields = fsCanonicalFieldsFromApiPerson(byId, person);
+    assert.equal(fields.relationshipToHead, '');
+    assert.equal(fields.maritalStatus, '');
+    assert.equal(fields.occupation, '');
+    assert.equal(fields.race, '');
+    assert.equal(fields.fatherBirthplace, '');
+    assert.equal(fields.motherBirthplace, '');
+    assert.equal(fields.givenName, 'Bozil');
+    assert.equal(fields.householdIdFs, '');
+});
+
+test('fsColumnsFromCanonicalFields: builds the exact existing columns shape, relationship present', () => {
+    const columns = fsColumnsFromCanonicalFields({
+        givenName: 'ELIZA M.', surname: 'FISK', sex: 'F', age: '38',
+        householdIdSource: '90', householdIdFs: '', relationshipToHead: 'Head',
+        maritalStatus: 'Married', occupation: 'Farmer', race: 'White',
+        fatherBirthplace: 'Germany', motherBirthplace: 'Vermont, United States', birthplace: 'Maine',
+    }, 1);
+    assert.deepEqual(columns, {
+        'Given Name': 'ELIZA M.', 'Surname': 'FISK', 'Gender': 'F', 'Age': '38',
+        'Family Number': '90', 'Relationship to Head': 'Head',
+    });
+});
+
+test('fsColumnsFromCanonicalFields: omits Relationship to Head entirely when absent, not blank', () => {
+    const columns = fsColumnsFromCanonicalFields({
+        givenName: 'Bozil', surname: 'Delmer', sex: 'M', age: '47',
+        householdIdSource: '', householdIdFs: '', relationshipToHead: '',
+        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
+    }, 2);
+    assert.deepEqual(columns, {
+        'Given Name': 'Bozil', 'Surname': 'Delmer', 'Gender': 'M', 'Age': '47', 'Family Number': '2',
+    });
+    assert.ok(!('Relationship to Head' in columns));
+});
+
+test('fsColumnsFromCanonicalFields: Family Number precedence, householdIdSource wins over householdIdFs', () => {
+    const columns = fsColumnsFromCanonicalFields({
+        givenName: 'X', surname: 'Y', sex: '', age: '',
+        householdIdSource: '90', householdIdFs: '999', relationshipToHead: '',
+        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
+    }, 5);
+    assert.equal(columns['Family Number'], '90');
+});
+
+test('fsColumnsFromCanonicalFields: Family Number falls back to householdIdFs when householdIdSource absent', () => {
+    const columns = fsColumnsFromCanonicalFields({
+        givenName: 'X', surname: 'Y', sex: '', age: '',
+        householdIdSource: '', householdIdFs: '999', relationshipToHead: '',
+        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
+    }, 5);
+    assert.equal(columns['Family Number'], '999');
+});
+
+test('fsColumnsFromCanonicalFields: Family Number falls back to sequenceFallback when neither household id exists', () => {
+    const columns = fsColumnsFromCanonicalFields({
+        givenName: 'X', surname: 'Y', sex: '', age: '',
+        householdIdSource: '', householdIdFs: '', relationshipToHead: '',
+        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
+    }, 3);
+    assert.equal(columns['Family Number'], '3');
 });

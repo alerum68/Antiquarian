@@ -252,17 +252,57 @@
             }));
     }
 
-    // Prefers the sheet-printed family number (SOURCE_HOUSEHOLD_ID), falling back to
-    // FamilySearch's own system-generated id (FS_HOUSEHOLD_ID) when the original indexer
-    // didn't record one - confirmed live these two are exact complements on a real image (35
-    // + 7 = 42 of 42 persons). SOURCE_HOUSE_NBR is a dwelling number, not a family number
-    // (a dwelling can hold multiple families) - deliberately not used here. Falls back to a
-    // sequential per-household counter only if neither field exists at all, matching the old
-    // UI-scraper's own behavior for collections this rich data isn't available on.
-    function fsFamilyNumber(byId, person, sequentialFallback) {
-        return fsPersonFieldText(byId, person, 'SOURCE_HOUSEHOLD_ID')
-            || fsPersonFieldText(byId, person, 'FS_HOUSEHOLD_ID')
-            || String(sequentialFallback);
+    // Reduces one orchestration-API PERSON down to the canonical field map shared with the
+    // Image-Index parser (fsCanonicalFieldsFromImageIndexPerson) - fsColumnsFromCanonicalFields
+    // below builds the final `columns` object from either source's canonical map the same way.
+    function fsCanonicalFieldsFromApiPerson(byId, person) {
+        const {given, surname} = fsPersonName(byId, person);
+        const sex = fsPersonFieldText(byId, person, 'SEX_CODE');
+        return {
+            givenName: given,
+            surname: surname,
+            sex: sex ? sex.toUpperCase() : '',
+            age: fsWrappedFieldText(byId, person, 'AGE'),
+            birthplace: fsPersonBirthPlace(byId, person),
+            householdIdSource: fsPersonFieldText(byId, person, 'SOURCE_HOUSEHOLD_ID'),
+            householdIdFs: fsPersonFieldText(byId, person, 'FS_HOUSEHOLD_ID'),
+            relationshipToHead: fsPersonFieldText(byId, person, 'RELATIONSHIP_TO_HEAD'),
+            maritalStatus: fsPersonFieldText(byId, person, 'MARITAL_STATUS'),
+            occupation: fsPersonFieldText(byId, person, 'OCCUPATION'),
+            race: fsPersonFieldText(byId, person, 'RACE_OR_COLOR'),
+            fatherBirthplace: fsPersonFieldText(byId, person, 'FTHR_BIR_PLACE'),
+            motherBirthplace: fsPersonFieldText(byId, person, 'MTHR_BIR_PLACE'),
+        };
+    }
+
+    // Shared by both fsBuildRowsFromApiResponse (orchestration API) and
+    // fsBuildRowsFromImageIndexResponse (filmdatainfo/image-data) - both sources reduce a
+    // person down to the same canonical field shape above this function, so the household-ID
+    // precedence and era-appropriate omission logic exists exactly once. householdIdSource
+    // (SOURCE_HOUSEHOLD_ID) is the sheet-printed family number, preferred over
+    // householdIdFs (FS_HOUSEHOLD_ID, FamilySearch's own system-generated id) - confirmed
+    // live on the orchestration API these two are exact complements on a real image (35 + 7 =
+    // 42 of 42 persons), and the same two-key relationship was independently confirmed live
+    // again on the Image-Index endpoint (1860 sample used FS_HOUSEHOLD_ID, 1880 used
+    // SOURCE_HOUSEHOLD_ID). Falls back to a sequential per-household counter only if neither
+    // exists at all.
+    function fsColumnsFromCanonicalFields(canonicalFields, sequenceFallback) {
+        const columns = {
+            'Given Name': canonicalFields.givenName || '',
+            'Surname': canonicalFields.surname || '',
+            'Gender': canonicalFields.sex || '',
+            'Age': canonicalFields.age || '',
+            'Family Number': canonicalFields.householdIdSource
+                || canonicalFields.householdIdFs
+                || String(sequenceFallback),
+        };
+        // Omitted entirely (not set to '') when absent - matches the old UI-scraper's own
+        // "don't fabricate data" convention, and is how the pre-1880 era boundary is handled:
+        // no special-case branching, just field-absence. maritalStatus/occupation/race/
+        // fatherBirthplace/motherBirthplace/birthplace are captured in canonicalFields but
+        // deliberately not added here - see this plan's Global Constraints.
+        if (canonicalFields.relationshipToHead) columns['Relationship to Head'] = canonicalFields.relationshipToHead;
+        return columns;
     }
 
     function fsBuildRowsFromApiResponse(apiResponse) {
@@ -275,22 +315,8 @@
                 const person = byId[personId];
                 if (!person) continue;
 
-                const {given, surname} = fsPersonName(byId, person);
-                const sex = fsPersonFieldText(byId, person, 'SEX_CODE');
-                const columns = {
-                    'Given Name': given,
-                    'Surname': surname,
-                    'Gender': sex ? sex.toUpperCase() : '',
-                    'Age': fsWrappedFieldText(byId, person, 'AGE'),
-                    'Family Number': fsFamilyNumber(byId, person, householdIndex),
-                };
-
-                // Omitted entirely (not set to '') when absent - matches the old UI-scraper's
-                // own "don't fabricate data" convention, and is how the 1850-1870 era
-                // boundary is handled: no special-case branching, just field-absence.
-                const relationshipToHead = fsPersonFieldText(byId, person, 'RELATIONSHIP_TO_HEAD');
-                if (relationshipToHead) columns['Relationship to Head'] = relationshipToHead;
-
+                const canonicalFields = fsCanonicalFieldsFromApiPerson(byId, person);
+                const columns = fsColumnsFromCanonicalFields(canonicalFields, householdIndex);
                 rows.push({columns, person_ark: person.id, attached_fsftid: ''});
             }
         }
@@ -2079,6 +2105,7 @@
             placesMatch, saveReloadState, loadReloadState, clearReloadState,
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
             fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
+            fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
         };
     }
 
