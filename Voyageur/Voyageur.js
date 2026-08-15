@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.25
+// @version      0.3.26
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1997,23 +1997,75 @@
             return {citationText, catalogItems};
         }
 
+        // Runs once per image, before either data source is awaited. Names/Image Index tab
+        // presence is the ground truth of which page actually rendered - confirmed live this
+        // is a navigation-method split (Search -> Names panel, Image Browser -> Image Index),
+        // not something inferable from the URL. Event-driven via the existing
+        // waitForCondition convention, same as clickTab() above.
+        async function detectFsPageType({timeoutMs = 15000} = {}) {
+            const wait = await waitForCondition(() => {
+                if (findByExactText('[role="tab"], button, a', 'Names')) return 'names';
+                if (findByExactText('[role="tab"], button, a', 'Image Index')) return 'image-index';
+                return null;
+            }, {timeoutMs});
+            return wait.result;
+        }
+
         async function scrapeCurrentImage() {
             const itemId = getItemId();
             if (!itemId || seenItemIds.has(itemId)) return;
 
-            const apiWait = await waitForFsApiResponse(itemId);
+            const pageType = await detectFsPageType();
             let rows = [];
-            if (apiWait.result) {
-                rows = fsBuildRowsFromApiResponse(apiWait.result);
+            let citationText = '';
+            let catalogItems = [];
+
+            if (pageType === 'image-index') {
+                const apiWait = await waitForFsImageIndexResponse(itemId);
+                if (apiWait.result) {
+                    rows = fsBuildRowsFromImageIndexResponse(apiWait.result);
+                    // The one UI read left in this whole plan: no JSON source for the total
+                    // image count was found on this endpoint (see the design spec's "Not yet
+                    // verified" list) - the page already renders it plainly ("Image 1 of 3").
+                    const imageMatch = document.body.innerText.match(/Image\s+(\d+)\s+of\s+(\d+)/i);
+                    citationText = fsBuildCitationTextFromImageIndexResponse(apiWait.result, {
+                        imageNumber: imageMatch ? imageMatch[1] : undefined,
+                        imageTotal: imageMatch ? imageMatch[2] : undefined,
+                    });
+                } else {
+                    debugLog(`No Image-Index response arrived for item ${itemId} after `
+                        + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
+                    if (window.fsShowToast) {
+                        window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
+                    }
+                }
+                // Still used for catalogItems (the Film/Digital Note table) - its own
+                // citationText is discarded in favor of the JSON-built one above; both page
+                // types share the same "Information" tab UI shell this function reads.
+                const catalog = await scrapeCitationAndCatalog();
+                catalogItems = catalog.catalogItems;
+            } else if (pageType === 'names') {
+                const apiWait = await waitForFsApiResponse(itemId);
+                if (apiWait.result) {
+                    rows = fsBuildRowsFromApiResponse(apiWait.result);
+                } else {
+                    debugLog(`No orchestration-API response arrived for item ${itemId} after `
+                        + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
+                    if (window.fsShowToast) {
+                        window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
+                    }
+                }
+                const citation = await scrapeCitationAndCatalog();
+                citationText = citation.citationText;
+                catalogItems = citation.catalogItems;
             } else {
-                debugLog(`No orchestration-API response arrived for item ${itemId} after `
-                    + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
+                debugLog(`Neither Names nor Image Index tab found for item ${itemId} - `
+                    + 'unrecognized page shape, continuing with no data.');
                 if (window.fsShowToast) {
-                    window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
+                    window.fsShowToast('Unrecognized page - skipping.', 'error', 4000);
                 }
             }
 
-            const {citationText, catalogItems} = await scrapeCitationAndCatalog();
             // Awaited before moving on to the next image, same convention as Ancestry's
             // own per-page image download.
             await downloadFsImage(itemId);
