@@ -44,6 +44,7 @@ participant_fields:
   "Married Within Year": type_specific_fields.married_within_year
   "Birth Month": type_specific_fields.birth_month
   "Marital Status": type_specific_fields.marital_status
+  "Widowed1": type_specific_fields.marital_status
 
 participant_facts:
   "Occupation": Occupation
@@ -83,6 +84,25 @@ participant_facts:
   "Native Tongue": Miscellaneous
   "Speaks English": Miscellaneous
   "Employment Field": Miscellaneous
+  # Complex Field Integration Mappings
+  "Income": Property
+  "IncomeOtherSources": Property
+  "InsuranceCost": Property
+  "LifeInsuranceCost": Property
+  "MonthlyRental": Property
+  "AmountOfLand": Property
+  "NumberOfHorses": Property
+  "ValueOfLivestock": Property
+  "Tribe": Nationality
+  "Clan": Nationality
+  "IndianBlood": Nationality
+  "EducationCost": Education
+  "CauseOfDeath": Death
+  "CannotRead1": Education
+  "ResidenceCityInNineteenThirtyFive": Residence
+  "VesselVisitedNumber": Residence
+  "ShantyVisitedNumber": Residence
+
 
 record_fields:
   "Family Number": family_number

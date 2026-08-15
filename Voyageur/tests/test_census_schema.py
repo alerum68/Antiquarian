@@ -465,3 +465,26 @@ def test_normalize_and_validate_census_returns_normalized_doc():
     assert doc["record_type_name"] == "Census_1900"
     assert doc["collection_title"] == "1900 US Census"
     assert len(doc["sheets"]) == 1
+
+
+def test_complex_field_integration_standard_mappings():
+    raw = {
+        "census_year": "1940", "location": "USA",
+        "pages": [_page([{"columns": {
+            "Income": "500",
+            "Tribe": "Cherokee",
+            "EducationCost": "50",
+            "CauseOfDeath": "Fever",
+            "CannotRead1": "Yes",
+            "Given Name": "John",
+            "Surname": "Doe",
+        }, "pid": "p1"}])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1940 Census", "C1940")
+    facts = doc["sheets"][0]["records"][0]["participants"][0]["facts"]
+    fact_types = [f["fact_type"] for f in facts]
+
+    assert "Property" in fact_types
+    assert "Nationality" in fact_types
+    assert "Education" in fact_types
+    assert "Death" in fact_types

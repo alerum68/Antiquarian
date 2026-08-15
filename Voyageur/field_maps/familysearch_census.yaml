@@ -23,12 +23,32 @@ participant_fields:
   "Relationship to Head of Household": role_name
   "Relationship": role_name
   "Line Number": type_specific_fields.line_number
+  "Widowed1": type_specific_fields.marital_status
 
 participant_facts:
   "Occupation": Occupation
   "Immigration Year": Immigration
   "Naturalization": Naturalization
   "Military Service": Military
+  # Complex Field Integration Mappings
+  "Income": Property
+  "IncomeOtherSources": Property
+  "InsuranceCost": Property
+  "LifeInsuranceCost": Property
+  "MonthlyRental": Property
+  "AmountOfLand": Property
+  "NumberOfHorses": Property
+  "ValueOfLivestock": Property
+  "Tribe": Nationality
+  "Clan": Nationality
+  "IndianBlood": Nationality
+  "EducationCost": Education
+  "CauseOfDeath": Death
+  "CannotRead1": Education
+  "ResidenceCityInNineteenThirtyFive": Residence
+  "VesselVisitedNumber": Residence
+  "ShantyVisitedNumber": Residence
+
 
 record_fields:
   "Family Number": family_number
