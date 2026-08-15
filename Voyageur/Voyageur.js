@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.24
+// @version      0.3.25
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1764,6 +1764,81 @@
                     settled = true;
                     clearTimeout(timer);
                     delete unsafeWindow.__voyageurFsApiWaiters[ark];
+                    resolve({result, elapsedMs: Math.round(performance.now() - startedAt), timedOut: false});
+                };
+            });
+        }
+
+        // Same technique as the orchestration-API interceptor just above, targeting
+        // filmdatainfo/image-data instead - confirmed live this endpoint's request URL is
+        // identical for every image ("/search/filmdatainfo/image-data", no per-image query
+        // param), so responses can't be keyed by URL the way the orchestration API's can.
+        // Keyed by the response BODY's own arkId field instead.
+        if (typeof unsafeWindow !== 'undefined' && !unsafeWindow.__voyageurFsImageIndexIntercepted) {
+            unsafeWindow.__voyageurFsImageIndexIntercepted = true;
+            unsafeWindow.__voyageurFsImageIndexResponses = {};
+            unsafeWindow.__voyageurFsImageIndexWaiters = {};
+
+            const FS_IMAGE_INDEX_TARGET = '/search/filmdatainfo/image-data';
+
+            function storeFsImageIndexResponse(bodyText) {
+                let parsed;
+                try {
+                    parsed = JSON.parse(bodyText);
+                } catch (e) {
+                    // Leave unset - waitForFsImageIndexResponse() below times out the same as
+                    // "never arrived", the correct behavior for an unparseable response.
+                    return;
+                }
+                const ark = parsed && parsed.arkId;
+                if (!ark) return;
+                unsafeWindow.__voyageurFsImageIndexResponses[ark] = parsed;
+                const waiter = unsafeWindow.__voyageurFsImageIndexWaiters[ark];
+                if (waiter) waiter(parsed);
+            }
+
+            const origImageIndexXhrOpen = unsafeWindow.XMLHttpRequest.prototype.open;
+            unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
+                this.__voyageurFsImageIndexUrl = url;
+                this.addEventListener('load', function () {
+                    if (this.__voyageurFsImageIndexUrl && this.__voyageurFsImageIndexUrl.includes(FS_IMAGE_INDEX_TARGET)) {
+                        storeFsImageIndexResponse(this.responseText);
+                    }
+                });
+                return origImageIndexXhrOpen.apply(this, arguments);
+            };
+
+            const origImageIndexFetch = unsafeWindow.fetch;
+            unsafeWindow.fetch = async function (...args) {
+                const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                const resp = await origImageIndexFetch.apply(this, args);
+                if (url.includes(FS_IMAGE_INDEX_TARGET)) {
+                    resp.clone().text().then((t) => storeFsImageIndexResponse(t));
+                }
+                return resp;
+            };
+        }
+
+        // Same event-driven-with-timeout-fallback shape as waitForFsApiResponse above.
+        async function waitForFsImageIndexResponse(ark, {timeoutMs = 15000} = {}) {
+            const startedAt = performance.now();
+            const existing = (unsafeWindow.__voyageurFsImageIndexResponses || {})[ark];
+            if (existing) {
+                return {result: existing, elapsedMs: 0, timedOut: false};
+            }
+            return new Promise((resolve) => {
+                let settled = false;
+                const timer = setTimeout(() => {
+                    if (settled) return;
+                    settled = true;
+                    delete unsafeWindow.__voyageurFsImageIndexWaiters[ark];
+                    resolve({result: null, elapsedMs: Math.round(performance.now() - startedAt), timedOut: true});
+                }, timeoutMs);
+                unsafeWindow.__voyageurFsImageIndexWaiters[ark] = (result) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    delete unsafeWindow.__voyageurFsImageIndexWaiters[ark];
                     resolve({result, elapsedMs: Math.round(performance.now() - startedAt), timedOut: false});
                 };
             });
