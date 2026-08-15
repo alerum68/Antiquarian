@@ -71,6 +71,27 @@ Top level:
 | `DATE` | Event date | Structure confirmed, text decoding not yet verified |
 | `FIELD` | Leaf text value, everywhere | `fieldValues[0].normalizedValues[0].text`, or `fieldValues[0].origValue.text` when no normalized form exists |
 
+### Era-dependent field richness — confirmed by the user's own domain knowledge, matches existing codebase handling
+
+A later, richer capture on an 1880 record surfaced a substantially larger field set than any earlier capture (1850 or 1880) had shown — including several fields that make earlier "unsolved" design problems trivial. **Per the user: 1850-1870 does not carry relationship-to-head data at all; 1880-1950 does.** Matches real US census history exactly - 1880 was the first US census year to record "relationship to head of household" as a questionnaire column at all (also the first to record marital status and parents' birthplace), so years before it have no such data to expose, API or otherwise. This is the same kind of era-dependent shape difference `census_schema.py`'s existing `get_census_era()`/`era == "pre1850"` handling already anticipates for Ancestry-sourced data - the FS parser needs the equivalent era-awareness, not a new concept, with the boundary specifically at 1880 (not 1850, which is what the existing `pre1850` naming might suggest at a glance).
+
+**Newly confirmed fields (1880-1950), with real decoded values:**
+
+| `fieldType` | Represents | Real value seen |
+|---|---|---|
+| `RELATIONSHIP_TO_HEAD` | Relationship to household head, **as a direct string** | "Other" (John Chislem) |
+| `MARITAL_STATUS` | | "Single" (Joseph Lawrenson) |
+| `OCCUPATION` | | "House Carpenter" (John Wimlaw) |
+| `RACE_OR_COLOR` | | "White" (Annie E. Robb) |
+| `FTHR_BIR_PLACE` / `MTHR_BIR_PLACE` | Father's/mother's birthplace | "Germany" / "District of Columbia, United States" |
+| `MISC_FLAG_NEW_HOUSEHOLD` | Marks the first person of a new household | "X" (Henry C. Feldman) - a second, redundant way to detect household boundaries alongside `RECORD.subElements` |
+| `SOURCE_SHEET_LTR` / `SOURCE_SHEET_NBR` | Census sheet letter/number | "A" / "48" |
+| `SOURCE_PERSON_NBR` | A per-person position number | "9" (Oscar Close) - relationship to `EXT_LINE_NBR` below not yet disambiguated |
+| `EXT_LINE_NBR` | **Per-person** sheet line number | "00036" (Matilda A. Tuschimsky) - resolves the earlier limitation that `SOURCE_LINE_NBR` is household-level only; this appears to be the true per-individual line number the UI never exposed either |
+| `DISTRICT` (on a `PLACE` element, not `PERSON`) | Enumeration district | "ED 75" |
+
+**Impact on open design questions:** `RELATIONSHIP_TO_HEAD` being a direct string field, if it holds up across more records, likely **eliminates** the "map `RELATIONSHIP` graph edges to a single string" problem flagged as unsolved design work below - read the field directly instead of walking the relationship graph. `EXT_LINE_NBR` likely resolves the per-person line number gap the `SOURCE_LINE_NBR` finding left open. Both should be re-verified across a few more 1880+ records before the parser design finalizes on them as the primary source (only confirmed on one record's capture so far), but this changes the shape of the "Downstream integration" and "Household ID / line number" sections above in the parser's favor - noted here rather than fully rewritten yet, since the household/line-number section above was written before this capture and should be revisited together with it.
+
 ### Confirmed working traversal (real data, both 1850 and 1880)
 
 ```js
@@ -156,8 +177,9 @@ Checked live on a second account specifically to test this: the older table-styl
 
 1. **`DATE` element text decoding** — structure confirmed, never actually resolved to a value.
 2. **Verification across collection types beyond US census** (church records, other countries) — everything confirmed so far is US census 1850/1880 only.
-3. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — real design work, not yet started.
+3. **`RELATIONSHIP`-to-"Relationship to Head" mapping** — likely no longer needed. `RELATIONSHIP_TO_HEAD` is a direct field (confirmed value: "Other"), so the parser can read it straight rather than walking the `RELATIONSHIP` graph, on 1880+ records. Confirmed on only one record so far - worth re-checking on a couple more 1880+ records before the implementation plan locks this in, but the graph-mapping problem this item originally flagged is probably moot.
 4. **Location field (`STATE`/`COUNTY`/`TOWN`) proper scoping** for citation purposes.
+5. **`SOURCE_PERSON_NBR` vs `EXT_LINE_NBR`** — both are per-person numeric fields with different real values on the same record; which one (if either) is the actual sheet line number vs. some other per-person ordinal isn't disambiguated yet.
 
 ## Next steps
 
