@@ -165,6 +165,52 @@ page-type detection ─┤                                                      
    during implementation against the full captured response, not yet fully characterized in
    this design).
 
+7. **`fsBuildCitationTextFromImageIndexResponse(apiResponse)`** — new. Builds the same prose
+   `citation_text` string `scrapeCitationAndCatalog()` currently scrapes from the
+   "Information" tab's UI, entirely from JSON fields, so the Image-Index path never depends
+   on that UI read. `FS.py`'s downstream parsing (`parse_citation()`, `parse_nara_citing_clause()`,
+   `parse_census_browse_path()`) is a **deliberately untouched regression boundary** — this
+   function's only job is to produce a string that regex-matches the exact same way a
+   UI-scraped one already does, verified against real fixture strings from
+   `Voyageur/tests/test_fs.py`:
+
+   ```
+   "<collection_name>," database with images, FamilySearch (<url> : <date>),
+   <state> > <county>[ > <township>][ > ED <n>] > image <N> of <total>;
+   citing NARA microfilm publication <publication> (<repo_loc>: <repo_name>, n.d.).
+   ```
+
+   Field sources, confirmed against the captured JSON unless noted:
+   - `collection_name` ← `collections[].collections[].title`
+   - `url` ← the page's own ark URL (`window.location.href`, already available)
+   - `date` ← current date at gather time (format is not parsed downstream — the
+     `CITATION_RE`/`url_match` regex only requires *some* text after `" : "`, so no specific
+     format is required)
+   - `state`/`county`/`township` ← `EVENT_STATE`/`EVENT_COUNTY`/`EVENT_TOWNSHIP`
+   - `ED <n>` ← `ENUMERATION_DISTRICT`, only when present (matches `parse_census_browse_path()`'s
+     own optional ED-segment handling)
+   - `publication` ← `FS_FILM_NBR` or `FS_DIGITAL_FILM_NBR`
+   - `repo_name` ← `EXT_REPOSITORY_NAME`
+   - **`repo_loc` — NOT CONFIRMED.** No matching field found in either captured sample. Likely
+     a fixed value ("Washington, D.C.") for NARA-sourced US census microfilm specifically,
+     but this is an assumption, not a verified fact — flagged below, must be confirmed (or
+     deliberately hardcoded with that reasoning stated) during implementation, not silently
+     assumed.
+   - **`image <N> of <total>` — `total` NOT CONFIRMED from this endpoint's JSON.** The Image
+     Index page's own UI already displays this (`Image 1 of 3`) — reading that one specific,
+     stable, already-rendered number is a legitimate fallback per this project's "no UI
+     unless there's no other option" rule, since no other JSON source for it was found in
+     `filmdatainfo/image-data` (the companion `waypoint-data` endpoint may carry it, but that
+     endpoint is out of scope for this plan). `N` itself (current image position) doesn't need
+     this: it's decided by ordering, not a field.
+
+   **Deliberately deferred, not built now:** a further, cross-language redesign where JS emits
+   a *structured* citation object and `FS.py` reads it directly, retiring `parse_citation()`/
+   `parse_nara_citing_clause()`/`parse_census_browse_path()` entirely instead of round-tripping
+   through prose. This was scoped out during design specifically to keep this plan JS-only and
+   avoid touching tested, working Python code in the same pass — a real improvement, revisit
+   as a separate follow-up once this path has shipped and proven itself.
+
 ## Data flow
 
 Image loads → both interceptors are already installed (harmless — the one for the page type
@@ -193,6 +239,9 @@ fields — matches the existing project-wide convention.
 - Task 1's existing 22-test suite re-run unchanged after the `fsBuildRowsFromApiResponse`
   refactor, as the regression contract for that refactor.
 - New test for the page-type detection helper (DOM fixture with each tab present/absent).
+- New tests for `fsBuildCitationTextFromImageIndexResponse()` asserting the produced string
+  round-trips correctly through `FS.py`'s existing `CITATION_RE`/`NARA_CITING_RE` — the real
+  regression contract for this function, not just "does it contain the right substrings."
 - No new test needed for the interceptor/wait function itself, same reasoning as Task 2:
   it depends on `unsafeWindow`, which the Node harness stubs as `undefined`.
 
@@ -200,11 +249,15 @@ fields — matches the existing project-wide convention.
 
 - **In scope:** Image Index page detection, `filmdatainfo/image-data` interception and
   parsing, the shared canonical-field/columns layer, `fsBuildRowsFromApiResponse`'s refactor
-  to route through the shared builder.
-- **Out of scope:** citation-text extraction (`scrapeCitationAndCatalog()`) is UI-based today
-  and untouched by this plan — both page types share the same "Information" tab UI shell, so
-  it should keep working unchanged on both, but this is unconfirmed and worth a live check
-  during implementation, not a design change.
+  to route through the shared builder, and building `citation_text` from JSON fields
+  (`fsBuildCitationTextFromImageIndexResponse`) rather than relying on
+  `scrapeCitationAndCatalog()`'s UI read — per explicit direction: JSON extraction is
+  preferred everywhere it's available, UI reads only where genuinely nothing else exists
+  (the one confirmed remaining case: total image count, see above).
+- **Deferred, not built now:** the structured cross-language citation redesign (JS emits
+  structured fields, `FS.py` consumes them directly instead of regex-parsing prose) —
+  explicitly scoped out to keep this plan JS-only; a real improvement to revisit later, not
+  a rejected idea.
 - **Out of scope:** restructuring the downstream Python pipeline (`FS.py`, `census_schema.py`,
   Commissioner models, Archivist's GEDCOM 5.5.1 builder) to consume GEDCOM X shapes directly.
   Considered and explicitly rejected — nothing downstream consumes GEDCOM X today, both
@@ -212,7 +265,8 @@ fields — matches the existing project-wide convention.
   `Voyageur.js`, and pushing GEDCOM X further downstream would be a much larger, separate
   initiative unrelated to covering the Image Browser navigation path.
 - **Out of scope:** `waypoint-data` (the companion endpoint) — not needed for row extraction;
-  may be relevant to future work on cleaner multi-image/waypoint navigation, not this plan.
+  may carry the total-image-count this plan otherwise reads from the UI, worth checking as a
+  follow-up, not blocking this plan.
 
 ## Not yet verified
 
@@ -221,8 +275,14 @@ fields — matches the existing project-wide convention.
   confirmed Family Tree attachment, not yet captured.
 - Whether the orchestration API also carries standard `gedcomx.org` type URIs (see Open item
   above) — check before starting the `fsBuildRowsFromApiResponse` refactor.
-- Whether `scrapeCitationAndCatalog()` behaves identically on the Image Index page (assumed
-  yes, both page types share the "Information" tab shell, not yet live-checked).
+- NARA repository location (`repo_loc` in the citation template) — no matching JSON field
+  found in either capture; likely a fixed "Washington, D.C." for US census microfilm, but
+  this is an assumption to confirm (or knowingly hardcode with reasoning stated), not a
+  verified fact.
+- Total image count for the "image N of total" citation segment — not found in
+  `filmdatainfo/image-data`'s JSON; current plan is to read the one already-rendered UI
+  number as the sole UI fallback in this whole plan, but `waypoint-data`'s response hasn't
+  been inspected and may carry it instead.
 - Field coverage beyond the two captured samples (1860/1880 US Federal Census only) — other
   years, non-census collections, and non-US collections are unverified. The standard-type-URI
   foundation should generalize better than the proprietary labelId convention would have, but
