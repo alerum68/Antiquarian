@@ -75,6 +75,8 @@ participant_facts:
   "Mother Foreign Born": Miscellaneous
   "Male Citizen Over 21": Miscellaneous
   "Voting Rights Denied": Miscellaneous
+  "Religion": Religion
+  "Nationality": Nationality
   "Months Not Employed": Miscellaneous
   "Home Ownership": Miscellaneous
   "Home Mortgaged": Miscellaneous

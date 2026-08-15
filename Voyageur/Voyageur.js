@@ -2553,6 +2553,13 @@ const ANCESTRY_INDEX_FIELD_TO_COLUMN = {
     SelfResidence1HomeMortgaged: 'Home Mortgaged', // 1890's numbered-variant naming of SelfResidenceHomeMortgaged (this ONE numbered variant is a confirmed like-for-like alias, unlike the ambiguous numbered-duplicate PAIRS noted in this plan's scope-exclusion list - it's the only field of its kind in the 1890 collection, no sibling "HomeMortgaged" to be confused with)
     SelfResidenceGradeCompleted: 'Highest Grade Completed', // 1890
     SelfResidenceMonthsAtSchool: 'Attended School', // 1890/1901 - numeric months-attended aliased onto the existing boolean/text Attended School fact
+    // Religion/Nationality - confirmed real, pre-existing FactTypes.json fact types
+    // (Commissioner/FactTypes.json), not invented for this plan. Present across most
+    // Canadian census years (1861 onward) and absent from every US year checked.
+    SelfReligion: 'Religion', // 1871/1881 naming variant (no "Residence" infix)
+    SelfResidenceReligion: 'Religion', // 1861/1901/1861-per-province/1891 naming variant
+    SelfNationality: 'Nationality', // 1871/1881/1901/1921
+    SelfResidenceNationality: 'Nationality', // alternate naming variant, not yet observed but kept consistent with the SelfX/SelfResidenceX pairing pattern seen for every other duplicated field name across years - if this specific spelling is never actually emitted by any real collection, it is a harmless unused entry, not a risk
 };
 
 // SelfGender's own value is the full word ("Male"/"Female"), unlike the DOM table's

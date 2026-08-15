@@ -211,6 +211,32 @@ def test_ancestry_birth_month_and_marital_status_are_mapped_not_unmapped():
     assert not participant["review"], participant.get("review_reason")
 
 
+def test_ancestry_religion_and_nationality_are_mapped_facts_not_unmapped():
+    """Regression for this plan's Task 2 - Religion and Nationality are real,
+    pre-existing FactTypes.json fact types (confirmed via Task 2 Step 1's live check),
+    common on Canadian census years and previously absent from ancestry_census.yaml
+    entirely. Confirms both land as facts, not flagged for manual review."""
+    raw = {
+        "census_year": "1871", "location": "Nova Scotia, Canada",
+        "pages": [_page([
+            {
+                "columns": {
+                    "Given Name": "Donald", "Surname": "MacDonald", "Gender": "M",
+                    "Age": "75", "Religion": "C Of Scotland", "Nationality": "Scotch",
+                },
+                "pid": "p1",
+            },
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1871 Canada Census", "Census_1871")
+
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    fact_types = {f["fact_type"] for f in participant["facts"]}
+    assert "Religion" in fact_types
+    assert "Nationality" in fact_types
+    assert not participant["review"], participant.get("review_reason")
+
+
 def test_street_address_is_mapped_and_house_number_is_not_double_claimed():
     """Regression: 'Street'/'Street Address'/'Address' were unmapped in
     ancestry_census.yaml's participant_fields - Census.py's build_gedcom_from_census
@@ -258,9 +284,9 @@ def test_group_household_prefers_household_id_over_column_based_key():
         "census_year": "1920", "location": "North Dakota",
         "pages": [_page([
             {"columns": {"Given Name": "Mary", "Surname": "Darylus", "Gender": "F", "Age": "67",
-                        "Family Number": "1"}, "pid": "p1", "household_id": "79215820"},
+                         "Family Number": "1"}, "pid": "p1", "household_id": "79215820"},
             {"columns": {"Given Name": "Helen", "Surname": "Darylus", "Gender": "F", "Age": "42",
-                        "Family Number": "2"}, "pid": "p2", "household_id": "79215820"},
+                         "Family Number": "2"}, "pid": "p2", "household_id": "79215820"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
@@ -278,9 +304,9 @@ def test_group_household_falls_back_to_column_based_key_when_household_id_absent
         "census_year": "1900", "location": "Minnesota",
         "pages": [_page([
             {"columns": {"Given Name": "Jean", "Surname": "Gagnon", "Gender": "M", "Age": "40",
-                        "Family Number": "5"}, "pid": "p1"},
+                         "Family Number": "5"}, "pid": "p1"},
             {"columns": {"Given Name": "Marie", "Surname": "Gagnon", "Gender": "F", "Age": "38",
-                        "Family Number": "5"}, "pid": "p2"},
+                         "Family Number": "5"}, "pid": "p2"},
         ])],
     }
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")

@@ -294,3 +294,32 @@ test('ancestryColumnsFromIndexPanelRecord: 1890 fragment fields (numbered HomeMo
     assert.equal(columns['Native Tongue'], 'GER');
 });
 
+test('ancestryColumnsFromIndexPanelRecord: Canadian Religion/Nationality fieldName variants both map to their new targets', () => {
+    // Real fieldName vocabulary confirmed live for 1871 Canada (dbId 1578, SelfReligion/
+    // SelfNationality, no "Residence" infix) and 1861 Canada (dbId 1570,
+    // SelfResidenceReligion, "Residence"-infixed).
+    const record1871 = {
+        pid: 1, householdId: '1', fullName: 'Donald MacDonald',
+        recordFields: [
+            {fieldName: 'SelfReligion', value: 'C Of Scotland', correctedValue: null},
+            {fieldName: 'SelfNationality', value: 'Scotch', correctedValue: null},
+        ],
+        citation: null, isUserCreated: false,
+    };
+    const record1861 = {
+        pid: 2, householdId: '2', fullName: 'Agnes MacDonald',
+        recordFields: [
+            {fieldName: 'SelfResidenceReligion', value: 'Presbyterian', correctedValue: null},
+        ],
+        citation: null, isUserCreated: false,
+    };
+
+    const columns1871 = ancestryColumnsFromIndexPanelRecord(record1871, {});
+    const columns1861 = ancestryColumnsFromIndexPanelRecord(record1861, {});
+
+    assert.equal(columns1871['Religion'], 'C Of Scotland');
+    assert.equal(columns1871['Nationality'], 'Scotch');
+    assert.equal(columns1861['Religion'], 'Presbyterian');
+});
+
+
