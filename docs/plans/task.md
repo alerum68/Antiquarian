@@ -13,8 +13,9 @@
 | 9 | 🏗️ | PyCharm Inspection Fixes Part 2 (`docs/plans/2026-08-14-pycharm-inspection-fixes-part-2.md`); Tasks 1-2 complete |
 | 10 | ✅ | FS Orchestration API Task 1: Pure API-response parser (`docs/superpowers/plans/2026-08-14-fs-orchestration-api-extraction.md`, reviewed, fix round 1 closed clean) |
 | 11 | ✅ | FS Orchestration API Task 2: Interceptor and response-wait glue (reviewed, fix round 1 closed clean) |
-| 12 | ✅ | FS Orchestration API Task 3: Wired extraction into gather loop, removed old UI-scraping (reviewed, fix round 1 closed clean) — only Task 4 (live verification) remains |
-| 13 | ✅ | FS Image-Index Extraction (`docs/superpowers/plans/2026-08-14-fs-image-index-extraction.md`), a second extraction path for the Image Browser navigation gap Task 4 above uncovered — Tasks 1-5 complete, individually reviewed clean, final whole-plan review clean (no Critical/Important findings) — only Task 6 (live verification) remains |
+| 12 | ✅ | FS Orchestration API Task 3: Wired extraction into gather loop, removed old UI-scraping. Task 4 live verification complete. |
+| 13 | ✅ | FS Image-Index Extraction (`docs/superpowers/plans/2026-08-14-fs-image-index-extraction.md`). Task 6 live verification complete. |
+| 14 | ✅ | Ancestry Index-Panel-Data Extraction (`docs/superpowers/plans/2026-08-15-ancestry-index-panel-extraction.md`) - all 5 tasks complete, Task 5 live verification confirmed real `pid`/`household_id` from the API path and correct household grouping (Kosses, May) in generated GEDCOM. Tasks 1-3 (JS) had been implemented but never committed - committed now (`fbcc2b5`), along with a separate bundle of already-tested FS ark-prefix/citation fixes from the earlier Task 12/13 live verifications that were also left uncommitted (`2186033`). FamilySearch side also re-verified live on the same collection (17 records, 3 images, clean GEDCOM) at user's request - confirmed the `person_ark` double-prefix fix works correctly in real output. Follow-on tracked: [issue #25](https://github.com/alerum68/Scriptorium/issues/25) (eliminate remaining FS Information-tab dependency). |
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
 * ✅ **D1 (HBCA_MAX_WORKERS)** — `Voyageur/HBCA.py:87` → `int(os.getenv("HBCA_MAX_WORKERS", "8"))`; schema default `"10"`→`"8"` (`7856b39`). Task-reviewer REQUIRED-ALL-MET/PASS.
