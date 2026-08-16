@@ -262,7 +262,7 @@ def evaluate_spouse_match(a: pd.Series, b: pd.Series) -> Tuple[bool, float, str]
     return True, 0.4, "surname missing for one party -- unverified pairing"
 
 
-def child_evaluation(unit: HouseholdUnit, member: pd.Series) -> Tuple[bool, float, str]:
+def evaluate_child_match(unit: HouseholdUnit, member: pd.Series) -> Tuple[bool, float, str]:
     h = unit.get('husband')
     w = unit.get('wife')
     if h is None and w is None:
@@ -307,7 +307,7 @@ def child_evaluation(unit: HouseholdUnit, member: pd.Series) -> Tuple[bool, floa
 def find_parent(units: List[HouseholdUnit], member: pd.Series) -> Optional[Tuple[int, float, str]]:
     best: Optional[Tuple[int, float, str]] = None
     for i in range(len(units) - 1, -1, -1):
-        plausible, match_conf, match_rsn = child_evaluation(units[i], member)
+        plausible, match_conf, match_rsn = evaluate_child_match(units[i], member)
         if plausible:
             if best is None:
                 best = (i, match_conf, match_rsn)
