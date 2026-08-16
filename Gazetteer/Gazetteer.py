@@ -41,14 +41,17 @@ RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(GENEALOGY_DIR, _
 
 # These ship alongside the Gazetteer tool at fixed, known-good locations - not
 # user-configurable settings, so they are plain constants rather than os.getenv() reads.
+# PROGRAM_DIR already IS the app's own install root (see Antiquarian.py's _run_subprocess),
+# so these paths sit directly under it - matching the .gitignore patterns for the same
+# folders (/Gazetteer/US_AtlasHCB_Counties/, /Gazetteer/CA_UNICEN_Counties/*).
 SHAPEFILE_PATH = os.path.join(
     PROGRAM_DIR,
-    "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
+    "Gazetteer/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
 
 # Optional: if the folder isn't present, Gazetteer simply runs US-only, exactly as it did
 # before this existed (one shapefile per census year - see that folder's own
 # LICENSE_AND_ATTRIBUTION.txt).
-CA_SHAPEFILE_DIR = os.path.join(PROGRAM_DIR, "Antiquarian/Gazetteer/CA_UNICEN_Counties")
+CA_SHAPEFILE_DIR = os.path.join(PROGRAM_DIR, "Gazetteer/CA_UNICEN_Counties")
 
 DEBUG_MODE = False
 CREATE_BACKUP = True

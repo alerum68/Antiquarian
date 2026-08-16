@@ -35,8 +35,8 @@ jobs:
         with:
           name: Antiquarian-Installer-Sandbox
           path: |
-            Output/Antiquarian_Installer.exe
-            Antiquarian_Portable.zip
+            Output/Antiquarian_*.exe
+            Antiquarian_Portable_*.zip
           retention-days: 7
 
       - name: Create GitHub Release
@@ -44,8 +44,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Output/Antiquarian_Installer.exe
-            Antiquarian_Portable.zip
+            Output/Antiquarian_*.exe
+            Antiquarian_Portable_*.zip
           draft: false
           prerelease: false
         env:

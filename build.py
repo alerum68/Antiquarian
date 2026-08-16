@@ -1,9 +1,24 @@
 import os
+import re
 import shutil
 import subprocess
 
 
+def get_version() -> str:
+    """Antiquarian.py's own APP_VERSION is the single source of truth - everything else
+    (this build's zip filename, the compiled installer's filename/AppVersion) derives from
+    it rather than keeping its own separately-hardcoded copy, which is exactly how the
+    installer and the app itself drifted out of sync before."""
+    with open("Antiquarian.py", "r", encoding="utf-8") as f:
+        text = f.read()
+    match = re.search(r'^APP_VERSION\s*=\s*"([^"]+)"', text, re.MULTILINE)
+    if not match:
+        raise RuntimeError("Could not find APP_VERSION in Antiquarian.py")
+    return match.group(1)
+
+
 def build():
+    version = get_version()
     # Package the Antiquarian binary natively. --onedir prevents extraction penalties
     # for background subprocesses during runtime.
     print("Running PyInstaller...")
@@ -42,11 +57,22 @@ def build():
     os.makedirs(sys_dst, exist_ok=True)
     shutil.copy(os.path.join("Voyageur", "Voyageur.js"), os.path.join(sys_dst, "Voyageur.js"))
 
-    # Bundle a portable version for users bypassing the Inno Setup installer
-    print("Zipping Antiquarian_Portable.zip...")
-    shutil.make_archive("Antiquarian_Portable", "zip", "dist", "Antiquarian")
+    # Bundle a portable version for users bypassing the Inno Setup installer. The zip's own
+    # filename is versioned, but the folder inside it stays plain "Antiquarian" - unzipping
+    # two different versions side by side shouldn't produce two differently-named folders.
+    zip_base = f"Antiquarian_Portable_{version}"
+    print(f"Zipping {zip_base}.zip...")
+    shutil.make_archive(zip_base, "zip", "dist", "Antiquarian")
 
-    print("Build complete.")
+    # Hand the version to the next CI step (Inno Setup compile) via a real env var, so
+    # installer.iss's AppVersion/output filename stay in sync with this same version
+    # instead of carrying their own separately-maintained copy.
+    github_env = os.environ.get("GITHUB_ENV")
+    if github_env:
+        with open(github_env, "a", encoding="utf-8") as f:
+            f.write(f"APP_VERSION={version}\n")
+
+    print(f"Build complete. Version {version}.")
 
 
 if __name__ == "__main__":
