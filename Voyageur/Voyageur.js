@@ -1001,164 +1001,8 @@
             };
         }
 
-        // Ancestry's own per-person Detail panel surfaces crowdsourced "alternate
-        // reading" submissions (bracketed values, each attributable to a specific
-        // Ancestry user) for fields like Name and Birth Place, alongside its own
-        // primary indexed reading (see ROADMAP.md). Confirmed live: selecting a
-        // different person's row triggers zero new network requests - all people's
-        // data for this page is already bulk-loaded - so reading this per person only
-        // costs UI interaction time, not extra fetches.
-        function findDetailTab() {
-            return [...document.querySelectorAll('[role="tab"]')].find(t => t.textContent.trim() === 'Detail');
-        }
 
-        function findFieldRow(detailContentEl, label) {
-            return [...detailContentEl.querySelectorAll('tr')].find(tr => {
-                const th = tr.querySelector('th');
-                return th && th.textContent.trim() === label;
-            });
-        }
-
-        async function ensureInfoPanelOpen() {
-            // The Detail/Related/Source panel is a separate, independently-toggled
-            // panel from the index table (#indexPanel) - confirmed live: the Source
-            // tab's own citation content never rendered until this was opened.
-            //
-            // Its open/closed state is a persisted user preference (confirmed live: a
-            // fresh page load can start already open, carried over from a previous
-            // browsing session), NOT something that always starts closed - the tab
-            // bar/buttons exist in the DOM either way, so checking for the Detail tab's
-            // mere presence is not a reliable "is it open" signal and caused a real bug:
-            // blindly clicking the toggle closed an already-open panel instead of
-            // opening a closed one. `.infopanel`'s own "opened" class is the real
-            // indicator.
-            const isOpen = () => {
-                const panel = document.querySelector('.infopanel');
-                return !!panel && panel.classList.contains('opened');
-            };
-            if (isOpen()) return;
-
-            const infoPanelToggle = [...document.querySelectorAll('button, [role="button"]')]
-                .find(el => /information panel/i.test(el.getAttribute('aria-label') || el.title || el.textContent || ''));
-            if (infoPanelToggle) {
-                infoPanelToggle.click();
-                await waitForCondition(isOpen, {timeoutMs: 5000});
-            }
-        }
-
-        function readAlternateEntries(fieldRow) {
-            // Each value in this field is its own <div class="full-row"><button>...
-            // </button></div>; when more than one exists, all but the last are
-            // crowdsourced alternates (the last is Ancestry's own primary reading,
-            // already captured from the index table, so it's not re-scraped here). The
-            // bracketed alternate text is already sitting right there on the button -
-            // no need to click it open to read the value itself.
-            //
-            // This deliberately does NOT click through to the "Added by <user>" popup
-            // to capture a submitter anymore. That popup has two entirely different
-            // rendering variants (a wide "callout" and a narrow "modal") depending on
-            // viewport, sometimes takes several seconds to render, and has no reliable
-            // close control in either variant (Escape does nothing, its own "Close
-            // popup region" button doesn't actually dismiss it, and the modal variant
-            // has none at all - only a genuine click outside its bounds works). A slow
-            // render meant the code gave up waiting and moved on while the popup was
-            // still pending, so it would surface moments later, orphaned, while the
-            // script had already moved to a different field/person/page - with nothing
-            // left watching to close it. That's confirmed live to be exactly what froze
-            // a real gather. Not worth the risk for a "submitted by" note.
-            if (!fieldRow) return [];
-            const valueButtons = [...fieldRow.querySelectorAll('td .full-row > button.link')];
-            if (valueButtons.length <= 1) return [];
-
-            const alternateButtons = valueButtons.slice(0, -1);
-            const seen = new Set();
-            const entries = [];
-            for (const btn of alternateButtons) {
-                const cleanValue = btn.textContent.trim().replace(/^\[|\]\s*$/g, '').trim();
-                if (!cleanValue) continue;
-                const key = cleanValue.toLowerCase();
-                if (seen.has(key)) continue;
-                seen.add(key);
-                entries.push({value: cleanValue});
-            }
-            return entries;
-        }
-
-        async function readPersonAlternates(row, expectedFullName) {
-            // Click this person's own row to activate their Detail panel, wait for it
-            // to actually reflect them (rather than a blind delay), then read
-            // alternates for Name and Birth Place specifically - the two fields that
-            // map onto GEDCOM facts (see ROADMAP.md); other fields' alternates aren't
-            // captured.
-            await ensureInfoPanelOpen();
-            // Confirmed live: alternate-settle timeouts start suddenly partway down a page
-            // (rows 1-25 fine, 26-30 all timed out) and never recover for the rest of that
-            // page - consistent with a virtualized/windowed table only fully rendering rows
-            // near the current scroll position, so a row further down may not be genuinely
-            // clickable yet even though it's already in `rows`. Scrolling it into view first
-            // is a no-op for an already-visible row, so this costs nothing on the common case.
-            row.scrollIntoView({block: 'center'});
-            row.click();
-
-            const detailTab = findDetailTab();
-            if (!detailTab) return {names: [], birthPlaces: [], timedOut: false};
-
-            // scrapeSourceCitation() (called once per page, before this per-row loop
-            // starts) leaves the info panel on the "Source" tab, and nothing switches
-            // it back - confirmed live: every alternate-button click was landing on a
-            // hidden Detail pane, so its tooltip never actually rendered. Reading
-            // textContent bypasses visibility fine, but clicking a button to trigger
-            // its popover needs the pane to genuinely be the active/displayed one.
-            if (detailTab.getAttribute('aria-selected') !== 'true') {
-                detailTab.click();
-            }
-
-            const settleWait = await waitForCondition(() => {
-                const el = document.getElementById(detailTab.getAttribute('aria-controls'));
-                const nameRow = el ? findFieldRow(el, 'Name') : null;
-                if (!nameRow) return null;
-                const valueButtons = [...nameRow.querySelectorAll('td .full-row > button.link')];
-                const lastValue = valueButtons.length ? valueButtons[valueButtons.length - 1].textContent.trim() : '';
-                return lastValue && expectedFullName && lastValue === expectedFullName ? el : null;
-            }, {timeoutMs: 5000});
-
-            if (DEBUG_MODE) {
-                console.log(`[MGS DEBUG] alternates: settle for "${expectedFullName}" ${settleWait.timedOut ? 'TIMED OUT' : 'resolved'} after ${settleWait.elapsedMs}ms`);
-            }
-
-            // On timeout, settleWait.result is null specifically because the panel never
-            // confirmed showing THIS person's name - falling back to "whatever's in the DOM
-            // right now" here used to mean reading the panel while it still showed the
-            // PREVIOUS row's data, silently attributing their alternate name/place to this
-            // person instead (confirmed live: "Gabe" - a real alternate for one specific
-            // person - showed up attached to other people too, whenever the panel was slow
-            // to swap over). Missing this person's own alternates on a slow render is a far
-            // smaller cost than misattributing someone else's, so a timeout now returns
-            // nothing rather than guessing from stale DOM state.
-            if (!settleWait.result) return {names: [], birthPlaces: [], timedOut: true};
-            const detailContentEl = settleWait.result;
-
-            const names = readAlternateEntries(findFieldRow(detailContentEl, 'Name'));
-            const birthPlaces = readAlternateEntries(findFieldRow(detailContentEl, 'Birth Place'));
-
-            if (DEBUG_MODE && (names.length || birthPlaces.length)) {
-                console.log(`[MGS DEBUG] alternates: "${expectedFullName}" -> names: ${JSON.stringify(names)} | birthPlaces: ${JSON.stringify(birthPlaces)}`);
-            }
-
-            return {names, birthPlaces, timedOut: false};
-        }
-
-        async function extractCurrentPageData(rows) {
-            // Confirmed live: once the alternate-reading settle-wait starts timing out (each
-            // one eating its full 5s ceiling), it keeps timing out for every remaining row on
-            // that page too - something about the page/panel got stuck, not this one row
-            // specifically. Continuing to pay the full ceiling per remaining row for a result
-            // we already know will come back empty either way (see readPersonAlternates'
-            // timeout handling) is pure wasted time, so this stops attempting it for the rest
-            // of the page after a couple of consecutive timeouts. Resets every page.
-            let consecutiveAlternateTimeouts = 0;
-            const ALTERNATE_TIMEOUT_CIRCUIT_BREAKER = 2;
-
+        async function extractCurrentPageData() {
             let imageId = getBaseImageId();
             let country = "USA", state = "", county = "", city = "", placeDetails = "", enumerationDistrict = "";
 
@@ -1182,15 +1026,11 @@
             const imageIdGuess = parseFilmRollFromImageId(imageId);
             const filmNumber = citation.film || imageIdGuess.film;
             const rollNumber = citation.roll || imageIdGuess.roll;
-            // The citation text is what will actually appear in the GEDCOM's own citation, so
-            // prefer it over the browsePath-derived guess whenever it's actually available.
             if (citation.ed) enumerationDistrict = citation.ed;
             const repository = citation.repository || "";
             const repositoryLoc = citation.repositoryLoc || "";
             const publisher = citation.publisher || "";
             const pubLoc = citation.pubLoc || "";
-
-            let rowIndex = 0;
 
             if (DEBUG_MODE) {
                 console.log(`[MGS DEBUG] page ${batchPageCounter} | url: ${window.location.href} | cached pids: ${typeof unsafeWindow !== 'undefined' ? unsafeWindow.__mgs_pids.length : 'n/a'}`);
@@ -1203,17 +1043,12 @@
                 enumeration_district: enumerationDistrict, film_number: filmNumber, roll_number: rollNumber,
                 apid_db: dbid !== "0" ? dbid : "",
                 repository: repository, repository_loc: repositoryLoc, publisher: publisher, pub_loc: pubLoc,
-                people: []
+                people: [],
+                incomplete: false,
             };
-            let columnNames = [];
 
-            // Try the index-panel-data API first (Task 1/2) - if it already fired for this
-            // exact image (the common case: it's the same page load that populated the DOM
-            // table extractCurrentPageData's caller already confirmed), this resolves
-            // instantly. Only pays the bounded timeout when the API genuinely never fires
-            // for this collection/page, in which case the DOM-table loop below (completely
-            // unmodified) is the fallback. dbid/imageId were both already computed above in
-            // this same function.
+            // API is the only extraction path - DOM-table scraping proved unnecessary in the
+            // common case and unreliable as a fallback (see design spec).
             const dbIdForApi = (dbid && dbid !== "0") ? dbid : null;
             let apiSourcedPeople = null;
             if (dbIdForApi && imageId) {
@@ -1224,150 +1059,16 @@
                         if (p.pid) seenPids.add(p.pid);
                         return true;
                     });
-                    debugLog(`Ancestry index-panel-data API: ${apiSourcedPeople.length} people (of ${apiWait.result.records.length} total, ${apiWait.elapsedMs}ms) - using API data, skipping DOM table scrape for this page.`);
+                    debugLog(`Ancestry index-panel-data API: ${apiSourcedPeople.length} people (${apiWait.elapsedMs}ms).`);
                 } else {
-                    debugLog(`Ancestry index-panel-data API ${apiWait.timedOut ? 'timed out' : 'returned no records'} after ${apiWait.elapsedMs}ms - falling back to DOM table scrape.`);
+                    debugLog(`Ancestry index-panel-data API ${apiWait.timedOut ? 'timed out' : 'returned no records'} after ${apiWait.elapsedMs}ms.`);
                 }
             }
 
             if (apiSourcedPeople) {
                 pageEntry.people.push(...apiSourcedPeople);
             } else {
-            for (const row of rows) {
-                const isHeader = row.classList.contains('indexPanelHeaderRow') || row.querySelectorAll('th, [role="columnheader"]').length > 0;
-
-                if (isHeader) {
-                    if (columnNames.length === 0) {
-                        row.querySelectorAll('th, td, .grid-cell, [role="columnheader"], [role="gridcell"]').forEach(col => {
-                            let text = (col.innerText || col.textContent).replace(/(\r\n|\n|\r)/gm, " ").trim();
-                            columnNames.push(text);
-                        });
-                    }
-                    continue;
-                }
-
-                const cols = row.querySelectorAll('td, .grid-cell, [role="gridcell"]');
-                if (cols.length === 0) continue;
-
-                let rowPid = "";
-                let rowUrl = "";
-                let pidSource = "none";
-                const link = row.querySelector('a[href*="records/"]');
-                if (link) {
-                    const match = link.href.match(/records\/(\d+)/);
-                    if (match) {
-                        rowPid = match[1];
-                        pidSource = "anchor href";
-                    }
-                }
-
-                if (!rowPid) {
-                    const domElements = [row, ...row.querySelectorAll('*')];
-                    for (let el of domElements) {
-                        const reactKey = Object.keys(el).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'));
-                        if (reactKey) {
-                            /** @type {any} */
-                            let fiber = el[reactKey];
-                            let attempts = 0;
-                            while (fiber && attempts < 15) {
-                                const props = fiber.memoizedProps || {};
-                                let recordsToCheck = [props.rowData, props.record, (props.data ? props.data[props.rowIndex] : null)];
-                                recordsToCheck.forEach(rec => {
-                                    if (rec && typeof rec === 'object') {
-                                        let potentialPid = rec.recordId || rec.clientRecordId || rec.id;
-                                        if (!rowPid && potentialPid && String(potentialPid).match(/^\d{5,15}$/)) {
-                                            rowPid = String(potentialPid);
-                                            pidSource = "react fiber";
-                                        }
-                                    }
-                                });
-                                fiber = fiber.return;
-                                attempts++;
-                            }
-                        }
-                        if (rowPid) break;
-                    }
-                }
-
-                if (!rowPid && typeof unsafeWindow !== 'undefined' && unsafeWindow.__mgs_pids[rowIndex]) {
-                    rowPid = unsafeWindow.__mgs_pids[rowIndex];
-                    pidSource = "network cache";
-                }
-                // No math-based pid fallback here anymore (see CHANGELOG) - it assumed the
-                // URL's pId param was this page's own starting pid, but that param actually
-                // carries the previous page's last-clicked record forward, so the guess
-                // could collide with an already-seen pid and wipe out a whole page (see the
-                // rowIndex-freeze fix below). anchor href/react fiber/network cache are
-                // reliable enough on their own; Archivist's rec_id fallback covers a person
-                // left with no pid at all.
-                if (rowPid && dbid && dbid !== "0") {
-                    rowUrl = `https://www.ancestry.com/search/collections/${dbid}/records/${rowPid}`;
-                }
-
-                // Incremented here - right after rowIndex is done being read for this row's
-                // own network-cache lookup, but before any `continue` below - rather than
-                // only at the very end of the loop body. Confirmed live: the duplicate-skip
-                // continue used to bypass the increment entirely, freezing rowIndex on the
-                // first duplicate hit, which then fed the (since-removed) math fallback the
-                // same stale value for every remaining row, cascading into "every row on the
-                // rest of the page marked duplicate" and silently wiping out an entire page's
-                // worth of real people. Still needed now for the network-cache lookup and
-                // the synthesized Line Number to track this row's true position on the page.
-                rowIndex++;
-
-                if (rowPid && seenPids.has(rowPid)) {
-                    if (DEBUG_MODE) {
-                        console.log(`[MGS DEBUG] Row ${rowIndex} | PID: ${rowPid} | Source: ${pidSource} | SKIPPED as duplicate`);
-                    }
-                    continue;
-                }
-                if (rowPid) {
-                    seenPids.add(rowPid);
-                }
-
-                const columns = {};
-                cols.forEach((col, i) => {
-                    columns[columnNames[i] || `Column_${i + 1}`] = (col.innerText || col.textContent).replace(/(\r\n|\n|\r)/gm, " ").trim();
-                });
-
-                // Not every census year's index exposes a Line Number column. When it's
-                // missing, synthesize one from this row's position on the page (1-based,
-                // restarting at 1 on every page) so citations get a real line reference
-                // instead of Archivist's "Line: X" filler.
-                const hasLineNumber = Object.keys(columns).some(name => /line/i.test(name));
-                if (!hasLineNumber) {
-                    columns['Line Number'] = String(rowIndex);
-                }
-
-                debugLog(`Row ${rowIndex} | PID: ${rowPid} | Source: ${pidSource}`);
-
-                // Alternate name/place capture (see ROADMAP.md): expects the Given
-                // Name/Surname column keys the index table already uses. Falls back to
-                // no-alternates rather than throwing if a given collection's own
-                // Detail panel doesn't match this shape, so a scraping hiccup here
-                // never costs the row's own already-scraped index data.
-                let alternateNames = [], alternateBirthPlaces = [];
-                if (consecutiveAlternateTimeouts < ALTERNATE_TIMEOUT_CIRCUIT_BREAKER) {
-                    try {
-                        const expectedFullName = `${columns['Given Name'] || ''} ${columns['Surname'] || ''}`.trim();
-                        const alts = await readPersonAlternates(row, expectedFullName);
-                        alternateNames = alts.names;
-                        alternateBirthPlaces = alts.birthPlaces;
-                        consecutiveAlternateTimeouts = alts.timedOut ? consecutiveAlternateTimeouts + 1 : 0;
-                    } catch (err) {
-                        if (DEBUG_MODE) {
-                            console.warn(`[MGS DEBUG] Row ${rowIndex}: alternate-reading capture failed: ${err.message || err}`);
-                        }
-                    }
-                } else if (DEBUG_MODE) {
-                    console.log(`[MGS DEBUG] Row ${rowIndex}: skipping alternate-reading (${consecutiveAlternateTimeouts} consecutive timeouts already seen on this page).`);
-                }
-
-                pageEntry.people.push({
-                    columns: columns, pid: rowPid, extracted_url: rowUrl,
-                    alternate_names: alternateNames, alternate_birth_places: alternateBirthPlaces
-                });
-            }
+                pageEntry.incomplete = true;
             }
 
             const thisPlace = {
@@ -1377,14 +1078,10 @@
             if (firstPagePlace === null) {
                 firstPagePlace = thisPlace;
             } else if (!placesMatch(thisPlace, firstPagePlace)) {
-                // Crossed into a new town/ED - this page belongs to the next town, not the
-                // one this gather is for. Discard it entirely (the caller also skips this
-                // page's image download) and signal the loop to stop here.
-                return {placeBoundaryCrossed: true};
+                return {placeBoundaryCrossed: true, pageEntry: null};
             }
 
-            accumulatedPages.push(pageEntry);
-            return {placeBoundaryCrossed: false};
+            return {placeBoundaryCrossed: false, pageEntry};
         }
 
         async function downloadCurrentImage() {
@@ -1615,17 +1312,14 @@
                         debugLog("Timed out waiting for React table to update.");
                     } else if (rows && rows.length > 1) {
                         if (window.showToast) window.showToast(`Transcribing page ${batchPageCounter}...`, "success", 1500);
-                        const extractResult = await extractCurrentPageData(rows);
-                        if (extractResult && extractResult.placeBoundaryCrossed) {
-                            // This page belongs to the next town, not the one this gather
-                            // started on - it's already been excluded from accumulatedPages
-                            // by extractCurrentPageData. Don't download its image either,
-                            // and stop here rather than advancing past it.
+                        const extractResult = await extractCurrentPageData();
+                        if (extractResult.placeBoundaryCrossed) {
                             debugLog(`Place boundary crossed at page ${batchPageCounter}. Stopping and discarding this page.`);
                             if (window.showToast) window.showToast("New town detected - stopping batch.", "error", 3000);
                             stopBatch();
                             break;
                         }
+                        if (extractResult.pageEntry) accumulatedPages.push(extractResult.pageEntry);
                     }
                 }
 
