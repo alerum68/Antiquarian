@@ -22,6 +22,19 @@ from dotenv import dotenv_values
 BASE_DIR = Path(__file__).resolve().parent
 APP_VERSION = "0.07.00"
 
+# Path(__file__).resolve().parent lands inside PyInstaller's _internal bundle dir when
+# frozen, not the exe's own folder - anything that needs "where the app itself actually
+# lives" (e.g. detecting a portable install via a marker file placed next to the exe)
+# must resolve via sys.executable instead.
+APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else BASE_DIR
+
+# Both portable delivery paths - the installer's own Portable Installation choice, and the
+# raw Antiquarian_Portable_*.zip (see build.py) - carry a ".portable" marker next to the
+# exe. Assume no separate Genealogy folder exists yet (e.g. running from a USB drive) and
+# default Genealogy Directory to wherever the app itself is, instead of an empty string
+# that would otherwise break every downstream path join.
+_DEFAULT_GENEALOGY_DIR = str(APP_DIR) if (APP_DIR / ".portable").exists() else ""
+
 # Each tool's own script lives in a fixed subfolder of this codebase - hardcoded rather than
 # a configurable Global Settings field, since the folder layout is the codebase's own, not
 # something that varies per user or per project the way PROGRAM_DIR does.
@@ -38,8 +51,8 @@ SCRIPT_PATHS = {
 
 
 def get_config_dir() -> Path:
-    if (BASE_DIR / ".portable").exists():
-        return BASE_DIR
+    if (APP_DIR / ".portable").exists():
+        return APP_DIR
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
         return Path(local_app_data) / "Antiquarian"
@@ -130,12 +143,12 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                     "COST_PER_1M_INPUT": "0.075",
                                     "COST_PER_1M_OUTPUT": "0.30",
                                     "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
-               "Global Directories": {"GENEALOGY_DIR": "",
+               "Global Directories": {"GENEALOGY_DIR": _DEFAULT_GENEALOGY_DIR,
                                       "RM_DIR": "",
                                       "FTM_DIR": "",
-                                      "MEDIA_DIR": "Antiquarian/Media",
-                                      "JSON_DIR": "Antiquarian/JSON",
-                                      "GEDCOM_OUTPUT_PATH": "Antiquarian/GEDCOM"},
+                                      "MEDIA_DIR": "Media",
+                                      "JSON_DIR": "JSON",
+                                      "GEDCOM_OUTPUT_PATH": "GEDCOM"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
                "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
@@ -748,8 +761,8 @@ class Antiquarian(ctk.CTk):
         if prog_dir_var:
             prog_dir = prog_dir_var.get().strip()
             if prog_dir:
-                for sub in ["Media", "JSON", "GEDCOM", os.path.join("Sys", "Gazetteer")]:
-                    os.makedirs(os.path.join(prog_dir, "Antiquarian", sub), exist_ok=True)
+                for sub in ["Media", "JSON", "GEDCOM", "Prompts"]:
+                    os.makedirs(os.path.join(prog_dir, sub), exist_ok=True)
 
         # Force a geometry update before building the first tab.
         # This fixes a known CustomTkinter bug where CTkScrollableFrame
@@ -799,15 +812,15 @@ class Antiquarian(ctk.CTk):
                "Would you like to install it and the Voyageur script now?")
         if messagebox.askyesno("Tampermonkey Required", msg):
             webbrowser.open("https://www.tampermonkey.net/")
-            prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
-            if prog_dir_var:
-                prog_dir = prog_dir_var.get().strip()
-                js_path = os.path.join(prog_dir, "Antiquarian", "Sys", "Voyageur.js")
-                if os.path.exists(js_path):
-                    try:
-                        os.startfile(js_path)
-                    except Exception as e:
-                        print(f"Could not open Voyageur.js: {e}")
+            # Voyageur.js ships alongside the app itself (build.py copies it to Sys/), not
+            # under the user's Genealogy directory - same PROGRAM_DIR-relative reasoning as
+            # Gazetteer's shapefiles.
+            js_path = APP_DIR / "Sys" / "Voyageur.js"
+            if js_path.exists():
+                try:
+                    os.startfile(js_path)
+                except Exception as e:
+                    print(f"Could not open Voyageur.js: {e}")
             batch_set_env(env_path_for(None), {"TAMPERMONKEY_INSTALLED": "True"})
 
     def _on_closing(self):

@@ -29,6 +29,7 @@ def build():
         "--windowed",
         "--noconfirm",
         "--clean",
+        "--icon", "Antiquarian.ico",
         "--add-data", "Commissioner/assets/theme.json;Commissioner/assets",
         "--add-data", "Archivist/settings_schema.yaml;Archivist",
         "--add-data", "Voyageur/settings_schema.yaml;Voyageur",
@@ -60,9 +61,21 @@ def build():
     # Bundle a portable version for users bypassing the Inno Setup installer. The zip's own
     # filename is versioned, but the folder inside it stays plain "Antiquarian" - unzipping
     # two different versions side by side shouldn't produce two differently-named folders.
-    zip_base = f"Antiquarian_Portable_{version}"
-    print(f"Zipping {zip_base}.zip...")
-    shutil.make_archive(zip_base, "zip", "dist", "Antiquarian")
+    #
+    # A ".portable" marker goes in only for the zip's own lifetime, not dist_dir itself -
+    # installer.iss's [Files] section reads from this same dist_dir for the standard/
+    # portable installer .exe, whose own Portable Installation writes this marker
+    # conditionally based on the wizard's own choice; baking it in here unconditionally
+    # would make every install (including Standard/Program Files) misdetect as portable.
+    portable_marker = os.path.join(dist_dir, ".portable")
+    with open(portable_marker, "w", encoding="utf-8"):
+        pass
+    try:
+        zip_base = f"Antiquarian_Portable_{version}"
+        print(f"Zipping {zip_base}.zip...")
+        shutil.make_archive(zip_base, "zip", "dist", "Antiquarian")
+    finally:
+        os.remove(portable_marker)
 
     # Hand the version to the next CI step (Inno Setup compile) via a real env var, so
     # installer.iss's AppVersion/output filename stay in sync with this same version

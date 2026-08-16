@@ -834,7 +834,7 @@ def main() -> None:
     program_dir = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("GATHER_URL", "").strip()
-    json_dir = os.getenv("JSON_DIR", "Antiquarian/Working/Project/JSON")
+    json_dir = os.getenv("JSON_DIR", "JSON")
     on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
 
     if not url:
