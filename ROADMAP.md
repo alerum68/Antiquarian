@@ -52,6 +52,21 @@ anything built would ship unverified against a real import (unlike FTM, where at
 maintainer can test empirically) until that access exists. Worth doing once that testing
 gap closes, not before.
 
+## Mac (.dmg) and Linux (.deb) packaging
+
+CI (`.github/workflows/build.yml`) only builds Windows today: a single `runs-on:
+windows-latest` job producing the Inno Setup installer and `Antiquarian_Portable.zip`.
+The original packaging design (`docs/superpowers/specs/2026-08-15-packaging-architecture-design.md`,
+Section 4) planned a full 3-OS matrix, but the Mac and Linux legs were never implemented.
+
+Needs real platform-specific work, not just adding runners:
+- A macOS job: PyInstaller `--onedir` build, then wrap in a `.dmg` (e.g. `create-dmg`).
+- A Linux job: PyInstaller `--onedir` build, then package via `fpm` or `dpkg-deb`.
+- CustomTkinter, Tampermonkey, and AGY-CLI dependency handling all need verifying on
+  both platforms - untested there today.
+- The installer's Node.js/AGY-CLI auto-install logic is Windows-specific PowerShell
+  (`installer.iss`) and has no Mac/Linux equivalent yet.
+
 ## Wills & Probates record type
 
 Another record type Paleographer will need a `.pmt` file for. Structurally closer to
