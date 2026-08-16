@@ -3,7 +3,7 @@ name: Build and Release Antiquarian
 on:
   push:
     branches:
-      - Unify
+      - master
     tags:
       - 'v*'
 
@@ -30,7 +30,7 @@ jobs:
         run: iscc installer.iss
 
       - name: Upload Sandbox Artifact
-        if: github.ref == 'refs/heads/Unify'
+        if: github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v4
         with:
           name: Antiquarian-Installer-Sandbox
