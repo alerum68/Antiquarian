@@ -621,15 +621,19 @@ def test_build_empty_sheet_validates_against_commissioner_schema():
 def test_get_field_remap_parish():
     remap = record_registry.get_field_remap("Parish")
     assert remap["CHURCH_MASTER_DB_NAME"] == "MASTER_DB_NAME"
-    # Image dirs are auto-resolved as Media/<Prompt_Name>, not remapped.
-    assert "CHURCH_IMAGE_DIR" not in remap
+    # IMAGE_DIR is still remapped, not auto-resolved: Archivist/General.py's own
+    # IMAGE_DIR resolution has no other source for a non-Census document type (its own
+    # hardcoded default is "Census", wrong for Parish/Scrip/HBCA) - Scriptorium.py's own
+    # comment (around its run_env.update(env_overrides) call) confirms this field_remap
+    # table is still the live mechanism it depends on.
+    assert remap["CHURCH_IMAGE_DIR"] == "IMAGE_DIR"
 
 
 def test_get_field_remap_scrip():
     remap = record_registry.get_field_remap("Scrip")
     assert remap["SCRIP_MASTER_DB_NAME"] == "MASTER_DB_NAME"
-    # Image dirs are auto-resolved as Media/<Prompt_Name>, not remapped.
-    assert "SCRIP_IMAGE_DIR" not in remap
+    # See test_get_field_remap_parish's comment - same still-live IMAGE_DIR mechanism.
+    assert remap["SCRIP_IMAGE_DIR"] == "IMAGE_DIR"
 
 
 def test_get_field_remap_unknown_document_type_raises():
