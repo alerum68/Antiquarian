@@ -24,6 +24,7 @@ extra_fields:
     - {name: city, type: string}
     - {name: country, type: string}
     - {name: apid_db, type: string}
+    - {name: place_details, type: string}
   participant:
     - {name: line_number, type: string}
     - {name: pid, type: string}
@@ -32,6 +33,11 @@ extra_fields:
     - {name: person_ark, type: string}
     - {name: familysearch_url, type: string}
     - {name: unmapped, type: dict}
+    - {name: street, type: string}
+    - {name: married_within_year, type: string}
+    - {name: birth_month, type: string}
+    - {name: marital_status, type: string}
+    - {name: alternate_birth_places, type: list}
 ---
 
 You are an expert genealogist specializing in historical census enumeration

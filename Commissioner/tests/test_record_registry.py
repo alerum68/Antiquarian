@@ -97,6 +97,39 @@ def test_census_participant_extra_fields_validate():
     assert extra.pid == "MXHY-ABC"  # type: ignore
 
 
+def test_census_record_extra_fields_include_place_details():
+    """Regression: place_details is set by census_schema.normalize_census_pages() (one
+    of the loc_key fields carried through from every page) but was never declared here,
+    so any record carrying it would fail Commissioner validation with extra_forbidden."""
+    extra = validate_record_extra_fields("Census", {"place_details": "Rural Route 2"})
+    assert extra.place_details == "Rural Route 2"  # type: ignore
+
+
+def test_census_participant_extra_fields_include_all_ancestry_fs_mapped_keys():
+    """Regression: confirmed live (2026-08-15 Canadian gather) that marital_status alone
+    tripped a real Commissioner extra_forbidden error, even though ancestry_census.yaml
+    has mapped it since the original Ancestry index-panel-data plan's Task 4. Auditing
+    every participant_fields type_specific_fields.* target across both
+    ancestry_census.yaml and familysearch_census.yaml (plus census_schema.py's own
+    always-added passthrough keys) surfaced four more of the same gap: street,
+    married_within_year, birth_month, and alternate_birth_places."""
+    extra = validate_participant_extra_fields(
+        "Census",
+        {
+            "street": "Main Street",
+            "married_within_year": "Yes",
+            "birth_month": "March",
+            "marital_status": "Widowed",
+            "alternate_birth_places": ["Ontario", "Canada"],
+        },
+    )
+    assert extra.street == "Main Street"  # type: ignore
+    assert extra.married_within_year == "Yes"  # type: ignore
+    assert extra.birth_month == "March"  # type: ignore
+    assert extra.marital_status == "Widowed"  # type: ignore
+    assert extra.alternate_birth_places == ["Ontario", "Canada"]  # type: ignore
+
+
 def test_census_roles_are_restricted_to_family_relationships():
     roles = get_valid_roles("Census")
     assert roles == {

@@ -23,7 +23,12 @@ participant_fields:
   "Relationship to Head of Household": role_name
   "Relationship": role_name
   "Line Number": type_specific_fields.line_number
-  "Widowed1": type_specific_fields.marital_status
+  # "Widowed1" is deliberately NOT mapped here - same reasoning as the identical fix on
+  # the Ancestry side (field_maps/ancestry_census.yaml): it's an ambiguous
+  # numbered-duplicate field (see docs/superpowers/plans/2026-08-15-ancestry-index-panel-
+  # field-coverage-extension.md's "do not guess" rule), and participant_fields is a flat
+  # overwrite, not a combine, so guessing it onto marital_status risks silently
+  # clobbering a genuine "Marital Status" column's value.
 
 participant_facts:
   "Occupation": Occupation
