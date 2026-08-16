@@ -28,7 +28,7 @@
 | 25 | ✅ | Action-Based Gather Triggers, Tasks 1-4 (`docs/superpowers/plans/2026-08-15-action-based-gather-triggers.md`) - implements issue #13. Delegated to `agy-delegate` per task, each independently re-verified line-by-line against the plan (not trusting self-reports - two delegations returned wrapper-level `ERROR` status while claiming success; one silently dropped a step, one added an unrequested `task.md` edit, one added a stray scratch script + crash dump - all caught and fixed/reverted before commit). Task 1 (`682a1b4`): removed Ancestry's DOM-table-scraper fallback. Task 2 (`65622d3`): removed the DOM-index-detection reload loop (was costing up to ~90s/blank page), added end-of-run retry pass. Task 3 (`a63838a`): same retry-pass treatment for FS's orchestration/Image-Index API waits. Task 4 (`1c1a1fb`): bordered terminal warning + `incomplete_pages` JSON field for any page/item still incomplete after retry. Full JS suite 64/64 pass, full Python suite 129/129 pass. Task 5 (FS citation-builder live capture, addresses issue #25) still needs the user's own FamilySearch login - not executable by an agent. |
 | 26 | ✅ | UI Overhaul Task 1: Voyageur Schema Consolidation |
 | 27 | ✅ | UI Overhaul Task 2: Voyageur Python Scripts Refactor |
-| 28 | 🏗️ | UI Overhaul Task 3: Paleographer Citation Metadata Schema |
+| 28 | ✅ | UI Overhaul Task 3: Paleographer Citation Metadata Schema |
 | 29 | 🏗️ | UI Overhaul Task 4: Paleographer Metadata Injection |
 | 30 | 🏗️ | UI Overhaul Task 5: Archivist Schema & Dependency Simplification |
 | 31 | 🏗️ | UI Overhaul Task 6: Help & Tooltips Refresh |

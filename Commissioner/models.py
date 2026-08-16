@@ -535,4 +535,7 @@ class Sheet(BaseModel):
 
 class Collection(BaseModel):
     collection_title: Optional[str] = None
+    record_type_name: Optional[str] = None
+    collection_metadata: Dict[str, Any] = Field(default_factory=dict)
     sheets: List[Sheet] = Field(default_factory=list)
+    model_config = {"extra": "allow"}

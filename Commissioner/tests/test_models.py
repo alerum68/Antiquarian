@@ -54,7 +54,7 @@ def test_unknown_fact_name_raises():
 SCHEMA_JSON_PATH = Path(__file__).resolve().parent.parent.parent / "Paleographer" / "schema.json"
 
 EXPECTED_FIELDS = {
-    "Collection": {"collection_title", "sheets"},
+    "Collection": {"collection_title", "record_type_name", "collection_metadata", "sheets"},
     "Sheet": {"page_id", "document_metadata", "records"},
     "DocumentMetadata": {"file_name", "file_type", "volume", "pages", "source_name", "source_location"},
     "Record": {

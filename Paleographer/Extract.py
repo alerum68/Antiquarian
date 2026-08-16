@@ -322,6 +322,22 @@ def load_master_db() -> Dict[str, Any]:
 
 
 def save_master_db(master_data: Dict[str, Any]) -> None:
+    master_data.setdefault("collection_metadata", {}).update({
+        "CITATION_TEXT": resolve_setting("CITATION_TEXT"),
+        "CITATION_DETAIL": resolve_setting("CITATION_DETAIL"),
+        "CALL_NUMBER": resolve_setting("CALL_NUMBER"),
+        "REPOSITORY": resolve_setting("REPOSITORY"),
+        "REPOSITORY_LOC": resolve_setting("REPOSITORY_LOC"),
+        "COLLECTION_URL": resolve_setting("COLLECTION_URL"),
+        "COLLECTION_NAME": resolve_setting("COLLECTION_NAME"),
+        "PUBLISHER": resolve_setting("PUBLISHER"),
+        "PUB_LOC": resolve_setting("PUB_LOC"),
+        "REGISTER_NAME": resolve_setting("REGISTER_NAME"),
+        "REGISTER_SOURCE_ID": resolve_setting("REGISTER_SOURCE_ID", "1"),
+        "VOLUME_TITLE": resolve_setting("VOLUME_TITLE"),
+        "VOLUME_NUM": resolve_setting("VOLUME_NUM"),
+    })
+
     try:
         from Commissioner.record_registry import validate_collection_softly
         validate_collection_softly(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)

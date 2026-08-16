@@ -210,3 +210,24 @@ def test_save_master_db_bad_shape_still_writes_file_and_logs_warning(minimal_pal
     # master_data's own "collection_title" key - the two are independent.
     assert "[WARN] Commissioner validation failed for 'Test Volume'" in captured.out
     assert os.path.exists(module.MASTER_DB)
+
+def test_save_master_db_injects_collection_metadata_from_citation_overrides(minimal_paleographer_env, monkeypatch, tmp_path):
+    monkeypatch.setenv("CITATION_TEXT", "Override Citation Text")
+    monkeypatch.setenv("CALL_NUMBER", "12345")
+    monkeypatch.delenv("REGISTER_SOURCE_ID", raising=False)
+    
+    module = minimal_paleographer_env
+    db_path = tmp_path / "test_master_db.json"
+    module.MASTER_DB = str(db_path)
+    
+    test_data = {"collection_title": "Test Title", "sheets": []}
+    module.save_master_db(test_data)
+    
+    import json
+    with open(db_path, "r", encoding="utf-8") as f:
+        saved = json.load(f)
+        
+    assert "collection_metadata" in saved
+    assert saved["collection_metadata"]["CITATION_TEXT"] == "Override Citation Text"
+    assert saved["collection_metadata"]["CALL_NUMBER"] == "12345"
+    assert saved["collection_metadata"]["REGISTER_SOURCE_ID"] == "1"  # Default
