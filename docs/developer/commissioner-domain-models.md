@@ -1,6 +1,6 @@
 # Commissioner Domain Models & Validation
 
-The `Commissioner` module serves as Scriptorium's central schema validator and domain model definition layer.
+The `Commissioner` module serves as Antiquarian's central schema validator and domain model definition layer.
 
 ---
 
@@ -44,12 +44,12 @@ Represents an individual person recorded in an event.
 Validation occurs via `Commissioner.record_registry.validate_soft()`:
 
 ```python
-from Commissioner.record_registry import validate_soft
+from Commissioner.record_registry import validate_collection_softly
 
-validate_soft(data, document_type, label)
+validate_collection_softly(data, document_type, label)
 ```
 
-- **Graceful Degradation**: `validate_soft` catches all Pydantic validation errors and schema exceptions without raising.
+- **Graceful Degradation**: `validate_collection_softly` catches all Pydantic validation errors and schema exceptions without raising.
 - **Logging**: When validation fails, a warning is printed to stdout in the exact format:
   ```text
   [WARN] Commissioner validation failed for 'Test Volume': <error details>

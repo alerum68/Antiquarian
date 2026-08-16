@@ -4,11 +4,11 @@
 
 > **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
 
-**Goal:** Make `Voyageur/Voyageur.py` a real ~30-line dispatcher that calls the maintained `A.py`/`FS.py`/`LAC.py` provider files instead of running its own 1300-line frozen fork, fix `Scriptorium.py`'s LAC dispatch so it reaches the real `LAC.py`'s `volume`/`reel` subcommands, and deduplicate the ~70-90 lines of gather boilerplate `A.py` and `FS.py` currently copy-paste between each other.
+**Goal:** Make `Voyageur/Voyageur.py` a real ~30-line dispatcher that calls the maintained `A.py`/`FS.py`/`LAC.py` provider files instead of running its own 1300-line frozen fork, fix `Antiquarian.py`'s LAC dispatch so it reaches the real `LAC.py`'s `volume`/`reel` subcommands, and deduplicate the ~70-90 lines of gather boilerplate `A.py` and `FS.py` currently copy-paste between each other.
 
-**Architecture:** `Voyageur/_retry_utils.py` is renamed to `Voyageur/_gather_helpers.py` and gains five new shared functions (verbatim extractions of A.py/FS.py's duplicated download-wait/image-move/image-dir-resolution/Archivist-write-back logic). `A.py` and `FS.py` call into these instead of their own inline copies. `Voyageur.py` is rewritten to import and delegate to `A`/`FS`/`LAC`'s real `main()` based on `sys.argv[1]`. `Scriptorium.py`'s LAC dispatch branch gains the `volume`/`reel` subcommand token the real `LAC.py`'s argparse now requires.
+**Architecture:** `Voyageur/_retry_utils.py` is renamed to `Voyageur/_gather_helpers.py` and gains five new shared functions (verbatim extractions of A.py/FS.py's duplicated download-wait/image-move/image-dir-resolution/Archivist-write-back logic). `A.py` and `FS.py` call into these instead of their own inline copies. `Voyageur.py` is rewritten to import and delegate to `A`/`FS`/`LAC`'s real `main()` based on `sys.argv[1]`. `Antiquarian.py`'s LAC dispatch branch gains the `volume`/`reel` subcommand token the real `LAC.py`'s argparse now requires.
 
-**Tech Stack:** Python, pytest, pathlib, argparse (LAC.py, unchanged), CustomTkinter (Scriptorium.py, unchanged).
+**Tech Stack:** Python, pytest, pathlib, argparse (LAC.py, unchanged), CustomTkinter (Antiquarian.py, unchanged).
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - No change to `Commissioner.normalization`/`record_registry` scope, and no change to `census_schema.py`.
 - `FS.py`'s own `_read_text_with_retry`/`_unlink_with_retry` stay in `FS.py` — not duplicated into `_gather_helpers.py`.
 - No new LAC features. Only fix: forward `LAC_HARVEST_VOLUME` as `volume --volume X` and `LAC_URL` as `reel --url <url>`.
-- No fix to the separate, pre-existing `LAC_MAX_WORKERS`/`LAC_RECORD_TYPE`/`LAC_VOLUME` vs. `Scriptorium.py`'s actual env-var names mismatch — out of scope, already flagged in the spec for a future task.
+- No fix to the separate, pre-existing `LAC_MAX_WORKERS`/`LAC_RECORD_TYPE`/`LAC_VOLUME` vs. `Antiquarian.py`'s actual env-var names mismatch — out of scope, already flagged in the spec for a future task.
 - No AI attribution, "Co-Authored-By", or AI Assistant stamps in any commit message.
 - Full `pytest` suite (run from repo root) must stay green after every task, not just at the end.
 
@@ -760,7 +760,7 @@ git commit -m "Consolidate FS.py's gather boilerplate into _gather_helpers"
 
 **Interfaces:**
 - Consumes: `A.main()`, `FS.main()`, `LAC.main()` — no signature requirements, called with no arguments; each reads its own CLI args from `sys.argv`.
-- Produces: nothing consumed by later tasks. `Scriptorium.py` (Task 5) already launches `Voyageur/Voyageur.py` as a subprocess with the source code as its first CLI argument — that contract is unchanged, only what happens inside the subprocess changes.
+- Produces: nothing consumed by later tasks. `Antiquarian.py` (Task 5) already launches `Voyageur/Voyageur.py` as a subprocess with the source code as its first CLI argument — that contract is unchanged, only what happens inside the subprocess changes.
 
 - [ ] **Step 1: Write the failing dispatcher tests**
 
@@ -822,9 +822,9 @@ Replace the entire contents of `Voyageur/Voyageur.py` with:
 ```python
 Voyageur - thin dispatcher for the GUI's A/FS/LAC gather buttons.
 
-Scriptorium.py launches this as a subprocess with cwd=Voyageur/ and the source code
+Antiquarian.py launches this as a subprocess with cwd=Voyageur/ and the source code
 (A/FS/LAC) as sys.argv[1], so A/FS/LAC import as plain sibling modules and each
-provider's own main() sees exactly the CLI arguments Scriptorium.py meant for it.
+provider's own main() sees exactly the CLI arguments Antiquarian.py meant for it.
 """
 
 import sys
@@ -873,16 +873,16 @@ git commit -m "Rewrite Voyageur.py as a thin dispatcher to A.py/FS.py/LAC.py"
 
 ---
 
-### Task 5: Fix Scriptorium.py's LAC dispatch to send the required subcommand token
+### Task 5: Fix Antiquarian.py's LAC dispatch to send the required subcommand token
 
 **Files:**
-- Modify: `Scriptorium.py:1858-1864`
+- Modify: `Antiquarian.py:1858-1864`
 
 **Interfaces:**
 - Consumes: `LAC.py`'s real `argparse` contract (unchanged, verified in design) — `volume` subcommand takes `--volume`, `reel` subcommand takes `--url`.
 - Produces: nothing consumed by later tasks. Task 6's manual verification exercises this.
 
-No existing automated test coverage exists for `Scriptorium.py` (a CustomTkinter GUI class with no test file). This task's test cycle is a compile check and full-suite regression; end-to-end correctness is verified manually in Task 6.
+No existing automated test coverage exists for `Antiquarian.py` (a CustomTkinter GUI class with no test file). This task's test cycle is a compile check and full-suite regression; end-to-end correctness is verified manually in Task 6.
 
 - [ ] **Step 1: Update the LAC dispatch branch**
 
@@ -913,18 +913,18 @@ new_string:
 
 - [ ] **Step 2: Compile-check the file**
 
-Run: `python -m py_compile Scriptorium.py`
+Run: `python -m py_compile Antiquarian.py`
 Expected: no output, exit code 0.
 
 - [ ] **Step 3: Run the full test suite to confirm nothing broke**
 
 Run: `pytest Voyageur/tests/ -v`
-Expected: all tests PASS (Scriptorium.py has no test file of its own to run).
+Expected: all tests PASS (Antiquarian.py has no test file of its own to run).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Scriptorium.py
+git add Antiquarian.py
 git commit -m "Fix LAC dispatch to send the volume/reel subcommand token LAC.py requires"
 ```
 
@@ -943,7 +943,7 @@ This is the first time the GUI's A/FS/LAC buttons will run the maintained code p
 Run: `pytest Voyageur/tests/ -v`
 Expected: all tests PASS.
 
-- [ ] **Step 2: Launch Scriptorium.py and run an Ancestry (A) gather against a real record**
+- [ ] **Step 2: Launch Antiquarian.py and run an Ancestry (A) gather against a real record**
 
 Set `CENSUS_URL` in the Toolbox settings to a real Ancestry census record URL, click the Ancestry gather button, and confirm: browser opens, JSON and images land in the expected project folders, and Archivist's `JSON_FILE` setting is updated. Confirm console output matches the existing `[System] ...` messages.
 

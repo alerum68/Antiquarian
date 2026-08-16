@@ -1,22 +1,22 @@
-# Scriptorium
+# Antiquarian
 
 Historical records are being digitized faster than ever. Parish registers, census schedules, newspapers, court records, and government files can now be downloaded with a few clicks. The problem is that a scanned image is still just an image. You can read it, but you can't easily search across thousands of pages, discover connections between people, or answer questions that span an entire collection.
 
-Scriptorium grew out of that problem.
+Antiquarian grew out of that problem.
 
 The original goal was simple: make large collections of historical records useful for research instead of leaving them trapped in PDFs and image files.
 
 While working through Métis Scrip applications, I realized that every file contained pieces of a much larger story. A parent mentioned in one application appeared as a witness in another. Communities overlapped. Families resurfaced years later in entirely different records. The information existed, but finding those connections depended on remembering where they had been seen before.
 
-Scriptorium helps organize that information as you work. Instead of producing another transcription to store in a folder, it builds a collection that can be searched, explored, corrected, and expanded over time.
+Antiquarian helps organize that information as you work. Instead of producing another transcription to store in a folder, it builds a collection that can be searched, explored, corrected, and expanded over time.
 
 It is intended for projects measured in hundreds or thousands of records rather than a handful of documents. That might be a church register, a township census, a collection of probate files, or an archive that has never been indexed before. Whatever the source, the objective is the same: spend more time researching the records and less time managing them.
 
 ---
 
-## What Scriptorium does
+## What Antiquarian does
 
-Scriptorium assists with the process of turning historical records into structured research data.
+Antiquarian assists with the process of turning historical records into structured research data.
 
 Current capabilities include:
 
@@ -36,15 +36,15 @@ Probably, if your work involves collections of historical records.
 
 For example, you may be creating a searchable index of parish registers, reconstructing a historical community from census records, preserving the contents of a local archive, or building a research database from a series of government files.
 
-If your goal is simply to enter an occasional birth, marriage, or death record into your family tree, Scriptorium is probably more than you need.
+If your goal is simply to enter an occasional birth, marriage, or death record into your family tree, Antiquarian is probably more than you need.
 
 ---
 
 ## Getting Started
 
-Scriptorium ships as a dual-mode Windows installer powered by Inno Setup, available from the [Releases](https://github.com/alerum68/Scriptorium/releases) page. The installer packages the application as a single-binary PyInstaller router, meaning you do not need to manage Python environments or dependencies. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, AGY) on its own, so there's nothing to configure by hand before you start.
+Antiquarian ships as a dual-mode Windows installer powered by Inno Setup, available from the [Releases](https://github.com/alerum68/Antiquarian/releases) page. The installer packages the application as a single-binary PyInstaller router, meaning you do not need to manage Python environments or dependencies. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, AGY) on its own, so there's nothing to configure by hand before you start.
 
-For browser-based integration with external repositories, Scriptorium includes a Tampermonkey script that bridges web index searches directly into your local database.
+For browser-based integration with external repositories, Antiquarian includes a Tampermonkey script that bridges web index searches directly into your local database.
 
 Detailed installation and setup instructions, along with CI/CD build artifacts from our GitHub Actions sandbox, are available in the project Wiki.
 
@@ -60,7 +60,7 @@ In general, the workflow is straightforward:
 
 ## Requirements
 
-Scriptorium relies on a few external services, depending on how you choose to use it.
+Antiquarian relies on a few external services, depending on how you choose to use it.
 
 * Windows 10 or Windows 11.
 * AGY (agy) for document processing. The installer sets this up for you if it isn't already on your machine; a AI API key is also supported as an alternative.
@@ -77,14 +77,14 @@ Some features may require additional software or accounts. These are documented 
 
 Comprehensive guides for setup, configuration, and module workflows are available on the project Wiki:
 
-* [Getting Started](https://github.com/alerum68/Scriptorium/wiki/Getting-Started)
-* [Configuration & Settings](https://github.com/alerum68/Scriptorium/wiki/Configuration-&-Settings)
-* [Voyageur User Guide](https://github.com/alerum68/Scriptorium/wiki/Voyageur-User-Guide)
-* [Paleographer User Guide](https://github.com/alerum68/Scriptorium/wiki/Paleographer-User-Guide)
-* [Archivist User Guide](https://github.com/alerum68/Scriptorium/wiki/Archivist-User-Guide)
-* [Registrar & Gazetteer](https://github.com/alerum68/Scriptorium/wiki/Registrar-&-Gazetteer)
-* [PDFix Utility](https://github.com/alerum68/Scriptorium/wiki/PDFix-Utility)
-* [Troubleshooting & FAQ](https://github.com/alerum68/Scriptorium/wiki/Troubleshooting-&-FAQ)
+* [Getting Started](https://github.com/alerum68/Antiquarian/wiki/Getting-Started)
+* [Configuration & Settings](https://github.com/alerum68/Antiquarian/wiki/Configuration-&-Settings)
+* [Voyageur User Guide](https://github.com/alerum68/Antiquarian/wiki/Voyageur-User-Guide)
+* [Paleographer User Guide](https://github.com/alerum68/Antiquarian/wiki/Paleographer-User-Guide)
+* [Archivist User Guide](https://github.com/alerum68/Antiquarian/wiki/Archivist-User-Guide)
+* [Registrar & Gazetteer](https://github.com/alerum68/Antiquarian/wiki/Registrar-&-Gazetteer)
+* [PDFix Utility](https://github.com/alerum68/Antiquarian/wiki/PDFix-Utility)
+* [Troubleshooting & FAQ](https://github.com/alerum68/Antiquarian/wiki/Troubleshooting-&-FAQ)
 
 ### Developer Documentation
 
@@ -100,15 +100,15 @@ Technical specifications and architecture guides are maintained in the `docs/dev
 
 ## Project Status
 
-Scriptorium is under active development.
+Antiquarian is under active development.
 
-Suggestions, bug reports, and discussions are always welcome. If you work with historical records and have encountered a workflow that Scriptorium could improve, I'd like to hear about it.
+Suggestions, bug reports, and discussions are always welcome. If you work with historical records and have encountered a workflow that Antiquarian could improve, I'd like to hear about it.
 
 ---
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for future plans for Scriptorium.
+See [ROADMAP.md](ROADMAP.md) for future plans for Antiquarian.
 
 ---
 

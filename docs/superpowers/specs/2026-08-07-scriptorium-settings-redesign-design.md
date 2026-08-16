@@ -1,8 +1,8 @@
-# Scriptorium Settings/UI Redesign — Design
+# Antiquarian Settings/UI Redesign — Design
 
 ## Problem
 
-`Scriptorium.py`'s settings definitions (`GLOBAL_VARS`, `ARCHIVIST_VARS`, `VOYAGEUR_VARS`, `PALEOGRAPHER_VARS`, `REGISTRAR_VARS`, `GAZETTEER_VARS`, `PDFIX_VARS`, plus their `TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS`) were written when the project started and have drifted from what each tool actually reads via `os.getenv`/`os.environ.get`, since each tool has changed substantially (Commissioner domain models, the citation-field rename, the Parish/Scrip profile scaffold, the Voyageur/Paleographer/Archivist structural splits). Centralizing every tool's settings inside `Scriptorium.py` means each tool's own evolution has no natural pressure to keep the GUI in sync — nothing breaks when a tool grows a new setting the GUI never learns about.
+`Antiquarian.py`'s settings definitions (`GLOBAL_VARS`, `ARCHIVIST_VARS`, `VOYAGEUR_VARS`, `PALEOGRAPHER_VARS`, `REGISTRAR_VARS`, `GAZETTEER_VARS`, `PDFIX_VARS`, plus their `TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS`) were written when the project started and have drifted from what each tool actually reads via `os.getenv`/`os.environ.get`, since each tool has changed substantially (Commissioner domain models, the citation-field rename, the Parish/Scrip profile scaffold, the Voyageur/Paleographer/Archivist structural splits). Centralizing every tool's settings inside `Antiquarian.py` means each tool's own evolution has no natural pressure to keep the GUI in sync — nothing breaks when a tool grows a new setting the GUI never learns about.
 
 ## Audit findings (confirmed via direct `os.getenv`/`os.environ.get` grep against each tool's source)
 
@@ -27,7 +27,7 @@
 
 ### 1. Per-tool schema files (YAML)
 
-Each tool folder gets its own `settings_schema.yaml`: `Voyageur/`, `Paleographer/`, `Archivist/`, `Registrar/`, `Gazetteer/`, `PDFix/`. `GLOBAL_VARS` and `SCRIPT_PATHS` stay as Python literals in `Scriptorium.py` — they're cross-cutting (API key, researcher credit, shared directories), not owned by any one tool.
+Each tool folder gets its own `settings_schema.yaml`: `Voyageur/`, `Paleographer/`, `Archivist/`, `Registrar/`, `Gazetteer/`, `PDFix/`. `GLOBAL_VARS` and `SCRIPT_PATHS` stay as Python literals in `Antiquarian.py` — they're cross-cutting (API key, researcher credit, shared directories), not owned by any one tool.
 
 Shape:
 
@@ -75,17 +75,17 @@ Every widget/picker key from today's `FIELD_WIDGETS`/`PATH_PICKER_FIELDS` carrie
       picker: {kind: open, base_dir_key: "__PROGRAM_DIR__", always_absolute: true}
 ```
 
-**Migration scope is settings-only.** Only the field list, tooltips, widget specs, path pickers, and labels move per-tool. Bespoke tab UI — action buttons, dropdown wiring, help text, button gating (e.g. Paleographer's Scrip-only buttons), the LAC debug-browser launcher — stays hand-written in `Scriptorium.py`'s `_build_tab_*` methods. That logic is workflow behavior, not settings, and forcing it into a generic schema would fight each tab's genuinely different bespoke needs.
+**Migration scope is settings-only.** Only the field list, tooltips, widget specs, path pickers, and labels move per-tool. Bespoke tab UI — action buttons, dropdown wiring, help text, button gating (e.g. Paleographer's Scrip-only buttons), the LAC debug-browser launcher — stays hand-written in `Antiquarian.py`'s `_build_tab_*` methods. That logic is workflow behavior, not settings, and forcing it into a generic schema would fight each tab's genuinely different bespoke needs.
 
 **Why YAML over a relocated Python module:** matches the `.pmt` front-matter precedent already in the codebase (Paleographer/Archivist profile files), and directly serves the actual goal (easy hand-editing) better than Python dict literals. The one YAML footgun — implicit typing turning an unquoted `0.4`/`true`/`off` into a non-string — is fully closed by having the loader `str()` every loaded value immediately regardless of YAML's inferred type, so no field needs to be quoted defensively.
 
 ### 2. Generic loader
 
-`Scriptorium.py` gains one function, `_load_tool_schema(tool_dir: Path) -> dict`, returning the same shape `_build_form_ui` already consumes today. `_build_form_ui`, `_build_segmented_field`, `_build_slider_field`, `_browse_for_path` are unchanged — only where their input data comes from changes. `ENV_TARGETS` is now built by the loader (each schema's target subfolder is the tool folder it loaded from) instead of six hand-maintained tuples. Archivist has no dropdown or dynamic filtering (see audit finding above) — it's rendered exactly like Registrar/Gazetteer/PDFix, one flat schema file. This project has no dependency on the unimplemented Archivist structural-split plan.
+`Antiquarian.py` gains one function, `_load_tool_schema(tool_dir: Path) -> dict`, returning the same shape `_build_form_ui` already consumes today. `_build_form_ui`, `_build_segmented_field`, `_build_slider_field`, `_browse_for_path` are unchanged — only where their input data comes from changes. `ENV_TARGETS` is now built by the loader (each schema's target subfolder is the tool folder it loaded from) instead of six hand-maintained tuples. Archivist has no dropdown or dynamic filtering (see audit finding above) — it's rendered exactly like Registrar/Gazetteer/PDFix, one flat schema file. This project has no dependency on the unimplemented Archivist structural-split plan.
 
 ### 3. Migration + error handling
 
-All six `*_VARS` dicts are translated into their tool's `settings_schema.yaml` in one atomic change, carrying over current defaults/sections/tooltips/widgets/pickers/labels plus the confirmed debt fixes above (new fields, the `LAC_ARCHIVAL_NUMBER` rename, Registrar's `schema_ui_map.py` descriptions harvested as tooltips and the file then deleted). `Scriptorium.py`'s old module-level `*_VARS`/`TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS` dicts are deleted in the same change — no transition period where both a hardcoded dict and a YAML file claim the same tool.
+All six `*_VARS` dicts are translated into their tool's `settings_schema.yaml` in one atomic change, carrying over current defaults/sections/tooltips/widgets/pickers/labels plus the confirmed debt fixes above (new fields, the `LAC_ARCHIVAL_NUMBER` rename, Registrar's `schema_ui_map.py` descriptions harvested as tooltips and the file then deleted). `Antiquarian.py`'s old module-level `*_VARS`/`TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS` dicts are deleted in the same change — no transition period where both a hardcoded dict and a YAML file claim the same tool.
 
 This is a single-user local desktop tool: a malformed or missing `settings_schema.yaml` fails loudly at startup with a message naming the file and the parse error, rather than silently rendering an empty or partial form.
 

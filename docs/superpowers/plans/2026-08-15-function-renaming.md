@@ -8,27 +8,27 @@
 
 **Tech Stack:** Python, pytest, pycodestyle.
 
-**Supersedes:** `docs/plans/2026-08-15-function-renaming-design.md` and `docs/plans/2026-08-15-commissioner-refactoring.md` (both untracked drafts started by Gemini/Antigravity). Those drafts correctly identified the same 3 Commissioner targets (`cap_case`, `parse_to_iso`, `validate_soft`) but their own caller-list examples were wrong when checked against real grep output (e.g. claimed `cap_case` was called from `Paleographer/Extract.py` alone; it's actually called from 8 files across 3 different `cap_case` implementations — see Corrections below). This plan replaces them; the two draft files should be deleted once this plan is approved, not kept alongside it.
+**Supersedes:** `docs/plans/2026-08-15-function-renaming-design.md` and `docs/plans/2026-08-15-commissioner-refactoring.md` (both untracked drafts started by Gemini/Antigravity). Those drafts correctly identified the same 3 Commissioner targets (`capitalize_text_string`, `parse_date_to_iso_format`, `validate_collection_softly`) but their own caller-list examples were wrong when checked against real grep output (e.g. claimed `capitalize_text_string` was called from `Paleographer/Extract.py` alone; it's actually called from 8 files across 3 different `capitalize_text_string` implementations — see Corrections below). This plan replaces them; the two draft files should be deleted once this plan is approved, not kept alongside it.
 
 ## Corrections to the original design
 
 Three findings from auditing Commissioner (all 25 functions), Voyageur, Archivist, and Paleographer (all files, excluding tests) before writing this plan:
 
-1. **`cap_case` is three independent functions, not one.** `Commissioner/normalization.py:30`, `Archivist/Utils.py:166`, and `Voyageur/census_schema.py:56` are three separate implementations with the same name and near-identical bodies. A blind repo-wide find-and-replace of the string `cap_case` (implied by the original draft's "grep_search and replace" method) would rename all three at once, including two that were never scoped by the original Commissioner-only plan. Tasks 1, 4, and 5 below rename each independently, with explicit caller lists per implementation so no task's replacement touches another's callers.
+1. **`capitalize_text_string` is three independent functions, not one.** `Commissioner/normalization.py:30`, `Archivist/Utils.py:166`, and `Voyageur/census_schema.py:56` are three separate implementations with the same name and near-identical bodies. A blind repo-wide find-and-replace of the string `capitalize_text_string` (implied by the original draft's "grep_search and replace" method) would rename all three at once, including two that were never scoped by the original Commissioner-only plan. Tasks 1, 4, and 5 below rename each independently, with explicit caller lists per implementation so no task's replacement touches another's callers.
 2. **Only 8 functions total warrant renaming** across the four modules audited. Everything else — 22 of Commissioner's 25 functions, and effectively all of Paleographer, Archivist, and Voyageur beyond the 6 flagged below — is already clear, verb-led, PEP8 snake_case. This is not a codebase-wide rewrite; it's 8 precise renames.
-3. **Consolidating the three `cap_case` implementations into one shared function is a separate, larger refactor** (behavior de-duplication, not renaming) and is explicitly out of scope here. Flagging it for a future decision, not building it now.
+3. **Consolidating the three `capitalize_text_string` implementations into one shared function is a separate, larger refactor** (behavior de-duplication, not renaming) and is explicitly out of scope here. Flagging it for a future decision, not building it now.
 
 ## Global Constraints
 
 - Comments: terse, single-line, WHY-only. No AI attribution anywhere.
 - Every rename task's caller list below was produced by a real grep run this session, not estimated — do not add or skip a caller without re-running the grep yourself if the file has changed since.
-- **Execution mechanism:** each rename is performed with the `mcp__pycharm__rename_refactoring` tool (`pathInProject`, `symbolName`, `newName`, `projectPath`), not text-based find/replace and not AI delegation — it resolves the symbol semantically (imports, scope), so it cannot cross-contaminate a same-named-but-different function living in another file, and it does not touch comments/strings that merely mention the name. `projectPath` is `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium` on every call. Treat a "success" response as provisional, not proof — always follow with the task's own test run and a repo-wide grep for the old name before committing.
+- **Execution mechanism:** each rename is performed with the `mcp__pycharm__rename_refactoring` tool (`pathInProject`, `symbolName`, `newName`, `projectPath`), not text-based find/replace and not AI delegation — it resolves the symbol semantically (imports, scope), so it cannot cross-contaminate a same-named-but-different function living in another file, and it does not touch comments/strings that merely mention the name. `projectPath` is `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian` on every call. Treat a "success" response as provisional, not proof — always follow with the task's own test run and a repo-wide grep for the old name before committing.
 - Run Python tests with: `pytest <scoped path> -q` (path given per task); full suite with `pytest . -q` in the final task.
 - Lint with: `python -m pycodestyle --max-line-length=120 <touched files>`.
 
 ---
 
-### Task 1: Rename Commissioner's `cap_case` → `capitalize_text_string`
+### Task 1: Rename Commissioner's `capitalize_text_string` → `capitalize_text_string`
 
 **Files:**
 - Modify: `Commissioner/normalization.py:30`
@@ -37,7 +37,7 @@ Three findings from auditing Commissioner (all 25 functions), Voyageur, Archivis
 - Modify: `Commissioner/tests/test_normalization.py:42`
 
 **Interfaces:**
-- Produces: `capitalize_text_string(text: str) -> str` in `Commissioner/normalization.py`, same signature and body as today's `cap_case`.
+- Produces: `capitalize_text_string(text: str) -> str` in `Commissioner/normalization.py`, same signature and body as today's `capitalize_text_string`.
 - Consumes: nothing new — pure rename, no behavior change.
 
 **Do NOT touch:** `Archivist/Utils.py::cap_case` or `Voyageur/census_schema.py::cap_case` — separate functions, separate tasks (4 and 5).
@@ -56,9 +56,9 @@ Expected: exactly the 5 lines listed in Files above, plus the definition itself 
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Commissioner/normalization.py`
-- `symbolName`: `cap_case`
+- `symbolName`: `capitalize_text_string`
 - `newName`: `capitalize_text_string`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with all 5 real call sites (`Paleographer/Extract.py:56,114`, `Voyageur/FS.py:191,260,274`) and the test call (`Commissioner/tests/test_normalization.py:42`) updated automatically. `Archivist/Utils.py` and `Voyageur/census_schema.py` are untouched — different symbols, resolved separately.
 
@@ -84,7 +84,7 @@ git commit -m "refactor(commissioner): rename cap_case to capitalize_text_string
 
 ---
 
-### Task 2: Rename Commissioner's `parse_to_iso` → `parse_date_to_iso_format`
+### Task 2: Rename Commissioner's `parse_date_to_iso_format` → `parse_date_to_iso_format`
 
 **Files:**
 - Modify: `Commissioner/normalization.py:57`
@@ -93,7 +93,7 @@ git commit -m "refactor(commissioner): rename cap_case to capitalize_text_string
 - Modify: `Commissioner/tests/test_normalization.py:46`
 
 **Interfaces:**
-- Produces: `parse_date_to_iso_format(reading: Optional[str]) -> Optional[str]`, same body as today's `parse_to_iso`. This is the only function of this name in the repo — no cross-contamination risk like Task 1.
+- Produces: `parse_date_to_iso_format(reading: Optional[str]) -> Optional[str]`, same body as today's `parse_date_to_iso_format`. This is the only function of this name in the repo — no cross-contamination risk like Task 1.
 
 - [ ] **Step 1: Confirm baseline passes**
 
@@ -104,9 +104,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Commissioner/normalization.py`
-- `symbolName`: `parse_to_iso`
+- `symbolName`: `parse_date_to_iso_format`
 - `newName`: `parse_date_to_iso_format`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with all 7 call sites (`Voyageur/FS.py:252,254,272,273`, `Paleographer/Extract.py:280,286,288`) and the test (`Commissioner/tests/test_normalization.py:46`) updated automatically.
 
@@ -130,7 +130,7 @@ git commit -m "refactor(commissioner): rename parse_to_iso to parse_date_to_iso_
 
 ---
 
-### Task 3: Rename Commissioner's `validate_soft` → `validate_collection_softly`
+### Task 3: Rename Commissioner's `validate_collection_softly` → `validate_collection_softly`
 
 **Files:**
 - Modify: `Commissioner/record_registry.py:164`
@@ -150,9 +150,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Commissioner/record_registry.py`
-- `symbolName`: `validate_soft`
+- `symbolName`: `validate_collection_softly`
 - `newName`: `validate_collection_softly`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with the definition, every import statement, and all 9 call sites (`Voyageur/LAC.py:142`, `Voyageur/HBCA.py:708`, `Voyageur/FS.py:459`, `Voyageur/census_schema.py:328`, `Paleographer/Extract.py:327`, `Commissioner/tests/test_record_registry.py:322,331,338`) updated automatically.
 
@@ -176,7 +176,7 @@ git commit -m "refactor(commissioner): rename validate_soft to validate_collecti
 
 ---
 
-### Task 4: Rename Archivist's `cap_case` → `capitalize_text_string`
+### Task 4: Rename Archivist's `capitalize_text_string` → `capitalize_text_string`
 
 **Files:**
 - Modify: `Archivist/Utils.py:166` (definition), `Archivist/Utils.py:179` (internal self-call inside `clean_place()`)
@@ -198,9 +198,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Archivist/Utils.py`
-- `symbolName`: `cap_case`
+- `symbolName`: `capitalize_text_string`
 - `newName`: `capitalize_text_string`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with the internal caller (`clean_place()` at `Utils.py:179`) and every external call site (`Archivist/Census.py:947,949,951,953,955,956,1391`, `Archivist/General.py:87,131,342,733,734,735,1137`, `Archivist/HBCA.py:54`) updated automatically. `Commissioner/normalization.py` and `Voyageur/census_schema.py` are untouched — different symbols.
 
@@ -233,7 +233,7 @@ git commit -m "refactor(archivist): rename cap_case to capitalize_text_string"
 - Modify: `Voyageur/census_schema.py:56` (definition), `:182,193` (internal callers, only callers that exist)
 
 **Interfaces:**
-- Produces: `capitalize_text_string(text: str) -> str` in `Voyageur/census_schema.py`, internal-only (no external callers found in this session's audit or the earlier repo-wide `cap_case` grep).
+- Produces: `capitalize_text_string(text: str) -> str` in `Voyageur/census_schema.py`, internal-only (no external callers found in this session's audit or the earlier repo-wide `capitalize_text_string` grep).
 
 - [ ] **Step 1: Confirm baseline passes**
 
@@ -244,9 +244,9 @@ Expected: PASS (adjust path if the actual test file differs — confirm with `ls
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Voyageur/census_schema.py`
-- `symbolName`: `cap_case`
+- `symbolName`: `capitalize_text_string`
 - `newName`: `capitalize_text_string`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with the two internal callers (lines 182, 193) updated. No external callers exist — confirmed via repo-wide grep this session — so no other file changes.
 
@@ -270,7 +270,7 @@ git commit -m "refactor(voyageur): rename census_schema's cap_case to capitalize
 
 ---
 
-### Task 6: Rename Archivist's `spouse_evaluation` → `evaluate_spouse_match`
+### Task 6: Rename Archivist's `evaluate_spouse_match` → `evaluate_spouse_match`
 
 **Files:**
 - Modify: `Archivist/Census.py:246` (definition), `:353,377` (internal callers)
@@ -287,9 +287,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Archivist/Census.py`
-- `symbolName`: `spouse_evaluation`
+- `symbolName`: `evaluate_spouse_match`
 - `newName`: `evaluate_spouse_match`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with both callers (lines 353, 377) updated. No other file references this function.
 
@@ -313,7 +313,7 @@ git commit -m "refactor(archivist): rename spouse_evaluation to evaluate_spouse_
 
 ---
 
-### Task 7: Rename Archivist's `child_evaluation` → `evaluate_child_match`
+### Task 7: Rename Archivist's `evaluate_child_match` → `evaluate_child_match`
 
 **Files:**
 - Modify: `Archivist/Census.py:265` (definition), `:310` (internal caller)
@@ -330,9 +330,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Archivist/Census.py`
-- `symbolName`: `child_evaluation`
+- `symbolName`: `evaluate_child_match`
 - `newName`: `evaluate_child_match`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with the one caller (line 310) updated. No other file references this function.
 
@@ -356,13 +356,13 @@ git commit -m "refactor(archivist): rename child_evaluation to evaluate_child_ma
 
 ---
 
-### Task 8: Rename Voyageur's `sex_code` → `normalize_sex_code`
+### Task 8: Rename Voyageur's `normalize_sex_code` → `normalize_sex_code`
 
 **Files:**
 - Modify: `Voyageur/FS.py:169` (definition), `:241` (internal caller)
 
 **Interfaces:**
-- Produces: `normalize_sex_code(raw: str) -> str`, same body. Internal-only — the name `sex_code` reads as a noun/label, not a verb that normalizes raw text into `"M"`/`"F"`/`""`.
+- Produces: `normalize_sex_code(raw: str) -> str`, same body. Internal-only — the name `normalize_sex_code` reads as a noun/label, not a verb that normalizes raw text into `"M"`/`"F"`/`""`.
 
 - [ ] **Step 1: Confirm baseline passes**
 
@@ -373,9 +373,9 @@ Expected: PASS
 
 Call `mcp__pycharm__rename_refactoring`:
 - `pathInProject`: `Voyageur/FS.py`
-- `symbolName`: `sex_code`
+- `symbolName`: `normalize_sex_code`
 - `newName`: `normalize_sex_code`
-- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Scriptorium`
+- `projectPath`: `C:/Users/Jason Cole/Documents/Genealogy/Antiquarian`
 
 Expected: success, with the one caller (line 241) updated. No other file references this function.
 
@@ -441,7 +441,7 @@ Add a row to `docs/plans/task.md` recording this plan's completion, per this pro
 
 **Type consistency:** every task's proposed new name matches across its own Interfaces block, delegate instructions, and verification greps. The two `capitalize_text_string` outcomes (Tasks 1 and 4) are explicitly called out as separate functions in separate modules, not a naming collision, in both tasks' Interfaces blocks.
 
-**Cross-task ordering:** Tasks 1, 4, and 5 (the three `cap_case` variants) are independent and can run in any order relative to each other, but each task's "confirm remaining cap_case count" step assumes the stated prior tasks are already done — if executed out of order, adjust the expected leftover count accordingly (called out inline in Tasks 4 and 5).
+**Cross-task ordering:** Tasks 1, 4, and 5 (the three `capitalize_text_string` variants) are independent and can run in any order relative to each other, but each task's "confirm remaining cap_case count" step assumes the stated prior tasks are already done — if executed out of order, adjust the expected leftover count accordingly (called out inline in Tasks 4 and 5).
 
 ---
 

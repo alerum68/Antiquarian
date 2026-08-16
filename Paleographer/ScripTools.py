@@ -5,7 +5,7 @@ Enriches, cross-checks against LAC search, partitions by collection, and resolve
 maiden/dit names for Scrip claim records extracted by Extract.py. This module is
 intentionally Scrip-only — it is not a generalization target for other record types.
 
-Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
+Antiquarian.py launches Paleographer.py (the dispatcher) as a subprocess with
 cwd=Paleographer/, so this module imports as a plain sibling.
 """
 

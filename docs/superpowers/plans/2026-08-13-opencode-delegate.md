@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Never pass `-m`/`--model` to `opencode run` — always let `--agent <name>`'s own frontmatter `model:` win (`implementer` → `opencode/deepseek-v4-flash-free`, `code-reviewer` → `opencode/big-pickle`).
-- Always pass `--dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium"` (forward slashes — matches the existing `.AI Assistant/agents/general-purpose.md` convention) and `--format json`.
+- Always pass `--dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian"` (forward slashes — matches the existing `.AI Assistant/agents/general-purpose.md` convention) and `--format json`.
 - `opencode-delegate` gets `tools: Bash, Read, Glob` — no `Write`/`Edit`. All file changes happen through the delegated CLI, never reconstructed by the subagent itself.
 - No `PreToolUse` hook / gate on `opencode-delegate`'s Bash tool (unlike `AGY-delegate`'s `hooks.PreToolUse`) — this integration is project-scoped and gitignored, wrapping a CLI the user already runs directly and trusts; that threat model does not require gating.
 - **Finding (this plan, Task 1):** `implementer` and `code-reviewer` are `mode: subagent` in `.opencode/agents/*.md`. OpenCode's CLI cannot run a subagent directly — `opencode run --agent code-reviewer` prints `agent "code-reviewer" is a subagent, not a primary agent. Falling back to default agent` **and exits 0**, silently substituting the full-permission `build` agent instead. Confirmed empirically. This must be fixed (`mode: subagent` → `mode: all`, OpenCode's third mode: "available in all contexts" — both directly runnable and still usable inside `build`'s own internal SDD dispatch) before any dispatch contract that names `implementer`/`code-reviewer` explicitly is trustworthy.
@@ -32,7 +32,7 @@
 - Modify: `.opencode/agents/code-reviewer.md:3`
 
 **Interfaces:**
-- Produces: a verified fact that `opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent implementer|code-reviewer --format json "<prompt>"` runs the named agent directly (no silent fallback), which Task 2's subagent definition depends on.
+- Produces: a verified fact that `opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent implementer|code-reviewer --format json "<prompt>"` runs the named agent directly (no silent fallback), which Task 2's subagent definition depends on.
 
 - [x] **1a. Edit `.opencode/agents/implementer.md`:** change line 3 from `mode: subagent` to `mode: all`. No other change.
 
@@ -42,8 +42,8 @@
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent implementer --format json "There is no separate brief file for this probe — this prompt is the full brief. Do not implement anything. Just reply with the single word: READY." 2>&1 | head -c 600
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent implementer --format json "There is no separate brief file for this probe — this prompt is the full brief. Do not implement anything. Just reply with the single word: READY." 2>&1 | head -c 600
 ```
 Expected: no `Falling back to default agent` line in the output; the JSON stream contains a `"type":"text"` part with `"text":"READY"`.
 
@@ -51,8 +51,8 @@ Expected: no `Falling back to default agent` line in the output; the JSON stream
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent code-reviewer --format json "This is a permission probe, not a real review. Attempt to write a file at DEV/tests/_opencode_permission_probe.tmp containing the word probe, then report whether the write tool succeeded or was denied. Do not do a real code review." 2>&1
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent code-reviewer --format json "This is a permission probe, not a real review. Attempt to write a file at DEV/tests/_opencode_permission_probe.tmp containing the word probe, then report whether the write tool succeeded or was denied. Do not do a real code review." 2>&1
 ls DEV/tests/_opencode_permission_probe.tmp 2>&1
 ```
 Expected: no `Falling back to default agent` line; the reply states it has no write tool / declines to write; `ls` reports "No such file or directory" (nothing was written). If the file exists, `rm` it and treat this step as failed — do not proceed to Task 2.
@@ -142,7 +142,7 @@ re-decide models here.
 **(a) Bulk/mechanical code generation — write mode:**
 
 ```bash
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent implementer --auto --format json "<full brief prompt>"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent implementer --auto --format json "<full brief prompt>"
 ```
 
 `--auto` is currently a no-op in this repo (the agent's default permission
@@ -156,7 +156,7 @@ whatever branch is checked out when you invoke it.
 **(b) Second-opinion review — read-only by construction:**
 
 ```bash
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent code-reviewer --format json "<full brief prompt>"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent code-reviewer --format json "<full brief prompt>"
 ```
 
 Never pass `--auto` here — it is unnecessary (OpenCode's own
@@ -228,7 +228,7 @@ they may stall waiting for a file path that does not exist.
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
 python -c "
 import re, yaml
 text = open('.AI Assistant/agents/opencode-delegate.md', encoding='utf-8').read()
@@ -276,7 +276,7 @@ New text:
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
 grep -n "OpenCode" .AI Assistant/AI Assistant.md
 ```
 Expected: at least 3 matching lines (the section header and the two bullets mentioning OpenCode).
@@ -298,8 +298,8 @@ No commit — `.AI Assistant/` is gitignored.
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent implementer --auto --format json "There is no separate brief file for this smoke test — this prompt is the full brief. Create a file at DEV/tests/test_opencode_smoke.py containing exactly one trivial pytest test function that asserts 1 + 1 == 2. Do not run any git commands (this directory is gitignored, there is nothing to commit). Then reply with the DONE status contract." > "$TEMP/opencode_smoke_write.json" 2>&1
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent implementer --auto --format json "There is no separate brief file for this smoke test — this prompt is the full brief. Create a file at DEV/tests/test_opencode_smoke.py containing exactly one trivial pytest test function that asserts 1 + 1 == 2. Do not run any git commands (this directory is gitignored, there is nothing to commit). Then reply with the DONE status contract." > "$TEMP/opencode_smoke_write.json" 2>&1
 cat "$TEMP/opencode_smoke_write.json" | tail -c 2000
 ```
 
@@ -307,7 +307,7 @@ cat "$TEMP/opencode_smoke_write.json" | tail -c 2000
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
 grep -c "Falling back to default agent" "$TEMP/opencode_smoke_write.json"
 python -m pytest DEV/tests/test_opencode_smoke.py -q
 ```
@@ -317,7 +317,7 @@ Expected: the `grep -c` prints `0` (no silent fallback); `pytest` shows `1 passe
 
 Run:
 ```bash
-rm "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium/DEV/tests/test_opencode_smoke.py"
+rm "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian/DEV/tests/test_opencode_smoke.py"
 ```
 No git revert needed — `/DEV/` is gitignored, so the file was never tracked.
 
@@ -325,8 +325,8 @@ No git revert needed — `/DEV/` is gitignored, so the file was never tracked.
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
-opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium" --agent code-reviewer --format json "There is no separate plan/diff/ledger file for this smoke test — this prompt is the complete input. Run 'git log -1 --stat' yourself via your Bash tool to see the most recent commit, and give a one-paragraph opinion on whether its commit message matches its diff. This is a smoke test of your read-only invocation, not a real review — do not attempt to write or edit anything. End with your normal Verdict/Findings/Strengths contract." > "$TEMP/opencode_smoke_review.json" 2>&1
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
+opencode run --dir "C:/Users/Jason Cole/Documents/Genealogy/Antiquarian" --agent code-reviewer --format json "There is no separate plan/diff/ledger file for this smoke test — this prompt is the complete input. Run 'git log -1 --stat' yourself via your Bash tool to see the most recent commit, and give a one-paragraph opinion on whether its commit message matches its diff. This is a smoke test of your read-only invocation, not a real review — do not attempt to write or edit anything. End with your normal Verdict/Findings/Strengths contract." > "$TEMP/opencode_smoke_review.json" 2>&1
 cat "$TEMP/opencode_smoke_review.json" | tail -c 2000
 ```
 
@@ -334,7 +334,7 @@ cat "$TEMP/opencode_smoke_review.json" | tail -c 2000
 
 Run:
 ```bash
-cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
+cd "C:\Users\Jason Cole\Documents\Genealogy\Antiquarian"
 grep -c "Falling back to default agent" "$TEMP/opencode_smoke_review.json"
 git status --short
 ```

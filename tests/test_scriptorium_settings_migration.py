@@ -1,12 +1,12 @@
 from pathlib import Path
 
-import Scriptorium
+import Antiquarian
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def test_archivist_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Archivist")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Archivist")
 
     assert result == {
         "Which JSON to Build From": {
@@ -38,7 +38,7 @@ def test_archivist_schema_matches_expected_shape():
 
 
 def test_voyageur_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Voyageur")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Voyageur")
 
     assert result == {
         "Gather Settings": {"VOYAGEUR_SOURCE": ""},
@@ -66,7 +66,7 @@ def test_voyageur_schema_matches_expected_shape():
 
 
 def test_paleographer_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Paleographer")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
         "AGY CLI": {"AGY_CLI_BIN": "agy"},
@@ -109,7 +109,7 @@ def test_paleographer_help_text_mentions_resolve_names():
     if getattr(tkinter, "_default_root", None) is not None and hasattr(tkinter._default_root, "help_texts"):
         assert "Resolve Names" in tkinter._default_root.help_texts["Paleographer"]
     else:
-        root = Scriptorium.Scriptorium()
+        root = Antiquarian.Antiquarian()
         try:
             assert "Resolve Names" in root.help_texts["Paleographer"]
         finally:
@@ -117,7 +117,7 @@ def test_paleographer_help_text_mentions_resolve_names():
 
 
 def test_registrar_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Registrar")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Registrar")
 
     assert result == {
         "File Paths (Relative to RootsMagic Dir)": {"REGISTRAR_RM_DATABASE": "Your Tree.rmtree"},
@@ -133,21 +133,21 @@ def test_registrar_schema_matches_expected_shape():
 
 
 def test_gazetteer_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Gazetteer")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Gazetteer")
 
     assert result == {
         "File Paths": {
             "GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
-            "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
+            "GAZETTEER_SHAPEFILE": "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/"
             "US_HistCounties_Shapefile/US_HistCounties.shp",
-            "GAZETTEER_CA_SHAPEFILE_DIR": "Scriptorium/Gazetteer/CA_UNICEN_Counties",
+            "GAZETTEER_CA_SHAPEFILE_DIR": "Antiquarian/Gazetteer/CA_UNICEN_Counties",
         },
         "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"},
     }
 
 
 def test_pdfix_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "PDFix")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "PDFix")
 
     assert result == {
         "Scan Settings": {
@@ -162,7 +162,7 @@ def test_batch_set_env_updates_existing_and_preserves_comments(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text("# Initial comment\nFOO='old'\nBAR='keep'\n", encoding="utf-8")
 
-    Scriptorium.batch_set_env(env_file, {"FOO": "new", "BAZ": "created", "EMPTY": ""})
+    Antiquarian.batch_set_env(env_file, {"FOO": "new", "BAZ": "created", "EMPTY": ""})
 
     vals = dotenv_values(env_file)
     assert vals == {"FOO": "new", "BAR": "keep", "BAZ": "created", "EMPTY": ""}

@@ -504,7 +504,7 @@ def query_keystone_for_code(
             pass
 
     client = session or requests.Session()
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Resolver)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Resolver)"}
     landing_url = f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH"
     result = {"record_urls": [], "media_urls": [], "metadata": {}}
 
@@ -577,7 +577,7 @@ def download_keystone_media(
     """Downloads digitized microfilm or document media files from Keystone."""
     target_dir.mkdir(parents=True, exist_ok=True)
     client = session or requests.Session()
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Media Downloader)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Media Downloader)"}
     downloaded_paths: List[str] = []
 
     for url in media_urls:
@@ -746,7 +746,7 @@ def gather_hbca_sheets(
     downloaded_set = load_checkpoint(checkpoint_file)
 
     print(f"[System] Fetching HBCA biographical index from {index_url}...")
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Research Pipeline)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Research Pipeline)"}
     resp = requests.get(index_url, headers=headers, timeout=30)
     resp.raise_for_status()
 

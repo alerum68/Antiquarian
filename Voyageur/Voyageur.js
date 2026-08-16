@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Voyageur
-// @namespace    https://github.com/alerum68/Scriptorium
+// @namespace    https://github.com/alerum68/Antiquarian
 // @version      0.3.29
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68

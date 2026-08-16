@@ -41,13 +41,13 @@ RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(GENEALOGY_DIR, _
 
 _shape = os.getenv(
     "GAZETTEER_SHAPEFILE",
-    "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
+    "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
 SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
 
 # Optional: if the folder isn't present, Gazetteer simply runs US-only, exactly as it did
 # before this existed (one shapefile per census year - see that folder's own
 # LICENSE_AND_ATTRIBUTION.txt).
-_ca_shape_dir = os.getenv("GAZETTEER_CA_SHAPEFILE_DIR", "Scriptorium/Gazetteer/CA_UNICEN_Counties")
+_ca_shape_dir = os.getenv("GAZETTEER_CA_SHAPEFILE_DIR", "Antiquarian/Gazetteer/CA_UNICEN_Counties")
 CA_SHAPEFILE_DIR = _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
 
 DEBUG_MODE = str(os.getenv("GAZETTEER_DEBUG_MODE", "True")).lower() in ('true', '1', 'yes')

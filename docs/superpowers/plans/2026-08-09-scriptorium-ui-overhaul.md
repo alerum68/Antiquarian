@@ -1,12 +1,12 @@
-# Scriptorium UI & Settings Overhaul Implementation Plan
+# Antiquarian UI & Settings Overhaul Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
 
-**Goal:** Simplify the Scriptorium UI by removing developer-centric settings, implementing agy OAuth, and adding proper UI widgets.
+**Goal:** Simplify the Antiquarian UI by removing developer-centric settings, implementing agy OAuth, and adding proper UI widgets.
 
-**Architecture:** We will systematically strip variables from `GLOBAL_VARS` and the tool-specific `settings_schema.yaml` files. Where these variables were previously consumed via `os.getenv()`, we will replace them with hardcoded constants in the Python scripts. Finally, we will inject a native CustomTkinter button into `Scriptorium.py` to shell out to `agy login`.
+**Architecture:** We will systematically strip variables from `GLOBAL_VARS` and the tool-specific `settings_schema.yaml` files. Where these variables were previously consumed via `os.getenv()`, we will replace them with hardcoded constants in the Python scripts. Finally, we will inject a native CustomTkinter button into `Antiquarian.py` to shell out to `agy login`.
 
 **Tech Stack:** Python, CustomTkinter, YAML, python-dotenv, subprocess.
 
@@ -19,20 +19,20 @@ No test requirements were specified in the blueprint (this is primarily a UI and
 ### Task 1: Clean up Global Settings and Implement agy OAuth
 
 **Files:**
-- Modify: `Scriptorium.py`
+- Modify: `Antiquarian.py`
 
 **Interfaces:**
-- Consumes: The `Scriptorium.py` file builds UI dynamically using `GLOBAL_VARS` and `TOOLTIP_DESCRIPTIONS`.
+- Consumes: The `Antiquarian.py` file builds UI dynamically using `GLOBAL_VARS` and `TOOLTIP_DESCRIPTIONS`.
 
 - [ ] **Step 1: Remove API and Boilerplate Variables from GLOBAL_VARS**
 
-In `Scriptorium.py`, edit `GLOBAL_VARS`. Remove `EXTRACTION_ENGINE`, `AI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`. Also remove `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`.
+In `Antiquarian.py`, edit `GLOBAL_VARS`. Remove `EXTRACTION_ENGINE`, `AI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`. Also remove `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`.
 Keep `AGY_MODEL_NAME`.
 Also remove their corresponding entries in `TOOLTIP_DESCRIPTIONS` and `CUSTOM_LABELS`.
 
-- [ ] **Step 2: Add agy OAuth Button Logic to Scriptorium.py**
+- [ ] **Step 2: Add agy OAuth Button Logic to Antiquarian.py**
 
-In `Scriptorium.py`, add a new helper method to the `Scriptorium` class that handles the agy login:
+In `Antiquarian.py`, add a new helper method to the `Antiquarian` class that handles the agy login:
 
 ```python
     def _run_agy_login(self, status_label):
@@ -54,7 +54,7 @@ In `Scriptorium.py`, add a new helper method to the `Scriptorium` class that han
 
 - [ ] **Step 3: Inject the Button into the Global Settings Tab**
 
-In `Scriptorium.py`, inside `_build_tab_global(self, parent_frame):`, add the button at the top of the tab before the dynamically built form:
+In `Antiquarian.py`, inside `_build_tab_global(self, parent_frame):`, add the button at the top of the tab before the dynamically built form:
 
 ```python
     def _build_tab_global(self, parent_frame):
@@ -77,7 +77,7 @@ In `Scriptorium.py`, inside `_build_tab_global(self, parent_frame):`, add the bu
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Scriptorium.py
+git add Antiquarian.py
 git commit -m "refactor(ui): remove dev global vars and add agy login button"
 ```
 
@@ -132,7 +132,7 @@ In `Paleographer/settings_schema.yaml`, add the `widget: dropdown` spec to `PALE
       widget: "dropdown"
       options: [["Parish.pmt", "Parish.pmt"], ["Scrip.pmt", "Scrip.pmt"]]
 ```
-*(Note: A dynamic loader in Scriptorium.py could do this, but for simplicity, we define the static list in YAML for now since those are the main two).*
+*(Note: A dynamic loader in Antiquarian.py could do this, but for simplicity, we define the static list in YAML for now since those are the main two).*
 
 - [ ] **Step 3: Hardcode Variables in Paleographer.py**
 
@@ -166,7 +166,7 @@ In `Voyageur/settings_schema.yaml`, update `HBCA_RESOLVE_KEYSTONE` and `HBCA_DOW
       tooltip: "Query Archives of Manitoba Keystone database to resolve microfilm/finding aid links for cited location codes."
       widget: "checkbox"
 ```
-*(Ensure `widget: checkbox` is supported by the `Scriptorium.py` UI builder, or map them to `segmented` True/False toggles).*
+*(Ensure `widget: checkbox` is supported by the `Antiquarian.py` UI builder, or map them to `segmented` True/False toggles).*
 
 - [ ] **Step 3: Hardcode 8 Workers in scripts**
 

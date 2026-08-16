@@ -168,7 +168,7 @@ function ancestryRowsFromIndexPanelResponse(apiResponse) {
 
 - [x] **Step 4: Run `node --check` to verify no syntax errors**
 
-Run: `node --check Voyageur/Voyageur.js` (from the repo root, i.e. `Scriptorium/`)
+Run: `node --check Voyageur/Voyageur.js` (from the repo root, i.e. `Antiquarian/`)
 Expected: no output, exit code 0.
 
 - [x] **Step 5: Export the two new functions**
@@ -999,4 +999,4 @@ All 5 tasks done, Task 5 live-verified against the 1860 Dakota Territory test re
 
 Tasks 1-3 (`Voyageur.js`) had been implemented and tested but never committed - committed post-hoc (`fbcc2b5`). One post-verification fix: `SelfGender` returns the full word ("Male"/"Female"), unlike the DOM table's single-letter form, which tripped Commissioner's soft schema validation - `ancestryColumnsFromIndexPanelRecord()` now normalizes it to M/F/U via `ancestryNormalizeGender()`, matching every other sex-bearing field in this codebase.
 
-Follow-on tracked separately: [issue #25](https://github.com/alerum68/Scriptorium/issues/25) (eliminate the remaining FS Information-tab dependency, found during this plan's live verification but out of this plan's own scope).
+Follow-on tracked separately: [issue #25](https://github.com/alerum68/Antiquarian/issues/25) (eliminate the remaining FS Information-tab dependency, found during this plan's live verification but out of this plan's own scope).

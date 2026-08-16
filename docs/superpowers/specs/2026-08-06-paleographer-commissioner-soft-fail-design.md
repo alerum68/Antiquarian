@@ -65,9 +65,9 @@ The three existing Voyageur wrappers (`census_schema.validate_against_commission
 keep their own document-type resolution logic (hardcoded `"Census"`, the
 `record_family` → document-type mapping with its early-return for unmapped
 families like `"wills"`, or a direct passthrough respectively) but replace
-their internal `parse_collection` call with a call to `validate_soft`,
+their internal `parse_collection` call with a call to `validate_collection_softly`,
 inside the same `try/except` shape they already have (this guards the
-`validate_soft` import itself; `validate_soft`'s own internal catch handles
+`validate_collection_softly` import itself; `validate_collection_softly`'s own internal catch handles
 everything after that import succeeds, so there is no double-logging in the
 normal case).
 
@@ -120,7 +120,7 @@ way, each with an independent copy of the try/except/log-WARN logic.
 
 After: every MASTER_DB write from any of Paleographer's ~6 call sites passes
 through the same `parse_collection` check Voyageur already runs, via the
-shared `validate_soft` helper. On success, nothing about the written output
+shared `validate_collection_softly` helper. On success, nothing about the written output
 changes. On failure (e.g. an AI-filled sheet with a shape Commissioner
 doesn't recognize), a `[WARN]` is logged and the file is still written
 exactly as before — this sub-project adds visibility, not a gate. The four
@@ -130,7 +130,7 @@ of four independent copies.
 
 ## Error handling
 
-No new exception types. `validate_soft` never raises once its own import has
+No new exception types. `validate_collection_softly` never raises once its own import has
 succeeded — it catches `Exception` broadly, matching the existing
 soft-fail policy's scope (a Pydantic `ValidationError`, an
 `UnknownFieldTypeError`, or any other failure inside `parse_collection` are
@@ -144,16 +144,16 @@ same `[WARN]` format on that (rare, first-import-only) failure too.
 ## Testing
 
 - `Commissioner/tests/test_record_registry.py`:
-  - New test: `validate_soft` with a valid collection and a known
+  - New test: `validate_collection_softly` with a valid collection and a known
     `document_type` produces no output (no `[WARN]` printed).
-  - New test: `validate_soft` with a malformed collection logs `[WARN]
+  - New test: `validate_collection_softly` with a malformed collection logs `[WARN]
     Commissioner validation failed for {label!r}: ...` and does not raise.
-  - New test: `validate_soft` with an unknown `document_type` also logs
+  - New test: `validate_collection_softly` with an unknown `document_type` also logs
     `[WARN]` and does not raise (covers `UnknownDocumentTypeError` the same
     way as any other `parse_collection` failure).
 - `Voyageur/tests/test_census_schema.py`, `Voyageur/tests/test_fs.py`,
   `Voyageur/tests/test_lac.py`: existing tests continue to pass unmodified —
-  proves the `validate_soft` delegation is behavior-neutral for all three
+  proves the `validate_collection_softly` delegation is behavior-neutral for all three
   existing call sites.
 - `Paleographer/tests/test_master_db_merge.py`:
   - New test: `save_master_db` on a MASTER_DB shape Commissioner accepts

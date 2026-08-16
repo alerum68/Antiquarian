@@ -155,8 +155,8 @@ but nothing labels the `reel` subcommand at all, and neither subcommand
 today resolves a `MASTER_DB` path the way Paleographer does. `main()` gains
 a `--record-type {parish,scrip}` argument on both subparsers, used to select
 which `MASTER_DB_NAME` env var to resolve (`CHURCH_MASTER_DB_NAME` /
-`SCRIP_MASTER_DB_NAME`, the same variables Scriptorium.py already defines
-per Paleographer's record type — Scriptorium.py:114,131) and which
+`SCRIP_MASTER_DB_NAME`, the same variables Antiquarian.py already defines
+per Paleographer's record type — Antiquarian.py:114,131) and which
 Commissioner document type to validate against (`"Parish"` / `"Scrip"`).
 
 **Validation.** After building each batch of new scaffold sheets (`LAC.py`)

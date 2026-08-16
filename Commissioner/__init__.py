@@ -1,4 +1,4 @@
-"""Commissioner: shared, domain-agnostic core models for the Scriptorium pipeline."""
+"""Commissioner: shared, domain-agnostic core models for the Antiquarian pipeline."""
 
 from Commissioner.models import (
     AlternateName,

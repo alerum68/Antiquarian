@@ -2,7 +2,7 @@
 
 ## What this is
 
-`Scriptorium.py`'s GUI launches `Voyageur/Voyageur.py` as a subprocess
+`Antiquarian.py`'s GUI launches `Voyageur/Voyageur.py` as a subprocess
 (`SCRIPT_PATHS["VOYAGEUR_SCRIPT"]`) for every Gather run — it is the only
 wiring for the A/FS/LAC buttons. `Voyageur.py` is a ~1300-line frozen fork of
 `A.py`/`FS.py`/`LAC.py`/`census_schema.py`, folded in once and never touched
@@ -32,7 +32,7 @@ smaller pocket of duplication, also deduplicates the gather boilerplate
 - `Voyageur.py` shrinks from ~1300 lines to a dispatcher: a `SOURCES` tuple
   and a `main()` that imports and calls the right provider's real `main()`,
   forwarding the remaining CLI arguments correctly.
-- The LAC CLI-argument path (`Scriptorium.py` → `Voyageur.py` → `LAC.py`)
+- The LAC CLI-argument path (`Antiquarian.py` → `Voyageur.py` → `LAC.py`)
   works end-to-end for both the `volume` and `reel` harvest modes, verified
   by running it, not just read.
 - The ~70-90 lines of near-identical logic independently duplicated between
@@ -60,7 +60,7 @@ smaller pocket of duplication, also deduplicates the gather boilerplate
   `reel` GUI fields (`LAC_HARVEST_VOLUME`, `LAC_URL`) actually reach
   `LAC.py` correctly. No new LAC features.
 - No fix to the separate, pre-existing env-var naming mismatch between what
-  `Scriptorium.py` writes (`LAC_HARVEST_ARCHIVAL_NUMBER`, no
+  `Antiquarian.py` writes (`LAC_HARVEST_ARCHIVAL_NUMBER`, no
   `LAC_MAX_WORKERS`/`LAC_RECORD_TYPE` at all) and what `LAC.py`'s argparse
   defaults for `--workers`/`--record-type`/`--archival-number` read from the
   environment — flagged during design, left for a future task.
@@ -94,26 +94,26 @@ if __name__ == "__main__":
     main()
 ```
 
-`Scriptorium.py` sets `cwd=Voyageur/` for the subprocess (`target_cwd =
+`Antiquarian.py` sets `cwd=Voyageur/` for the subprocess (`target_cwd =
 os.path.dirname(target_script_path)`), so `import A`/`import FS`/`import LAC`
 resolve as plain sibling-module imports — the same pattern `A.py`/`FS.py`
 already use for `import census_schema` today. Deleting `sys.argv[1]` (the
 mode token) before delegating means each provider's own `sys.argv`-based
 parsing (in particular `LAC.py`'s `argparse.ArgumentParser().parse_args()`,
 which reads `sys.argv[1:]` implicitly) sees exactly the arguments
-`Scriptorium.py` meant for it.
+`Antiquarian.py` meant for it.
 
 Every folded-in section of the current `Voyageur.py` (shared utilities,
 census schema, the `_a_*`/`_fs_*`/`_lac_*` gather logic) is deleted — none of
 it is imported or referenced by anything else in the repo (confirmed: no
 `import Voyageur`/`from Voyageur import Voyageur` anywhere in the codebase).
 
-### Scriptorium.py's LAC dispatch gets fixed to match the real LAC.py
+### Antiquarian.py's LAC dispatch gets fixed to match the real LAC.py
 
 `LAC.py`'s real `main()` requires a `volume`/`reel` subcommand as its first
 positional (`add_subparsers(dest="command", required=True)`) — the folded-in
-copy never needed this, since it predates that split. `Scriptorium.py`'s
-current LAC branch (`Scriptorium.py:1858-1864`) sends `LAC --volume X`,
+copy never needed this, since it predates that split. `Antiquarian.py`'s
+current LAC branch (`Antiquarian.py:1858-1864`) sends `LAC --volume X`,
 missing the subcommand token entirely, and has no handling at all for the
 `reel` mode (the `LAC_URL` field exists in the GUI's env vars but nothing
 currently forwards it as a CLI argument). Both gaps get fixed in the same
@@ -126,7 +126,7 @@ delegates to the real `LAC.py`, so the GUI's LAC buttons would go from
 Design-time inspection also found `LAC.py`'s argparse defaults for
 `--workers`, `--record-type`, and `--archival-number` read
 `os.environ.get("LAC_MAX_WORKERS"/"LAC_RECORD_TYPE", ...)` and a
-`DEFAULT_ARCHIVAL_NUMBER` constant, while `Scriptorium.py` never sets
+`DEFAULT_ARCHIVAL_NUMBER` constant, while `Antiquarian.py` never sets
 `LAC_MAX_WORKERS` or `LAC_RECORD_TYPE` at all (it writes
 `LAC_HARVEST_ARCHIVAL_NUMBER`, `LAC_HARVEST_VOLUME`, `LAC_URL`,
 `LAC_IMAGE_DIR`, `LAC_COOKIE_FILE` — a different naming scheme). This looks
@@ -135,7 +135,7 @@ LAC.py argument's env-var plumbing is a distinct, larger scope than this
 sub-project's dispatcher fix — it's flagged here for a future task, not
 fixed as part of this one. The `--volume` value is the only one already
 proven to reach `LAC.py` correctly (via the explicit CLI arg
-`Scriptorium.py` already sends), so it's the only one this sub-project's
+`Antiquarian.py` already sends), so it's the only one this sub-project's
 fix depends on.
 
 ### A.py/FS.py gather-boilerplate consolidation
@@ -183,7 +183,7 @@ FamilySearch's census-or-universal branch).
 - **`Voyageur/FS.py`**: same treatment as `A.py` for its matching duplicated
   blocks. Its own unique `_read_text_with_retry`/`_unlink_with_retry` stay
   as-is.
-- **`Scriptorium.py`** (~1858-1864): LAC branch gains the `volume`/`reel`
+- **`Antiquarian.py`** (~1858-1864): LAC branch gains the `volume`/`reel`
   subcommand token ahead of the existing `--volume`/new `--url` argument, so
   both harvest modes reach the real `LAC.py` correctly.
 
@@ -209,7 +209,7 @@ No new exception types. `wait_for_downloaded_json`'s `KeyboardInterrupt`
 handling and `move_downloaded_images`'s per-file `try/except Exception`
 logging are verbatim lifts of the current inline behavior — unchanged.
 `LAC.py`'s existing `argparse` error behavior (exits with a usage message on
-an invalid/missing subcommand) is unchanged; `Scriptorium.py`'s fix ensures
+an invalid/missing subcommand) is unchanged; `Antiquarian.py`'s fix ensures
 it's never hit by GUI-triggered runs, but a user invoking `Voyageur.py LAC`
 by hand with no further arguments still sees the same `argparse` error as
 running `LAC.py` directly.

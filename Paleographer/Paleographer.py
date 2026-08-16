@@ -4,7 +4,7 @@ enrichment.
 
 Extraction (record-type-generic, driven entirely by the active .pmt file) lives in
 Extract.py. Scrip-only enrichment (enrich, crosscheck, partition, resolve-names)
-lives in ScripTools.py. Scriptorium.py launches this as a subprocess with
+lives in ScripTools.py. Antiquarian.py launches this as a subprocess with
 cwd=Paleographer/, so Extract.py and ScripTools.py import as plain sibling modules.
 """
 

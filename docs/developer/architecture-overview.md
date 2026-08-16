@@ -1,6 +1,6 @@
 # Architecture Overview
 
-Scriptorium is structured as a pipeline with four primary operational stages and a centralized domain-validation core.
+Antiquarian is structured as a pipeline with four primary operational stages and a centralized domain-validation core.
 
 ---
 
@@ -8,7 +8,7 @@ Scriptorium is structured as a pipeline with four primary operational stages and
 
 ```mermaid
 graph TD
-    UI[Scriptorium.py UI Layer] --> Voyageur[Voyageur - Gather Stage]
+    UI[Antiquarian.py UI Layer] --> Voyageur[Voyageur - Gather Stage]
     UI --> Paleographer[Paleographer - Analyze Stage]
     UI --> Archivist[Archivist - Create Stage]
     UI --> Tools[Registrar & Gazetteer - Maintenance]

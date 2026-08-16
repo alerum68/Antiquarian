@@ -3,7 +3,7 @@ Confirms Paleographer.py resolves its own runtime settings (SOURCE_DIR, MASTER_D
 only its own record type's PREFIXED settings-tab keys (e.g. CHURCH_IMAGE_DIR,
 CHURCH_MASTER_DB_NAME) via field_remap - with the generic names (IMAGE_DIR,
 MASTER_DB_NAME) never set at all. This is the actual standalone-execution scenario: no
-Scriptorium.py subprocess-env injection bridging prefixed names to generic ones.
+Antiquarian.py subprocess-env injection bridging prefixed names to generic ones.
 """
 import importlib
 import sys

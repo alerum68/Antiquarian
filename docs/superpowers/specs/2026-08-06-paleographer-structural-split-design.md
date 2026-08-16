@@ -31,11 +31,11 @@ file's structure and the GUI both currently hide that split:
   verbatim.
 - The original reason for folding — "self-contained entrypoint, no
   sibling-file imports required at runtime" (commit `9663cdb`) — no longer
-  applies and may never have: `Scriptorium.py:1869`
+  applies and may never have: `Antiquarian.py:1869`
   (`target_cwd = os.path.dirname(target_script_path)`) already launches
   every script, including `Paleographer.py`, with its own directory as
   `cwd`, exactly the mechanism the Voyageur dispatcher rewrite relies on.
-- `Scriptorium.py`'s Enrich/Partition/Resolve-Names/Crosscheck buttons
+- `Antiquarian.py`'s Enrich/Partition/Resolve-Names/Crosscheck buttons
   (`:1566-1574`) are built once and stay clickable regardless of selected
   Record Type — a Parish or Census user can click "Enrich Metadata" today
   and get a silent no-op (`classify_sheet_collection` falls to
@@ -118,10 +118,10 @@ each sibling fully self-contained for its own concern.
   there). Fix the three reads to go through `type_specific_fields`. This
   is a real bug independent of the split — worth a regression test
   either way.
-- **UI gating**: in `Scriptorium.py`, disable (not hide — keep layout
+- **UI gating**: in `Antiquarian.py`, disable (not hide — keep layout
   stable) the Enrich Metadata / Partition Collections / Resolve Names
   buttons unless the currently selected Record Type is `Scrip`. Wire this
-  into `_on_record_type_change` (`Scriptorium.py:1523-1536`), which
+  into `_on_record_type_change` (`Antiquarian.py:1523-1536`), which
   already runs on every Record Type switch; add button
   enable/disable alongside the existing settings-form rebuild.
   `crosscheck` was already effectively gated behind Scrip-only cookie/PID
@@ -147,7 +147,7 @@ each sibling fully self-contained for its own concern.
 ### Rename
 
 - `CENSUS_URL` → `A_URL` throughout: `Voyageur/A.py:58`,
-  `Scriptorium.py:106,235,331`, `Voyageur/.env`, `Archivist/.env`. Purely
+  `Antiquarian.py:106,235,331`, `Voyageur/.env`, `Archivist/.env`. Purely
   mechanical — same env var, new name, matching the `FS_URL`/`LAC_URL`
   convention the other two Voyageur sources already follow.
 

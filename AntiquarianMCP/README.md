@@ -1,15 +1,15 @@
-# ScriptoriumMCP
+# AntiquarianMCP
 
 A generic, reusable, **synchronous** library for safely calling Google's AGY
-CLI (`agy`) from any Scriptorium tool. Right now Paleographer's `agy_engine.py` is the
+CLI (`agy`) from any Antiquarian tool. Right now Paleographer's `agy_engine.py` is the
 only consumer, but `agy_client.py` itself knows nothing about Parish.pmt, schemas, or
-genealogy - any future Scriptorium tool that wants to call `agy` can import it directly.
+genealogy - any future Antiquarian tool that wants to call `agy` can import it directly.
 
 ## Not an MCP server
 
 Despite the name (chosen to echo the separate, general-purpose `ai-research-mcp`
 tool below), this is a **plain importable Python package, not an MCP server**.
-Paleographer runs as a standalone subprocess launched by Scriptorium.py's GUI with no
+Paleographer runs as a standalone subprocess launched by Antiquarian.py's GUI with no
 MCP client present at runtime, so a real MCP server would be unreachable from it. The
 name is a naming convention, not a protocol claim.
 
@@ -29,7 +29,7 @@ for both.
   fully headless extraction call (never interactive, hard timeout, full Windows
   process-tree kill on timeout). `check_or_prompt_auth(...)` is the one deliberately
   interactive function, used only for first-time sign-in.
-- `test_agy_connection.py` - standalone script backing Scriptorium's "Test Agy
+- `test_agy_connection.py` - standalone script backing Antiquarian's "Test Agy
   Connection" button (Global Settings, API & Processing section).
 - `tests/` - unit tests against `tests/fake_bins/*.bat` stand-ins, no live `agy` or
   network access needed.
@@ -41,8 +41,8 @@ for both.
    ```
    agy --help
    ```
-2. **Authenticate.** Use Scriptorium's **Test Agy Connection** button (Global Settings,
-   next to the Extraction Engine selector), or run `ScriptoriumMCP/test_agy_connection.py`
+2. **Authenticate.** Use Antiquarian's **Test Agy Connection** button (Global Settings,
+   next to the Extraction Engine selector), or run `AntiquarianMCP/test_agy_connection.py`
    directly. This is the one deliberately-interactive step - if `agy` isn't already
    signed in, it may need to open a browser for Google sign-in.
 
@@ -67,7 +67,7 @@ for both.
    explicitly on every call, never relying on `agy`'s own default - confirmed live that
    with no `--model` flag, `agy` defaults to a flash-tier model with noticeably worse
    OCR quality.
-5. **In Scriptorium**, set "Extraction Engine" (Global Settings) to "AGY CLI"
+5. **In Antiquarian**, set "Extraction Engine" (Global Settings) to "AGY CLI"
    (the default) and confirm "Agy Model Name" reads `gemini-3.1-pro-high`.
 
 ## Known behavior worth knowing about

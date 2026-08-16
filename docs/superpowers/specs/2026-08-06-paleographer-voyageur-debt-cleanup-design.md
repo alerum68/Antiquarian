@@ -44,7 +44,7 @@ target for the other.
   never removed. Nothing in production imports `postprocess`.
 - `Paleographer.py:381-398` `clean_race`, `Paleographer.py:400-438`
   `clean_date_and_place` — the folded-in copies are themselves uncalled.
-  Race/date-place fields are actually normalized inline via `cap_case`
+  Race/date-place fields are actually normalized inline via `capitalize_text_string`
   elsewhere (see `Paleographer.py:657`).
 - `Paleographer.py:327-330` `MONTHS_REGEX`, `:331-336` `DATE_PATTERN`,
   `:337-340` `NARRATIVE_JUNK_REGEX` — sole consumer was the now-deleted
@@ -115,11 +115,11 @@ target for the other.
   duplicated — leave them where they are, or move them into the same new
   module if that reads more naturally once it exists — implementer's call.)
 - Normalization helpers independently reimplemented in both
-  `Paleographer.py` (`_titlecase_callback`/`cap_case` at `:80-100`, date
+  `Paleographer.py` (`_titlecase_callback`/`capitalize_text_string` at `:80-100`, date
   parsing at `:103-164`, `derive_record_identity` at `:167-178`,
   `derive_role_number`/`derive_role_semantic` at `:180-203`) and
-  `Voyageur/FS.py` (`cap_case` at `:44-66`, `MONTH_NAMES`/
-  `_DATE_PATTERNS`/`parse_to_iso` at `:153-203`, `derive_record_identity`
+  `Voyageur/FS.py` (`capitalize_text_string` at `:44-66`, `MONTH_NAMES`/
+  `_DATE_PATTERNS`/`parse_date_to_iso_format` at `:153-203`, `derive_record_identity`
   at `:206-216`, `derive_role_numbers`/`derive_role_semantics` at
   `:219-237`): extract one shared implementation into a new
   `Commissioner/normalization.py` (Commissioner already sits below both

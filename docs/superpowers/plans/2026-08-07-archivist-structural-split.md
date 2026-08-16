@@ -41,7 +41,7 @@
 | 237–257 | `GENERAL_CONFIG` dict (drop the `'omit_source_id_prefix'` key entirely — no longer used by anything) | **General.py** |
 | 264–266 | `FACT_TYPES` JSON load | **Utils.py** — read by `get_event_gedcom_tag` (Utils.py) and `build_custom_fact_lines` (General.py) |
 | 268–284 | `get_event_gedcom_tag`, `is_family_event` | **Utils.py** |
-| 290–335 | `clean_val`, `_titlecase_callback`, `cap_case`, `clean_place` | **Utils.py** |
+| 290–335 | `clean_val`, `_titlecase_callback`, `capitalize_text_string`, `clean_place` | **Utils.py** |
 | 338–350 | `get_gender` | **Census.py** — interleaving exception, see below |
 | 353–548 | `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines` | **Utils.py** |
 | 554–1995 | `get_age` through `run_census_flavor` (household parsing, census citation/task building, `build_gedcom_from_census`, `load_census_dataframe`, `build_census_dataframe_from_unified`) | **Census.py** — interleaving exception at 1414, see below |
@@ -59,7 +59,7 @@ Also note: `_SIMPLIFIED_CITATION_TEMPLATES` (referenced by `_SCRIP_TEMPLATES` at
 
 1. **`get_gender`** (338–350) — physically sits inside the Utils.py-bound 290–548 range but is used only by census row processing. Move to **Census.py**.
 2. **`split_full_name`** (1414–1424) — physically sits inside the Census.py-bound 554–1995 range but is a generic name-splitting helper with no census-specific logic. Move to **Utils.py**.
-3. **`HouseholdUnit`/`FlagRecord`** (30–45) — physically the first symbols in the file (before the `CONFIGURATION` block) but used exclusively by `child_evaluation`, `find_parent`, `parse_household`, `resolve_cross_family_links`, `append_unit_if_not_empty`, `parse_household_relational` (all Census.py-bound). Move to **Census.py**.
+3. **`HouseholdUnit`/`FlagRecord`** (30–45) — physically the first symbols in the file (before the `CONFIGURATION` block) but used exclusively by `evaluate_child_match`, `find_parent`, `parse_household`, `resolve_cross_family_links`, `append_unit_if_not_empty`, `parse_household_relational` (all Census.py-bound). Move to **Census.py**.
 4. **`_SCRIP_TEMPLATES` cluster** (2362–2536, listed above) — physically inside the General.py-bound 1999–2638 range but Scrip-only. Move to **ScripProfile.py**.
 
 ### Constant ownership (resolved by grepping every `global` statement in the file; Census and General flows never both run in one process, so each module safely owns an independent copy of any constant it mutates)
@@ -238,7 +238,7 @@ git commit -m "test: capture golden GEDCOM fixtures ahead of Archivist structura
 
 **Interfaces:**
 - Consumes: nothing from other split modules (Utils.py is the dependency floor).
-- Produces: `get_env_int`, `safe_path`, `resolve_source_id`, `get_event_gedcom_tag`, `is_family_event`, `clean_val`, `cap_case`, `clean_place`, `split_full_name`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, plus module constants `FACT_TYPES`, `GEDCOM_OUTPUT_NAME` (mutable, see constant-ownership note above), `PROGRAM_DIR`, `RM_DIR`, `FTM_DIR`, `GEDCOM_OUTPUT_PATH`, `GEDCOM_OUTPUT_MODE`, `CURRENT_DATE`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`, `SUBM_ADDRESS`, `MGS_GROUP_URL`, `ANCESTRY_GROUP_URL`, `ROOT_SOURCE_ID`, `APID_DB` (read-only canonical default).
+- Produces: `get_env_int`, `safe_path`, `resolve_source_id`, `get_event_gedcom_tag`, `is_family_event`, `clean_val`, `capitalize_text_string`, `clean_place`, `split_full_name`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, plus module constants `FACT_TYPES`, `GEDCOM_OUTPUT_NAME` (mutable, see constant-ownership note above), `PROGRAM_DIR`, `RM_DIR`, `FTM_DIR`, `GEDCOM_OUTPUT_PATH`, `GEDCOM_OUTPUT_MODE`, `CURRENT_DATE`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`, `SUBM_ADDRESS`, `MGS_GROUP_URL`, `ANCESTRY_GROUP_URL`, `ROOT_SOURCE_ID`, `APID_DB` (read-only canonical default).
 
 - [ ] **Step 1: Create `Archivist/Utils.py`**
 
@@ -248,7 +248,7 @@ Move verbatim from `Archivist.py`, using the module boundary table above:
 - Lines 130–187 (`SOURCE ID REGISTRY` block) verbatim, including `resolve_source_id`.
 - Lines 264–266 (`FACT_TYPES` JSON load) verbatim.
 - Lines 268–284 (`get_event_gedcom_tag`, `is_family_event`) verbatim.
-- Lines 290–335 (`clean_val`, `_titlecase_callback`, `PRESERVED_ACRONYMS`, `_PLACE_QUALIFIER_RE`, `cap_case`, `clean_place`) verbatim.
+- Lines 290–335 (`clean_val`, `_titlecase_callback`, `PRESERVED_ACRONYMS`, `_PLACE_QUALIFIER_RE`, `capitalize_text_string`, `clean_place`) verbatim.
 - Line 1414–1424 (`split_full_name`) — interleaving exception, moved here even though it's physically inside the Census.py range.
 - Lines 353–548 (`format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`) verbatim — note `resolve_gedcom_output_path` reads `GEDCOM_OUTPUT_NAME` as a plain module-level name here (it's defined in this same module, so no qualification needed inside Utils.py itself).
 - `APID_DB`'s canonical read-only default (find its `os.getenv`-based definition in the `CONFIGURATION` block and confirm via grep — `APID_DB` is not in this plan's already-read line ranges, so grep `^APID_DB` in the original file before moving; it is Utils.py-owned per the ownership table).
@@ -313,7 +313,7 @@ git commit -m "refactor: extract Utils.py from Archivist.py"
 - Lines 190–234 (`ANCESTRY_START_RECORD_ID` through `CENSUS_SOURCE_ID`) — Census.py's own copy of `CALL_NUMBER`, `COLLECTION_URL`, `COLLECTION_NAME`, `REPOSITORY`, `REPOSITORY_LOC`, `PUBLISHER`, `PUB_LOC`, `IMAGE_DIR`, `APID_DB`, `ANCESTRY_IMAGE_BASE_ID`, `BASE_ID`, `IMAGE_EXTENSION`, `FORM_TYPE` per the constant-ownership table (grep each `os.getenv` default from the original `CONFIGURATION` block at 46–129 and reproduce it here verbatim — these constants physically live in the `CONFIGURATION` block but are Census.py-owned by usage, another interleaving instance the implementer must grep for, not assume from the block's physical boundaries).
 - Line 338–350 (`get_gender`) — interleaving exception.
 - Lines 554–1995 (`get_age` through `run_census_flavor`) verbatim, **except** line 1414–1424 (`split_full_name`, moved to Utils.py in Task 2 — replace internal calls with `Utils.split_full_name(...)`).
-- Every bare reference inside these moved functions to a name now owned by Utils.py (`clean_val`, `cap_case`, `clean_place`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, `get_event_gedcom_tag`, `is_family_event`, `resolve_source_id`, `GEDCOM_OUTPUT_NAME`, `ROOT_SOURCE_ID`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `SUBM_ADDRESS`, `CURRENT_DATE`, `get_env_int`, `safe_path`) becomes `Utils.<name>`. `run_census_flavor`'s `global GEDCOM_OUTPUT_NAME` (if present — grep to confirm before moving) becomes a qualified `Utils.GEDCOM_OUTPUT_NAME = ...` assignment, not a `global` statement, per the cross-module mutation rule.
+- Every bare reference inside these moved functions to a name now owned by Utils.py (`clean_val`, `capitalize_text_string`, `clean_place`, `format_gedcom_date`, `get_proof_status`, `estimate_birth_from_age`, `wrap_text`, `resolve_gedcom_output_targets`, `resolve_gedcom_output_path`, `dedent_citation_lines`, `weblink_lines`, `get_event_gedcom_tag`, `is_family_event`, `resolve_source_id`, `GEDCOM_OUTPUT_NAME`, `ROOT_SOURCE_ID`, `ORG_NAME`, `RESEARCHER`, `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `SUBM_ADDRESS`, `CURRENT_DATE`, `get_env_int`, `safe_path`) becomes `Utils.<name>`. `run_census_flavor`'s `global GEDCOM_OUTPUT_NAME` (if present — grep to confirm before moving) becomes a qualified `Utils.GEDCOM_OUTPUT_NAME = ...` assignment, not a `global` statement, per the cross-module mutation rule.
 
 - [ ] **Step 2: Verify the module imports cleanly and `run_census_flavor` is reachable**
 
@@ -371,32 +371,45 @@ git commit -m "refactor: extract Census.py from Archivist.py"
 ```python
 class Profile(Protocol):
     def dynamic_source_id(self, vol_digits: str) -> str: ...
+    
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]: ...
+    
     def family_uid(self, identity: str) -> Optional[str]: ...
-    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                        document_type: Optional[str]) -> str: ...
+    
+    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str, document_type: Optional[str]) -> str: ...
+    
     def citation_page(self, rec: dict, part: dict, page: str) -> str: ...
+    
     def citation_template_id(self, rec: dict, vol: str) -> Optional[int]: ...
+    
     def citation_proof_status(self, computed_status: str) -> str: ...
-    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
-                                target_software: str) -> List[str]: ...
+    
+    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str, target_software: str) -> List[str]: ...
+    
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]: ...
+    
     def citation_uses_source_documents(self, rec: dict) -> bool: ...
+    
     def primary_fact_date(self, rec: dict, is_primary: bool) -> str: ...
-    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]: ...
+    
+    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict], vol: str,
+                                  media_uid: str, target_software: str, resi: str, alt_names: list,
+                                  scrip_fact_date: str, raw_event_date: str, age: str) -> List[str]: ...
+    
     def volume_source_detail_fields(self, v_clause: str) -> List[str]: ...
+    
     def media_caption(self, sheet: dict, vol: str, pages: str) -> str: ...
+    
     def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]: ...
+    
     def repository_defaults(self) -> Tuple[str, str]: ...
+    
     def default_gedcom_output_name(self) -> Optional[str]: ...
 
 
-def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                        vol: str, media_uid: str, target_software: str,
-                                        alt_names: list, raw_event_date: str, age: str) -> List[str]:
+def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict], vol: str,
+                                       media_uid: str, target_software: str, alt_names: list, raw_event_date: str,
+                                       age: str) -> List[str]:
     """The non-Scrip primary-event GEDCOM block (today's `Archivist.py:3138-3158`
     else-branch). Exposed as a module function, not only a GeneralProfile method,
     because ScripProfile.build_primary_event_lines also needs it verbatim for the
@@ -408,12 +421,12 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
     event_value = ""
     if event_tag == 'EVEN':
         extra_fields = rec.get('type_specific_fields') or {}
-        value_parts = [f"{k.replace('_', ' ').title()}: {Utils.clean_val(v)}"
-                       for k, v in extra_fields.items() if k != 'document_type' and Utils.clean_val(v)]
+        value_parts = [f"{k.replace('_', ' ').title()}: {Utils.clean_val(v)}" for k, v in extra_fields.items() if
+                       k != 'document_type' and Utils.clean_val(v)]
         event_value = f" {'; '.join(value_parts)}" if value_parts else ""
     lines.append(f"1 {event_tag}{event_value}")
     if event_tag == 'EVEN':
-        lines.append(f"2 TYPE {Utils.cap_case(event_type)}")
+        lines.append(f"2 TYPE {Utils.capitalize_text_string(event_type)}")
     if raw_event_date:
         lines.append(f"2 DATE {Utils.format_gedcom_date(raw_event_date)}")
     lines.append(f"2 PLAC {Utils.clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}")
@@ -423,8 +436,8 @@ def _build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wi
         alt_values = ", ".join(Utils.clean_val(a.get('value')) for a in alt_names)
         lines.append(f"2 NOTE Margin note suggests alternate spelling: {alt_values}")
     lines.extend(build_witness_links(rec, witnesses, vol, target_software))
-    lines.extend(build_general_citation(rec, part, event_tag, vol, media_uid,
-                                         Utils.get_proof_status(raw_event_date), target_software))
+    lines.extend(build_general_citation(rec, part, event_tag, vol, media_uid, Utils.get_proof_status(raw_event_date),
+                                        target_software))
     return lines
 
 
@@ -434,41 +447,39 @@ class GeneralProfile:
         if base_id.endswith('001') and len(base_id) > 1:
             base_id = base_id[:-3]
         return f"@S{base_id or '1'}{vol_digits.zfill(3)}@"
-
+    
     def participant_uid(self, identity: str, role: str, occ: int) -> Optional[str]:
         return None
-
+    
     def family_uid(self, identity: str) -> Optional[str]:
         return None
-
-    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str,
-                        document_type: Optional[str]) -> str:
+    
+    def citation_title(self, rec: dict, part: dict, tag_name: str, year: str, document_type: Optional[str]) -> str:
         std_g = Utils.clean_val(part.get('std_given'))
         std_s = Utils.clean_val(part.get('std_surname'))
         titl = f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}"
         if document_type:
-            titl += f" -- {Utils.cap_case(document_type)}"
+            titl += f" -- {Utils.capitalize_text_string(document_type)}"
         return titl
-
+    
     def citation_page(self, rec: dict, part: dict, page: str) -> str:
         rec_id = Utils.clean_val(rec.get('record_id')) or 'Unknown'
         type_fields = rec.get('type_specific_fields') or {}
         claim_num = Utils.clean_val(type_fields.get('claim_number'))
         affdt_num = Utils.clean_val(type_fields.get('affidavit_number'))
-        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
-                                f"Affdt {affdt_num}" if affdt_num else "") if b]
+        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "", f"Affdt {affdt_num}" if affdt_num else "") if
+                    b]
         if ref_bits:
             return f"3 PAGE {'; '.join(ref_bits)}, Page {page}"
         return f"3 PAGE Page {page}, Record {rec_id}"
-
+    
     def citation_template_id(self, rec: dict, vol: str) -> Optional[int]:
         return None
-
+    
     def citation_proof_status(self, computed_status: str) -> str:
         return computed_status
-
-    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str,
-                                target_software: str) -> List[str]:
+    
+    def citation_detail_fields(self, rec: dict, part: dict, page: str, vol: str, target_software: str) -> List[str]:
         if target_software != "RM":
             return []
         std_g = Utils.clean_val(part.get('std_given'))
@@ -477,27 +488,21 @@ class GeneralProfile:
         type_fields = rec.get('type_specific_fields') or {}
         claim_num = Utils.clean_val(type_fields.get('claim_number'))
         affdt_num = Utils.clean_val(type_fields.get('affidavit_number'))
-        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "",
-                                f"Affdt {affdt_num}" if affdt_num else "") if b]
+        ref_bits = [b for b in (f"Claim {claim_num}" if claim_num else "", f"Affdt {affdt_num}" if affdt_num else "") if
+                    b]
         person_name = f"{std_g} {std_s}".strip()
         parish_loc = Utils.clean_val(GENERAL_CONFIG.get('parish_location'))
-        ref_num_str = ('; '.join(ref_bits) if ref_bits
-                       else (f"Record {rec.get('record_number') or rec_id}"
-                             if rec_id and rec_id != 'Unknown' else ""))
-        parish_detail_fields = [
-            ("Page", f"Page {page}" if page and page != 'X' else ""),
-            ("SourceDetailPerson", person_name),
-            ("Location", parish_loc),
-            ("Repository", Utils.clean_val(REPOSITORY)),
-            ("URL", Utils.clean_val(COLLECTION_URL)),
-            ("RefNumber", ref_num_str),
-        ]
+        ref_num_str = ('; '.join(ref_bits) if ref_bits else (
+            f"Record {rec.get('record_number') or rec_id}" if rec_id and rec_id != 'Unknown' else ""))
+        parish_detail_fields = [("Page", f"Page {page}" if page and page != 'X' else ""),
+            ("SourceDetailPerson", person_name), ("Location", parish_loc), ("Repository", Utils.clean_val(REPOSITORY)),
+            ("URL", Utils.clean_val(COLLECTION_URL)), ("RefNumber", ref_num_str), ]
         lines = []
         for f_name, f_val in parish_detail_fields:
             if f_val:
                 lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
         return lines
-
+    
     def citation_text_block(self, rec: dict, part: dict, raw_orig: str, raw_trans: str) -> List[str]:
         orig_val = Utils.clean_val(raw_orig)
         trans_val = Utils.clean_val(raw_trans)
@@ -519,20 +524,19 @@ class GeneralProfile:
             if orig_text:
                 lines.append(orig_text)
         return lines
-
+    
     def citation_uses_source_documents(self, rec: dict) -> bool:
         return True
-
+    
     def primary_fact_date(self, rec: dict, is_primary: bool) -> str:
         return ""
-
-    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict],
-                                   vol: str, media_uid: str, target_software: str, resi: str,
-                                   alt_names: list, scrip_fact_date: str, raw_event_date: str,
-                                   age: str) -> List[str]:
-        return _build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid,
-                                                    target_software, alt_names, raw_event_date, age)
-
+    
+    def build_primary_event_lines(self, rec: dict, part: dict, event_tag: str, witnesses: List[dict], vol: str,
+                                  media_uid: str, target_software: str, resi: str, alt_names: list,
+                                  scrip_fact_date: str, raw_event_date: str, age: str) -> List[str]:
+        return _build_generic_primary_event_lines(rec, part, event_tag, witnesses, vol, media_uid, target_software,
+                                                  alt_names, raw_event_date, age)
+    
     def volume_source_detail_fields(self, v_clause: str) -> List[str]:
         tid = 10009
         primary_creator = Utils.clean_val(GENERAL_CONFIG.get('parish_name'))
@@ -553,18 +557,18 @@ class GeneralProfile:
         if REPOSITORY_LOC:
             lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
         return lines
-
+    
     def media_caption(self, sheet: dict, vol: str, pages: str) -> str:
         return f"{GENERAL_CONFIG['parish_name_short']} - Vol {vol or 'Unknown'} - Page {pages or 'X'}"
-
+    
     def resolve_source_templates(self, json_data: dict, target_software: str) -> List[str]:
         if target_software == "RM":
             return get_source_templates({10009})
         return []
-
+    
     def repository_defaults(self) -> Tuple[str, str]:
         return ("FamilySearch.org", "Granite Mountain, UT")
-
+    
     def default_gedcom_output_name(self) -> Optional[str]:
         return None
 

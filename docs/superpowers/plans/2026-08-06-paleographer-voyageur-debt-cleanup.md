@@ -1230,15 +1230,10 @@ Create `Commissioner/tests/test_normalization.py`:
 ```python
 from Commissioner import normalization
 
-ROLES = {
-    "1": {"name": "Primary", "semantic": "primary"},
-    "2": {"name": "Father", "semantic": "father"},
-    "7": {"name": "Godfather/Witness 1"},
-}
+ROLES = {"1": {"name": "Primary", "semantic": "primary"}, "2": {"name": "Father", "semantic": "father"},
+         "7": {"name": "Godfather/Witness 1"}, }
 
-EVENT_TYPES = {
-    "Baptism": {"code": "7", "id_prefix": "BAPM-"},
-}
+EVENT_TYPES = {"Baptism": {"code": "7", "id_prefix": "BAPM-"}, }
 
 
 def test_derive_role_semantic_matches_by_role_number():
@@ -1269,11 +1264,11 @@ def test_derive_record_identity_set_type_code_true_sets_it():
 
 
 def test_cap_case_preserves_known_acronym():
-    assert normalization.cap_case("hbc trading post") == "HBC Trading Post"
+    assert normalization.capitalize_text_string("hbc trading post") == "HBC Trading Post"
 
 
 def test_parse_to_iso_full_date():
-    assert normalization.parse_to_iso("December 12, 1850") == "1850-12-12"
+    assert normalization.parse_date_to_iso_format("December 12, 1850") == "1850-12-12"
 ```
 
 - [ ] **Step 2: Run the new test to verify it fails (module doesn't exist yet)**
@@ -1460,7 +1455,7 @@ from Commissioner import normalization
 # its own subfolder's .env, so Paleographer stays runnable standalone.
 ```
 
-Remove the now-duplicated definitions (`_titlecase_callback`/`cap_case`/`MONTH_NAMES`/date patterns/`parse_to_iso`/`derive_record_identity`, currently lines 77-178, keeping `strip_diacritics` and everything from `derive_role_numbers` onward):
+Remove the now-duplicated definitions (`_titlecase_callback`/`capitalize_text_string`/`MONTH_NAMES`/date patterns/`parse_date_to_iso_format`/`derive_record_identity`, currently lines 77-178, keeping `strip_diacritics` and everything from `derive_role_numbers` onward):
 
 ```python
 old_string:
@@ -1584,6 +1579,8 @@ def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str,
 
 ```python
 new_string:
+
+
 def strip_diacritics(text: Optional[str]) -> Optional[str]:
     """Mechanically strips diacritics/accents, keeping only plain ASCII letters/numbers/
     punctuation. Applies to any std_* field regardless of record type."""
@@ -1598,7 +1595,7 @@ def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str,
     for participant in record.get("participants", []):
         raw_role_name = participant.get("role_name")
         if raw_role_name:
-            participant["role_name"] = normalization.cap_case(raw_role_name)
+            participant["role_name"] = normalization.capitalize_text_string(raw_role_name)
         if participant.get("role_number"):
             continue
         role_number = normalization.derive_role_number(raw_role_name or "", roles_table)
@@ -1651,7 +1648,7 @@ def finalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
     derive_suffixes(record, TYPE_CFG.roles)
 ```
 
-Now find every remaining call site of the module-level `cap_case`/`parse_to_iso` names throughout `Paleographer.py` (they are used well beyond the deleted block — e.g. `_label_for` at line 246, `clean_race`/`clean_date_and_place` already removed in Task 1, plus many more downstream) and prefix each with `normalization.`:
+Now find every remaining call site of the module-level `capitalize_text_string`/`parse_date_to_iso_format` names throughout `Paleographer.py` (they are used well beyond the deleted block — e.g. `_label_for` at line 246, `clean_race`/`clean_date_and_place` already removed in Task 1, plus many more downstream) and prefix each with `normalization.`:
 
 ```
 grep -n "\bcap_case(\|\bparse_to_iso(" Paleographer/Paleographer.py
@@ -1752,9 +1749,9 @@ from Commissioner import normalization  # noqa: E402
 SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
 ```
 
-(`titlecase` import is dropped since `_titlecase_callback`/`cap_case` move out; `re` stays — still used elsewhere in `FS.py` beyond the deleted block.)
+(`titlecase` import is dropped since `_titlecase_callback`/`capitalize_text_string` move out; `re` stays — still used elsewhere in `FS.py` beyond the deleted block.)
 
-Remove the now-duplicated `MONTH_NAMES`/date-pattern constants/`parse_to_iso`/`derive_record_identity`/`derive_role_number`/`derive_role_semantic` block:
+Remove the now-duplicated `MONTH_NAMES`/date-pattern constants/`parse_date_to_iso_format`/`derive_record_identity`/`derive_role_number`/`derive_role_semantic` block:
 
 ```python
 old_string:
@@ -1857,7 +1854,7 @@ old_string:
 
 ```python
 new_string:
-        primary["birth_date"] = normalization.parse_to_iso(birth_date) or (birth_date or None)
+primary["birth_date"] = normalization.parse_date_to_iso_format(birth_date) or (birth_date or None)
 ```
 
 ```python
@@ -1867,7 +1864,7 @@ old_string:
 
 ```python
 new_string:
-        primary["death_date"] = normalization.parse_to_iso(death_date) or (death_date or None)
+primary["death_date"] = normalization.parse_date_to_iso_format(death_date) or (death_date or None)
 ```
 
 ```python
@@ -1877,7 +1874,7 @@ old_string:
 
 ```python
 new_string:
-    event_type = normalization.cap_case(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
+event_type = normalization.capitalize_text_string(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
 ```
 
 ```python
@@ -1889,9 +1886,10 @@ old_string:
 
 ```python
 new_string:
-        "year": (normalization.parse_to_iso(event_date_raw) or "")[:4] or None,
-        "event_date": normalization.parse_to_iso(event_date_raw) or event_date_raw or None,
-        "event_place": normalization.cap_case((columns.get("Event Place") or "").strip()) or None,
+"year": (normalization.parse_date_to_iso_format(event_date_raw) or "")[
+            :4] or None, "event_date": normalization.parse_date_to_iso_format(
+    event_date_raw) or event_date_raw or None, "event_place": normalization.capitalize_text_string(
+    (columns.get("Event Place") or "").strip()) or None,
 ```
 
 ```python
@@ -1901,7 +1899,7 @@ old_string:
 
 ```python
 new_string:
-        "role_name": normalization.cap_case(role_name),
+"role_name": normalization.capitalize_text_string(role_name),
 ```
 
 Update the batch-processing loop that calls `derive_record_identity`/`derive_role_number`/`derive_role_semantic`:

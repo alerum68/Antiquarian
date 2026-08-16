@@ -298,7 +298,7 @@
   "Paleographer/tests\\test_agy_engine.py": [
     [
       "module",
-      "Tests for agy_engine.py. agy_client.call_agy_structured is monkeypatched throughout -\nthese tests are about agy_engine's own scratch-dir staging, retry policy, and cost\nadaptation, not the subprocess layer (already covered in\nScriptoriumMCP/tests/test_agy_client.py). rasterize_pdf_to_images is tested against a\nreal, tiny, locally-generated PDF (via PyMuPDF, already a project dependency) since\nthat logic is cheap to exercise for real rather than mock."
+      "Tests for agy_engine.py. agy_client.call_agy_structured is monkeypatched throughout -\nthese tests are about agy_engine's own scratch-dir staging, retry policy, and cost\nadaptation, not the subprocess layer (already covered in\nAntiquarianMCP/tests/test_agy_client.py). rasterize_pdf_to_images is tested against a\nreal, tiny, locally-generated PDF (via PyMuPDF, already a project dependency) since\nthat logic is cheap to exercise for real rather than mock."
     ],
     [
       "test_call_agy_extract_chunked_threads_continuation_across_chunks",
@@ -402,7 +402,7 @@
   "Paleographer/tests\\test_settings_standalone.py": [
     [
       "module",
-      "Confirms Paleographer.py resolves its own runtime settings (SOURCE_DIR, MASTER_DB) from\nonly its own record type's PREFIXED settings-tab keys (e.g. CHURCH_IMAGE_DIR,\nCHURCH_MASTER_DB_NAME) via field_remap - with the generic names (IMAGE_DIR,\nMASTER_DB_NAME) never set at all. This is the actual standalone-execution scenario: no\nScriptorium.py subprocess-env injection bridging prefixed names to generic ones."
+      "Confirms Paleographer.py resolves its own runtime settings (SOURCE_DIR, MASTER_DB) from\nonly its own record type's PREFIXED settings-tab keys (e.g. CHURCH_IMAGE_DIR,\nCHURCH_MASTER_DB_NAME) via field_remap - with the generic names (IMAGE_DIR,\nMASTER_DB_NAME) never set at all. This is the actual standalone-execution scenario: no\nAntiquarian.py subprocess-env injection bridging prefixed names to generic ones."
     ]
   ],
   "Voyageur/tests\\conftest.py": [
@@ -552,7 +552,7 @@
   "tests\\conftest.py": [
     [
       "module",
-      "Makes Scriptorium.py importable as a plain top-level module (matching how it's run\ndirectly, e.g. `python Scriptorium.py`) when pytest is run from anywhere."
+      "Makes Antiquarian.py importable as a plain top-level module (matching how it's run\ndirectly, e.g. `python Antiquarian.py`) when pytest is run from anywhere."
     ]
   ],
   "tests\\test_code_quality.py": [
@@ -571,7 +571,7 @@
       "_load_tool_schema mutates shared module-level dicts as a side effect - snapshot and\nrestore them around every test so tests can't pollute each other or the real schema\nstate loaded at import time."
     ]
   ],
-  "tests\\test_scriptorium_voyageur_settings_ui.py": [
+  "tests\\test_antiquarian_voyageur_settings_ui.py": [
     [
       "test_visible_sections_for_lac_does_not_include_ancestry_only_settings",
       "GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py never reads it, so\nit must not leak into LAC's section just because Gather Settings is always included."

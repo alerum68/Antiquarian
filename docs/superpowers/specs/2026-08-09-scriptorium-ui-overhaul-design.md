@@ -1,7 +1,7 @@
-# Scriptorium UI & Settings Overhaul Design
+# Antiquarian UI & Settings Overhaul Design
 
 ## 1. Overview
-The goal of this overhaul is to drastically simplify the Scriptorium interface by removing "developer-centric" settings, hardcoding them as sensible defaults, and upgrading remaining inputs to proper UI widgets (checkboxes, dropdowns) to prevent option overload for genealogists. We will also integrate a seamless "Sign in to Google" button for AGY (`agy`), deprecating raw AI Assistant API inputs.
+The goal of this overhaul is to drastically simplify the Antiquarian interface by removing "developer-centric" settings, hardcoding them as sensible defaults, and upgrading remaining inputs to proper UI widgets (checkboxes, dropdowns) to prevent option overload for genealogists. We will also integrate a seamless "Sign in to Google" button for AGY (`agy`), deprecating raw AI Assistant API inputs.
 
 ## 2. AGY OAuth Integration
 - **Remove API Variables:** Remove all direct AI Assistant API variables from `Global Settings` (`EXTRACTION_ENGINE`, `AI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`).

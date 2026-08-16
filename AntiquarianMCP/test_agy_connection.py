@@ -1,10 +1,10 @@
 """
-Standalone script backing Scriptorium's "Test Agy Connection" button.
+Standalone script backing Antiquarian's "Test Agy Connection" button.
 
 Runs agy_client.check_or_prompt_auth once, deliberately interactively (may open a
 browser for first-time Google sign-in) - this is meant to be run by a human, launched
 from the GUI, not as part of an unattended batch. Exits 0 on success, 1 on failure, so
-Scriptorium's own subprocess launcher reports the outcome the same way every other tool
+Antiquarian's own subprocess launcher reports the outcome the same way every other tool
 script does.
 """
 

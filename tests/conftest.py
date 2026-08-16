@@ -1,6 +1,6 @@
 """
-Makes Scriptorium.py importable as a plain top-level module (matching how it's run
-directly, e.g. `python Scriptorium.py`) when pytest is run from anywhere.
+Makes Antiquarian.py importable as a plain top-level module (matching how it's run
+directly, e.g. `python Antiquarian.py`) when pytest is run from anywhere.
 """
 
 import sys

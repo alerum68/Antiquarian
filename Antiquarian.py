@@ -33,7 +33,7 @@ SCRIPT_PATHS = {
     "GAZETTEER_SCRIPT": "Gazetteer/Gazetteer.py",
     "PDFIX_SCRIPT": "PDFix/PDFix.py",
     "CLEANUP_CACHE_SCRIPT": "Paleographer/CacheCleanup.py",
-    "AGY_TEST_SCRIPT": "ScriptoriumMCP/test_agy_connection.py",
+    "AGY_TEST_SCRIPT": "AntiquarianMCP/test_agy_connection.py",
 }
 
 
@@ -42,8 +42,8 @@ def get_config_dir() -> Path:
         return BASE_DIR
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
-        return Path(local_app_data) / "Scriptorium"
-    return Path.home() / "AppData" / "Local" / "Scriptorium"
+        return Path(local_app_data) / "Antiquarian"
+    return Path.home() / "AppData" / "Local" / "Antiquarian"
 
 
 def env_path_for(subfolder: Optional[str]) -> Path:
@@ -148,13 +148,13 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
 # PATH & FILE PICKER FIELDS CONSTANTS
 # ==========================================
 GENEALOGY_DIR_SENTINEL = "__GENEALOGY_DIR__"  # Distinct from the real "GENEALOGY_DIR" settings key
-TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (BASE_DIR).
+TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Antiquarian code folder itself (BASE_DIR).
 
 # ==========================================
 # TOOLTIP DESCRIPTIONS
 # ==========================================
 TOOLTIP_DESCRIPTIONS = {  # Global Settings
-    "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
+    "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Antiquarian code, your "
     "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
     "this one folder.",
     "AGY_MODEL_NAME": "The exact AGY CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
@@ -581,11 +581,11 @@ _APP_ICON_PNG_64 = (
 )
 
 
-class Scriptorium(ctk.CTk):
+class Antiquarian(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("The Scriptorium")
+        self.title("The Antiquarian")
 
         # iconphoto() (unlike iconbitmap) takes PhotoImage objects built directly from
         # in-memory PNG data - no .ico file needed on disk. Tk keeps only a weak reference
@@ -739,7 +739,7 @@ class Scriptorium(ctk.CTk):
             prog_dir = prog_dir_var.get().strip()
             if prog_dir:
                 for sub in ["Media", "JSON", "GEDCOM", os.path.join("Sys", "Gazetteer")]:
-                    os.makedirs(os.path.join(prog_dir, "Scriptorium", sub), exist_ok=True)
+                    os.makedirs(os.path.join(prog_dir, "Antiquarian", sub), exist_ok=True)
 
         # Force a geometry update before building the first tab.
         # This fixes a known CustomTkinter bug where CTkScrollableFrame
@@ -759,8 +759,8 @@ class Scriptorium(ctk.CTk):
             import urllib.request
             import json
             req = urllib.request.Request(
-                "https://api.github.com/repos/alerum68/Scriptorium/releases/latest",
-                headers={'User-Agent': 'Scriptorium-App'}
+                "https://api.github.com/repos/alerum68/Antiquarian/releases/latest",
+                headers={'User-Agent': 'Antiquarian-App'}
             )
             with urllib.request.urlopen(req, timeout=5) as response:
                 data = json.loads(response.read().decode())
@@ -779,20 +779,20 @@ class Scriptorium(ctk.CTk):
             print(f"Update check failed: {e}")
 
     def _show_update_popup(self, version, url):
-        msg = f"A new version of Scriptorium ({version}) is available!\n\nWould you like to download it now?"
+        msg = f"A new version of Antiquarian ({version}) is available!\n\nWould you like to download it now?"
         if messagebox.askyesno("New Version Available", msg):
             import webbrowser
             webbrowser.open(url)
 
     def _prompt_tampermonkey(self):
-        msg = ("Scriptorium requires the Tampermonkey browser extension to gather Ancestry records.\n\n"
+        msg = ("Antiquarian requires the Tampermonkey browser extension to gather Ancestry records.\n\n"
                "Would you like to install it and the Voyageur script now?")
         if messagebox.askyesno("Tampermonkey Required", msg):
             webbrowser.open("https://www.tampermonkey.net/")
             prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
             if prog_dir_var:
                 prog_dir = prog_dir_var.get().strip()
-                js_path = os.path.join(prog_dir, "Scriptorium", "Sys", "Voyageur.js")
+                js_path = os.path.join(prog_dir, "Antiquarian", "Sys", "Voyageur.js")
                 if os.path.exists(js_path):
                     try:
                         os.startfile(js_path)
@@ -959,7 +959,7 @@ class Scriptorium(ctk.CTk):
         self.nav_frame = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.nav_frame.pack(side="top", fill="x", padx=8, pady=(14, 4))
 
-        ctk.CTkLabel(self.nav_frame, text="Scriptorium", font=ctk.CTkFont(family="Georgia", size=17, weight="bold")
+        ctk.CTkLabel(self.nav_frame, text="Antiquarian", font=ctk.CTkFont(family="Georgia", size=17, weight="bold")
                      ).pack(anchor="w", padx=6, pady=(0, 14))
 
         self._nav_buttons: Dict[str, ctk.CTkButton] = {}
@@ -1578,7 +1578,7 @@ class Scriptorium(ctk.CTk):
         key -> generic runtime name Paleographer.py/Archivist.py each read from their own
         .env - see Parish.pmt/Scrip.pmt). The GUI only ever needs this for its own display
         purposes (e.g. picking the right image-dir field to browse from); the scripts
-        resolve it themselves at runtime regardless of whether Scriptorium is involved."""
+        resolve it themselves at runtime regardless of whether Antiquarian is involved."""
         return self._read_pmt_front_matter(record_type_value).get("field_remap") or {}
 
     def _on_record_type_change(self, _value: Optional[str] = None):
@@ -2046,5 +2046,5 @@ if __name__ == "__main__":
         runpy.run_module(args.module, run_name="__main__")
         sys.exit(0)
 
-    app = Scriptorium()
+    app = Antiquarian()
     app.mainloop()

@@ -6,7 +6,7 @@ This specification details the Master DB JSON format and scaffold sheet contract
 
 ## Master DB JSON Schema
 
-The Master DB JSON is the primary intermediate data format used across Scriptorium. It represents a single archival collection.
+The Master DB JSON is the primary intermediate data format used across Antiquarian. It represents a single archival collection.
 
 ```json
 {

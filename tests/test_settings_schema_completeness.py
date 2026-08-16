@@ -3,13 +3,13 @@ from pathlib import Path
 
 import pytest
 
-import Scriptorium
+import Antiquarian
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_VAR_PATTERN = re.compile(r"os\.(?:getenv|environ\.get)\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']")
 
-# PROGRAM_DIR is set by the Scriptorium launcher, never user-configured: the codebase
-# resolves its own install location via the __PROGRAM_DIR__ sentinel (see Scriptorium.py)
+# PROGRAM_DIR is set by the Antiquarian launcher, never user-configured: the codebase
+# resolves its own install location via the __PROGRAM_DIR__ sentinel (see Antiquarian.py)
 # rather than a settings key, so it is excluded from schema completeness checks.
 INTERNAL_KEYS = {"PROGRAM_DIR"}
 
@@ -33,13 +33,13 @@ def _env_keys_read_by(tool_dir: Path) -> set:
 
 def _global_keys() -> set:
     keys = set()
-    for fields in Scriptorium.GLOBAL_VARS.values():
+    for fields in Antiquarian.GLOBAL_VARS.values():
         keys.update(fields.keys())
     return keys
 
 
 def _schema_keys(tool_dir: Path) -> set:
-    schema = Scriptorium.load_tool_schema(tool_dir)
+    schema = Antiquarian.load_tool_schema(tool_dir)
     keys = set()
     for fields in schema.values():
         keys.update(fields.keys())

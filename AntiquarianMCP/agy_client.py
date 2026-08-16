@@ -1,7 +1,7 @@
 """
-ScriptoriumMCP: safe, synchronous Google AGY CLI (agy) invocation.
+AntiquarianMCP: safe, synchronous Google AGY CLI (agy) invocation.
 
-A generic, domain-agnostic library any Scriptorium tool can use to call agy - the
+A generic, domain-agnostic library any Antiquarian tool can use to call agy - the
 subscription-covered CLI backend for AI Assistant, distinct from the metered google-genai API
 key path. Knows nothing about Parish.pmt, schemas, or genealogy; Paleographer's own
 agy_engine.py builds on top of this.
@@ -130,7 +130,7 @@ def _run_agy(args: List[str], cwd: Path, cli_bin: str, timeout_seconds: int,
     that inability is the actual safety boundary, not a documented promise) and stdout/
     stderr are captured. Interactive (check_or_prompt_auth only): stdin/stdout/stderr are
     all inherited from the parent process, so a printed sign-in URL or browser-launch
-    behavior is visible to whoever is running Scriptorium.
+    behavior is visible to whoever is running Antiquarian.
 
     Raises AgyCallError on spawn OSError or on timeout (kills the process tree via
     _kill_process_tree first)."""

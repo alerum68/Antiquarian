@@ -1,14 +1,14 @@
 [Setup]
-AppName=Scriptorium
+AppName=Antiquarian
 AppVersion=0.3.28
-DefaultDirName={autopf}\Scriptorium
-DefaultGroupName=Scriptorium
-OutputBaseFilename=Scriptorium_Installer
+DefaultDirName={autopf}\Antiquarian
+DefaultGroupName=Antiquarian
+OutputBaseFilename=Antiquarian_Installer
 Compression=lzma2
 SolidCompression=yes
 
 [Files]
-Source: "dist\Scriptorium\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "dist\Antiquarian\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Code]
 var
@@ -20,14 +20,14 @@ procedure InitializeWizard;
 begin
   PortablePage := CreateInputOptionPage(wpSelectDir,
     'Installation Type', 'Choose your installation type.',
-    'Please choose whether to install Scriptorium normally or in Portable mode.', True, False);
+    'Please choose whether to install Antiquarian normally or in Portable mode.', True, False);
   PortablePage.Add('Standard Installation (Recommended)');
   PortablePage.Add('Portable Installation');
   PortablePage.Values[0] := True;
 
   GenealogyPage := CreateInputDirPage(PortablePage.ID,
     'Genealogy Directory', 'Where is your Genealogy folder?',
-    'Select your primary Genealogy directory where Scriptorium will scaffold its folders.',
+    'Select your primary Genealogy directory where Antiquarian will scaffold its folders.',
     False, '');
   GenealogyPage.Add('');
 
@@ -56,7 +56,7 @@ begin
 
     // Download Gazetteer DBs
     DownloadTemporaryFile('https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip', ExpandConstant('{tmp}\US_AtlasHCB_Counties.zip'), '', nil);
-    DownloadTemporaryFile('https://github.com/alerum68/Scriptorium/raw/main/Sys/Gazetteer/Canada_Counties.zip', ExpandConstant('{tmp}\Canada_Counties.zip'), '', nil);
+    DownloadTemporaryFile('https://github.com/alerum68/Antiquarian/raw/main/Sys/Gazetteer/Canada_Counties.zip', ExpandConstant('{tmp}\Canada_Counties.zip'), '', nil);
   end;
   Result := True;
 end;
@@ -76,7 +76,7 @@ begin
     
     if GenDir <> '' then
     begin
-      GazDir := GenDir + '\Scriptorium\Sys\Gazetteer';
+      GazDir := GenDir + '\Antiquarian\Sys\Gazetteer';
       ForceDirectories(GazDir);
       
       // We would ideally extract the zips here, but Inno Setup requires a plugin or PowerShell to extract.

@@ -1,6 +1,6 @@
 # Developer Workflow & Guidelines
 
-This document outlines environment setup, testing standards, linter rules, and commit practices for Scriptorium contributors.
+This document outlines environment setup, testing standards, linter rules, and commit practices for Antiquarian contributors.
 
 ---
 
@@ -42,7 +42,7 @@ Tests live in dedicated `tests/` directories within each module:
 - `PDFix/tests/`
 - `Paleographer/tests/`
 - `Registrar/tests/`
-- `ScriptoriumMCP/tests/`
+- `AntiquarianMCP/tests/`
 - `Voyageur/tests/`
 
 ### Guidelines

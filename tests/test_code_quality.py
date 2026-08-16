@@ -24,8 +24,8 @@ def test_code_quality_flake8():
         "PDFix",
         "Registrar",
         "Gazetteer",
-        "ScriptoriumMCP",
-        "Scriptorium.py",
+        "AntiquarianMCP",
+        "Antiquarian.py",
         "tests",
     ]
     result = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True)

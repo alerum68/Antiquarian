@@ -38,7 +38,7 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from PDFix.PDFix import optimize_pdf, COMPRESSION_PARAMS  # noqa: E402
-from ScriptoriumMCP import agy_client  # noqa: E402
+from AntiquarianMCP import agy_client  # noqa: E402
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_TYPE = "Parish.pmt"
@@ -185,7 +185,7 @@ def parse_type_config(pmt_path: Path) -> TypeConfig:
     field_remap exists so Paleographer.py (and, independently, Archivist.py) can resolve
     their own generic runtime settings (IMAGE_DIR, MASTER_DB_NAME, CALL_NUMBER, etc.) from
     whichever of this record type's own prefixed .env keys is actually set, without
-    Scriptorium.py's GUI layer needing to know what a record type even is - each script
+    Antiquarian.py's GUI layer needing to know what a record type even is - each script
     reads this table itself, from its own .env, and stays runnable standalone."""
     raw = pmt_path.read_text(encoding="utf-8")
     stripped = raw.lstrip()

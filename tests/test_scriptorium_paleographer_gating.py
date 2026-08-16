@@ -1,16 +1,16 @@
 import pytest
 
-from Scriptorium import Scriptorium as ScriptoriumApp
+from Antiquarian import Antiquarian as AntiquarianApp
 
 
 @pytest.fixture(scope="module")
 def app():
     import tkinter
     default_root = getattr(tkinter, "_default_root", None)
-    if default_root is not None and isinstance(default_root, ScriptoriumApp):
+    if default_root is not None and isinstance(default_root, AntiquarianApp):
         root = default_root
     else:
-        root = ScriptoriumApp()
+        root = AntiquarianApp()
     root.switch_tab("Paleographer")
     yield root
     root.withdraw()

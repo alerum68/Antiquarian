@@ -1,4 +1,4 @@
-# Scriptorium Program Documentation Design Specification
+# Antiquarian Program Documentation Design Specification
 
 **Date:** 2026-08-06  
 **Status:** Approved  
@@ -8,11 +8,11 @@
 
 ## 1. Overview & Goals
 
-Scriptorium is a desktop genealogy toolkit that automates historical record retrieval, AI-assisted transcription, schema normalization, and GEDCOM tree generation.
+Antiquarian is a desktop genealogy toolkit that automates historical record retrieval, AI-assisted transcription, schema normalization, and GEDCOM tree generation.
 
 This project delivers comprehensive, human-written documentation across two distinct destinations:
-1. **User Documentation (GitHub Wiki)**: Stored in the `Scriptorium-Docs` repository (`https://github.com/alerum68/Scriptorium.wiki.git`), focused on practical setup, step-by-step workflows, and operational guides for genealogists and researchers.
-2. **Developer Documentation (`docs/developer/`)**: Stored in the core `Scriptorium` repository, detailing the system architecture, domain models, schema contracts, `.pmt` prompt specifications, and contributor workflows.
+1. **User Documentation (GitHub Wiki)**: Stored in the `Antiquarian-Docs` repository (`https://github.com/alerum68/Antiquarian.wiki.git`), focused on practical setup, step-by-step workflows, and operational guides for genealogists and researchers.
+2. **Developer Documentation (`docs/developer/`)**: Stored in the core `Antiquarian` repository, detailing the system architecture, domain models, schema contracts, `.pmt` prompt specifications, and contributor workflows.
 
 ---
 
@@ -33,14 +33,14 @@ All documentation must read naturally, clearly, and pragmatically. It must avoid
 
 ---
 
-## 3. User Documentation Specification (GitHub Wiki — `Scriptorium-Docs/`)
+## 3. User Documentation Specification (GitHub Wiki — `Antiquarian-Docs/`)
 
-The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Docs\` and synchronize directly with the GitHub Wiki.
+The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian-Docs\` and synchronize directly with the GitHub Wiki.
 
 ### 3.1 Page Hierarchy & Contents
 
 1. **`Home.md`**:
-   - Introduction to Scriptorium's role in processing large archival collections.
+   - Introduction to Antiquarian's role in processing large archival collections.
    - The core pipeline: **Voyageur** (Gather) → **Paleographer** (Analyze) → **Archivist** (Create GEDCOM).
    - Navigation links to all wiki topics.
 
@@ -51,7 +51,7 @@ The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Do
    - System requirements (Windows 10/11, Python 3.12+).
    - Installing dependencies via `requirements.txt`.
    - Installing the `Voyageur.js` TamperMonkey browser extension.
-   - Launching Scriptorium (`python Scriptorium.py`).
+   - Launching Antiquarian (`python Antiquarian.py`).
    - First-run checklist.
 
 4. **`Configuration-&-Settings.md`**:
@@ -100,13 +100,13 @@ The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Do
 
 ## 4. Developer Documentation Specification (`docs/developer/`)
 
-These files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\docs\developer\`.
+These files reside in `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\docs\developer\`.
 
 ### 4.1 Document Structure & Contents
 
 1. **`docs/developer/architecture-overview.md`**:
    - Top-level architectural diagram (UI layer, pipeline stages, shared validation kernel).
-   - Directory structure and responsibilities of core modules (`Scriptorium.py`, `Voyageur/`, `Paleographer/`, `Archivist/`, `Commissioner/`, `Registrar/`, `Gazetteer/`, `PDFix/`).
+   - Directory structure and responsibilities of core modules (`Antiquarian.py`, `Voyageur/`, `Paleographer/`, `Archivist/`, `Commissioner/`, `Registrar/`, `Gazetteer/`, `PDFix/`).
    - Execution lifecycle of a typical record batch.
 
 2. **`docs/developer/commissioner-domain-models.md`**:
@@ -139,17 +139,17 @@ These files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\docs\
 ## 5. Main Repo README Cross-Linking
 
 Update `README.md` in the root repository to provide direct markdown links:
-- User Guide links pointing to GitHub Wiki pages (`https://github.com/alerum68/Scriptorium/wiki/...`).
+- User Guide links pointing to GitHub Wiki pages (`https://github.com/alerum68/Antiquarian/wiki/...`).
 - Developer Architecture links pointing to local `docs/developer/` files.
 
 ---
 
 ## 6. Implementation & Delivery Plan
 
-1. **Task 1: User Documentation (GitHub Wiki in `Scriptorium-Docs`)**
-   - Create and populate all 10 wiki markdown files in `Scriptorium-Docs`.
+1. **Task 1: User Documentation (GitHub Wiki in `Antiquarian-Docs`)**
+   - Create and populate all 10 wiki markdown files in `Antiquarian-Docs`.
    - Verify formatting and navigation.
-   - Commit and push to `origin/master` (or main branch) on `Scriptorium.wiki.git`.
+   - Commit and push to `origin/master` (or main branch) on `Antiquarian.wiki.git`.
 2. **Task 2: Developer Documentation (`docs/developer/`)**
    - Create `docs/developer/` directory.
    - Author all 5 technical specification documents.

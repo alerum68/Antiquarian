@@ -66,4 +66,4 @@ To add support for a new record format (e.g., Wills & Probate):
    ---
    ```
 3. Write the instructions directing the extraction engine how to format JSON output.
-4. Scriptorium automatically discovers `Probate.pmt` on startup and adds `Probate` to the dropdown options in Paleographer. No code changes are required.
+4. Antiquarian automatically discovers `Probate.pmt` on startup and adds `Probate` to the dropdown options in Paleographer. No code changes are required.

@@ -3,7 +3,7 @@
 ## Problem
 
 Following the completed per-tool YAML schema migration (see
-`2026-08-07-scriptorium-settings-redesign-design.md`), a second, independent
+`2026-08-07-antiquarian-settings-redesign-design.md`), a second, independent
 round of settings issues remains:
 
 - `CENSUS_IMAGE_DIR` still lives in `GLOBAL_VARS` even though it's
@@ -28,7 +28,7 @@ This spec resolves all four, plus a fifth item raised after the audit: the
 
 ### 1. `CENSUS_IMAGE_DIR` relocation
 
-Move `CENSUS_IMAGE_DIR` out of `Scriptorium.py`'s `GLOBAL_VARS` ("Global
+Move `CENSUS_IMAGE_DIR` out of `Antiquarian.py`'s `GLOBAL_VARS` ("Global
 Directories" section) into `Archivist/settings_schema.yaml`. No loader
 changes needed — Archivist already has its own schema file and its own
 subfolder `.env` via `ENV_TARGETS`. After this change `CENSUS_IMAGE_DIR`
@@ -148,7 +148,7 @@ either would silently break it.
 `Paleographer/test_master_db_merge.py`,
 `Paleographer/test_paleographer_pipeline.py`,
 `Paleographer/test_settings_standalone.py`,
-`ScriptoriumMCP/test_agy_connection.py`.
+`AntiquarianMCP/test_agy_connection.py`.
 
 ### 6. `agy` prompt caching
 
@@ -290,6 +290,6 @@ separate, small, standalone task.
 - `CALL_NUMBER`/`COLLECTION_*`/`REPOSITORY*` vs. `CHURCH_*`/`SCRIP_*`
   `field_remap:` pairs, and `MASTER_DB_NAME`/`OUTPUT_DIR` pairs.
 - Any change to the already-completed per-tool YAML schema migration
-  itself (see `2026-08-07-scriptorium-settings-redesign-design.md`).
+  itself (see `2026-08-07-antiquarian-settings-redesign-design.md`).
 - Dropping `LAC_VOLUME` — noted as optional in Section 2, not included as
   a task.

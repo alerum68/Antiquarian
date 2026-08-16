@@ -71,7 +71,7 @@ titlecase==2.4.1
 `Commissioner/__init__.py`:
 
 ```python
-"""Commissioner: shared, domain-agnostic core models for the Scriptorium pipeline."""
+"""Commissioner: shared, domain-agnostic core models for the Antiquarian pipeline."""
 ```
 
 `Commissioner/tests/__init__.py`: empty file (makes the tests directory a package so relative imports behave consistently across pytest invocations).
@@ -1081,7 +1081,7 @@ Expected: PASS (all tests)
 `Commissioner/__init__.py`:
 
 ```python
-"""Commissioner: shared, domain-agnostic core models for the Scriptorium pipeline."""
+"""Commissioner: shared, domain-agnostic core models for the Antiquarian pipeline."""
 
 from Commissioner.models import (
     AlternateName,

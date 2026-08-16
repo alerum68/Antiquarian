@@ -22,11 +22,11 @@ from google import genai
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# Add repo root to sys.path to allow absolute imports for ScriptoriumMCP.
+# Add repo root to sys.path to allow absolute imports for AntiquarianMCP.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from ScriptoriumMCP import agy_client  # noqa: E402
+from AntiquarianMCP import agy_client  # noqa: E402
 
 from Commissioner import normalization  # noqa: E402
 
@@ -711,7 +711,7 @@ def main() -> None:
         print("Verifying AGY CLI authentication...")
         if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
             print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
-                  "Connection' action in Scriptorium's Global Settings, or `agy` "
+                  "Connection' action in Antiquarian's Global Settings, or `agy` "
                   "directly, to sign in, then try again.")
             return
         print("Authenticated.\n")

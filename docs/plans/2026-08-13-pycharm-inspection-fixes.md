@@ -4,7 +4,7 @@
 
 **Goal:** Resolve all 504 PyCharm inspection errors (across 24 XML inspection types in `DEV/Issues`, ignoring Proofreading) and update the project's automated lint suite (`flake8`/`pyflakes`/`pycodestyle` integration in pytest) to enforce zero inspection violations on future commits.
 
-**Architecture:** Group and resolve code quality findings across all Scriptorium modules (`Archivist`, `Paleographer`, `Voyageur`, `Commissioner`, `PDFix`, `Registrar`, `Gazetteer`, `ScriptoriumMCP`, and `Scriptorium.py`). Enhance the automated lint test runner (`tests/test_code_quality.py`) to run `flake8` / `pyflakes` / `pycodestyle` with strict checks matching PyCharm's inspection rules.
+**Architecture:** Group and resolve code quality findings across all Antiquarian modules (`Archivist`, `Paleographer`, `Voyageur`, `Commissioner`, `PDFix`, `Registrar`, `Gazetteer`, `AntiquarianMCP`, and `Antiquarian.py`). Enhance the automated lint test runner (`tests/test_code_quality.py`) to run `flake8` / `pyflakes` / `pycodestyle` with strict checks matching PyCharm's inspection rules.
 
 **Tech Stack:** Python 3.12, Pytest, Flake8 / Pyflakes / Pycodestyle, Pydantic v2, CustomTkinter.
 
@@ -24,11 +24,11 @@
 - Modify: `Commissioner/tests/test_hbca_registry.py` (Remove unused import `pytest`)
 - Modify: `Paleographer/tests/test_paleographer_pipeline.py` (Remove unused import `pytest`)
 - Modify: `Archivist/tests/test_archivist.py` (Remove unused local `joined`)
-- Modify: `Scriptorium.py` (Remove unused local `status_msg`)
+- Modify: `Antiquarian.py` (Remove unused local `status_msg`)
 
 **Step 1: Write failing lint test targeting unused imports/variables**
 
-Run: `python -m flake8 --select=F401,F841 Archivist/ Voyageur/ Commissioner/ Paleographer/ Scriptorium.py`
+Run: `python -m flake8 --select=F401,F841 Archivist/ Voyageur/ Commissioner/ Paleographer/ Antiquarian.py`
 Expected output: Reports unused imports and variables in target files.
 
 **Step 2: Remove unused imports, unused variables, redundant parentheses, and duplicate keys**
@@ -37,7 +37,7 @@ Edit the specified files to remove unused `import` statements, drop unused varia
 
 **Step 3: Run flake8 check to verify clean output**
 
-Run: `python -m flake8 --select=F401,F841 Archivist/ Voyageur/ Commissioner/ Paleographer/ Scriptorium.py`
+Run: `python -m flake8 --select=F401,F841 Archivist/ Voyageur/ Commissioner/ Paleographer/ Antiquarian.py`
 Expected output: Exit code 0 (no violations reported).
 
 **Step 4: Run test suite to verify no regressions**
@@ -48,7 +48,7 @@ Expected output: All tests PASS.
 **Step 5: Commit**
 
 ```bash
-git add Archivist/ Voyageur/ Commissioner/ Paleographer/ Scriptorium.py
+git add Archivist/ Voyageur/ Commissioner/ Paleographer/ Antiquarian.py
 git commit -m "fix(lint): remove unused imports, unused variables, and redundant parentheses"
 ```
 
@@ -162,7 +162,7 @@ git commit -m "refactor(clean): add @staticmethod and prefix unused interface pa
 - Modify: `Archivist/Census.py` (Fix `HouseholdUnit | None` dict index checks and `None.__setitem__` warnings)
 - Modify: `Archivist/HBCA.py` (Fix `None.get()` protection checks and protected member `_build_generic_primary_event_lines` access)
 - Modify: `Archivist/Scrip.py` (Fix protected member `_build_generic_primary_event_lines` access)
-- Modify: `Scriptorium.py` (Fix protected member `_canvas` access and deprecation warnings)
+- Modify: `Antiquarian.py` (Fix protected member `_canvas` access and deprecation warnings)
 - Modify: `Paleographer/engine.py` & `Paleographer/Extract.py` (Fix unresolved reference warnings and broad try-except handling)
 - Modify: `Voyageur/LAC.py` & `Voyageur/FS.py` (Fix None checks and exception handling)
 - Modify: `tests/` (Fix `_default_root`, `_switch_tab`, and `_load_tool_schema` protected member accesses in unit tests by introducing public test helper accessors or explicit `# noqa` where testing private methods)
@@ -187,7 +187,7 @@ Expected output: PASS with 0 failures.
 **Step 4: Commit**
 
 ```bash
-git add Archivist/ Paleographer/ Voyageur/ Scriptorium.py tests/
+git add Archivist/ Paleographer/ Voyageur/ Antiquarian.py tests/
 git commit -m "fix(quality): add None guards, resolve references, and clean up scope shadowing"
 ```
 
@@ -201,7 +201,7 @@ git commit -m "fix(quality): add None guards, resolve references, and clean up s
 
 **Step 1: Create `tests/test_code_quality.py` enforcing PyCharm-equivalent static analysis checks**
 
-Write a pytest test file `tests/test_code_quality.py` that runs `flake8` / `pyflakes` / `pycodestyle` programmatically over all project Python modules (`Archivist/`, `Commissioner/`, `Paleographer/`, `Voyageur/`, `PDFix/`, `Registrar/`, `Gazetteer/`, `ScriptoriumMCP/`, `Scriptorium.py`).
+Write a pytest test file `tests/test_code_quality.py` that runs `flake8` / `pyflakes` / `pycodestyle` programmatically over all project Python modules (`Archivist/`, `Commissioner/`, `Paleographer/`, `Voyageur/`, `PDFix/`, `Registrar/`, `Gazetteer/`, `AntiquarianMCP/`, `Antiquarian.py`).
 
 ```python
 import subprocess
@@ -215,7 +215,7 @@ def test_code_quality_flake8():
         "--max-line-length=120",
         "--exclude=.venv,venv,.git,__pycache__,.pytest_cache,.opencode,build,dist",
         "Archivist", "Commissioner", "Paleographer", "Voyageur",
-        "PDFix", "Registrar", "Gazetteer", "ScriptoriumMCP", "Scriptorium.py", "tests"
+        "PDFix", "Registrar", "Gazetteer", "AntiquarianMCP", "Antiquarian.py", "tests"
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, f"Lint violations found:\n{result.stdout}\n{result.stderr}"

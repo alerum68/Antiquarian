@@ -4,12 +4,12 @@ import subprocess
 
 
 def build():
-    # Package the Scriptorium binary natively. --onedir prevents extraction penalties
+    # Package the Antiquarian binary natively. --onedir prevents extraction penalties
     # for background subprocesses during runtime.
     print("Running PyInstaller...")
     subprocess.run([
         "python", "-m", "PyInstaller",
-        "--name", "Scriptorium",
+        "--name", "Antiquarian",
         "--onedir",
         "--windowed",
         "--noconfirm",
@@ -21,10 +21,10 @@ def build():
         "--add-data", "Registrar/settings_schema.yaml;Registrar",
         "--add-data", "Gazetteer/settings_schema.yaml;Gazetteer",
         "--add-data", "PDFix/settings_schema.yaml;PDFix",
-        "Scriptorium.py"
+        "Antiquarian.py"
     ], check=True)
 
-    dist_dir = os.path.join("dist", "Scriptorium")
+    dist_dir = os.path.join("dist", "Antiquarian")
 
     # Expose the raw prompts directory so power users can modify .pmt templates directly
     # without recompiling the executable.
@@ -43,8 +43,8 @@ def build():
     shutil.copy(os.path.join("Voyageur", "Voyageur.js"), os.path.join(sys_dst, "Voyageur.js"))
 
     # Bundle a portable version for users bypassing the Inno Setup installer
-    print("Zipping Scriptorium_Portable.zip...")
-    shutil.make_archive("Scriptorium_Portable", "zip", "dist", "Scriptorium")
+    print("Zipping Antiquarian_Portable.zip...")
+    shutil.make_archive("Antiquarian_Portable", "zip", "dist", "Antiquarian")
 
     print("Build complete.")
 

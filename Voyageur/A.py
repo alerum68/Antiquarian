@@ -153,9 +153,9 @@ def main() -> Path:
     program_dir = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("A_URL", "").strip()
-    json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
+    json_dir = os.getenv("JSON_DIR", "Antiquarian/Working/Project/JSON")
     on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
-    # Matches Scriptorium.py's own default ("Census", resolved against
+    # Matches Antiquarian.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
 
@@ -227,7 +227,7 @@ def main() -> Path:
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
     # button) still targets the exact file that was just produced, instead of whatever
     # JSON_FILE happened to be set to before this run started. JSON_FILE is read by
-    # Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py), so it's written to
+    # Archivist (see its own ARCHIVIST_VARS entry in Antiquarian.py), so it's written to
     # Archivist's own .env, not this script's own subfolder one - confirmed live this was
     # the actual bug behind Archivist immediately failing with FileNotFoundError right
     # after a real gather succeeded: this used to write to Voyageur/.env, a file Archivist
@@ -243,7 +243,7 @@ def main() -> Path:
 
     # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
     # PROGRAM_DIR directly. Resolved here independently (rather than relying on
-    # Scriptorium.py's GUI to pre-resolve it into an absolute path before launching this
+    # Antiquarian.py's GUI to pre-resolve it into an absolute path before launching this
     # as a subprocess) so this script produces correct output standalone, with nothing
     # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
     # directly by the user) is used as-is, never re-nested.

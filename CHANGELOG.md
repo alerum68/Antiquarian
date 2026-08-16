@@ -16,7 +16,7 @@ cleanup with no new functionality.
 - **License**: Switched from the PolyForm Noncommercial License 1.0.0 to the GNU General Public License v3.0.
 
 ### Removed
-- **`CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` global settings**: Removed from Scriptorium's Global Settings UI — image directories are now resolved automatically.
+- **`CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` global settings**: Removed from Antiquarian's Global Settings UI — image directories are now resolved automatically.
 - **`CHURCH_IMAGE_DIR` and `SCRIP_IMAGE_DIR` settings**: Removed from Paleographer settings schema — image paths are derived from the active `.pmt` prompt name at runtime.
 
 ### Fixed
@@ -37,7 +37,7 @@ cleanup with no new functionality.
   `TRANSLATION_HEADER`/`TRANSCRIPTION_HEADER` vars still set keeps working as-is
   (read as a fallback when the new vars are blank/unset) — no action needed, but
   re-entering the same text under `CITATION_DETAIL`/`CITATION_TEXT` in
-  Scriptorium's settings is recommended so the old var names can eventually be
+  Antiquarian's settings is recommended so the old var names can eventually be
   removed from your `.env`.
 - **Unified Pipeline Architecture**: `Paleographer.py` and `Archivist.py`
   are unified as self-contained standalone execution entrypoints with folded sub-modules
@@ -46,13 +46,13 @@ cleanup with no new functionality.
 - **Voyageur Dispatcher Consolidation**: `Voyageur.py` rewritten as a thin dispatcher to
   `A.py`, `FS.py`, and `LAC.py`'s real `main()` functions. `_retry_utils.py` renamed to
   `_gather_helpers.py` with shared gather-boilerplate now used by both `A.py` and `FS.py`.
-  Fixed `Scriptorium.py`'s LAC dispatch to pass the `volume`/`reel` subcommand token
+  Fixed `Antiquarian.py`'s LAC dispatch to pass the `volume`/`reel` subcommand token
   `LAC.py`'s argparse requires.
 - **Commissioner Integration**: folded `Commissioner` into `Voyageur` (for LAC gathering,
   volume harvesting, and search scraping) and `Paleographer` (for Scrip metadata enrichment,
   name resolution, citation cleaning, and archival collection partitioning), streamlining
   the pipeline into three core stages: Gathering (`Voyageur`) -> Analysis/Enrichment (`Paleographer`)
-  -> GEDCOM Compilation (`Archivist`). Removed the standalone Commissioner tab from `Scriptorium.py`.
+  -> GEDCOM Compilation (`Archivist`). Removed the standalone Commissioner tab from `Antiquarian.py`.
 - **Cross-Source Merge Concept**: archived dual-source census merging prototype (`Merged.py`,
   `MergedCensus.py`, `test_merged_census.py`) into `DEV/merged_concept/` and catalogued on the
   roadmap for future development.
@@ -71,7 +71,7 @@ cleanup with no new functionality.
   produces nothing despite the fetch succeeding. `FS.py` collects and moves these images
   into the same nested `{year} US Federal Census / {location}` folder structure `A.py`
   already uses.
-- **Scriptorium (settings shell)**: left sidebar navigation replacing the old top-tab
+- **Antiquarian (settings shell)**: left sidebar navigation replacing the old top-tab
   strip (Voyageur/Paleographer/Archivist ungrouped, a labeled Utilities group for
   Registrar/Gazetteer/PDFix, Help and Global Settings pinned to the bottom), a custom
   dark theme with Georgia headings and role-tag pills per tool, and richer field widgets
@@ -88,7 +88,7 @@ cleanup with no new functionality.
   "Researcher & Organization" card.
 
 ### Fixed
-- **Voyageur (HBCA)**: fixed a crash during the HBCA gather run caused by `HBCA_IMAGE_DIR` missing from Scriptorium's internal `nested_dir_keys` resolution list. The setting was correctly resolving to `MEDIA_DIR/HBCA` inside `HBCA.py` standalone, but failing with a `KeyError` when launched via the Scriptorium GUI.
+- **Voyageur (HBCA)**: fixed a crash during the HBCA gather run caused by `HBCA_IMAGE_DIR` missing from Antiquarian's internal `nested_dir_keys` resolution list. The setting was correctly resolving to `MEDIA_DIR/HBCA` inside `HBCA.py` standalone, but failing with a `KeyError` when launched via the Antiquarian GUI.
 - **Archivist (census GEDCOM)**: a `NAME` line was being written as a direct child of a
   `SOUR` citation (both inside each person's own citation block and, duplicated one level
   shallower, inside `_TASK` records) - `NAME` isn't a legal `SOURCE_CITATION` child under
@@ -112,7 +112,7 @@ cleanup with no new functionality.
   `_FSFTID` tag, for both the census and church flavors - previously only the
   record/citation-level FamilySearch ark URL was ever emitted, so there was no actual link
   to the person's own FS Tree profile to begin with.
-- **Scriptorium (UI polish)**: primary action buttons (Generate GEDCOM, Run Script, Gather,
+- **Antiquarian (UI polish)**: primary action buttons (Generate GEDCOM, Run Script, Gather,
   Clear Cache, ...) passed a custom `fg_color` but no `text_color`, silently inheriting the
   theme's dark default text meant for its light default `fg_color` - near-black-on-green/
   red/blue read as "grayed out and disabled." All now set an explicit light `text_color`.
@@ -124,7 +124,7 @@ cleanup with no new functionality.
   handling directly. The pop-up console overlay now also measures the active tab's own
   bottom-docked action-button row (not just its header) and stops short of it, so a script
   can be re-run without first closing the console.
-- **Scriptorium (Global Settings)**: sections after the first (auto-expanded) one could
+- **Antiquarian (Global Settings)**: sections after the first (auto-expanded) one could
   render effectively dead - collapsed headers not responding to clicks, or responding only
   along a thin sliver near the arrow rather than across the whole row. Root-caused, not
   guessed at: wrapping each settings section in its own bordered `CTkFrame` ("card") left
@@ -145,7 +145,7 @@ cleanup with no new functionality.
   failing with `FileNotFoundError` right after a real gather succeeded.
 - **Voyageur (Ancestry/FamilySearch)**: `CENSUS_IMAGE_DIR` is a subfolder of the Base Media
   Directory (`MEDIA_DIR`), not of `PROGRAM_DIR` directly - both `A.py` and `FS.py` now
-  resolve this themselves, matching how Scriptorium.py's GUI already resolves it before
+  resolve this themselves, matching how Antiquarian.py's GUI already resolves it before
   launching either script as a subprocess. Confirmed live: running either script standalone
   (bypassing the GUI, which normally injects the fully-resolved path) previously put images
   in a stray folder at the program root instead of nested under the user's actual
@@ -184,11 +184,11 @@ cleanup with no new functionality.
 - **Paleographer + Archivist**: both now resolve their own settings (image directory,
   master DB filename, citation fields) from their own `.env` files via each record type's
   `field_remap` table (declared in `Parish.pmt`/`Scrip.pmt`'s front matter), with no
-  dependency on Scriptorium.py's GUI layer to bridge prefixed settings-tab names to the
+  dependency on Antiquarian.py's GUI layer to bridge prefixed settings-tab names to the
   generic names each script actually reads - fixes a real standalone-execution gap found
   during a function-by-function audit against the project's design specification.
 - PyCharm Run/Debug configurations for Voyageur (per source), Paleographer, Archivist, and
-  the Scriptorium GUI shell, so each can be launched standalone directly from the IDE.
+  the Antiquarian GUI shell, so each can be launched standalone directly from the IDE.
 - **Gazetteer**: Canadian place standardization, using the UNI-CEN Project's Census
   Division boundary shapefiles (`Gazetteer/CA_UNICEN_Counties/`, one file per census year
   1851-1921, gitignored like the existing US atlas - see that folder's own
@@ -315,7 +315,7 @@ cleanup with no new functionality.
   1850-1900") and `VOLUME_TITLE` (this specific volume's own label, e.g. "Volume 1"), into
   just `volume_title` - silently dropping `REGISTER_NAME` from the citation's `TITL` line
   and RootsMagic's `RegisterName` template field. Restored as its own `CHURCH_CONFIG` key
-  and Scriptorium settings field, matching the original GitHub-committed
+  and Antiquarian settings field, matching the original GitHub-committed
   `ChurchCreateGedcom.py`.
 - **Archivist (census)**: `build_census_citation`'s RM-flavor branch never emitted a
   `QUAY`/`_QUAL` citation-quality block at all (only the FTM branch had a bare `QUAY`); the
@@ -330,7 +330,7 @@ cleanup with no new functionality.
   always awaited each image fully before moving on). Reverted to sequential/awaited image
   downloads; the `pendingImageDownload` bookkeeping this required is removed as
   unnecessary once every download is already finished before the loop moves on.
-- **Voyageur (A, FS)**: downloaded filenames no longer carry a `Scriptorium_` prefix (now
+- **Voyageur (A, FS)**: downloaded filenames no longer carry a `Antiquarian_` prefix (now
   `MGS_`) - purely cosmetic, `A.py`/`FS.py`'s Downloads-folder scan updated to match.
 - **Archivist**: replaced the church-flavor GEDCOM builder's hardcoded `role_number` digit
   table (role "2" is always "Father", role "4" is always the marriage bride, a
@@ -440,10 +440,10 @@ cleanup with no new functionality.
 
 ### Cleanup
 Project-wide dead-code audit and pass across Voyageur.js, A.py, FS.py, MergedCensus.py,
-Archivist.py, and Scriptorium.py - removing artifacts left behind by earlier fix attempts
+Archivist.py, and Antiquarian.py - removing artifacts left behind by earlier fix attempts
 that were superseded but never cleaned up, plus a few real bugs the audit surfaced along
 the way:
-- **Scriptorium**: `GEDCOM_OUTPUT_NAME` was only ever set from `CHURCH_GEDCOM_NAME` inside
+- **Antiquarian**: `GEDCOM_OUTPUT_NAME` was only ever set from `CHURCH_GEDCOM_NAME` inside
   the `paleographer_api` mode (the AI transcription step, which never calls Archivist) and
   never in `gedcom_auto` (the only mode that does) - so clicking "Generate GEDCOM" on a
   church/scrip register always wrote to Archivist's module-level default filename instead
@@ -484,7 +484,7 @@ the way:
   (FamilySearch's census citation never exposes `film_number`, only `roll_number`), a
   redundant `pid` reassignment that was a no-op, and consolidated two identical
   `normalize_key`/`normalize_locator` functions into one.
-- **Scriptorium**: removed a dead `is_waiting_for_downloads` flag (assigned in three
+- **Antiquarian**: removed a dead `is_waiting_for_downloads` flag (assigned in three
   places, never read - the polling it once tracked moved into `A.py`/`FS.py` long ago), and
   renamed `PROGRAM_DIR_SENTINEL`'s value from `"PROGRAM_DIR"` (identical to the real
   settings key of the same name) to `"__PROGRAM_DIR__"` to remove the collision risk,
@@ -610,10 +610,10 @@ the way:
   in production (see git history) - no special permission grant to lose, and it always
   honors the exact name given. Chrome replaces `/` in a `download` attribute with `_`
   rather than creating a subfolder, so the intended subfolder is now baked into the
-  filename as a `Scriptorium_A_`/`Scriptorium_A_Images_`/`Scriptorium_FS_` prefix instead
+  filename as a `Antiquarian_A_`/`Antiquarian_A_Images_`/`Antiquarian_FS_` prefix instead
   of a real path - `A.py`/`FS.py` now scan the Downloads *root* for that prefix (stripped
   back off once found) rather than a dedicated subfolder.
-- **Scriptorium**: `_run_subprocess` treated any non-zero, non-cancel-looking exit code as
+- **Antiquarian**: `_run_subprocess` treated any non-zero, non-cancel-looking exit code as
   either "an error" or "cancelled", but on Windows `Popen.terminate()` and an unhandled
   Python exception both exit with code 1 - so a genuine crash (e.g. `A.py` failing partway
   through moving a file) was silently mislabeled "Task was cancelled by you" instead of
@@ -625,7 +625,7 @@ the way:
   Downloads staging folder. Both moves now retry up to 5 times with a short backoff.
 
 ### Added
-- **Scriptorium**: the Voyageur tab has a new "Gather and Send to Archivist" button - runs the
+- **Antiquarian**: the Voyageur tab has a new "Gather and Send to Archivist" button - runs the
   selected gather and, only if it finishes cleanly (not on error or cancellation),
   automatically runs Archivist's "Generate GEDCOM" right after, in one click.
   `execute_script` gained an optional `on_success` callback for this, invoked once a

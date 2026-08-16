@@ -432,7 +432,7 @@ git commit -m "feat(fs-gather): replace scrapeIndexRows with scrapeNamesPanel fo
 
 - [ ] **Step 1: Run a real gather against the reference record**
 
-With `Voyageur/.env`'s `FS_URL` set to the Rolette record URL, run `Voyageur/FS.py` standalone (`cd Voyageur && python FS.py`) or via Scriptorium's own Voyageur tab, letting the batch UI's "Start Auto-Batch" run for at least the 2-3 images starting at image 39, then "Stop & Download JSON".
+With `Voyageur/.env`'s `FS_URL` set to the Rolette record URL, run `Voyageur/FS.py` standalone (`cd Voyageur && python FS.py`) or via Antiquarian's own Voyageur tab, letting the batch UI's "Start Auto-Batch" run for at least the 2-3 images starting at image 39, then "Stop & Download JSON".
 
 Expected: a `FS - {collection}.json` file downloads with no console errors reported by the userscript's own toast notifications, and `item_id` `3:1:S3HY-67NL-ZP` (image 39) present with all households from Step 4 above.
 

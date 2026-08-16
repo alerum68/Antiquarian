@@ -1,9 +1,9 @@
 """
 Voyageur - thin dispatcher for the GUI's A/FS/LAC gather buttons.
 
-Scriptorium.py launches this as a subprocess with cwd=Voyageur/ and the source code
+Antiquarian.py launches this as a subprocess with cwd=Voyageur/ and the source code
 (A/FS/LAC) as sys.argv[1], so A/FS/LAC import as plain sibling modules and each
-provider's own main() sees exactly the CLI arguments Scriptorium.py meant for it.
+provider's own main() sees exactly the CLI arguments Antiquarian.py meant for it.
 """
 
 import sys

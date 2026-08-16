@@ -1,11 +1,11 @@
 import pytest
 
-import Scriptorium
-from Scriptorium import Scriptorium as ScriptoriumApp
+import Antiquarian
+from Antiquarian import Antiquarian as AntiquarianApp
 
 
 def test_visible_sections_includes_matching_provider_and_universal_gather_settings():
-    result = Scriptorium.Scriptorium._voyageur_visible_sections("Ancestry")
+    result = Antiquarian.Antiquarian._voyageur_visible_sections("Ancestry")
 
     assert set(result.keys()) == {"Ancestry", "Gather Settings"}
     assert "A_URL" in result["Ancestry"]
@@ -14,7 +14,7 @@ def test_visible_sections_includes_matching_provider_and_universal_gather_settin
 
 
 def test_visible_sections_excludes_other_providers():
-    result = Scriptorium.Scriptorium._voyageur_visible_sections("FamilySearch")
+    result = Antiquarian.Antiquarian._voyageur_visible_sections("FamilySearch")
 
     assert "Ancestry" not in result
     assert "LAC" not in result
@@ -25,7 +25,7 @@ def test_visible_sections_excludes_other_providers():
 def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
     """GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py never reads it, so
     it must not leak into LAC's section just because Gather Settings is always included."""
-    result = Scriptorium.Scriptorium._voyageur_visible_sections("LAC")
+    result = Antiquarian.Antiquarian._voyageur_visible_sections("LAC")
 
     assert set(result.keys()) == {"LAC", "Gather Settings"}
     assert "GATHER_ON_COLLISION" not in result["LAC"]
@@ -36,10 +36,10 @@ def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
 def app():
     import tkinter
     default_root = getattr(tkinter, "_default_root", None)
-    if default_root is not None and isinstance(default_root, ScriptoriumApp):
+    if default_root is not None and isinstance(default_root, AntiquarianApp):
         root = default_root
     else:
-        root = ScriptoriumApp()
+        root = AntiquarianApp()
     root.switch_tab("Voyageur")
     yield root
     root.withdraw()

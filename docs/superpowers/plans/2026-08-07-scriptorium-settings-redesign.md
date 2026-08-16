@@ -1,10 +1,10 @@
-# Scriptorium Settings/UI Redesign Implementation Plan
+# Antiquarian Settings/UI Redesign Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 > **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
 
-**Goal:** Replace `Scriptorium.py`'s six hardcoded, drifted `*_VARS`/`TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS` settings dicts with per-tool `settings_schema.yaml` files loaded by one generic function, fixing every confirmed drift bug (missing fields, the `LAC_ARCHIVAL_NUMBER` rename, stale help text) along the way.
+**Goal:** Replace `Antiquarian.py`'s six hardcoded, drifted `*_VARS`/`TOOLTIP_DESCRIPTIONS`/`FIELD_WIDGETS`/`PATH_PICKER_FIELDS`/`CUSTOM_LABELS` settings dicts with per-tool `settings_schema.yaml` files loaded by one generic function, fixing every confirmed drift bug (missing fields, the `LAC_ARCHIVAL_NUMBER` rename, stale help text) along the way.
 
 **Architecture:** Each of the six tools (`Archivist/`, `Voyageur/`, `Paleographer/`, `Registrar/`, `Gazetteer/`, `PDFix/`) gets its own `settings_schema.yaml`. A new module-level function, `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]`, reads one tool's YAML, returns the `{section: {key: default}}` shape `_build_form_ui` already consumes, and as a side effect merges that tool's tooltips/widgets/pickers/label-overrides into the shared module-level dicts. Each `*_VARS = {...}` literal becomes `*_VARS = _load_tool_schema(BASE_DIR / "ToolName")`. `GLOBAL_VARS` and `SCRIPT_PATHS` stay Python literals — they are cross-cutting, not tool-owned. `_build_form_ui`, `_build_segmented_field`, `_build_slider_field`, `_browse_for_path`, `ENV_TARGETS` need zero code changes: `ENV_TARGETS` is a literal list of `(NAME, subfolder)` tuples that already reference the `*_VARS` names by identifier, so it keeps working unchanged once those names hold loader output instead of dict literals.
 
@@ -12,10 +12,10 @@
 
 ## Global Constraints
 
-- **Migration scope is settings-only.** Field lists, tooltips, widget specs, path pickers, and labels move per-tool into YAML. Action buttons, dropdown wiring, help text (except the one confirmed stale Paleographer fix in Task 4), button gating, and the LAC debug-browser launcher stay hand-written in `Scriptorium.py`'s `_build_tab_*` methods — untouched by this plan.
+- **Migration scope is settings-only.** Field lists, tooltips, widget specs, path pickers, and labels move per-tool into YAML. Action buttons, dropdown wiring, help text (except the one confirmed stale Paleographer fix in Task 4), button gating, and the LAC debug-browser launcher stay hand-written in `Antiquarian.py`'s `_build_tab_*` methods — untouched by this plan.
 - **Fail loud.** A missing or malformed `settings_schema.yaml` raises at startup naming the file and the parse error — never renders a silently empty or partial form. `_load_tool_schema` raises `FileNotFoundError` (missing file), `RuntimeError` (malformed YAML), or `ValueError` (missing `sections` key, a section that isn't a mapping, or a field missing `default`) — every message names the schema file path.
 - **YAML values are always `str()`-coerced.** Only the `default` value is coerced immediately on load, closing YAML's implicit-typing footgun (`0.4`/`true` parsing as non-string) without needing defensive quoting in any YAML file. Widget numeric params (`min`/`max`/`step`) are NOT string-coerced — they stay native ints/floats, matching `_build_slider_field`'s existing math.
-- **`GLOBAL_VARS` and `SCRIPT_PATHS` never migrate.** They stay Python literals in `Scriptorium.py`. Their own entries in `TOOLTIP_DESCRIPTIONS`/`CUSTOM_LABELS`/`PATH_PICKER_FIELDS`/`FIELD_WIDGETS` are never touched by any task in this plan, including `CENSUS_IMAGE_DIR` (a `GLOBAL_VARS` key that happens to sit under a `# Archivist` comment in those dicts today).
+- **`GLOBAL_VARS` and `SCRIPT_PATHS` never migrate.** They stay Python literals in `Antiquarian.py`. Their own entries in `TOOLTIP_DESCRIPTIONS`/`CUSTOM_LABELS`/`PATH_PICKER_FIELDS`/`FIELD_WIDGETS` are never touched by any task in this plan, including `CENSUS_IMAGE_DIR` (a `GLOBAL_VARS` key that happens to sit under a `# Archivist` comment in those dicts today).
 - **Archivist keeps a flat form** — no Record-Type dropdown, rendered exactly like Registrar/Gazetteer/PDFix. This plan has no dependency on the separate, unimplemented Archivist structural-split plan.
 - **No changes to Commissioner** — it has no UI and no `os.getenv` calls.
 - **Sidebar/tab grouping is unchanged.**
@@ -26,12 +26,12 @@
 ## File Structure
 
 - **Create:** `Archivist/settings_schema.yaml`, `Voyageur/settings_schema.yaml`, `Paleographer/settings_schema.yaml`, `Registrar/settings_schema.yaml`, `Gazetteer/settings_schema.yaml`, `PDFix/settings_schema.yaml` — one per tool, each with a top-level `sections:` key (section name → field name → `{default, tooltip?, widget?, picker?}`) and an optional top-level `label_overrides:` key (field name → display label).
-- **Modify:** `Scriptorium.py` — add `_load_tool_schema`; relocate `TOOLTIP_DESCRIPTIONS`/`CUSTOM_LABELS`/`PROGRAM_DIR_SENTINEL`/`TOOLBOX_DIR_SENTINEL`/filetypes constants/`PATH_PICKER_FIELDS`/`FIELD_WIDGETS` to sit between `GLOBAL_VARS` and `ARCHIVIST_VARS`; replace each of the six `*_VARS` literals with a `_load_tool_schema()` call and trim that tool's entries out of the four shared dicts; fix the stale Paleographer help text; delete the now-dead `RMTREE_FILETYPES`/`JSON_FILETYPES`/`GED_FILETYPES`/`SHP_FILETYPES` constants once nothing references them.
+- **Modify:** `Antiquarian.py` — add `_load_tool_schema`; relocate `TOOLTIP_DESCRIPTIONS`/`CUSTOM_LABELS`/`PROGRAM_DIR_SENTINEL`/`TOOLBOX_DIR_SENTINEL`/filetypes constants/`PATH_PICKER_FIELDS`/`FIELD_WIDGETS` to sit between `GLOBAL_VARS` and `ARCHIVIST_VARS`; replace each of the six `*_VARS` literals with a `_load_tool_schema()` call and trim that tool's entries out of the four shared dicts; fix the stale Paleographer help text; delete the now-dead `RMTREE_FILETYPES`/`JSON_FILETYPES`/`GED_FILETYPES`/`SHP_FILETYPES` constants once nothing references them.
 - **Modify:** `Paleographer/prompts/Parish.pmt`, `Paleographer/prompts/Scrip.pmt` — add the new `"AGY CLI"` section to each file's `settings_sections:` list, so the two new Paleographer fields (owned by `Extract.py`, used by both record types) aren't silently hidden by the existing per-record-type section filter.
 - **Delete:** `Registrar/schema_ui_map.py` — dead, unimported scaffolding; its `UI_SCHEMA_MAPPINGS` descriptions are harvested into Registrar's new YAML tooltips in Task 5, then the file is removed.
 - **Create:** `tests/test_load_tool_schema.py` — pure-function unit tests for the loader against small YAML fixtures.
 - **Create:** `tests/test_settings_schema_completeness.py` — per-tool regression test: greps each tool's own source for every `os.getenv`/`os.environ.get` key and asserts it exists in that tool's `settings_schema.yaml`.
-- **Create:** `tests/test_scriptorium_settings_migration.py` — one assertion per tool (Tasks 2–7) that `_load_tool_schema` on the real, committed YAML reproduces the exact `{section: {key: default}}` shape the old hardcoded dict used to provide (plus the debt-fix additions).
+- **Create:** `tests/test_antiquarian_settings_migration.py` — one assertion per tool (Tasks 2–7) that `_load_tool_schema` on the real, committed YAML reproduces the exact `{section: {key: default}}` shape the old hardcoded dict used to provide (plus the debt-fix additions).
 
 ---
 
@@ -40,11 +40,11 @@
 Purely additive: adds the function and its dedicated test file. No `*_VARS` assignment changes yet, so nothing in the app's runtime behavior changes in this task.
 
 **Files:**
-- Modify: `Scriptorium.py` (insert after the `FIELD_WIDGETS = {...}` dict, which currently ends at line 435, and before the `# CUSTOM WIDGET CLASSES` comment at line 438)
+- Modify: `Antiquarian.py` (insert after the `FIELD_WIDGETS = {...}` dict, which currently ends at line 435, and before the `# CUSTOM WIDGET CLASSES` comment at line 438)
 - Test: `tests/test_load_tool_schema.py`
 
 **Interfaces:**
-- Produces: `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]`, a module-level function (not a method) in `Scriptorium.py`. Reachable in tests as `Scriptorium._load_tool_schema` after `import Scriptorium`. Raises `FileNotFoundError`/`RuntimeError`/`ValueError` as described in Global Constraints. Side effect: mutates the module globals `TOOLTIP_DESCRIPTIONS`, `CUSTOM_LABELS`, `PATH_PICKER_FIELDS`, `FIELD_WIDGETS` via `.update()`/item-assignment (never reassigns them, so existing references stay valid).
+- Produces: `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]`, a module-level function (not a method) in `Antiquarian.py`. Reachable in tests as `Antiquarian._load_tool_schema` after `import Antiquarian`. Raises `FileNotFoundError`/`RuntimeError`/`ValueError` as described in Global Constraints. Side effect: mutates the module globals `TOOLTIP_DESCRIPTIONS`, `CUSTOM_LABELS`, `PATH_PICKER_FIELDS`, `FIELD_WIDGETS` via `.update()`/item-assignment (never reassigns them, so existing references stay valid).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -55,7 +55,7 @@ import textwrap
 
 import pytest
 
-import Scriptorium
+import Antiquarian
 
 
 @pytest.fixture(autouse=True)
@@ -63,19 +63,19 @@ def _restore_shared_dicts():
     """_load_tool_schema mutates shared module-level dicts as a side effect - snapshot and
     restore them around every test so tests can't pollute each other or the real schema
     state loaded at import time."""
-    tooltip_before = dict(Scriptorium.TOOLTIP_DESCRIPTIONS)
-    labels_before = dict(Scriptorium.CUSTOM_LABELS)
-    pickers_before = dict(Scriptorium.PATH_PICKER_FIELDS)
-    widgets_before = dict(Scriptorium.FIELD_WIDGETS)
+    tooltip_before = dict(Antiquarian.TOOLTIP_DESCRIPTIONS)
+    labels_before = dict(Antiquarian.CUSTOM_LABELS)
+    pickers_before = dict(Antiquarian.PATH_PICKER_FIELDS)
+    widgets_before = dict(Antiquarian.FIELD_WIDGETS)
     yield
-    Scriptorium.TOOLTIP_DESCRIPTIONS.clear()
-    Scriptorium.TOOLTIP_DESCRIPTIONS.update(tooltip_before)
-    Scriptorium.CUSTOM_LABELS.clear()
-    Scriptorium.CUSTOM_LABELS.update(labels_before)
-    Scriptorium.PATH_PICKER_FIELDS.clear()
-    Scriptorium.PATH_PICKER_FIELDS.update(pickers_before)
-    Scriptorium.FIELD_WIDGETS.clear()
-    Scriptorium.FIELD_WIDGETS.update(widgets_before)
+    Antiquarian.TOOLTIP_DESCRIPTIONS.clear()
+    Antiquarian.TOOLTIP_DESCRIPTIONS.update(tooltip_before)
+    Antiquarian.CUSTOM_LABELS.clear()
+    Antiquarian.CUSTOM_LABELS.update(labels_before)
+    Antiquarian.PATH_PICKER_FIELDS.clear()
+    Antiquarian.PATH_PICKER_FIELDS.update(pickers_before)
+    Antiquarian.FIELD_WIDGETS.clear()
+    Antiquarian.FIELD_WIDGETS.update(widgets_before)
 
 
 def test_load_tool_schema_basic_shape(tmp_path):
@@ -89,7 +89,7 @@ def test_load_tool_schema_basic_shape(tmp_path):
               default: 0.4
         """), encoding="utf-8")
 
-    result = Scriptorium._load_tool_schema(tmp_path)
+    result = Antiquarian._load_tool_schema(tmp_path)
 
     assert result == {"Section One": {"FIELD_A": "hello", "FIELD_B": "0.4"}}
 
@@ -106,7 +106,7 @@ def test_load_tool_schema_str_coerces_yaml_typed_defaults(tmp_path):
               default: 0.4
         """), encoding="utf-8")
 
-    result = Scriptorium._load_tool_schema(tmp_path)
+    result = Antiquarian._load_tool_schema(tmp_path)
 
     assert result == {"Section One": {"BOOL_FIELD": "True", "INT_FIELD": "3", "FLOAT_FIELD": "0.4"}}
     assert all(isinstance(v, str) for v in result["Section One"].values())
@@ -121,9 +121,9 @@ def test_load_tool_schema_merges_tooltip_into_shared_dict(tmp_path):
               tooltip: "Explains FIELD_A."
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Antiquarian._load_tool_schema(tmp_path)
 
-    assert Scriptorium.TOOLTIP_DESCRIPTIONS["FIELD_A"] == "Explains FIELD_A."
+    assert Antiquarian.TOOLTIP_DESCRIPTIONS["FIELD_A"] == "Explains FIELD_A."
 
 
 def test_load_tool_schema_merges_widget_into_shared_dict(tmp_path):
@@ -143,17 +143,17 @@ def test_load_tool_schema_merges_widget_into_shared_dict(tmp_path):
               suffix: "s"
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Antiquarian._load_tool_schema(tmp_path)
 
-    assert Scriptorium.FIELD_WIDGETS["LEVEL"] == {
+    assert Antiquarian.FIELD_WIDGETS["LEVEL"] == {
         "type": "segmented",
         "options": [("0", "Low"), ("1", "Medium"), ("2", "High")],
     }
-    assert Scriptorium.FIELD_WIDGETS["AMOUNT"] == {
+    assert Antiquarian.FIELD_WIDGETS["AMOUNT"] == {
         "type": "slider", "min": 0, "max": 5, "step": 0.1, "suffix": "s",
     }
-    assert isinstance(Scriptorium.FIELD_WIDGETS["AMOUNT"]["min"], int)
-    assert isinstance(Scriptorium.FIELD_WIDGETS["AMOUNT"]["step"], float)
+    assert isinstance(Antiquarian.FIELD_WIDGETS["AMOUNT"]["min"], int)
+    assert isinstance(Antiquarian.FIELD_WIDGETS["AMOUNT"]["step"], float)
 
 
 def test_load_tool_schema_merges_picker_into_shared_dict(tmp_path):
@@ -169,9 +169,9 @@ def test_load_tool_schema_merges_picker_into_shared_dict(tmp_path):
                 filetypes: [["GEDCOM files", "*.ged"], ["All files", "*.*"]]
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Antiquarian._load_tool_schema(tmp_path)
 
-    assert Scriptorium.PATH_PICKER_FIELDS["OUT_FILE"] == {
+    assert Antiquarian.PATH_PICKER_FIELDS["OUT_FILE"] == {
         "kind": "save",
         "base_dir_key": "__PROGRAM_DIR__",
         "defaultextension": ".ged",
@@ -189,28 +189,28 @@ def test_load_tool_schema_merges_label_overrides_into_shared_dict(tmp_path):
           SOME_FIELD: "A Nicer Label"
         """), encoding="utf-8")
 
-    Scriptorium._load_tool_schema(tmp_path)
+    Antiquarian._load_tool_schema(tmp_path)
 
-    assert Scriptorium.CUSTOM_LABELS["SOME_FIELD"] == "A Nicer Label"
+    assert Antiquarian.CUSTOM_LABELS["SOME_FIELD"] == "A Nicer Label"
 
 
 def test_load_tool_schema_missing_file_raises_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Antiquarian._load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_malformed_yaml_raises_runtime_error(tmp_path):
     (tmp_path / "settings_schema.yaml").write_text("sections: [this is not: valid: yaml", encoding="utf-8")
 
     with pytest.raises(RuntimeError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Antiquarian._load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_missing_sections_key_raises_value_error(tmp_path):
     (tmp_path / "settings_schema.yaml").write_text("foo: bar\n", encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Antiquarian._load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_section_not_a_mapping_raises_value_error(tmp_path):
@@ -220,7 +220,7 @@ def test_load_tool_schema_section_not_a_mapping_raises_value_error(tmp_path):
         """), encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Antiquarian._load_tool_schema(tmp_path)
 
 
 def test_load_tool_schema_field_missing_default_raises_value_error(tmp_path):
@@ -232,15 +232,15 @@ def test_load_tool_schema_field_missing_default_raises_value_error(tmp_path):
         """), encoding="utf-8")
 
     with pytest.raises(ValueError):
-        Scriptorium._load_tool_schema(tmp_path)
+        Antiquarian._load_tool_schema(tmp_path)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `pytest tests/test_load_tool_schema.py -v`
-Expected: every test FAILs with `AttributeError: module 'Scriptorium' has no attribute '_load_tool_schema'`.
+Expected: every test FAILs with `AttributeError: module 'Antiquarian' has no attribute '_load_tool_schema'`.
 
-- [ ] **Step 3: Add `_load_tool_schema` to `Scriptorium.py`**
+- [ ] **Step 3: Add `_load_tool_schema` to `Antiquarian.py`**
 
 Insert this immediately after the `FIELD_WIDGETS = {...}` dict's closing `}` (currently line 435), before the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment block (currently line 438):
 
@@ -312,7 +312,7 @@ Expected: all 11 tests PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Scriptorium.py tests/test_load_tool_schema.py
+git add Antiquarian.py tests/test_load_tool_schema.py
 git commit -m "Add generic per-tool settings schema loader"
 ```
 
@@ -324,8 +324,8 @@ This is the first tool migrated, so it also performs the one-time relocation thi
 
 **Files:**
 - Create: `Archivist/settings_schema.yaml`
-- Modify: `Scriptorium.py`
-- Test: `tests/test_scriptorium_settings_migration.py` (new file, this task adds its first test)
+- Modify: `Antiquarian.py`
+- Test: `tests/test_antiquarian_settings_migration.py` (new file, this task adds its first test)
 
 **Interfaces:**
 - Consumes: `_load_tool_schema(tool_dir: Path) -> Dict[str, Dict[str, str]]` from Task 1.
@@ -333,18 +333,18 @@ This is the first tool migrated, so it also performs the one-time relocation thi
 
 - [ ] **Step 1: Write the failing migration test**
 
-Create `tests/test_scriptorium_settings_migration.py`:
+Create `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 from pathlib import Path
 
-import Scriptorium
+import Antiquarian
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 def test_archivist_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Archivist")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Archivist")
 
     assert result == {
         "Which JSON to Build From": {"JSON_FILE": ""},
@@ -366,7 +366,7 @@ def test_archivist_schema_matches_expected_shape():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py -v`
 Expected: FAIL with `FileNotFoundError` (no `Archivist/settings_schema.yaml` yet).
 
 - [ ] **Step 3: Create `Archivist/settings_schema.yaml`**
@@ -465,7 +465,7 @@ label_overrides:
 
 - [ ] **Step 4: Relocate the four shared dicts (and their supporting constants) to sit before `ARCHIVIST_VARS`, trimmed of Archivist's own entries**
 
-In `Scriptorium.py`, cut the entire block starting at `# ==========================================` / `# TOOLTIP DESCRIPTIONS` (currently line 172) through the end of the `_load_tool_schema` function added in Task 1 (the blank line right after its closing `return result`) — this is everything currently between `ENV_TARGETS = [...]` and the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment. Delete it from that location.
+In `Antiquarian.py`, cut the entire block starting at `# ==========================================` / `# TOOLTIP DESCRIPTIONS` (currently line 172) through the end of the `_load_tool_schema` function added in Task 1 (the blank line right after its closing `return result`) — this is everything currently between `ENV_TARGETS = [...]` and the `# ==========================================` / `# CUSTOM WIDGET CLASSES` comment. Delete it from that location.
 
 Paste it back in, trimmed of Archivist's own keys, immediately after `GLOBAL_VARS = {...}`'s closing `}` (currently line 90) and before `ARCHIVIST_VARS = {...}` (currently line 92):
 
@@ -475,7 +475,7 @@ Paste it back in, trimmed of Archivist's own keys, immediately after `GLOBAL_VAR
 # TOOLTIP DESCRIPTIONS
 # ==========================================
 TOOLTIP_DESCRIPTIONS = {  # Global Settings
-    "PROGRAM_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
+    "PROGRAM_DIR": "Your single base Genealogy folder. Everything else, including the Antiquarian code, your "
                    "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
                    "this one folder.",
     "EXTRACTION_ENGINE": "Which backend performs the AI extraction. 'AGY CLI' shells out to the agy CLI - "
@@ -529,7 +529,7 @@ CUSTOM_LABELS = {
 # start in: another field's key (resolved against PROGRAM_DIR, same as execute_script does),
 # or one of the two sentinels below.
 PROGRAM_DIR_SENTINEL = "__PROGRAM_DIR__"  # Distinct from the real "PROGRAM_DIR" settings key
-TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Scriptorium code folder itself (BASE_DIR).
+TOOLBOX_DIR_SENTINEL = "__TOOLBOX_DIR__"  # The Antiquarian code folder itself (BASE_DIR).
 
 PATH_PICKER_FIELDS = {
     # Global: Directories (folders, relative to PROGRAM_DIR unless absolute)
@@ -647,22 +647,22 @@ Where the `# TOOLTIP DESCRIPTIONS` block used to sit (originally right after `EN
 
 - [ ] **Step 7: Run the app's existing test to confirm nothing broke**
 
-Run: `pytest tests/test_scriptorium_paleographer_gating.py -v`
-Expected: both tests still PASS (Paleographer isn't migrated yet in this task, so this is a regression check on the reorder itself — if `Scriptorium.py` fails to import, both tests error immediately).
+Run: `pytest tests/test_antiquarian_paleographer_gating.py -v`
+Expected: both tests still PASS (Paleographer isn't migrated yet in this task, so this is a regression check on the reorder itself — if `Antiquarian.py` fails to import, both tests error immediately).
 
 - [ ] **Step 8: Run the migration test to verify it passes**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py -v`
 Expected: `test_archivist_schema_matches_expected_shape` PASSES.
 
 - [ ] **Step 9: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Archivist tab, confirm all four sections render (including the new "Citation & Role Vocabulary" section with its five fields), confirm the age-gap sliders still work, confirm "Downloaded JSON File Name" still shows as `JSON_FILE`'s label with its Browse button, save, and confirm `Archivist/.env` gets the new keys with their defaults.
+Launch `python Antiquarian.py`, open the Archivist tab, confirm all four sections render (including the new "Citation & Role Vocabulary" section with its five fields), confirm the age-gap sliders still work, confirm "Downloaded JSON File Name" still shows as `JSON_FILE`'s label with its Browse button, save, and confirm `Archivist/.env` gets the new keys with their defaults.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add Scriptorium.py Archivist/settings_schema.yaml tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py Archivist/settings_schema.yaml tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate Archivist settings to settings_schema.yaml, add missing citation/location fields"
 ```
 
@@ -674,8 +674,8 @@ Fixes the confirmed `LAC_HARVEST_ARCHIVAL_NUMBER` bug — `LAC.py` line 50 actua
 
 **Files:**
 - Create: `Voyageur/settings_schema.yaml`
-- Modify: `Scriptorium.py`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `Antiquarian.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
 **Interfaces:**
 - Consumes: `_load_tool_schema` (Task 1).
@@ -683,11 +683,11 @@ Fixes the confirmed `LAC_HARVEST_ARCHIVAL_NUMBER` bug — `LAC.py` line 50 actua
 
 - [ ] **Step 1: Write the failing migration test**
 
-Append to `tests/test_scriptorium_settings_migration.py`:
+Append to `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 def test_voyageur_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Voyageur")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Voyageur")
 
     assert result == {
         "Gather Settings": {"VOYAGEUR_SOURCE": ""},
@@ -704,7 +704,7 @@ def test_voyageur_schema_matches_expected_shape():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py::test_voyageur_schema_matches_expected_shape -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py::test_voyageur_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
 - [ ] **Step 3: Create `Voyageur/settings_schema.yaml`**
@@ -805,7 +805,7 @@ label_overrides:
   FS_URL: "FamilySearch Record URL"
 ```
 
-- [ ] **Step 4: Trim Voyageur's entries out of the four shared dicts in `Scriptorium.py`**
+- [ ] **Step 4: Trim Voyageur's entries out of the four shared dicts in `Antiquarian.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete these entries (the `# LAC & Scrip Enrichment` group's LAC-only lines, plus the `# Voyageur (Gather step)` group):
 
@@ -874,17 +874,17 @@ VOYAGEUR_VARS = _load_tool_schema(BASE_DIR / "Voyageur")
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py tests/test_antiquarian_paleographer_gating.py -v`
 Expected: all PASS.
 
 - [ ] **Step 7: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Voyageur tab, confirm the LAC section shows all 8 fields including the 3 new ones, save, and confirm `Voyageur/.env` now has `LAC_ARCHIVAL_NUMBER` (not `LAC_HARVEST_ARCHIVAL_NUMBER`) plus the three new keys.
+Launch `python Antiquarian.py`, open the Voyageur tab, confirm the LAC section shows all 8 fields including the 3 new ones, save, and confirm `Voyageur/.env` now has `LAC_ARCHIVAL_NUMBER` (not `LAC_HARVEST_ARCHIVAL_NUMBER`) plus the three new keys.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Scriptorium.py Voyageur/settings_schema.yaml tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py Voyageur/settings_schema.yaml tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate Voyageur settings to settings_schema.yaml, fix LAC_ARCHIVAL_NUMBER rename bug"
 ```
 
@@ -892,13 +892,13 @@ git commit -m "Migrate Voyageur settings to settings_schema.yaml, fix LAC_ARCHIV
 
 ### Task 4: Migrate Paleographer to `settings_schema.yaml` + fix stale help text
 
-Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"`, matching `agy_client.DEFAULT_CLI_BIN`) and `AGY_TIMEOUT_SECONDS` (`Extract.py` line 273, default `"240"`, matching `agy_client.DEFAULT_TIMEOUT_SECONDS`) were missing from the UI. These are read by the shared `Extract.py` module used by BOTH the Parish and Scrip record-type flows, so the new "AGY CLI" section must be visible for both — meaning `Parish.pmt` and `Scrip.pmt`'s own `settings_sections:` front-matter lists (which `_get_pmt_settings_sections` uses to filter which `PALEOGRAPHER_VARS` sections show per record type) both need the new section name added, or the fields would be silently invisible in the GUI for every record type. Also fixes the confirmed stale help text: it currently only mentions "Enrich Metadata"/"Partition Collections" but the tab has a third button, "Resolve Names" (`Scriptorium.py` line 1584-1587), that the help text never mentions.
+Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"`, matching `agy_client.DEFAULT_CLI_BIN`) and `AGY_TIMEOUT_SECONDS` (`Extract.py` line 273, default `"240"`, matching `agy_client.DEFAULT_TIMEOUT_SECONDS`) were missing from the UI. These are read by the shared `Extract.py` module used by BOTH the Parish and Scrip record-type flows, so the new "AGY CLI" section must be visible for both — meaning `Parish.pmt` and `Scrip.pmt`'s own `settings_sections:` front-matter lists (which `_get_pmt_settings_sections` uses to filter which `PALEOGRAPHER_VARS` sections show per record type) both need the new section name added, or the fields would be silently invisible in the GUI for every record type. Also fixes the confirmed stale help text: it currently only mentions "Enrich Metadata"/"Partition Collections" but the tab has a third button, "Resolve Names" (`Antiquarian.py` line 1584-1587), that the help text never mentions.
 
 **Files:**
 - Create: `Paleographer/settings_schema.yaml`
-- Modify: `Scriptorium.py` (settings migration + help text fix)
+- Modify: `Antiquarian.py` (settings migration + help text fix)
 - Modify: `Paleographer/prompts/Parish.pmt`, `Paleographer/prompts/Scrip.pmt`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
 **Interfaces:**
 - Consumes: `_load_tool_schema` (Task 1).
@@ -906,11 +906,11 @@ Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"
 
 - [ ] **Step 1: Write the failing migration test**
 
-Append to `tests/test_scriptorium_settings_migration.py`:
+Append to `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 def test_paleographer_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Paleographer")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
         "AGY CLI": {"AGY_CLI_BIN": "agy", "AGY_TIMEOUT_SECONDS": "240"},
@@ -947,7 +947,7 @@ def test_paleographer_schema_matches_expected_shape():
 
 
 def test_paleographer_help_text_mentions_resolve_names():
-    assert "Resolve Names" in Scriptorium.Scriptorium.__dict__ or True  # placeholder removed below
+    assert "Resolve Names" in Antiquarian.Antiquarian.__dict__ or True  # placeholder removed below
 ```
 
 Remove that last placeholder test immediately — it isn't real. Replace it with an actual assertion against the constructed app's `help_texts` dict:
@@ -955,7 +955,7 @@ Remove that last placeholder test immediately — it isn't real. Replace it with
 ```python
 def test_paleographer_help_text_mentions_resolve_names():
     import customtkinter as ctk
-    root = Scriptorium.Scriptorium()
+    root = Antiquarian.Antiquarian()
     try:
         assert "Resolve Names" in root.help_texts["Paleographer"]
     finally:
@@ -964,7 +964,7 @@ def test_paleographer_help_text_mentions_resolve_names():
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py::test_paleographer_schema_matches_expected_shape tests/test_scriptorium_settings_migration.py::test_paleographer_help_text_mentions_resolve_names -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py::test_paleographer_schema_matches_expected_shape tests/test_antiquarian_settings_migration.py::test_paleographer_help_text_mentions_resolve_names -v`
 Expected: the schema test FAILs with `FileNotFoundError`; the help-text test FAILs with `AssertionError` (current text only mentions "Enrich Metadata"/"Partition Collections").
 
 - [ ] **Step 3: Create `Paleographer/settings_schema.yaml`**
@@ -1135,7 +1135,7 @@ settings_sections:
   - "Scrip Information"
 ```
 
-- [ ] **Step 5: Trim Paleographer's entries out of the four shared dicts in `Scriptorium.py`**
+- [ ] **Step 5: Trim Paleographer's entries out of the four shared dicts in `Antiquarian.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the Scrip-only lines from the `# LAC & Scrip Enrichment` group:
 
@@ -1291,17 +1291,17 @@ to:
 
 - [ ] **Step 8: Run tests to verify they pass**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py tests/test_antiquarian_paleographer_gating.py -v`
 Expected: all PASS, including the two new Paleographer tests from Step 1.
 
 - [ ] **Step 9: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Paleographer tab, switch the Record Type dropdown between `Parish.pmt` and `Scrip.pmt`, and for each confirm the "AGY CLI" section now appears alongside that type's usual sections. Click the ⓘ help icon and confirm the updated text mentions Resolve Names.
+Launch `python Antiquarian.py`, open the Paleographer tab, switch the Record Type dropdown between `Parish.pmt` and `Scrip.pmt`, and for each confirm the "AGY CLI" section now appears alongside that type's usual sections. Click the ⓘ help icon and confirm the updated text mentions Resolve Names.
 
 - [ ] **Step 10: Commit**
 
 ```bash
-git add Scriptorium.py Paleographer/settings_schema.yaml Paleographer/prompts/Parish.pmt Paleographer/prompts/Scrip.pmt tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py Paleographer/settings_schema.yaml Paleographer/prompts/Parish.pmt Paleographer/prompts/Scrip.pmt tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate Paleographer settings to settings_schema.yaml, add AGY_CLI_BIN/AGY_TIMEOUT_SECONDS, fix stale help text"
 ```
 
@@ -1313,9 +1313,9 @@ No missing fields (all 8 already represented), but harvests `Registrar/schema_ui
 
 **Files:**
 - Create: `Registrar/settings_schema.yaml`
-- Modify: `Scriptorium.py`
+- Modify: `Antiquarian.py`
 - Delete: `Registrar/schema_ui_map.py`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
 **Interfaces:**
 - Consumes: `_load_tool_schema` (Task 1).
@@ -1323,11 +1323,11 @@ No missing fields (all 8 already represented), but harvests `Registrar/schema_ui
 
 - [ ] **Step 1: Write the failing migration test**
 
-Append to `tests/test_scriptorium_settings_migration.py`:
+Append to `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 def test_registrar_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Registrar")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Registrar")
 
     assert result == {
         "File Paths (Relative to RootsMagic Dir)": {"REGISTRAR_RM_DATABASE": "Your Tree.rmtree"},
@@ -1344,7 +1344,7 @@ def test_registrar_schema_matches_expected_shape():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py::test_registrar_schema_matches_expected_shape -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py::test_registrar_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
 - [ ] **Step 3: Create `Registrar/settings_schema.yaml`**
@@ -1402,7 +1402,7 @@ label_overrides:
   REGISTRAR_RM_DATABASE: "RootsMagic Database Path"
 ```
 
-- [ ] **Step 4: Trim Registrar's entries out of the four shared dicts in `Scriptorium.py`**
+- [ ] **Step 4: Trim Registrar's entries out of the four shared dicts in `Antiquarian.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# Registrar` group:
 
@@ -1484,17 +1484,17 @@ git rm Registrar/schema_ui_map.py
 
 - [ ] **Step 7: Run tests to verify they pass**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py tests/test_antiquarian_paleographer_gating.py -v`
 Expected: all PASS.
 
 - [ ] **Step 8: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Registrar tab, hover each field's ⓘ icon and confirm the new, more specific tooltip text shows, confirm the four sliders and the file picker still work, save.
+Launch `python Antiquarian.py`, open the Registrar tab, hover each field's ⓘ icon and confirm the new, more specific tooltip text shows, confirm the four sliders and the file picker still work, save.
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add Scriptorium.py Registrar/settings_schema.yaml tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py Registrar/settings_schema.yaml tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate Registrar settings to settings_schema.yaml, harvest tooltips from schema_ui_map.py, delete dead file"
 ```
 
@@ -1506,8 +1506,8 @@ No missing fields — a straightforward move.
 
 **Files:**
 - Create: `Gazetteer/settings_schema.yaml`
-- Modify: `Scriptorium.py`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `Antiquarian.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
 **Interfaces:**
 - Consumes: `_load_tool_schema` (Task 1).
@@ -1515,16 +1515,16 @@ No missing fields — a straightforward move.
 
 - [ ] **Step 1: Write the failing migration test**
 
-Append to `tests/test_scriptorium_settings_migration.py`:
+Append to `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 def test_gazetteer_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "Gazetteer")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "Gazetteer")
 
     assert result == {
         "File Paths": {
             "GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
-            "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
+            "GAZETTEER_SHAPEFILE": "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/"
                                     "US_HistCounties_Shapefile/US_HistCounties.shp",
         },
         "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"},
@@ -1533,7 +1533,7 @@ def test_gazetteer_schema_matches_expected_shape():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py::test_gazetteer_schema_matches_expected_shape -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py::test_gazetteer_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
 - [ ] **Step 3: Create `Gazetteer/settings_schema.yaml`**
@@ -1549,7 +1549,7 @@ sections:
         base_dir_key: "RM_DIR"
         filetypes: [["RootsMagic files", "*.rmtree"], ["All files", "*.*"]]
     GAZETTEER_SHAPEFILE:
-      default: "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp"
+      default: "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp"
       tooltip: "The path to the Newberry Atlas '.shp' file containing historical county boundaries. Relative to your Program Dir (it ships alongside the Gazetteer tool), not the RootsMagic folder."
       picker:
         kind: open
@@ -1568,7 +1568,7 @@ label_overrides:
   GAZETTEER_RM_DATABASE: "RootsMagic Database Path"
 ```
 
-- [ ] **Step 4: Trim Gazetteer's entries out of the four shared dicts in `Scriptorium.py`**
+- [ ] **Step 4: Trim Gazetteer's entries out of the four shared dicts in `Antiquarian.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# Gazetteer` group:
 
@@ -1612,7 +1612,7 @@ Old:
 
 ```python
 GAZETTEER_VARS = {"File Paths": {"GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
-                                 "GAZETTEER_SHAPEFILE": "Scriptorium/Gazetteer/Reference/US_AtlasHCB_Counties/"
+                                 "GAZETTEER_SHAPEFILE": "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/"
                                  "US_HistCounties_Shapefile/US_HistCounties.shp"},
                   "Settings": {"GAZETTEER_DEBUG_MODE": "False", "GAZETTEER_CREATE_BACKUP": "True"}}
 ```
@@ -1625,17 +1625,17 @@ GAZETTEER_VARS = _load_tool_schema(BASE_DIR / "Gazetteer")
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py tests/test_antiquarian_paleographer_gating.py -v`
 Expected: all PASS.
 
 - [ ] **Step 7: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Gazetteer tab, confirm both toggles and both file pickers still work, confirm the RootsMagic database field shows the "RootsMagic Database Path" label, save.
+Launch `python Antiquarian.py`, open the Gazetteer tab, confirm both toggles and both file pickers still work, confirm the RootsMagic database field shows the "RootsMagic Database Path" label, save.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Scriptorium.py Gazetteer/settings_schema.yaml tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py Gazetteer/settings_schema.yaml tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate Gazetteer settings to settings_schema.yaml"
 ```
 
@@ -1647,8 +1647,8 @@ No missing fields — a straightforward move, and the last of the six tools.
 
 **Files:**
 - Create: `PDFix/settings_schema.yaml`
-- Modify: `Scriptorium.py`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `Antiquarian.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
 **Interfaces:**
 - Consumes: `_load_tool_schema` (Task 1).
@@ -1656,11 +1656,11 @@ No missing fields — a straightforward move, and the last of the six tools.
 
 - [ ] **Step 1: Write the failing migration test**
 
-Append to `tests/test_scriptorium_settings_migration.py`:
+Append to `tests/test_antiquarian_settings_migration.py`:
 
 ```python
 def test_pdfix_schema_matches_expected_shape():
-    result = Scriptorium._load_tool_schema(BASE_DIR / "PDFix")
+    result = Antiquarian._load_tool_schema(BASE_DIR / "PDFix")
 
     assert result == {
         "Scan Settings": {
@@ -1672,7 +1672,7 @@ def test_pdfix_schema_matches_expected_shape():
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py::test_pdfix_schema_matches_expected_shape -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py::test_pdfix_schema_matches_expected_shape -v`
 Expected: FAIL with `FileNotFoundError`.
 
 - [ ] **Step 3: Create `PDFix/settings_schema.yaml`**
@@ -1712,7 +1712,7 @@ label_overrides:
   PDFIX_TARGET_DIR: "PDF Scan Folder"
 ```
 
-- [ ] **Step 4: Trim PDFix's entries out of the four shared dicts in `Scriptorium.py`**
+- [ ] **Step 4: Trim PDFix's entries out of the four shared dicts in `Antiquarian.py`**
 
 In `TOOLTIP_DESCRIPTIONS`, delete the entire `# PDFix` group (the last group in the dict):
 
@@ -1788,17 +1788,17 @@ PDFIX_VARS = _load_tool_schema(BASE_DIR / "PDFix")
 
 - [ ] **Step 6: Run tests to verify they pass**
 
-Run: `pytest tests/test_scriptorium_settings_migration.py tests/test_scriptorium_paleographer_gating.py -v`
+Run: `pytest tests/test_antiquarian_settings_migration.py tests/test_antiquarian_paleographer_gating.py -v`
 Expected: all PASS. All 6 migration tests (Archivist, Voyageur, Paleographer, Registrar, Gazetteer, PDFix) plus the Paleographer help-text test now pass.
 
 - [ ] **Step 7: Manual click-through**
 
-Launch `python Scriptorium.py`, click through all 7 tabs (6 tools + Global Settings) once, confirming every field, tooltip, toggle, slider, segmented control, and Browse button still renders and works, and every tab still saves without error.
+Launch `python Antiquarian.py`, click through all 7 tabs (6 tools + Global Settings) once, confirming every field, tooltip, toggle, slider, segmented control, and Browse button still renders and works, and every tab still saves without error.
 
 - [ ] **Step 8: Commit**
 
 ```bash
-git add Scriptorium.py PDFix/settings_schema.yaml tests/test_scriptorium_settings_migration.py
+git add Antiquarian.py PDFix/settings_schema.yaml tests/test_antiquarian_settings_migration.py
 git commit -m "Migrate PDFix settings to settings_schema.yaml, completing the six-tool migration"
 ```
 
@@ -1809,7 +1809,7 @@ git commit -m "Migrate PDFix settings to settings_schema.yaml, completing the si
 `RMTREE_FILETYPES`, `JSON_FILETYPES`, `GED_FILETYPES`, `SHP_FILETYPES` were only ever referenced from `PATH_PICKER_FIELDS` entries that Tasks 2, 4, 5, 6 have now all moved into YAML (each tool's own `filetypes` list is now inline in its `settings_schema.yaml`). Confirm they're unreferenced, then delete them. `PROGRAM_DIR_SENTINEL`/`TOOLBOX_DIR_SENTINEL` are NOT deleted — they're still read by `_resolve_base_dir`/`_browse_for_path` and still referenced by `GLOBAL_VARS`'s own `PROGRAM_DIR` picker entry, which never migrates.
 
 **Files:**
-- Modify: `Scriptorium.py`
+- Modify: `Antiquarian.py`
 
 **Interfaces:**
 - Consumes: nothing new.
@@ -1817,12 +1817,12 @@ git commit -m "Migrate PDFix settings to settings_schema.yaml, completing the si
 
 - [ ] **Step 1: Confirm the four constants are unreferenced outside their own definitions**
 
-Run: `python -c "import re,pathlib; text=pathlib.Path('Scriptorium.py').read_text(encoding='utf-8'); [print(name, text.count(name)) for name in ('RMTREE_FILETYPES','JSON_FILETYPES','GED_FILETYPES','SHP_FILETYPES')]"`
+Run: `python -c "import re,pathlib; text=pathlib.Path('Antiquarian.py').read_text(encoding='utf-8'); [print(name, text.count(name)) for name in ('RMTREE_FILETYPES','JSON_FILETYPES','GED_FILETYPES','SHP_FILETYPES')]"`
 Expected: each name prints a count of exactly `1` (only its own definition line remains; every consuming `PATH_PICKER_FIELDS` entry was already migrated to inline YAML `filetypes` lists in Tasks 2-7).
 
 - [ ] **Step 2: Delete the four constant definitions**
 
-In `Scriptorium.py`, delete:
+In `Antiquarian.py`, delete:
 
 ```python
 RMTREE_FILETYPES = [("RootsMagic files", "*.rmtree"), ("All files", "*.*")]
@@ -1840,12 +1840,12 @@ Expected: all tests PASS (loader unit tests, all 6 migration tests, the Paleogra
 
 - [ ] **Step 4: Launch check**
 
-Run: `python Scriptorium.py`, confirm the app launches with no import error, click through all 7 tabs once more.
+Run: `python Antiquarian.py`, confirm the app launches with no import error, click through all 7 tabs once more.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Scriptorium.py
+git add Antiquarian.py
 git commit -m "Delete dead per-tool filetypes constants, superseded by inline YAML filetypes lists"
 ```
 
@@ -1872,7 +1872,7 @@ from pathlib import Path
 
 import pytest
 
-import Scriptorium
+import Antiquarian
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_VAR_PATTERN = re.compile(r"os\.(?:getenv|environ\.get)\(\s*[\"']([A-Z][A-Z0-9_]*)[\"']")
@@ -1897,13 +1897,13 @@ def _env_keys_read_by(tool_dir: Path) -> set:
 
 def _global_keys() -> set:
     keys = set()
-    for fields in Scriptorium.GLOBAL_VARS.values():
+    for fields in Antiquarian.GLOBAL_VARS.values():
         keys.update(fields.keys())
     return keys
 
 
 def _schema_keys(tool_dir: Path) -> set:
-    schema = Scriptorium._load_tool_schema(tool_dir)
+    schema = Antiquarian._load_tool_schema(tool_dir)
     keys = set()
     for fields in schema.values():
         keys.update(fields.keys())

@@ -155,7 +155,7 @@ def get_field_remap(document_type: str) -> Dict[str, str]:
     {"CHURCH_MASTER_DB_NAME": "MASTER_DB_NAME", ...}). Reuses the same lightweight
     _load_pmt_front_matter() the rest of this module already uses, rather than
     Paleographer/engine.py's own TYPE_CFG - engine.py transitively imports google.genai,
-    pdfplumber, PIL, PDFix, and ScriptoriumMCP.agy_client, a dependency chain LAC.py (a
+    pdfplumber, PIL, PDFix, and AntiquarianMCP.agy_client, a dependency chain LAC.py (a
     standalone, light-dependency script) must not be forced to pull in."""
     _get_schema(document_type)  # raises UnknownDocumentTypeError early if unrecognized
     front_matter = _load_pmt_front_matter(PMT_DIR / f"{document_type}.pmt")

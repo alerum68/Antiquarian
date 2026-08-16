@@ -27,7 +27,7 @@
 - Modify: `Commissioner/tests/test_hbca_registry.py`
 - Modify: `Commissioner/tests/test_record_registry.py`
 
-**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-1-brief.md` and implement fixes.
+**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-1-brief.md` and implement fixes.
 **Step 2:** Run `python -m pytest`
 **Step 3:** Commit changes.
 
@@ -51,18 +51,18 @@
 - Modify: `Paleographer/tests/test_schema.py`
 - Modify: `Paleographer/tests/test_scriptools_dispatch.py`
 
-**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-2-brief.md` and implement fixes.
+**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-2-brief.md` and implement fixes.
 **Step 2:** Run `python -m pytest`
 **Step 3:** Commit changes.
 
-### Task 3: Fix Remaining Issues in Registrar, Gazetteer, ScriptoriumMCP
+### Task 3: Fix Remaining Issues in Registrar, Gazetteer, AntiquarianMCP
 **Files:**
 - Modify: `Gazetteer/Gazetteer.py`
 - Modify: `Registrar/tests/test_registrar.py`
-- Modify: `ScriptoriumMCP/agy_client.py`
-- Modify: `ScriptoriumMCP/tests/test_agy_client.py`
+- Modify: `AntiquarianMCP/agy_client.py`
+- Modify: `AntiquarianMCP/tests/test_agy_client.py`
 
-**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-3-brief.md` and implement fixes.
+**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-3-brief.md` and implement fixes.
 **Step 2:** Run `python -m pytest`
 **Step 3:** Commit changes.
 
@@ -86,17 +86,17 @@
 - Modify: `Voyageur/tests/test_hbca_regex.py`
 - Modify: `Voyageur/tests/test_voyageur_dispatcher.py`
 
-**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-4-brief.md` and implement fixes.
+**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-4-brief.md` and implement fixes.
 **Step 2:** Run `python -m pytest`
 **Step 3:** Commit changes.
 
-### Task 5: Fix Remaining Issues in Scriptorium.py, tests, Working
+### Task 5: Fix Remaining Issues in Antiquarian.py, tests, Working
 **Files:**
-- Modify: `Scriptorium.py`
-- Modify: `tests/test_scriptorium_voyageur_settings_ui.py`
-- Modify: `tests/test_scriptorium_settings_migration.py`
+- Modify: `Antiquarian.py`
+- Modify: `tests/test_antiquarian_voyageur_settings_ui.py`
+- Modify: `tests/test_antiquarian_settings_migration.py`
 
-**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-5-brief.md` and implement fixes.
+**Step 1:** Read brief at `C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\.superpowers\sdd\2026-08-14-pycharm-inspection-fixes-part-2\task-5-brief.md` and implement fixes.
 **Step 2:** Run `python -m pytest`
 **Step 3:** Commit changes.
 

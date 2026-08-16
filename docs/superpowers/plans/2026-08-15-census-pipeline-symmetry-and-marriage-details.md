@@ -6,7 +6,7 @@
 
 **Why these five together:** all were found in the same review/live-verification pass and touch the same handful of files (`Voyageur.js`, both `field_maps/*.yaml`, `Census.pmt`, `Census.py`, `FactTypes.json`) — sequencing them separately would mean repeatedly re-deriving the same context. Task order matters: Task 4 (Commissioner schema) must land before Task 5 (Marriage Details) can be validated end-to-end, since Marriage Details' `facts[]` entries need `FACT_TYPE_TO_COLUMN`/`Census.pmt` wiring that Task 4 establishes the pattern for.
 
-**Not in this plan:** the FS "Information tab" elimination (tracked as [issue #25](https://github.com/alerum68/Scriptorium/issues/25)); the general FS/Ancestry mapping-review session mentioned in prior plans' self-review notes (numbered-duplicate fields, income/earnings, tribe/clan, etc. — still deliberately unmapped passthrough, not this plan's job to resolve).
+**Not in this plan:** the FS "Information tab" elimination (tracked as [issue #25](https://github.com/alerum68/Antiquarian/issues/25)); the general FS/Ancestry mapping-review session mentioned in prior plans' self-review notes (numbered-duplicate fields, income/earnings, tribe/clan, etc. — still deliberately unmapped passthrough, not this plan's job to resolve).
 
 ## Global Constraints
 

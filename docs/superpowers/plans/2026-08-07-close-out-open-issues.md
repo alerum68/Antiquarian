@@ -4,7 +4,7 @@
 
 > **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
 
-**Goal:** Close out the three open GitHub issues on this repo (#3 Voyageur field-map normalization, #4 Archivist unified tree ingestion, #5 Scriptorium FIELD_REMAP relocation) by finishing the specific remaining gaps each issue's own comment thread already identifies, and fix a repo-hygiene bug where `docs/superpowers/` is gitignored locally but 25 files under it are already tracked and pushed to GitHub. Issue #81159 (the LAC.py/AI Assistant-Desktop GPU-crash blocker) is explicitly out of scope — nothing here touches `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or the LAC site.
+**Goal:** Close out the three open GitHub issues on this repo (#3 Voyageur field-map normalization, #4 Archivist unified tree ingestion, #5 Antiquarian FIELD_REMAP relocation) by finishing the specific remaining gaps each issue's own comment thread already identifies, and fix a repo-hygiene bug where `docs/superpowers/` is gitignored locally but 25 files under it are already tracked and pushed to GitHub. Issue #81159 (the LAC.py/AI Assistant-Desktop GPU-crash blocker) is explicitly out of scope — nothing here touches `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or the LAC site.
 
 **Architecture:** All three issues already have substantial progress landed (confirmed by reading their comment threads against the current code). What remains is: (1) a pure audit-and-close for #5, which is already done in code; (2) a small, testable extraction in Voyageur's census-gather orchestration to close #3's "no direct test coverage" gap; (3) wiring the already-existing generic `facts[]` fact vocabulary into Archivist's church-flavor GEDCOM renderer to close #4's "write-only for church records" gap; (4)-(5) two manual, non-automatable live-data verification checkpoints (#3's `familysearch_census.yaml` DRAFT status, and end-to-end real-gather verification for both #3 and #4) that require an actual live Ancestry/FamilySearch browser session and are the user's to run, not an implementer subagent's.
 
@@ -62,7 +62,7 @@ Run: `git status --short` → expect clean (or only unrelated pending changes).
 
 ---
 
-### Task 2: Audit and close Issue #5 (Scriptorium FIELD_REMAP relocation)
+### Task 2: Audit and close Issue #5 (Antiquarian FIELD_REMAP relocation)
 
 **Files:**
 - No source changes — this task is verification-only.
@@ -77,21 +77,21 @@ Run:
 ```bash
 git grep -n "FIELD_REMAP\|_record_type_family\|_peek_record_family" -- '*.py'
 ```
-Expected: the only hit is a historical comment in `Voyageur/FS.py` referencing the old name for context (`# generalizes Scriptorium.py's existing _record_type_family() ...`). No live code defines or calls any of these three names anymore.
+Expected: the only hit is a historical comment in `Voyageur/FS.py` referencing the old name for context (`# generalizes Antiquarian.py's existing _record_type_family() ...`). No live code defines or calls any of these three names anymore.
 
-- [ ] **Step 2: Confirm Scriptorium.py never computes a generic runtime setting itself**
+- [ ] **Step 2: Confirm Antiquarian.py never computes a generic runtime setting itself**
 
 Run:
 ```bash
-grep -n "run_env\[" Scriptorium.py
+grep -n "run_env\[" Antiquarian.py
 ```
-Expected: only `run_env['PYTHONUNBUFFERED']` and `run_env['PYTHONIOENCODING']` — process-level env vars, not app settings. Then read `Scriptorium.py`'s `_get_pmt_field_remap` method (currently around line 1614) and confirm its docstring and body: it only *reads* a `.pmt`'s `field_remap` table for the GUI's own display purposes (e.g. picking which image-dir field to browse from), and never writes a resolved generic key into the child process's `.env`. Confirm `Archivist/Archivist.py`'s `apply_record_type_field_remap` (around line 3519) and `Paleographer/engine.py`'s `resolve_setting`-equivalent mechanism are what actually resolve generic names — each script resolving its own settings from its own `.env`, independent of Scriptorium.
+Expected: only `run_env['PYTHONUNBUFFERED']` and `run_env['PYTHONIOENCODING']` — process-level env vars, not app settings. Then read `Antiquarian.py`'s `_get_pmt_field_remap` method (currently around line 1614) and confirm its docstring and body: it only *reads* a `.pmt`'s `field_remap` table for the GUI's own display purposes (e.g. picking which image-dir field to browse from), and never writes a resolved generic key into the child process's `.env`. Confirm `Archivist/Archivist.py`'s `apply_record_type_field_remap` (around line 3519) and `Paleographer/engine.py`'s `resolve_setting`-equivalent mechanism are what actually resolve generic names — each script resolving its own settings from its own `.env`, independent of Antiquarian.
 
 - [ ] **Step 3: Post the audit findings and close the issue**
 
 This step is GitHub-visible — confirm with the human partner before running it. Once confirmed:
 ```bash
-gh issue close 5 --comment "Verified done: FIELD_REMAP/_record_type_family/_peek_record_family no longer exist anywhere in Scriptorium.py (confirmed via git grep). Scriptorium.py's _get_pmt_field_remap only reads a .pmt's field_remap table for its own display purposes; Archivist.py's apply_record_type_field_remap and Paleographer's own resolve_setting mechanism each resolve their own generic runtime settings from their own .env independently of Scriptorium. Landed across b43b33d (Paleographer + Archivist: resolve own settings from own .env via field_remap) and the Archivist/Paleographer structural work that followed it."
+gh issue close 5 --comment "Verified done: FIELD_REMAP/_record_type_family/_peek_record_family no longer exist anywhere in Antiquarian.py (confirmed via git grep). Antiquarian.py's _get_pmt_field_remap only reads a .pmt's field_remap table for its own display purposes; Archivist.py's apply_record_type_field_remap and Paleographer's own resolve_setting mechanism each resolve their own generic runtime settings from their own .env independently of Antiquarian. Landed across b43b33d (Paleographer + Archivist: resolve own settings from own .env via field_remap) and the Archivist/Paleographer structural work that followed it."
 ```
 
 - [ ] **Step 4: Nothing to commit** — this task changes no tracked files.

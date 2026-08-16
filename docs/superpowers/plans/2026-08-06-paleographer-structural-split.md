@@ -60,7 +60,7 @@ Which record type is active, and every piece of type-specific vocabulary (event
 types, roles, defaults, schema extensions), comes entirely from a single .pmt file
 in prompts/; this module never changes when a new record type is added.
 
-Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
+Antiquarian.py launches Paleographer.py (the dispatcher) as a subprocess with
 cwd=Paleographer/, so engine and agy_engine import here as plain sibling modules.
 """
 
@@ -82,12 +82,12 @@ from google import genai
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ScriptoriumMCP lives in a sibling tool folder, not an installed package - add the repo
+# AntiquarianMCP lives in a sibling tool folder, not an installed package - add the repo
 # root to sys.path so it can be imported by absolute path.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
-from ScriptoriumMCP import agy_client  # noqa: E402
+from AntiquarianMCP import agy_client  # noqa: E402
 
 from Commissioner import normalization  # noqa: E402
 
@@ -175,7 +175,7 @@ def main() -> None:
         print("Verifying AGY CLI authentication...")
         if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
             print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
-                  "Connection' action in Scriptorium's Global Settings, or `agy` "
+                  "Connection' action in Antiquarian's Global Settings, or `agy` "
                   "directly, to sign in, then try again.")
             return
         print("Authenticated.\n")
@@ -279,7 +279,7 @@ Enriches, cross-checks against LAC search, partitions by collection, and resolve
 maiden/dit names for Scrip claim records extracted by Extract.py. This module is
 intentionally Scrip-only — it is not a generalization target for other record types.
 
-Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
+Antiquarian.py launches Paleographer.py (the dispatcher) as a subprocess with
 cwd=Paleographer/, so this module imports as a plain sibling.
 """
 
@@ -495,7 +495,7 @@ git commit -m "Create ScripTools.py: Scrip-only enrichment split out of Paleogra
 
 **Interfaces:**
 - Consumes: `Extract.main()`, `ScripTools.main()` (Tasks 1–2) — both take no arguments and read `sys.argv` themselves.
-- Produces: nothing consumed by later tasks. `Scriptorium.py` already launches `Paleographer/Paleographer.py` as a subprocess with cwd set to its own directory (`Scriptorium.py:1869`) — that contract is unchanged.
+- Produces: nothing consumed by later tasks. `Antiquarian.py` already launches `Paleographer/Paleographer.py` as a subprocess with cwd set to its own directory (`Antiquarian.py:1869`) — that contract is unchanged.
 
 - [ ] **Step 1: Write the failing dispatcher tests**
 
@@ -563,7 +563,7 @@ enrichment.
 
 Extraction (record-type-generic, driven entirely by the active .pmt file) lives in
 Extract.py. Scrip-only enrichment (enrich, crosscheck, partition, resolve-names)
-lives in ScripTools.py. Scriptorium.py launches this as a subprocess with
+lives in ScripTools.py. Antiquarian.py launches this as a subprocess with
 cwd=Paleographer/, so Extract.py and ScripTools.py import as plain sibling modules.
 """
 
@@ -677,12 +677,12 @@ git commit -m "Repoint Paleographer test suite from the monolith to Extract.py/S
 
 ---
 
-### Task 5: UI-gate the Scrip-only buttons in Scriptorium.py
+### Task 5: UI-gate the Scrip-only buttons in Antiquarian.py
 
 **Files:**
-- Modify: `Scriptorium.py:1523-1536` (`_on_record_type_change`)
-- Modify: `Scriptorium.py:1566-1578` (button creation)
-- Test: `tests/test_scriptorium_paleographer_gating.py` (new — check the existing `tests/` directory structure first; if Scriptorium has no existing GUI-logic test file, create this one at the repo root `tests/` directory alongside any existing Scriptorium tests, or inside `Scriptorium/tests/` if that's the established location. If `Scriptorium.py` has no test directory at all, place it at `tests/test_scriptorium_paleographer_gating.py`.)
+- Modify: `Antiquarian.py:1523-1536` (`_on_record_type_change`)
+- Modify: `Antiquarian.py:1566-1578` (button creation)
+- Test: `tests/test_antiquarian_paleographer_gating.py` (new — check the existing `tests/` directory structure first; if Antiquarian has no existing GUI-logic test file, create this one at the repo root `tests/` directory alongside any existing Antiquarian tests, or inside `Antiquarian/tests/` if that's the established location. If `Antiquarian.py` has no test directory at all, place it at `tests/test_antiquarian_paleographer_gating.py`.)
 
 **Interfaces:**
 - Consumes: `self.string_vars["PALEOGRAPHER_RECORD_TYPE"]` (existing), `self._on_record_type_change` (existing method, being modified).
@@ -757,22 +757,22 @@ new_string:
 
 - [ ] **Step 3: Determine the record-type values `_list_record_types()` actually produces**
 
-Read `Scriptorium.py`'s `_list_record_types` method (referenced at line 1548) to confirm it returns `.pmt` file stems (e.g. `"Scrip"`, `"Parish"`, `"Census"`) and not full filenames like `"Scrip.pmt"` — the gating check in Step 2 compares `record_type == "Scrip"`. If `_list_record_types()` returns filenames with the `.pmt` suffix instead, change the comparison to `record_type == "Scrip.pmt"` and note this in the commit message.
+Read `Antiquarian.py`'s `_list_record_types` method (referenced at line 1548) to confirm it returns `.pmt` file stems (e.g. `"Scrip"`, `"Parish"`, `"Census"`) and not full filenames like `"Scrip.pmt"` — the gating check in Step 2 compares `record_type == "Scrip"`. If `_list_record_types()` returns filenames with the `.pmt` suffix instead, change the comparison to `record_type == "Scrip.pmt"` and note this in the commit message.
 
 - [ ] **Step 4: Write the gating test**
 
-Create `tests/test_scriptorium_paleographer_gating.py` (adjust the import path in the first line if `Scriptorium.py`'s test suite imports it differently elsewhere — check an existing Scriptorium test file for the established import pattern first):
+Create `tests/test_antiquarian_paleographer_gating.py` (adjust the import path in the first line if `Antiquarian.py`'s test suite imports it differently elsewhere — check an existing Antiquarian test file for the established import pattern first):
 
 ```python
 import customtkinter as ctk
 import pytest
 
-from Scriptorium import ScriptoriumApp
+from Antiquarian import AntiquarianApp
 
 
 @pytest.fixture
 def app():
-    root = ScriptoriumApp()
+    root = AntiquarianApp()
     yield root
     root.destroy()
 
@@ -793,17 +793,17 @@ def test_non_scrip_record_type_disables_enrichment_buttons(app):
     assert app.paleographer_resolve_names_btn.cget("state") == "disabled"
 ```
 
-If `ScriptoriumApp()` cannot be constructed headlessly in this environment (CustomTkinter needs a display), report `DONE_WITH_CONCERNS` rather than forcing it — note in the report which import/construction failed, keep Steps 1-3's gating code as-is (it is correct regardless), and skip Steps 4-5 for an automated test; manual verification substitutes (toggle Record Type in the running GUI, confirm the three buttons enable/disable).
+If `AntiquarianApp()` cannot be constructed headlessly in this environment (CustomTkinter needs a display), report `DONE_WITH_CONCERNS` rather than forcing it — note in the report which import/construction failed, keep Steps 1-3's gating code as-is (it is correct regardless), and skip Steps 4-5 for an automated test; manual verification substitutes (toggle Record Type in the running GUI, confirm the three buttons enable/disable).
 
 - [ ] **Step 5: Run the test**
 
-Run: `pytest tests/test_scriptorium_paleographer_gating.py -v` (or skip per the fallback above)
+Run: `pytest tests/test_antiquarian_paleographer_gating.py -v` (or skip per the fallback above)
 Expected: PASS (2 tests).
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Scriptorium.py tests/test_scriptorium_paleographer_gating.py
+git add Antiquarian.py tests/test_antiquarian_paleographer_gating.py
 git commit -m "Gate Enrich/Partition/Resolve-Names buttons to Scrip record type"
 ```
 
@@ -874,7 +874,7 @@ git commit -m "Add scaffold-placeholder round-trip regression test for merge_she
 
 **Files:**
 - Modify: `Voyageur/A.py:58`
-- Modify: `Scriptorium.py:106,235,331`
+- Modify: `Antiquarian.py:106,235,331`
 - Modify: `Voyageur/.env:4`
 - Modify: `Archivist/.env:1`
 
@@ -894,7 +894,7 @@ new_string:
     url = os.getenv("A_URL", "").strip()
 ```
 
-- [ ] **Step 2: Rename in `Scriptorium.py`**
+- [ ] **Step 2: Rename in `Antiquarian.py`**
 
 ```python
 old_string:
@@ -946,7 +946,7 @@ Expected: all tests PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add Voyageur/A.py Scriptorium.py
+git add Voyageur/A.py Antiquarian.py
 git commit -m "Rename CENSUS_URL to A_URL, matching the FS_URL/LAC_URL convention"
 ```
 

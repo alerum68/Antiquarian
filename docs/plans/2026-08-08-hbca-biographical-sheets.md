@@ -21,7 +21,7 @@ Before writing this revision, the live site (`gov.mb.ca/chc/archives/hbca`) and 
 3. **The record page's own URL is not stable, but a separate permalink is.** The session-scoped record page (e.g. `/scripts/mwimain.dll/221743522/1/0?SEARCH&ERRMSG=[PAM]listNo.htm`) gets a fresh session ID every search — it cannot be stored and revisited later. The page's "Share Link" control reveals a genuinely stable, cookie-independent permalink instead (verified live with a cookie-less request): `https://pam.minisisinc.com/scripts/mwimain.dll/144/LISTINGS_IMAGES/LISTINGS_DET_IMAGES/SISN%20<N>?sessionsearch`. That page also already carries the full citation-relevant metadata in one load — Item Description (title), Date, Fonds/Series Title, Notes, Location Code, and Microfilm No. — so it must be scraped for citation data, not just the PDF link.
 4. **A single location code can span multiple digitized reels, each its own PDF.** The Archives' microfilm digitization is reel-based, so one `HBCA Reference` can resolve to several separate PDF files on the record page rather than one. All of them need to be downloaded and joined into a single combined PDF per location code — `parse_keystone_search_response` already collects every matching media link into a list rather than just the first, so this is a downstream download/merge step rather than a detection gap.
 
-This design integrates HBCA Biographical Sheets into the standard Scriptorium architecture using a **tiered extraction strategy**: deterministic regex handles what it reliably can (alphabet filtering, reference-code discovery for Keystone lookups, well-formed tables), and the LLM is used both for unstructured family notes (always) and as a fallback for structured vitals/service history when Voyageur's regex pass finds the sheet incomplete (conditionally).
+This design integrates HBCA Biographical Sheets into the standard Antiquarian architecture using a **tiered extraction strategy**: deterministic regex handles what it reliably can (alphabet filtering, reference-code discovery for Keystone lookups, well-formed tables), and the LLM is used both for unstructured family notes (always) and as a fallback for structured vitals/service history when Voyageur's regex pass finds the sheet incomplete (conditionally).
 
 ### Core Requirements
 1. **Alphabet Filter**: Voyageur must correctly respect the alphabet filter (e.g., `--letter A`) to allow targeted gathering.
@@ -392,7 +392,7 @@ def download_and_merge_keystone_media(
 ) -> Path:
     target_dir.mkdir(parents=True, exist_ok=True)
     client = session or requests.Session()
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Media Downloader)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Media Downloader)"}
     reel_paths: List[Path] = []
     for i, url in enumerate(media_urls):
         reel_path = target_dir / f"_reel_{i}_{output_name}"
@@ -427,7 +427,7 @@ def query_keystone_for_code(
             return cache[location_code]
 
     client = session or requests.Session()
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Resolver)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Resolver)"}
     landing_url = f"{base_url}/144/PAM_LISTINGS?DIRECTSEARCH"
     result = {"record_urls": [], "media_urls": [], "metadata": {}}
     try:

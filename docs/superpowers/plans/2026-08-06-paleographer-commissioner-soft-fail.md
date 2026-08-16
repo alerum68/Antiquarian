@@ -4,19 +4,19 @@
 
 **Goal:** Wire Paleographer's `save_master_db()` into the same soft-fail Commissioner validation Voyageur already runs, and collapse the three existing copy-pasted try/except/log-WARN blocks (`census_schema.py`, `FS.py`, `LAC.py`) plus the new Paleographer one into a single shared `Commissioner.record_registry.validate_soft()` helper.
 
-**Architecture:** Add one new function, `validate_soft(data, document_type, label) -> None`, to `Commissioner/record_registry.py`. It wraps the existing `parse_collection()` call in a try/except that logs `[WARN] Commissioner validation failed for {label!r}: {e}` and never raises. The three existing Voyageur wrapper functions swap their inline `parse_collection` call for a call to `validate_soft`, keeping their own document-type resolution logic and their own outer try/except (which guards the `validate_soft` import itself). Paleographer's `save_master_db()` gets the same guarded call added directly, with no signature change — every one of its ~6 existing call sites is covered automatically.
+**Architecture:** Add one new function, `validate_soft(data, document_type, label) -> None`, to `Commissioner/record_registry.py`. It wraps the existing `parse_collection()` call in a try/except that logs `[WARN] Commissioner validation failed for {label!r}: {e}` and never raises. The three existing Voyageur wrapper functions swap their inline `parse_collection` call for a call to `validate_collection_softly`, keeping their own document-type resolution logic and their own outer try/except (which guards the `validate_collection_softly` import itself). Paleographer's `save_master_db()` gets the same guarded call added directly, with no signature change — every one of its ~6 existing call sites is covered automatically.
 
 **Tech Stack:** Python, pytest, Pydantic (via `Commissioner.models`).
 
 ## Global Constraints
 
-- Soft-fail only, everywhere: `validate_soft` must never raise once its own import has succeeded — every failure inside `parse_collection` is caught by `Exception` and logged, never propagated.
+- Soft-fail only, everywhere: `validate_collection_softly` must never raise once its own import has succeeded — every failure inside `parse_collection` is caught by `Exception` and logged, never propagated.
 - No hard-fail/blocking validation mode is introduced anywhere in this plan.
 - `save_master_db(master_data)` keeps its exact current signature — `Dict[str, Any] -> None`. No new parameter.
 - No changes to `Commissioner.models` or to `parse_collection`'s own behavior — only how many places call it changes.
 - The three existing Voyageur wrapper functions (`census_schema.validate_against_commissioner`, `FS.validate_against_commissioner`, `LAC.validate_master_db_against_commissioner`) keep their exact current signatures and their own document-type resolution logic. Only their internal `parse_collection` call is replaced.
-- `validate_soft`'s exact signature: `validate_soft(data: dict, document_type: str, label: str) -> None`.
-- `validate_soft`'s exact log line: `f"[WARN] Commissioner validation failed for {label!r}: {e}"` — this exact format is asserted by existing tests in `Voyageur/tests/test_census_schema.py`, `Voyageur/tests/test_fs.py`, and `Voyageur/tests/test_lac.py`, and must not change.
+- `validate_collection_softly`'s exact signature: `validate_soft(data: dict, document_type: str, label: str) -> None`.
+- `validate_collection_softly`'s exact log line: `f"[WARN] Commissioner validation failed for {label!r}: {e}"` — this exact format is asserted by existing tests in `Voyageur/tests/test_census_schema.py`, `Voyageur/tests/test_fs.py`, and `Voyageur/tests/test_lac.py`, and must not change.
 
 ---
 
@@ -81,22 +81,13 @@ def test_validate_soft_logs_and_does_not_raise_on_unknown_document_type(capsys):
     assert "NotARecordType" in captured.out
 ```
 
-Add `validate_soft` to the existing import block at the top of the file:
+Add `validate_collection_softly` to the existing import block at the top of the file:
 
 ```python
-from Commissioner.record_registry import (
-    InvalidRoleError,
-    UnknownDocumentTypeError,
-    UnknownFieldTypeError,
-    _build_registry,
-    get_document_types,
-    get_valid_roles,
-    parse_collection,
-    validate_participant_extra_fields,
-    validate_record_extra_fields,
-    validate_role_name,
-    validate_soft,
-)
+from Commissioner.record_registry import (InvalidRoleError, UnknownDocumentTypeError, UnknownFieldTypeError,
+                                          _build_registry, get_document_types, get_valid_roles, parse_collection,
+                                          validate_participant_extra_fields, validate_record_extra_fields,
+                                          validate_role_name, validate_collection_softly, )
 ```
 
 - [x] **Step 2: Run tests to verify they fail**
@@ -104,7 +95,7 @@ from Commissioner.record_registry import (
 Run: `pytest Commissioner/tests/test_record_registry.py -k validate_soft -v`
 Expected: FAIL with `ImportError: cannot import name 'validate_soft'`
 
-- [x] **Step 3: Implement `validate_soft`**
+- [x] **Step 3: Implement `validate_collection_softly`**
 
 In `Commissioner/record_registry.py`, immediately after `parse_collection`'s closing `return collection` (line 163), insert:
 
@@ -168,10 +159,11 @@ Replace with:
 
 ```python
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(normalized, "Census", collection_title)
-    except Exception as e:
-        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+    from Commissioner.record_registry import validate_collection_softly
+    
+    validate_collection_softly(normalized, "Census", collection_title)
+except Exception as e:
+    print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
 - [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
@@ -226,13 +218,14 @@ Replace with:
 
 ```python
     document_type = RECORD_FAMILY_TO_DOCUMENT_TYPE.get(record_family)
-    if document_type is None:
-        return
-    try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(final_data, document_type, collection_title)
-    except Exception as e:
-        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+if document_type is None:
+    return
+try:
+    from Commissioner.record_registry import validate_collection_softly
+    
+    validate_collection_softly(final_data, document_type, collection_title)
+except Exception as e:
+    print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
 - [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
@@ -280,10 +273,11 @@ Replace with:
 
 ```python
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(master_data, document_type, collection_title)
-    except Exception as e:
-        print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
+    from Commissioner.record_registry import validate_collection_softly
+    
+    validate_collection_softly(master_data, document_type, collection_title)
+except Exception as e:
+    print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 ```
 
 - [x] **Step 3: Run the existing tests to confirm they still pass unmodified**
@@ -405,11 +399,11 @@ Replace with:
 ```python
 def save_master_db(master_data: Dict[str, Any]) -> None:
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)
+        from Commissioner.record_registry import validate_collection_softly
+        validate_collection_softly(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {COLLECTION_TITLE!r}: {e}")
-
+    
     os.makedirs(os.path.dirname(MASTER_DB), exist_ok=True)
     with open(MASTER_DB, "w", encoding="utf-8") as f:
         json.dump(master_data, f, indent=2, ensure_ascii=False)

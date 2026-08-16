@@ -291,7 +291,7 @@
     "551: # AGY ENGINE PIPELINE (EXTRACTION_ENGINE=agy)",
     "552: # ==========================================",
     "553: # agy_engine.call_agy_extract/rasterize_pdf_to_images are monkeypatched here - the",
-    "554: # subprocess layer itself is already covered by ScriptoriumMCP/tests/test_agy_client.py",
+    "554: # subprocess layer itself is already covered by AntiquarianMCP/tests/test_agy_client.py",
     "555: # and Paleographer/tests/test_agy_engine.py. This is about Paleographer.py's own",
     "556: # orchestration (file classification, finalize_page_data, tag_document_metadata,",
     "557: # save_master_db, cost accounting) working correctly for the agy engine, for both an",
@@ -380,8 +380,8 @@
     "464: # and pid3/pid4 (never reached before the crash) must still get downloaded."
   ],
   "tests\\test_settings_schema_completeness.py": [
-    "11: # PROGRAM_DIR is set by the Scriptorium launcher, never user-configured: the codebase",
-    "12: # resolves its own install location via the __PROGRAM_DIR__ sentinel (see Scriptorium.py)",
+    "11: # PROGRAM_DIR is set by the Antiquarian launcher, never user-configured: the codebase",
+    "12: # resolves its own install location via the __PROGRAM_DIR__ sentinel (see Antiquarian.py)",
     "13: # rather than a settings key, so it is excluded from schema completeness checks."
   ]
 }

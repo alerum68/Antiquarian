@@ -841,7 +841,7 @@ def query_keystone_for_code(
     """Queries Keystone database for a given location code."""
     url = build_keystone_search_url(location_code, base_url)
     client = session or requests.Session()
-    headers = {"User-Agent": "Scriptorium/1.0 (Genealogy Keystone Resolver)"}
+    headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Resolver)"}
     try:
         resp = client.get(url, headers=headers, timeout=20)
         if resp.status_code == 200:
@@ -956,7 +956,7 @@ per reference instead of sharing a single hardcoded Source across every HBCA rec
 runs after Extract.py's AI pass (HBCA.pmt), since hbca_references isn't known until then -
 unlike ScripTools' LAC enrichment, which can run against gather-time PIDs directly.
 
-Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
+Antiquarian.py launches Paleographer.py (the dispatcher) as a subprocess with
 cwd=Paleographer/, so this module imports as a plain sibling.
 """
 

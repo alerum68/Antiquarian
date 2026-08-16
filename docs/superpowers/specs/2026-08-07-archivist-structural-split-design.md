@@ -40,7 +40,7 @@ These two flavors already share zero logic below the entry point:
 `build_gedcom_from_general`/`run_general_flavor` never call into each
 other's helpers (confirmed by grep — no census-only helper is referenced
 from line 1999 onward, and `GENERAL_CONFIG` is never referenced before it).
-A handful of genuinely generic helpers (`clean_val`, `cap_case`,
+A handful of genuinely generic helpers (`clean_val`, `capitalize_text_string`,
 `format_gedcom_date`, `weblink_lines`, `resolve_source_id`,
 `get_source_templates`/`load_source_template_lines`/
 `_rmst_element_to_gedcom`, `split_full_name`, ...) are used by both.
@@ -72,7 +72,7 @@ calls the profile instead of checking a flag.
 - **`Archivist/Utils.py`** (new) — every helper confirmed used by both
   flavors, plus the shared module-level `.env` config: `get_env_int`,
   `safe_path`, `resolve_source_id` (+ the source-ID registry and
-  `PRECODED_SOURCE_IDS`), `clean_val`, `_titlecase_callback`, `cap_case`,
+  `PRECODED_SOURCE_IDS`), `clean_val`, `_titlecase_callback`, `capitalize_text_string`,
   `clean_place`, `format_gedcom_date`, `get_proof_status`,
   `estimate_birth_from_age`, `wrap_text`, `dedent_citation_lines`,
   `weblink_lines`, `resolve_gedcom_output_targets`,
@@ -91,7 +91,7 @@ calls the profile instead of checking a flag.
 - **`Archivist/Census.py`** (new) — every census-only symbol, moved
   verbatim: `HouseholdUnit`, `FlagRecord`, `get_gender`, `get_census_era`,
   `get_census_template_id`, `CENSUS_TEMPLATES`, the household-parsing chain
-  (`get_age`, `spouse_evaluation`, `child_evaluation`, `find_parent`,
+  (`get_age`, `evaluate_spouse_match`, `evaluate_child_match`, `find_parent`,
   `parse_household`, `normalize_relationship`, `is_relationship_column`,
   `find_relationship_column`, `resolve_cross_family_links`,
   `append_unit_if_not_empty`, `parse_household_relational`), the census

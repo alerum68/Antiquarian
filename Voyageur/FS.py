@@ -122,7 +122,7 @@ SEX_COLUMN_MAP = {
 }
 
 # Keyword match used to auto-detect record_family from the collection title/catalog text -
-# generalizes Scriptorium.py's existing _record_type_family() keyword-matching so Archivist's
+# generalizes Antiquarian.py's existing _record_type_family() keyword-matching so Archivist's
 # single "Generate GEDCOM" button can dispatch without a manual per-type pick.
 RECORD_FAMILY_KEYWORDS = {
     "church": ["church", "baptism", "baptême", "marriage", "mariage", "burial", "sépulture",
@@ -834,7 +834,7 @@ def main() -> None:
     program_dir = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
     url = os.getenv("FS_URL", "").strip()
-    json_dir = os.getenv("JSON_DIR", "Scriptorium/Working/Project/JSON")
+    json_dir = os.getenv("JSON_DIR", "Antiquarian/Working/Project/JSON")
     on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
 
     if not url:
@@ -911,7 +911,7 @@ def main() -> None:
          for s in final_data.get("sheets", []) if s.get("records")), "")
     census_folder = census_collection_folder_name(census_year, country, collection_name)
 
-    # Matches Scriptorium.py's own default ("Census", resolved against
+    # Matches Antiquarian.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
     img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
@@ -923,7 +923,7 @@ def main() -> None:
           f"{f', skipped {len(img_skipped)}' if img_skipped else ''}"
           f"{f', {len(img_failed)} FAILED' if img_failed else ''} to Project folder.")
 
-    # JSON_FILE is read by Archivist (see its own ARCHIVIST_VARS entry in Scriptorium.py),
+    # JSON_FILE is read by Archivist (see its own ARCHIVIST_VARS entry in Antiquarian.py),
     # so it's written to Archivist's own .env, not this script's own subfolder one -
     # confirmed live this was the actual bug behind Archivist immediately failing with
     # FileNotFoundError right after a real gather succeeded: this used to write to
