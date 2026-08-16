@@ -20,6 +20,7 @@ import yaml
 from dotenv import dotenv_values
 
 BASE_DIR = Path(__file__).resolve().parent
+APP_VERSION = "0.3.28"
 
 # Each tool's own script lives in a fixed subfolder of this codebase - hardcoded rather than
 # a configurable Global Settings field, since the folder layout is the codebase's own, not
@@ -749,6 +750,39 @@ class Scriptorium(ctk.CTk):
         global_env = dotenv_values(env_path_for(None))
         if global_env.get("TAMPERMONKEY_INSTALLED") != "True":
             self.after(500, self._prompt_tampermonkey)
+
+        # Launch auto-updater check
+        threading.Thread(target=self._auto_update_check, daemon=True).start()
+
+    def _auto_update_check(self):
+        try:
+            import urllib.request
+            import json
+            req = urllib.request.Request(
+                "https://api.github.com/repos/alerum68/Scriptorium/releases/latest",
+                headers={'User-Agent': 'Scriptorium-App'}
+            )
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                latest_tag = data.get("tag_name", "")
+
+                def parse_ver(v):
+                    m = re.search(r'(\d+)\.(\d+)\.(\d+)', v)
+                    return tuple(map(int, m.groups())) if m else (0, 0, 0)
+
+                current = parse_ver(APP_VERSION)
+                latest = parse_ver(latest_tag)
+
+                if latest > current:
+                    self.after(2000, lambda: self._show_update_popup(latest_tag, data.get("html_url", "")))
+        except Exception as e:
+            print(f"Update check failed: {e}")
+
+    def _show_update_popup(self, version, url):
+        msg = f"A new version of Scriptorium ({version}) is available!\n\nWould you like to download it now?"
+        if messagebox.askyesno("New Version Available", msg):
+            import webbrowser
+            webbrowser.open(url)
 
     def _prompt_tampermonkey(self):
         msg = ("Scriptorium requires the Tampermonkey browser extension to gather Ancestry records.\n\n"
