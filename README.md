@@ -114,7 +114,6 @@ See [ROADMAP.md](ROADMAP.md) for future plans for Scriptorium.
 
 ## License
 
-This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). In short: you're free to
-use, modify, and share it for any noncommercial purpose (personal genealogy research, other historical or
-genealogical societies, education, etc.), but it may not be used to build or sell a commercial product or
-service. See the [LICENSE](LICENSE) file for the full terms.
+This project is licensed under the [GNU General Public License v3.0](LICENSE). In short: you're free to use,
+modify, and distribute it, including commercially, but any distributed version or derivative work must also
+be licensed under the GPLv3 with its source made available. See the [LICENSE](LICENSE) file for the full terms.

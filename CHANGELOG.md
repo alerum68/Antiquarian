@@ -12,6 +12,9 @@ cleanup with no new functionality.
 - **Scrip tab gets its own GEDCOM setting**: `SCRIP_GEDCOM_NAME` added to the Scrip Information section in Paleographer settings, so Scrip and Parish each manage their own output files independently.
 - **HBCA Keystone toggles**: `HBCA_RESOLVE_KEYSTONE` and `HBCA_DOWNLOAD_KEYSTONE_MEDIA` now render as on/off toggle switches in the Voyageur settings UI.
 
+### Changed
+- **License**: Switched from the PolyForm Noncommercial License 1.0.0 to the GNU General Public License v3.0.
+
 ### Removed
 - **`CENSUS_IMAGE_DIR` and `IMAGE_EXTENSION` global settings**: Removed from Scriptorium's Global Settings UI — image directories are now resolved automatically.
 - **`CHURCH_IMAGE_DIR` and `SCRIP_IMAGE_DIR` settings**: Removed from Paleographer settings schema — image paths are derived from the active `.pmt` prompt name at runtime.
