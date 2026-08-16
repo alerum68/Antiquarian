@@ -40,7 +40,6 @@ if str(_REPO_ROOT) not in sys.path:
 from PDFix.PDFix import optimize_pdf, COMPRESSION_PARAMS  # noqa: E402
 from AntiquarianMCP import agy_client  # noqa: E402
 
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 DEFAULT_TYPE = "Parish.pmt"
 FACT_TYPES_PATH = Path(__file__).resolve().parent.parent / "Commissioner" / "FactTypes.json"
 
@@ -127,6 +126,32 @@ def _substitute_env(value: Any) -> Any:
     return value
 
 
+def _prompt_search_dirs() -> List[Path]:
+    """.pmt search path, highest priority first:
+    1. GENEALOGY_DIR/Prompts - a user's own per-installation overrides. For a portable
+       install GENEALOGY_DIR defaults to the portable folder itself (see Antiquarian.py's
+       _DEFAULT_GENEALOGY_DIR), so this naturally lands on the very "Prompts" folder
+       build.py already ships there - no hardcoded app/folder name involved either way.
+    2. PROGRAM_DIR/Prompts - the app's own bundled defaults (what build.py copies into
+       dist/Antiquarian/Prompts). PROGRAM_DIR-relative rather than __file__-relative so
+       this resolves correctly in a frozen build too - see Gazetteer.py's SHAPEFILE_PATH
+       for the same reasoning (.pmt files aren't part of PyInstaller's own --add-data
+       bundling, only this copied folder has them once frozen).
+    3. This source file's own sibling "prompts" folder - dev-mode fallback for running
+       straight from a checkout with no env vars set at all.
+    A record type found in an earlier tier shadows the same filename in a later one, so
+    overriding a single .pmt doesn't require copying the rest alongside it."""
+    dirs = []
+    genealogy_dir = os.getenv("GENEALOGY_DIR", "").strip()
+    if genealogy_dir:
+        dirs.append(Path(genealogy_dir) / (os.getenv("PROMPTS_DIR") or "Prompts"))
+    program_dir = os.getenv("PROGRAM_DIR", "").strip()
+    if program_dir:
+        dirs.append(Path(program_dir) / "Prompts")
+    dirs.append(Path(__file__).resolve().parent / "prompts")
+    return dirs
+
+
 def resolve_prompt_path(requested_name: str) -> Path:
     """Finds the .pmt file for the requested record type (case-insensitive, extension
     optional), falling back to DEFAULT_TYPE if not found."""
@@ -134,7 +159,12 @@ def resolve_prompt_path(requested_name: str) -> Path:
     if not requested.lower().endswith(".pmt"):
         requested += ".pmt"
 
-    available = {p.name.lower(): p for p in PROMPTS_DIR.glob("*.pmt")} if PROMPTS_DIR.is_dir() else {}
+    search_dirs = _prompt_search_dirs()
+    available: Dict[str, Path] = {}
+    for prompts_dir in reversed(search_dirs):
+        if prompts_dir.is_dir():
+            for p in prompts_dir.glob("*.pmt"):
+                available[p.name.lower()] = p
 
     match = available.get(requested.lower())
     if match:
@@ -144,8 +174,9 @@ def resolve_prompt_path(requested_name: str) -> Path:
     if fallback:
         return fallback
 
+    searched = ", ".join(str(d) for d in search_dirs)
     raise FileNotFoundError(
-        f"Could not find record type '{requested}' or fallback '{DEFAULT_TYPE}' in {PROMPTS_DIR}"
+        f"Could not find record type '{requested}' or fallback '{DEFAULT_TYPE}' in any of: {searched}"
     )
 
 

@@ -9,6 +9,7 @@ AppVersion={#MyAppVersion}
 DefaultDirName={autopf}\Antiquarian
 DefaultGroupName=Antiquarian
 OutputBaseFilename=Antiquarian_{#MyAppVersion}
+SetupIconFile=Antiquarian.ico
 Compression=lzma2
 SolidCompression=yes
 
@@ -117,6 +118,12 @@ begin
     GenDir := GenealogyPage.Values[0];
     RmDir := Rmpage.Values[0];
 
+    // Portable installs assume no separate Genealogy folder exists yet (e.g. running from
+    // a USB drive) - default to the portable install's own folder rather than leaving
+    // GENEALOGY_DIR unset. Standard installs left blank stay unset, unchanged.
+    if (GenDir = '') and PortablePage.Values[1] then
+      GenDir := ExpandConstant('{app}');
+
     // PROGRAM_DIR is the app's own install root - always known and always written,
     // regardless of whether a Genealogy directory was provided, since standalone tool
     // runs outside the GUI need it to find Gazetteer's shapefiles the same way the
@@ -125,9 +132,15 @@ begin
 
     if GenDir <> '' then
     begin
-      ForceDirectories(GenDir + '\Antiquarian\Media');
-      ForceDirectories(GenDir + '\Antiquarian\JSON');
-      ForceDirectories(GenDir + '\Antiquarian\GEDCOM');
+      // No hardcoded "Antiquarian" folder name here - GenDir already IS the right place
+      // (a dedicated Genealogy folder for Standard installs, or the portable install's own
+      // folder for Portable - see the default fill-in above), so these sit directly under
+      // it, matching Antiquarian.py's own MEDIA_DIR/JSON_DIR/GEDCOM_OUTPUT_PATH defaults
+      // and Paleographer/engine.py's _prompt_search_dirs.
+      ForceDirectories(GenDir + '\Media');
+      ForceDirectories(GenDir + '\JSON');
+      ForceDirectories(GenDir + '\GEDCOM');
+      ForceDirectories(GenDir + '\Prompts');
 
       // Plain KEY=value, no surrounding quotes (matching how the app's own settings
       // save/load already writes .env).

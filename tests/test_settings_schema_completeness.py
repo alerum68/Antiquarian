@@ -11,7 +11,11 @@ ENV_VAR_PATTERN = re.compile(r"os\.(?:getenv|environ\.get)\(\s*[\"']([A-Z][A-Z0-
 # PROGRAM_DIR is set by the Antiquarian launcher, never user-configured: the codebase
 # resolves its own install location via the __PROGRAM_DIR__ sentinel (see Antiquarian.py)
 # rather than a settings key, so it is excluded from schema completeness checks.
-INTERNAL_KEYS = {"PROGRAM_DIR", "AGY_CLI_BIN", "GEDCOM_OUTPUT_NAME", "APID_DB", "ANCESTRY_IMAGE_BASE_ID"}
+# PROMPTS_DIR is the same shape - a sensible "Prompts" default resolved relative to
+# GENEALOGY_DIR (see Paleographer/engine.py's _prompt_search_dirs), overridable by hand-
+# editing .env for advanced use, but not a GUI-exposed setting.
+INTERNAL_KEYS = {"PROGRAM_DIR", "PROMPTS_DIR", "AGY_CLI_BIN", "GEDCOM_OUTPUT_NAME", "APID_DB",
+                 "ANCESTRY_IMAGE_BASE_ID"}
 
 TOOL_DIRS = {
     "Archivist": BASE_DIR / "Archivist",
