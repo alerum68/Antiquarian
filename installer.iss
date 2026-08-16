@@ -1,6 +1,6 @@
 [Setup]
 AppName=Antiquarian
-AppVersion=0.3.28
+AppVersion=0.07.00
 DefaultDirName={autopf}\Antiquarian
 DefaultGroupName=Antiquarian
 OutputBaseFilename=Antiquarian_Installer
