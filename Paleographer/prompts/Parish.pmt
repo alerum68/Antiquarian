@@ -32,7 +32,7 @@ settings_sections:
 # Maps this record type's own prefixed settings-tab keys (grouped under the sections
 # above, saved to Paleographer/.env) to the generic runtime env var name Paleographer.py
 # and Archivist.py each actually read from their own .env - so neither script depends on
-# Scriptorium.py's GUI layer to bridge the two; each resolves this itself, standalone.
+# Antiquarian.py's GUI layer to bridge the two; each resolves this itself, standalone.
 field_remap:
   CHURCH_MASTER_DB_NAME: MASTER_DB_NAME
   CHURCH_GEDCOM_NAME: GEDCOM_OUTPUT_NAME

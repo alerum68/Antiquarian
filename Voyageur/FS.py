@@ -56,9 +56,9 @@ if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from Commissioner import normalization  # noqa: E402
 
-SCRIPTORIUM_DIR = Path(__file__).resolve().parent.parent
-FACT_TYPES_PATH = SCRIPTORIUM_DIR / "Commissioner" / "FactTypes.json"
-PARISH_PMT_PATH = SCRIPTORIUM_DIR / "Paleographer" / "prompts" / "Parish.pmt"
+ANTIQUARIAN_DIR = Path(__file__).resolve().parent.parent
+FACT_TYPES_PATH = ANTIQUARIAN_DIR / "Commissioner" / "FactTypes.json"
+PARISH_PMT_PATH = ANTIQUARIAN_DIR / "Paleographer" / "prompts" / "Parish.pmt"
 
 # ==========================================
 # SHARED VOCABULARY (read as data, not imported as code - see module docstring)

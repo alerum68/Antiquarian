@@ -1,4 +1,4 @@
-name: Build and Release Scriptorium
+name: Build and Release Antiquarian
 
 on:
   push:
@@ -33,8 +33,8 @@ jobs:
         if: github.ref == 'refs/heads/Unify'
         uses: actions/upload-artifact@v4
         with:
-          name: Scriptorium-Installer-Sandbox
-          path: Output/Scriptorium_Installer.exe
+          name: Antiquarian-Installer-Sandbox
+          path: Output/Antiquarian_Installer.exe
           retention-days: 7
 
       - name: Create GitHub Release
@@ -42,8 +42,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            Output/Scriptorium_Installer.exe
-            Scriptorium_Portable.zip
+            Output/Antiquarian_Installer.exe
+            Antiquarian_Portable.zip
           draft: false
           prerelease: false
         env:
