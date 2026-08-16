@@ -163,7 +163,7 @@ def _titlecase_callback(word: str, **_kwargs) -> Optional[str]:
     return None
 
 
-def cap_case(text: CellValue) -> str:
+def capitalize_text_string(text: CellValue) -> str:
     """Format string to Title Case using the titlecase library while preserving
     genealogical acronyms (HBC, NWT, etc.) and handling nulls/empty strings safely."""
     val = clean_val(text)
@@ -176,7 +176,7 @@ def clean_place(val: CellValue) -> str:
     """Like clean_val, but also strips a leading descriptive qualifier ('near', 'around',
     'about', ...) off a place name and normalizes to proper Title Case."""
     cleaned = _PLACE_QUALIFIER_RE.sub('', clean_val(val)).strip()
-    return cap_case(cleaned) if cleaned else ""
+    return capitalize_text_string(cleaned) if cleaned else ""
 
 
 def split_full_name(full_name: str) -> Tuple[str, str]:

@@ -939,21 +939,21 @@ def is_foreign_birthplace(birth_place: str) -> bool:
 
 def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
     # 1. Primary Selection
-    # cap_case (not clean_val alone) on every raw-sourced piece here - a real census
+    # capitalize_text_string (not clean_val alone) on every raw-sourced piece here - a real census
     # source can hand back ALL-CAPS or lowercase text, and every other proper-noun-like
     # census field in this module (race, birth_place, occupation itself pre-refactor)
     # already normalizes to Title Case. The connector words this function assembles
     # itself ("at"/"working in") are left alone - they're ours, not sourced data.
-    base_occ = Utils.cap_case(row.get('Usual Occupation'))
+    base_occ = Utils.capitalize_text_string(row.get('Usual Occupation'))
     if not base_occ:
-        base_occ = Utils.cap_case(row.get('Occupation'))
+        base_occ = Utils.capitalize_text_string(row.get('Occupation'))
     if not base_occ:
-        base_occ = Utils.cap_case(row.get('Occupation Category'))
+        base_occ = Utils.capitalize_text_string(row.get('Occupation Category'))
     if not base_occ:
-        base_occ = Utils.cap_case(row.get('Trade or Profession'))
+        base_occ = Utils.capitalize_text_string(row.get('Trade or Profession'))
 
-    employer = Utils.cap_case(row.get('Employer'))
-    industry = Utils.cap_case(row.get('Industry'))
+    employer = Utils.capitalize_text_string(row.get('Employer'))
+    industry = Utils.capitalize_text_string(row.get('Industry'))
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
@@ -1388,7 +1388,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             occ_evt.extend(["2 _PROOF proven"] + cit)
             ged.extend(occ_evt)
 
-        if race := Utils.cap_case(row.get('Race', row.get('Color', ''))):
+        if race := Utils.capitalize_text_string(row.get('Race', row.get('Color', ''))):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
 
         nat_val = Utils.clean_val(row.get('Nationality'))

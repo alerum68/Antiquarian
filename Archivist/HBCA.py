@@ -51,7 +51,7 @@ class HBCAProfile:
         std_s = Utils.clean_val(part.get('std_surname'))
         titl = f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}"
         if document_type:
-            titl += f" -- {Utils.cap_case(document_type)}"
+            titl += f" -- {Utils.capitalize_text_string(document_type)}"
         else:
             titl += " -- HBCA Biographical Sheet"
         return titl

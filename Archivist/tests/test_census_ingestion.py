@@ -494,7 +494,7 @@ def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
 
 
 def test_dynamic_occupation_template_normalizes_raw_case():
-    """Regression: get_occupation_value's 2026-08-15 refactor dropped the cap_case
+    """Regression: get_occupation_value's 2026-08-15 refactor dropped the capitalize_text_string
     normalization the pre-refactor version applied to its assembled result - real census
     source text can come back ALL-CAPS or lowercase, unlike this test file's other
     already-Title-Case fixtures."""

@@ -84,7 +84,7 @@ def build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, wit
         event_value = f" {'; '.join(value_parts)}" if value_parts else ""
     lines.append(f"1 {event_tag}{event_value}")
     if event_tag == 'EVEN':
-        lines.append(f"2 TYPE {Utils.cap_case(event_type)}")
+        lines.append(f"2 TYPE {Utils.capitalize_text_string(event_type)}")
     if raw_event_date:
         lines.append(f"2 DATE {Utils.format_gedcom_date(raw_event_date)}")
     lines.append(f"2 PLAC {Utils.clean_place(rec.get('event_place')) or GENERAL_CONFIG['default_location']}")
@@ -128,7 +128,7 @@ class GeneralProfile:
         std_s = Utils.clean_val(part.get('std_surname'))
         titl = f"3 _TITL {std_s}, {std_g}, {tag_name}, {year}"
         if document_type:
-            titl += f" -- {Utils.cap_case(document_type)}"
+            titl += f" -- {Utils.capitalize_text_string(document_type)}"
         return titl
 
     # noinspection DuplicatedCode
@@ -339,7 +339,7 @@ def get_role_name(part: dict) -> str:
     """The display/citation name for a participant's role."""
     if part.get('is_priest'):
         return GENERAL_CONFIG['role_clergy']
-    return Utils.cap_case(part.get('role_name')) or GENERAL_CONFIG['role_default_witness']
+    return Utils.capitalize_text_string(part.get('role_name')) or GENERAL_CONFIG['role_default_witness']
 
 
 def resolve_family_links(rec: dict) -> Dict[str, Any]:
@@ -730,9 +730,9 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
     dit_name = re.sub(r'(?i)^dit\s+', '', Utils.clean_val(part.get('dit_name'))).strip()
 
     sex = Utils.clean_val(part.get('sex'))[:1]
-    race = Utils.cap_case(part.get('race'))
-    religion = Utils.cap_case(part.get('religion'))
-    occu = Utils.cap_case(part.get('occupation'))
+    race = Utils.capitalize_text_string(part.get('race'))
+    religion = Utils.capitalize_text_string(part.get('religion'))
+    occu = Utils.capitalize_text_string(part.get('occupation'))
     resi = Utils.clean_place(part.get('residence'))
 
     age = Utils.clean_val(part.get('age'))
@@ -1132,9 +1132,10 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
                                  else generate_media_uid_for_path(doc_media_path))
                 if doc_media_uid in printed_media:
                     continue
+                doc_type_title = Utils.capitalize_text_string(doc.get('document_type')) or 'LAC Digital Object'
                 doc_media_block = [f"0 @{doc_media_uid}@ OBJE", f"1 FILE {doc_media_path}",
                                    "2 FORM " + ("pdf" if doc_media_path.lower().endswith(".pdf") else "jpg"),
-                                   f"2 TITL {Utils.cap_case(doc.get('document_type')) or 'LAC Digital Object'}"]
+                                   f"2 TITL {doc_type_title}"]
                 media_recs.append("\n".join(doc_media_block))
                 printed_media.add(doc_media_uid)
 
