@@ -277,15 +277,15 @@ def finalize_record(record: Dict[str, Any]) -> Dict[str, Any]:
     apply_defaults(record, TYPE_CFG.defaults.get("record", {}))
 
     if record.get("event_date"):
-        record["event_date"] = normalization.parse_to_iso(record["event_date"])
+        record["event_date"] = normalization.parse_date_to_iso_format(record["event_date"])
 
     for participant in record.get("participants", []):
         participant["std_given"] = strip_diacritics(participant.get("std_given"))
         participant["std_surname"] = strip_diacritics(participant.get("std_surname"))
         if participant.get("birth_date"):
-            participant["birth_date"] = normalization.parse_to_iso(participant["birth_date"])
+            participant["birth_date"] = normalization.parse_date_to_iso_format(participant["birth_date"])
         if participant.get("death_date"):
-            participant["death_date"] = normalization.parse_to_iso(participant["death_date"])
+            participant["death_date"] = normalization.parse_date_to_iso_format(participant["death_date"])
         apply_defaults(participant, TYPE_CFG.defaults.get("participant", {}))
 
     return record

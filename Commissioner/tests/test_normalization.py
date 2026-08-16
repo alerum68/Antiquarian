@@ -38,9 +38,9 @@ def test_derive_record_identity_set_type_code_true_sets_it():
     assert record["record_type_code"] == "7"
 
 
-def test_cap_case_preserves_known_acronym():
+def test_capitalize_text_string_preserves_known_acronym():
     assert normalization.capitalize_text_string("hbc trading post") == "HBC Trading Post"
 
 
-def test_parse_to_iso_full_date():
-    assert normalization.parse_to_iso("December 12, 1850") == "1850-12-12"
+def test_parse_date_to_iso_format_full_date():
+    assert normalization.parse_date_to_iso_format("December 12, 1850") == "1850-12-12"

@@ -54,7 +54,7 @@ _DATE_PATTERNS = [
 ]
 
 
-def parse_to_iso(reading: Optional[str]) -> Optional[str]:
+def parse_date_to_iso_format(reading: Optional[str]) -> Optional[str]:
     """Parses an English-language date reading into ISO format (YYYY-MM-DD, YYYY-MM, or YYYY)."""
     if not reading:
         return None

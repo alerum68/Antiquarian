@@ -246,7 +246,7 @@ def test_parish_pipeline_end_to_end(tmp_path, monkeypatch):
     record = sheet["records"][0]
     # Derived from event_type via the real FactTypes.json vocabulary (Baptism -> BAPM).
     assert record["record_id"] == "BAPM-45"
-    # LLM's English-language date reading converted to ISO by postprocess.parse_to_iso.
+    # LLM's English-language date reading converted to ISO by normalization.parse_date_to_iso_format.
     assert record["event_date"] == "1850-12-12"
     # Parish.pmt's record-level default (event_place was left null by the fake response).
     assert record["event_place"] == "Testville, TS, USA"

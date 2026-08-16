@@ -249,9 +249,9 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
     if primary is not None:
         primary["age"] = (columns.get("Age") or "").strip() or None
         birth_date = (columns.get("Birth Date") or "").strip() or (columns.get("Birth Year (Estimated)") or "").strip()
-        primary["birth_date"] = normalization.parse_to_iso(birth_date) or (birth_date or None)
+        primary["birth_date"] = normalization.parse_date_to_iso_format(birth_date) or (birth_date or None)
         death_date = (columns.get("Death Date") or "").strip()
-        primary["death_date"] = normalization.parse_to_iso(death_date) or (death_date or None)
+        primary["death_date"] = normalization.parse_date_to_iso_format(death_date) or (death_date or None)
         legitimacy = (columns.get("Legitimacy") or "").strip()
         if legitimacy:
             primary["type_specific_fields"]["legitimacy"] = legitimacy
@@ -269,8 +269,8 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
         "record_number": record_number,
         "record_type_code": None,
         "event_type": event_type,
-        "year": (normalization.parse_to_iso(event_date_raw) or "")[:4] or None,
-        "event_date": normalization.parse_to_iso(event_date_raw) or event_date_raw or None,
+        "year": (normalization.parse_date_to_iso_format(event_date_raw) or "")[:4] or None,
+        "event_date": normalization.parse_date_to_iso_format(event_date_raw) or event_date_raw or None,
         "event_place": normalization.capitalize_text_string((columns.get("Event Place") or "").strip()) or None,
         "citation_details": "",
         "citation_text": "",
