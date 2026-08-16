@@ -9,9 +9,9 @@
 2. Configuration loading moved from `PROGRAM_DIR` to `%LOCALAPPDATA%\Scriptorium`.
 3. Directory scaffolding updated.
 4. Tampermonkey and Auto-Update triggers injected on startup.
-5. `build.py` orchestrates PyInstaller.
+5. `build.py` orchestrates PyInstaller and copies `Voyageur.js` to `Sys`.
 6. `installer.iss` handles the dual-mode Windows setup + NodeJS + Gazetteer downloads.
-7. `.github/workflows/build.yml` automates releases.
+7. `.github/workflows/build.yml` automates sandbox and release builds.
 
 ---
 
@@ -35,7 +35,8 @@
 **Files:** `build.py`
 **Step 1:** Create `build.py` to run PyInstaller with `--onedir`.
 **Step 2:** Do *not* bundle `Paleographer/prompts` into the binary. Manually copy the `prompts/` folder to `dist/Scriptorium/Prompts/`.
-**Step 3:** Zip the `dist/Scriptorium` folder into `Scriptorium_Portable.zip`.
+**Step 3:** Manually copy `Voyageur/Voyageur.js` to `dist/Scriptorium/Sys/Voyageur.js`.
+**Step 4:** Zip the `dist/Scriptorium` folder into `Scriptorium_Portable.zip`.
 
 ### Task 5: Inno Setup Installer Script
 **Files:** `installer.iss`
@@ -43,10 +44,10 @@
 **Step 2:** Add `[Code]` logic to check for `npm`. If missing, download `node-v20.x-x64.msi` and `msiexec /i node.msi /qn`. Then `Exec()` the `npm install -g @google/antigravity-cli` command.
 **Step 3:** Use the Inno Download Plugin (or built-in `DownloadTemporaryFile`) to download `https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip` and the Canadian DB zip from GitHub raw, extracting them to `[Genealogy_Dir]\Scriptorium\Sys\Gazetteer`.
 
-### Task 6: GitHub Actions CI/CD
+### Task 6: GitHub Actions CI/CD (Sandbox & Release)
 **Files:** `.github/workflows/build.yml`
-**Step 1:** Create a YAML workflow triggering on `push: tags: - 'v*'`.
-**Step 2:** Define jobs for `windows-latest`, `macos-latest`, `ubuntu-latest`.
-**Step 3:** Checkout code, run `pip install`, run `python build.py`.
-**Step 4:** On Windows, run `iscc installer.iss`.
-**Step 5:** Upload the resulting artifacts to the GitHub Release.
+**Step 1:** Create a YAML workflow triggering on TWO events: `push` to `main` (Sandbox) and `push` to `tags` (Release).
+**Step 2:** Define jobs for `windows-latest`. Checkout code, run `pip install`, run `python build.py`.
+**Step 3:** On Windows, run `iscc installer.iss`.
+**Step 4:** For pushes to `main`, upload the `.exe` as a "Workflow Artifact" (a private zip you can download to test without publishing).
+**Step 5:** For pushes to `tags`, upload the `.exe` directly to a public GitHub Release.
