@@ -3,7 +3,7 @@ name: Build and Release Scriptorium
 on:
   push:
     branches:
-      - main
+      - Unify
     tags:
       - 'v*'
 
@@ -30,7 +30,7 @@ jobs:
         run: iscc installer.iss
 
       - name: Upload Sandbox Artifact
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/Unify'
         uses: actions/upload-artifact@v4
         with:
           name: Scriptorium-Installer-Sandbox
