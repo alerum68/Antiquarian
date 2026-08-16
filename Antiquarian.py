@@ -20,7 +20,7 @@ import yaml
 from dotenv import dotenv_values
 
 BASE_DIR = Path(__file__).resolve().parent
-APP_VERSION = "0.3.28"
+APP_VERSION = "0.07.00"
 
 # Each tool's own script lives in a fixed subfolder of this codebase - hardcoded rather than
 # a configurable Global Settings field, since the folder layout is the codebase's own, not
@@ -1997,6 +1997,11 @@ class Antiquarian(ctk.CTk):
     def _run_subprocess(self, safe_cmd, run_env, target_cwd, on_complete, on_success=None):
         run_env['PYTHONUNBUFFERED'] = '1'
         run_env['PYTHONIOENCODING'] = 'utf-8'
+        # The app's own install location - not a GUI-editable setting, so it never rides
+        # along via string_vars like the rest of run_env. Tools that resolve fixed,
+        # ships-with-the-app paths (e.g. Gazetteer's shapefiles) read this rather than a
+        # settings key.
+        run_env.setdefault('PROGRAM_DIR', str(BASE_DIR))
 
         script_path = safe_cmd[0]
         try:
