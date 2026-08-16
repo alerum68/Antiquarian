@@ -3,7 +3,8 @@ import shutil
 import subprocess
 
 def build():
-    # Step 1: Run PyInstaller with --onedir
+    # Package the Scriptorium binary natively. --onedir prevents extraction penalties
+    # for background subprocesses during runtime.
     print("Running PyInstaller...")
     subprocess.run([
         "python", "-m", "PyInstaller",
@@ -24,7 +25,8 @@ def build():
 
     dist_dir = os.path.join("dist", "Scriptorium")
     
-    # Step 2: Manually copy Prompts folder
+    # Expose the raw prompts directory so power users can modify .pmt templates directly 
+    # without recompiling the executable.
     print("Copying Prompts...")
     prompts_src = os.path.join("Paleographer", "prompts")
     prompts_dst = os.path.join(dist_dir, "Prompts")
@@ -32,13 +34,14 @@ def build():
         shutil.rmtree(prompts_dst)
     shutil.copytree(prompts_src, prompts_dst)
 
-    # Step 3: Manually copy Voyageur.js
+    # Expose the Voyageur userscript directly in the Sys directory to facilitate
+    # easy browser installation via the first-launch Tampermonkey prompt.
     print("Copying Voyageur.js...")
     sys_dst = os.path.join(dist_dir, "Sys")
     os.makedirs(sys_dst, exist_ok=True)
     shutil.copy(os.path.join("Voyageur", "Voyageur.js"), os.path.join(sys_dst, "Voyageur.js"))
 
-    # Step 4: Zip the folder
+    # Bundle a portable version for users bypassing the Inno Setup installer
     print("Zipping Scriptorium_Portable.zip...")
     shutil.make_archive("Scriptorium_Portable", "zip", "dist", "Scriptorium")
     

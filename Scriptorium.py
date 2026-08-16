@@ -47,8 +47,7 @@ def get_config_dir() -> Path:
 
 
 def env_path_for(subfolder: Optional[str]) -> Path:
-    """Resolves the .env path for a settings group: the config root if subfolder is None,
-    otherwise that tool's own subfolder, so each tool's config stays self-contained."""
+    """Resolves the .env config path, isolating module-specific settings into subfolders."""
     config_dir = get_config_dir()
     return config_dir / subfolder / ".env" if subfolder else config_dir / ".env"
 
@@ -733,7 +732,8 @@ class Scriptorium(ctk.CTk):
         self._build_layout()
         self._load_env_to_vars()
 
-        # Scaffold default directories
+        # Ensure required internal data directories exist in the target working path
+        # before any downstream tools attempt to read or write to them.
         prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
         if prog_dir_var:
             prog_dir = prog_dir_var.get().strip()
@@ -751,7 +751,7 @@ class Scriptorium(ctk.CTk):
         if global_env.get("TAMPERMONKEY_INSTALLED") != "True":
             self.after(500, self._prompt_tampermonkey)
 
-        # Launch auto-updater check
+        # Check for new releases asynchronously to avoid blocking the GUI thread on startup.
         threading.Thread(target=self._auto_update_check, daemon=True).start()
 
     def _auto_update_check(self):
@@ -1893,17 +1893,9 @@ class Scriptorium(ctk.CTk):
             if key in self.string_vars:
                 env_overrides[key] = resolve_path(base_dir, self.string_vars[key].get())
 
-        # Nothing else to compute here: every prefixed setting (CHURCH_*/SCRIP_*/CENSUS_*)
-        # is already in run_env from the blanket string_vars dump above (with the nested
-        # RM/FTM-database and PDFix-target ones now resolved to full paths, via
-        # nested_dir_keys). Paleographer.py and Archivist.py each resolve their own
-        # generic runtime settings (MASTER_DB_NAME, CALL_NUMBER, GEDCOM_OUTPUT_NAME, etc.)
-        # directly from those env vars via their own field_remap table (declared in the
-        # active .pmt's front matter) - the same resolution they use when run standalone,
-        # with no dependency on this GUI computing anything family/record-type-specific on
-        # their behalf. IMAGE_DIR is the one exception: it has no user-facing override at
-        # all, auto-resolved by Archivist/General.py to Media/<record type> from the
-        # active .pmt's own name.
+        # Inject runtime overrides. Downstream modules (Paleographer/Archivist) 
+        # independently resolve their own schemas via .pmt field_remaps, so we 
+        # avoid computing record-type-specific logic here.
         run_env.update(env_overrides)
 
         self._set_ui_state("disabled")
