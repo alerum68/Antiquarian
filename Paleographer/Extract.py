@@ -235,10 +235,7 @@ PROGRAM_DIR: Path = Path(os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().p
 GENEALOGY_DIR: Path = Path(os.getenv("GENEALOGY_DIR", ""))
 _MASTER_DB_NAME = resolve_setting("MASTER_DB_NAME")
 if not _MASTER_DB_NAME:
-    raise RuntimeError(
-        "MASTER_DB_NAME resolved to an empty value (check the active record type's own "
-        "MASTER_DB_NAME setting, e.g. CHURCH_MASTER_DB_NAME for Parish.pmt) - without it "
-        "MASTER_DB would just be the JSON folder itself, not a file inside it.")
+    _MASTER_DB_NAME = f"{TYPE_CFG.name}.json"
 MASTER_DB: str = str(PROGRAM_DIR / os.getenv("JSON_DIR", "") / _MASTER_DB_NAME)
 MEDIA_DIR: Path = GENEALOGY_DIR / (os.getenv("MEDIA_DIR") or "Media")
 SOURCE_DIR: str = str(MEDIA_DIR / TYPE_CFG.name)
@@ -322,7 +319,7 @@ def load_master_db() -> Dict[str, Any]:
 
 
 def save_master_db(master_data: Dict[str, Any]) -> None:
-    master_data.setdefault("collection_metadata", {}).update({
+    updates = {
         "CITATION_TEXT": resolve_setting("CITATION_TEXT"),
         "CITATION_DETAIL": resolve_setting("CITATION_DETAIL"),
         "CALL_NUMBER": resolve_setting("CALL_NUMBER"),
@@ -333,10 +330,13 @@ def save_master_db(master_data: Dict[str, Any]) -> None:
         "PUBLISHER": resolve_setting("PUBLISHER"),
         "PUB_LOC": resolve_setting("PUB_LOC"),
         "REGISTER_NAME": resolve_setting("REGISTER_NAME"),
-        "REGISTER_SOURCE_ID": resolve_setting("REGISTER_SOURCE_ID", "1"),
+        "REGISTER_SOURCE_ID": resolve_setting("REGISTER_SOURCE_ID"),
         "VOLUME_TITLE": resolve_setting("VOLUME_TITLE"),
         "VOLUME_NUM": resolve_setting("VOLUME_NUM"),
-    })
+    }
+    non_empty_updates = {k: v for k, v in updates.items() if v}
+    if non_empty_updates:
+        master_data.setdefault("collection_metadata", {}).update(non_empty_updates)
 
     try:
         from Commissioner.record_registry import validate_collection_softly

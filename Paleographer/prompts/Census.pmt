@@ -38,6 +38,8 @@ extra_fields:
     - {name: birth_month, type: string}
     - {name: marital_status, type: string}
     - {name: alternate_birth_places, type: list}
+settings_sections:
+  - "Citation Overrides"
 ---
 
 You are an expert genealogist specializing in historical census enumeration

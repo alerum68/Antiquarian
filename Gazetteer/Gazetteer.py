@@ -39,16 +39,16 @@ GENEALOGY_DIR = os.getenv("GENEALOGY_DIR", "")
 _rm_db = os.getenv("GAZETTEER_RM_DATABASE", "Roots Magic 11/Your Tree.rmtree")
 RM_DATABASE = _rm_db if os.path.isabs(_rm_db) else os.path.join(GENEALOGY_DIR, _rm_db)
 
-_shape = os.getenv(
-    "GAZETTEER_SHAPEFILE",
+# These ship alongside the Gazetteer tool at fixed, known-good locations - not
+# user-configurable settings, so they are plain constants rather than os.getenv() reads.
+SHAPEFILE_PATH = os.path.join(
+    PROGRAM_DIR,
     "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp")
-SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, _shape)
 
 # Optional: if the folder isn't present, Gazetteer simply runs US-only, exactly as it did
 # before this existed (one shapefile per census year - see that folder's own
 # LICENSE_AND_ATTRIBUTION.txt).
-_ca_shape_dir = os.getenv("GAZETTEER_CA_SHAPEFILE_DIR", "Antiquarian/Gazetteer/CA_UNICEN_Counties")
-CA_SHAPEFILE_DIR = _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
+CA_SHAPEFILE_DIR = os.path.join(PROGRAM_DIR, "Antiquarian/Gazetteer/CA_UNICEN_Counties")
 
 DEBUG_MODE = False
 CREATE_BACKUP = True

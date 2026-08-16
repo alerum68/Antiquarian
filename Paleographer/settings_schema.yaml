@@ -1,8 +1,4 @@
 sections:
-  Antigravity CLI:
-    AGY_CLI_BIN:
-      default: "agy"
-      tooltip: "The Antigravity CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
   Data & Directories:
     PALEOGRAPHER_RECORD_TYPE:
       default: ""
@@ -16,33 +12,38 @@ sections:
       options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
 
   Parish Information:
-    CHURCH_MASTER_DB_NAME:
-      default: "parish_register.json"
-      tooltip: "The filename for the JSON database storing the extracted records."
-      picker:
-        kind: save
-        base_dir_key: "JSON_DIR"
-        filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
-        defaultextension: ".json"
     PARISH_NAME:
-      default: "St. Generic Catholic Church"
-      tooltip: "The full historical name of the church (e.g., St. Joseph Catholic Church)."
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The full historical name of the church (e.g., St. Joseph Catholic Church)."
     PARISH_NAME_SHORT:
-      default: "St. Generic Parish, Anytown, ST"
-      tooltip: "A shortened name for the parish, used in file titles."
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. A shortened name for the parish, used in file titles."
     PARISH_CITY:
-      default: "Anytown"
-      tooltip: "The city where the parish is located."
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The city where the parish is located."
     PARISH_STATE:
-      default: "State"
-      tooltip: "The state or province where the parish is located."
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The state or province where the parish is located."
     DEFAULT_EVENT_LOCATION:
-      default: "Anytown, Any County, State, USA"
-      tooltip: "The default location assigned to events if none is specified."
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The default location assigned to events if none is specified."
+    REGISTER_NAME:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The name of the specific register or book."
+    REGISTER_SOURCE_ID:
+      default: ""
+      tooltip: "A numeric source ID, if you are synchronizing with an existing RootsMagic database."
+    VOLUME_TITLE:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. This specific volume/book's own title or label (e.g., 'Volume 1')."
+    VOLUME_NUM:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The volume number of the register."
+
   Citation Overrides:
     CITATION_TEXT:
       default: ""
-      tooltip: "The full text of the citation, if overriding default GEDCOM generation."
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The full text of the citation, if overriding default GEDCOM generation."
     CITATION_DETAIL:
       default: ""
       tooltip: "Specific page/item details to append to the base citation."
@@ -67,18 +68,7 @@ sections:
     PUB_LOC:
       default: ""
       tooltip: "Location of the publisher."
-    REGISTER_NAME:
-      default: ""
-      tooltip: "The name of the specific register or book."
-    REGISTER_SOURCE_ID:
-      default: "1"
-      tooltip: "A numeric source ID, if you are synchronizing with an existing RootsMagic database."
-    VOLUME_TITLE:
-      default: ""
-      tooltip: "This specific volume/book's own title or label (e.g., 'Volume 1'). Used alongside Register Name in the generated source citations."
-    VOLUME_NUM:
-      default: ""
-      tooltip: "The volume number of the register."
+
   Scrip Information:
     SCRIP_MASTER_DB_NAME:
       default: "scrip_records.json"

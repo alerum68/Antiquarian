@@ -63,7 +63,7 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  GenDir, RmDir, GazDir: String;
+  GenDir, RmDir, GazDir, EnvContent: String;
   ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
@@ -78,11 +78,27 @@ begin
     begin
       GazDir := GenDir + '\Antiquarian\Sys\Gazetteer';
       ForceDirectories(GazDir);
+      ForceDirectories(GenDir + '\Antiquarian\Media');
+      ForceDirectories(GenDir + '\Antiquarian\JSON');
+      ForceDirectories(GenDir + '\Antiquarian\GEDCOM');
       
       // We would ideally extract the zips here, but Inno Setup requires a plugin or PowerShell to extract.
       // Using PowerShell snippet to extract
       Exec('powershell.exe', '-NoProfile -Command "Expand-Archive -Force -Path ''' + ExpandConstant('{tmp}\US_AtlasHCB_Counties.zip') + ''' -DestinationPath ''' + GazDir + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       Exec('powershell.exe', '-NoProfile -Command "Expand-Archive -Force -Path ''' + ExpandConstant('{tmp}\Canada_Counties.zip') + ''' -DestinationPath ''' + GazDir + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+      // Write the selected paths to the .env file
+      EnvContent := 'GENEALOGY_DIR=''' + GenDir + '''' + #13#10;
+      if RmDir <> '' then
+        EnvContent := EnvContent + 'RM_DIR=''' + RmDir + '''' + #13#10;
+      
+      if PortablePage.Values[1] then
+        SaveStringToFile(ExpandConstant('{app}\.env'), EnvContent, False)
+      else
+      begin
+        ForceDirectories(ExpandConstant('{localappdata}\Antiquarian'));
+        SaveStringToFile(ExpandConstant('{localappdata}\Antiquarian\.env'), EnvContent, False);
+      end;
     end;
   end;
 end;

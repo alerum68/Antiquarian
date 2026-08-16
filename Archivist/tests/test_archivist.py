@@ -1002,76 +1002,24 @@ def test_build_general_citation_scrip_emits_commissioners_review_note():
         General.set_active_profile(General.GeneralProfile())
 
 
-def test_apply_record_type_field_remap_hbca_auto_resolves_image_dir(monkeypatch):
+def test_apply_collection_metadata_auto_resolves_image_dir(monkeypatch):
     """IMAGE_DIR has no user-facing override (not even via env var) - it's always
     auto-resolved to Media/<record type>, matching Paleographer/Extract.py's own
     SOURCE_DIR convention for where that type's images were actually extracted from. A
     stray HBCA_IMAGE_DIR env var (e.g. left over from a legacy .env) must NOT change it."""
     monkeypatch.setenv("HBCA_IMAGE_DIR", "SomeOtherPath")
-    orig_call = General.CALL_NUMBER
-    orig_url = General.COLLECTION_URL
-    orig_name = General.COLLECTION_NAME
-    orig_repo = General.REPOSITORY
-    orig_repo_loc = General.REPOSITORY_LOC
     orig_image_dir = General.IMAGE_DIR
-    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
     try:
-        General.apply_record_type_field_remap("HBCA")
+        General.apply_collection_metadata({"record_type_name": "HBCA"})
         assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "HBCA")
-    finally:
-        General.CALL_NUMBER = orig_call
-        General.COLLECTION_URL = orig_url
-        General.COLLECTION_NAME = orig_name
-        General.REPOSITORY = orig_repo
-        General.REPOSITORY_LOC = orig_repo_loc
-        General.IMAGE_DIR = orig_image_dir
-        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
-
-def test_apply_record_type_field_remap_parish_auto_resolves_image_dir(monkeypatch):
-    monkeypatch.delenv("CHURCH_IMAGE_DIR", raising=False)
-    orig_call = General.CALL_NUMBER
-    orig_url = General.COLLECTION_URL
-    orig_name = General.COLLECTION_NAME
-    orig_repo = General.REPOSITORY
-    orig_repo_loc = General.REPOSITORY_LOC
-    orig_image_dir = General.IMAGE_DIR
-    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
-    try:
-        General.apply_record_type_field_remap("Parish")
+        General.apply_collection_metadata({"record_type_name": "Parish"})
         assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Parish")
-    finally:
-        General.CALL_NUMBER = orig_call
-        General.COLLECTION_URL = orig_url
-        General.COLLECTION_NAME = orig_name
-        General.REPOSITORY = orig_repo
-        General.REPOSITORY_LOC = orig_repo_loc
-        General.IMAGE_DIR = orig_image_dir
-        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
-
-def test_apply_record_type_field_remap_scrip_auto_resolves_image_dir(monkeypatch):
-    monkeypatch.setenv("SCRIP_IMAGE_DIR", "Scrip Records/pdf_out")
-    orig_call = General.CALL_NUMBER
-    orig_url = General.COLLECTION_URL
-    orig_name = General.COLLECTION_NAME
-    orig_repo = General.REPOSITORY
-    orig_repo_loc = General.REPOSITORY_LOC
-    orig_image_dir = General.IMAGE_DIR
-    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
-    try:
-        General.apply_record_type_field_remap("Scrip")
-        # The SCRIP_IMAGE_DIR env var set above is deliberately ignored - Scrip.pmt no
-        # longer declares an IMAGE_DIR field_remap entry at all.
+        General.apply_collection_metadata({"record_type_name": "Scrip"})
         assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Scrip")
     finally:
-        General.CALL_NUMBER = orig_call
-        General.COLLECTION_URL = orig_url
-        General.COLLECTION_NAME = orig_name
-        General.REPOSITORY = orig_repo
-        General.REPOSITORY_LOC = orig_repo_loc
         General.IMAGE_DIR = orig_image_dir
-        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
 def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):

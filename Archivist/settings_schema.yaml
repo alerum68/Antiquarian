@@ -7,57 +7,11 @@ sections:
         kind: open
         base_dir_key: "JSON_DIR"
         filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
-    GEDCOM_OUTPUT_NAME:
-      default: "Family_Register.ged"
-      tooltip: "Name of generated GEDCOM file."
     GEDCOM_OUTPUT_MODE:
       default: "Both"
       tooltip: "Output mode for generated GEDCOM records (e.g., Both)."
-    APID_DB:
-      default: ""
-      tooltip: "Ancestry APID database identifier."
-    ANCESTRY_IMAGE_BASE_ID:
-      default: ""
-      tooltip: "Ancestry image base identifier."
-  Citation Overrides:
-    CITATION_TEXT:
-      default: ""
-      tooltip: "Optional header prefixed to transcribed original-language text inside generated source citations (leave blank for no header)."
-    CITATION_DETAIL:
-      default: ""
-      tooltip: "Optional header prefixed to English translation/details text inside generated source citations (leave blank for no header)."
-    CALL_NUMBER:
-      default: ""
-      tooltip: "Call number for church or archival register collection."
-    REPOSITORY:
-      default: ""
-      tooltip: "Archive or website hosting this collection."
-    REPOSITORY_LOC:
-      default: ""
-      tooltip: "Physical location or address of the repository."
-    COLLECTION_URL:
-      default: ""
-      tooltip: "URL link to the historical collection."
-    COLLECTION_NAME:
-      default: ""
-      tooltip: "Name of the archival collection."
-    PUBLISHER:
-      default: ""
-      tooltip: "Publisher of the collection or record series."
-    PUB_LOC:
-      default: ""
-      tooltip: "Publication location."
-    REGISTER_NAME:
-      default: ""
-      tooltip: "Contents and coverage description of the register."
-    REGISTER_SOURCE_ID:
-      default: "1"
-      tooltip: "Source ID assigned to the register volume."
-    VOLUME_TITLE:
-      default: ""
-      tooltip: "Title or label of the specific volume."
-    VOLUME_NUM:
-      default: ""
-      tooltip: "Volume number of the register."
+      widget: segmented
+      options: [["RM", "RootsMagic"], ["FTM", "FTM"], ["Both", "Both"]]
 label_overrides:
-  JSON_FILE: "Downloaded JSON File Name"
+  JSON_FILE: "Input JSON File"
+  GEDCOM_OUTPUT_MODE: "GEDCOM Format"

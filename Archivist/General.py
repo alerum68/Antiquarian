@@ -3,39 +3,37 @@ import hashlib
 import os
 import re
 import xml.etree.ElementTree as etree
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol, Tuple, Union
-import yaml
 
 import Utils
 
 GENERAL_CONFIG = {
-    'volume_num': os.getenv('VOLUME_NUM', ''),
-    'register_source_id': os.getenv('REGISTER_SOURCE_ID', '1'),
-    'register_name': os.getenv('REGISTER_NAME', ''),
+    'volume_num': '',
+    'register_source_id': '1',
+    'register_name': '',
     'parish_name': 'Parish Name',
     'parish_name_short': 'Parish',
     'parish_location': 'City, State',
-    'volume_title': os.getenv('VOLUME_TITLE', ''),
+    'volume_title': '',
     'date_range_str': '',
     'diocese': '',
-    'collection_url': os.getenv('COLLECTION_URL', ''),
-    'collection_name': os.getenv('COLLECTION_NAME', ''),
+    'collection_url': '',
+    'collection_name': '',
     'parish_file_name': 'Parish_Export',
     'default_location': '',
-    'citation_detail': os.getenv('CITATION_DETAIL', ''),
-    'citation_text': os.getenv('CITATION_TEXT', ''),
+    'citation_detail': '',
+    'citation_text': '',
     'role_clergy': 'Priest',
     'role_default_witness': 'Witness',
     'clergy_honorific': 'Father',
 }
 
-CALL_NUMBER = os.getenv("CALL_NUMBER", "")
-COLLECTION_URL = os.getenv("COLLECTION_URL", "")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
-REPOSITORY = os.getenv("REPOSITORY", "")
-REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-# Default image directory (overridden per-record-type in apply_record_type_field_remap)
+CALL_NUMBER = ""
+COLLECTION_URL = ""
+COLLECTION_NAME = ""
+REPOSITORY = ""
+REPOSITORY_LOC = ""
+# Default image directory (overridden per-record-type in apply_collection_metadata)
 IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"))
 
 
@@ -1178,42 +1176,26 @@ def build_gedcom_from_general(json_data: dict, target_software: str) -> str:
     return "\n".join(ged)
 
 
-def apply_record_type_field_remap(record_type_name: str) -> None:
+def apply_collection_metadata(data: dict) -> None:
     global CALL_NUMBER, COLLECTION_URL, COLLECTION_NAME, REPOSITORY, REPOSITORY_LOC, IMAGE_DIR
+    cm = data.get("collection_metadata", {})
+    if cm:
+        CALL_NUMBER = cm.get("CALL_NUMBER", CALL_NUMBER)
+        COLLECTION_URL = cm.get("COLLECTION_URL", COLLECTION_URL)
+        COLLECTION_NAME = cm.get("COLLECTION_NAME", COLLECTION_NAME)
+        REPOSITORY = cm.get("REPOSITORY", REPOSITORY)
+        REPOSITORY_LOC = cm.get("REPOSITORY_LOC", REPOSITORY_LOC)
 
-    pmt_path = Path(__file__).resolve().parent.parent / "Paleographer" / "prompts" / f"{record_type_name}.pmt"
-    if not record_type_name or not pmt_path.is_file():
-        return
+        GENERAL_CONFIG['citation_text'] = cm.get("CITATION_TEXT", GENERAL_CONFIG['citation_text'])
+        GENERAL_CONFIG['citation_detail'] = cm.get("CITATION_DETAIL", GENERAL_CONFIG['citation_detail'])
+        GENERAL_CONFIG['register_name'] = cm.get("REGISTER_NAME", GENERAL_CONFIG['register_name'])
+        GENERAL_CONFIG['register_source_id'] = cm.get("REGISTER_SOURCE_ID", GENERAL_CONFIG['register_source_id'])
+        GENERAL_CONFIG['volume_title'] = cm.get("VOLUME_TITLE", GENERAL_CONFIG['volume_title'])
+        GENERAL_CONFIG['volume_num'] = cm.get("VOLUME_NUM", GENERAL_CONFIG['volume_num'])
 
-    raw = pmt_path.read_text(encoding="utf-8")
-    stripped = raw.lstrip()
-    if not stripped.startswith("---"):
-        return
-    parts = stripped.split("---", 2)
-    if len(parts) < 3:
-        return
-    front_matter = yaml.safe_load(parts[1]) or {}
-    field_remap = front_matter.get("field_remap", {}) or {}
-
-    resolved: Dict[str, str] = {}
-    for prefixed_key, target in field_remap.items():
-        val = os.getenv(prefixed_key, "")
-        if val:
-            resolved[target] = val
-
-    CALL_NUMBER = resolved.get("CALL_NUMBER") or CALL_NUMBER
-    COLLECTION_URL = resolved.get("COLLECTION_URL") or COLLECTION_URL
-    COLLECTION_NAME = resolved.get("COLLECTION_NAME") or COLLECTION_NAME
-    REPOSITORY = resolved.get("REPOSITORY") or REPOSITORY
-    REPOSITORY_LOC = resolved.get("REPOSITORY_LOC") or REPOSITORY_LOC
-    # No env-var override (deliberate - see IMAGE_DIR's own module-level comment):
-    # record_type_name IS this record type's own .pmt stem (pmt_path.is_file() above
-    # already confirmed it), so it's also the exact subfolder name Paleographer/
-    # Extract.py's own SOURCE_DIR already wrote this type's images to
-    # (Media/TYPE_CFG.name) - reusing it here needs no field_remap entry of its own.
-    IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), record_type_name)
-    if resolved.get("GEDCOM_OUTPUT_NAME") and not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
-        Utils.GEDCOM_OUTPUT_NAME = resolved["GEDCOM_OUTPUT_NAME"]
+    record_type_name = data.get("record_type_name", "")
+    if record_type_name:
+        IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), record_type_name)
 
 
 def apply_extracted_parish_name(data: dict) -> None:
@@ -1234,7 +1216,7 @@ def apply_extracted_parish_name(data: dict) -> None:
 
 
 def apply_resolved_source_id(data: dict) -> None:
-    explicit = os.getenv("REGISTER_SOURCE_ID", "").strip()
+    explicit = str(GENERAL_CONFIG.get("register_source_id", "")).strip()
     if explicit and explicit != "1":
         return
 
@@ -1261,7 +1243,7 @@ def apply_resolved_source_id(data: dict) -> None:
 def run_general_flavor(data: dict, profile: Profile) -> None:
     set_active_profile(profile)
     global REPOSITORY, REPOSITORY_LOC
-    apply_record_type_field_remap(data.get("record_type_name", ""))
+    apply_collection_metadata(data)
 
     default_repo, default_repo_loc = profile.repository_defaults()
     REPOSITORY = REPOSITORY or default_repo

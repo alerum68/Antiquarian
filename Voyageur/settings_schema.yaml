@@ -11,7 +11,7 @@ sections:
       tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file."
       widget: segmented
       options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
-  HBCA / Manitoba Archives:
+  HBCA Settings:
     HBCA_LETTER_FILTER:
       default: ""
       tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."

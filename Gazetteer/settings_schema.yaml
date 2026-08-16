@@ -7,18 +7,5 @@ sections:
         kind: open
         base_dir_key: "RM_DIR"
         filetypes: [["RootsMagic files", "*.rmtree"], ["All files", "*.*"]]
-    GAZETTEER_SHAPEFILE:
-      default: "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/US_HistCounties_Shapefile/US_HistCounties.shp"
-      tooltip: "The path to the Newberry Atlas '.shp' file containing historical county boundaries. Relative to your Program Dir (it ships alongside the Gazetteer tool), not the RootsMagic folder."
-      picker:
-        kind: open
-        base_dir_key: "__PROGRAM_DIR__"
-        filetypes: [["Shapefiles", "*.shp"], ["All files", "*.*"]]
-    GAZETTEER_CA_SHAPEFILE_DIR:
-      default: "Antiquarian/Gazetteer/CA_UNICEN_Counties"
-      tooltip: "The directory containing Canadian Census historical boundary shapefiles."
-      picker:
-        kind: directory
-        base_dir_key: "__PROGRAM_DIR__"
 label_overrides:
   GAZETTEER_RM_DATABASE: "RootsMagic Database Path"

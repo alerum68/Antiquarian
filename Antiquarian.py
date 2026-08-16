@@ -131,8 +131,8 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                     "COST_PER_1M_OUTPUT": "0.30",
                                     "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
                "Global Directories": {"GENEALOGY_DIR": "",
-                                      "RM_DIR": "Antiquarian/RM",
-                                      "FTM_DIR": "Antiquarian/FTM",
+                                      "RM_DIR": "",
+                                      "FTM_DIR": "",
                                       "MEDIA_DIR": "Antiquarian/Media",
                                       "JSON_DIR": "Antiquarian/JSON",
                                       "GEDCOM_OUTPUT_PATH": "Antiquarian/GEDCOM"},
@@ -162,12 +162,20 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
                       "quality, and shorthand values like 'pro' or 'flash' are not valid - only exact IDs from "
                       "`agy models` work.",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
-    "RM_DIR": "The folder where your RootsMagic files live, relative to the Program Dir.",
+    "RM_DIR": "The folder where your RootsMagic files live, relative to the Genealogy Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
     "RESEARCHER": "Your name. This will be added to the GEDCOM file to give you credit as the transcriber.",
     "ORG_NAME": "The name of your Historical Society, Library, or personal organization to include in GEDCOM headers.",
-    "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@)."}
+    "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
+    "FTM_DIR": "The folder where your Family Tree Maker files live, relative to the Genealogy Dir.",
+    "SUBM_ADDRESS": "A contact URL or email address for the submitter/researcher.",
+    "MGS_GROUP_URL": "The URL for the MGS online group or repository (if applicable).",
+    "ANCESTRY_GROUP_URL": "The URL for the corresponding Ancestry group or page (if applicable).",
+    "API_BUDGET": "Your configured maximum API spend budget for transcription tasks.",
+    "COST_PER_1M_INPUT": "The cost per 1 million input tokens for the AI model.",
+    "COST_PER_1M_OUTPUT": "The cost per 1 million output tokens for the AI model.",
+    "CACHE_DISCOUNT_MULTIPLIER": "The discount multiplier applied when prompts match the cached context."}
 
 # ==========================================
 # CUSTOM UI LABELS OVERRIDE
@@ -178,7 +186,8 @@ CUSTOM_LABELS = {
     "RM_DIR": "RootsMagic Folder",
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
-    "JSON_DIR": "JSON Download Folder"}
+    "JSON_DIR": "JSON Download Folder",
+    "AGY_MODEL_NAME": "Antigravity Model Name"}
 
 # ==========================================
 # PATH & FILE PICKER FIELDS
@@ -277,7 +286,7 @@ VOYAGEUR_SOURCES = [
     ("A", "Ancestry"),
     ("FS", "FamilySearch"),
     ("LAC", "LAC"),
-    ("HBCA", "HBCA / Manitoba Archives"),
+    ("HBCA", "Keystone Archives"),
 ]
 
 VOYAGEUR_VARS = load_tool_schema(BASE_DIR / "Voyageur")
@@ -1485,6 +1494,14 @@ class Antiquarian(ctk.CTk):
         except ValueError:
             self.string_vars[key].set(str(selected_path).replace("\\", "/"))
 
+    def _reset_api_tuning(self):
+        defaults = GLOBAL_VARS["API & Processing"]
+        for key in ["API_BUDGET", "COST_PER_1M_INPUT", "COST_PER_1M_OUTPUT", "CACHE_DISCOUNT_MULTIPLIER"]:
+            if key in self.string_vars:
+                self.string_vars[key].set(defaults[key])
+        self.console.put("\n[System] API Tuning values reset to defaults. Click 'Save Configuration' to keep them.\n")
+        self._expand_console()
+
     def _build_tab_global(self, parent_frame: ctk.CTkFrame):
         self._build_tab_header(parent_frame, "Global Settings", "SHARED",
                                "The API key, folders, and researcher credit every tool above shares, "
@@ -1492,11 +1509,11 @@ class Antiquarian(ctk.CTk):
 
         # Build buttons first so they dock safely to the bottom
         btn_box = self._create_action_box(parent_frame)
-        ctk.CTkButton(btn_box, text="Test Antigravity Connection", fg_color=C_ACCENT_STRONG, hover_color=C_ACCENT,
-                      text_color=C_ON_ACCENT,
-                      command=lambda: self.execute_script("AGY_TEST_SCRIPT", "test")).pack(side="left", padx=5)
+        ctk.CTkButton(btn_box, text="Reset API Tuning Defaults", fg_color=C_SURFACE_RAISED, hover_color=C_BORDER,
+                      text_color=C_TEXT,
+                      command=self._reset_api_tuning).pack(side="left", padx=5)
 
-        api_keys = set(GLOBAL_VARS.get("API & Processing", {}).keys())
+        api_keys = {"AI_API_KEY", "EXTRACTION_ENGINE", "MODEL_NAME", "AGY_MODEL_NAME"}
         self._build_form_ui(parent_frame, GLOBAL_VARS, skip_keys=api_keys)
 
     def _build_tab_archivist(self, frame: ctk.CTkFrame):
@@ -1591,7 +1608,7 @@ class Antiquarian(ctk.CTk):
             filtered = {name: fields for name, fields in PALEOGRAPHER_VARS.items()
                         if not sections or name in sections}
             self._build_form_ui(self.paleographer_form_container, filtered,
-                                skip_keys={"PALEOGRAPHER_RECORD_TYPE"})
+                                skip_keys={"PALEOGRAPHER_RECORD_TYPE", "PALEOGRAPHER_PDF_COMPRESSION_LEVEL"})
 
     def _build_tab_paleographer(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Paleographer", "TRANSCRIBE",
@@ -1609,11 +1626,20 @@ class Antiquarian(ctk.CTk):
 
         debug_frame = ctk.CTkFrame(frame, fg_color="transparent")
         debug_frame.pack(side="top", fill="x", pady=(10, 5))
-        ctk.CTkLabel(debug_frame, text="Debug Filename (Leave blank for Batch):",
+        ctk.CTkLabel(debug_frame, text="Single Document Extraction (Leave blank for Batch):",
                      font=ctk.CTkFont(weight="bold")).pack(side="left")
         ctk.CTkEntry(debug_frame, textvariable=self.debug_file_var, width=300).pack(side="left", padx=10)
         ctk.CTkButton(debug_frame, text="Browse...", width=90,
                       command=self._browse_debug_file).pack(side="left")
+
+        compress_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        compress_frame.pack(side="top", fill="x", pady=(10, 5))
+        comp_lbl = ctk.CTkLabel(compress_frame, text="PDF Compression Level ⓘ", font=ctk.CTkFont(weight="bold"),
+                                cursor="hand2")
+        comp_lbl.pack(side="left")
+        ToolTip(comp_lbl, TOOLTIP_DESCRIPTIONS.get("PALEOGRAPHER_PDF_COMPRESSION_LEVEL", ""))
+        self._build_segmented_field(compress_frame, "PALEOGRAPHER_PDF_COMPRESSION_LEVEL",
+                                    FIELD_WIDGETS["PALEOGRAPHER_PDF_COMPRESSION_LEVEL"])
 
         # Unified action buttons (Docked to bottom)
         btn_box = self._create_action_box(frame)
@@ -1638,12 +1664,25 @@ class Antiquarian(ctk.CTk):
                       command=lambda: self.execute_script("CLEANUP_CACHE_SCRIPT", "standalone")).pack(side="right",
                                                                                                       padx=5)
 
+        # Clear fields button above the form container
+        clear_frame = ctk.CTkFrame(frame, fg_color="transparent")
+        clear_frame.pack(side="top", fill="x", pady=(5, 0))
+        ctk.CTkButton(clear_frame, text="Clear Overrides & Settings", fg_color=C_SURFACE_RAISED, hover_color=C_BORDER,
+                      text_color=C_TEXT, command=self._clear_paleographer_overrides).pack(side="left")
+
         # Persistent container the filtered settings form gets rebuilt into whenever the
         # Record Type changes, so switching types only shows the fields that type uses.
         self.paleographer_form_container = ctk.CTkFrame(frame, fg_color="transparent")
         self.paleographer_form_container.pack(side="top", fill="both", expand=True)
 
         self._on_record_type_change()
+
+    def _clear_paleographer_overrides(self):
+        """Clears all text inputs in the dynamic Parish/Citation/Scrip sections."""
+        for section in ["Parish Information", "Citation Overrides", "Scrip Information"]:
+            for key in PALEOGRAPHER_VARS.get(section, {}).keys():
+                if key in self.string_vars:
+                    self.string_vars[key].set("")
 
     def _browse_debug_file(self):
         """Opens a file browser rooted in whichever image folder the current Record Type
@@ -1709,19 +1748,21 @@ class Antiquarian(ctk.CTk):
     @staticmethod
     def _voyageur_visible_sections(label: str) -> Dict[str, Dict[str, str]]:
         """Fields shown for the given VOYAGEUR_SOURCE label: its own provider section
-        (first, so it's the one expanded by default) plus "Gather Settings", shown
-        regardless of which provider is selected - for settings that apply across
-        multiple/all providers rather than belonging to one source-specific section
-        (currently just VOYAGEUR_SOURCE itself, hidden by the caller's skip_keys; a
-        genuinely cross-provider setting has somewhere to live without being duplicated
-        into every section that happens to use it, the way GATHER_ON_COLLISION currently
-        has to be duplicated into Ancestry and FamilySearch since it's not universal to
-        every provider - LAC and HBCA don't read it)."""
+        plus "Gather Settings", shown regardless of which provider is selected."""
         result = {}
-        if label in VOYAGEUR_VARS:
-            result[label] = VOYAGEUR_VARS[label]
+
         if "Gather Settings" in VOYAGEUR_VARS:
-            result["Gather Settings"] = VOYAGEUR_VARS["Gather Settings"]
+            gather_settings = dict(VOYAGEUR_VARS["Gather Settings"])
+            # GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py and the
+            # HBCA/Keystone script never read it, so it must not leak into their form.
+            if label not in ("Ancestry", "FamilySearch"):
+                gather_settings.pop("GATHER_ON_COLLISION", None)
+            result["Gather Settings"] = gather_settings
+
+        section_name = "HBCA Settings" if label == "Keystone Archives" else label
+        if section_name in VOYAGEUR_VARS:
+            result[section_name] = VOYAGEUR_VARS[section_name]
+
         return result
 
     def _on_voyageur_source_change(self, _value: Optional[str] = None):
@@ -1811,7 +1852,9 @@ class Antiquarian(ctk.CTk):
         for key, val in defaults.items():
             if key in self.string_vars:
                 self.string_vars[key].set(val)
-        self.save_settings("Registrar", REGISTRAR_VARS)
+        self.console.put("\n[System] Registrar thresholds reset to defaults. "
+                         "Click 'Save Configuration' to keep them.\n")
+        self._expand_console()
 
     def _build_tab_gazetteer(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Gazetteer", "UTILITY",
@@ -1870,11 +1913,11 @@ class Antiquarian(ctk.CTk):
 
         # --- DYNAMIC PATH RESOLUTION ---
         def resolve_path(base, sub):
-            if not sub:
-                return ""
+            if not sub or sub == ".":
+                return base
             if os.path.isabs(sub):
                 return sub
-            return os.path.join(base, sub).replace("\\", "/")
+            return os.path.normpath(os.path.join(base, sub)).replace("\\", "/")
 
         prog_dir_var: Union[ctk.StringVar, None] = self.string_vars.get("GENEALOGY_DIR")
         program_dir = prog_dir_var.get().strip() if prog_dir_var is not None else ""

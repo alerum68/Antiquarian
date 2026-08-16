@@ -34,17 +34,17 @@ class FlagRecord(TypedDict):
 # ==========================================
 # CONFIGURATION & CONSTANTS
 # ==========================================
-CALL_NUMBER = os.getenv("CALL_NUMBER", "")
-REPOSITORY = os.getenv("REPOSITORY", "")
-REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-COLLECTION_URL = os.getenv("COLLECTION_URL", "")
-COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
+CALL_NUMBER = ""
+REPOSITORY = ""
+REPOSITORY_LOC = ""
+COLLECTION_URL = ""
+COLLECTION_NAME = ""
 # Derived from Country column in run_census_flavor()
 COUNTRY = ""
 # Display fallback when COLLECTION_NAME is missing
 DEFAULT_COLLECTION_NAME = ""
-PUBLISHER = os.getenv("PUBLISHER", "")
-PUB_LOC = os.getenv("PUB_LOC", "")
+PUBLISHER = ""
+PUB_LOC = ""
 
 IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Census")
 IMAGE_EXTENSION = "jpg"
@@ -52,8 +52,8 @@ FORM_TYPE = IMAGE_EXTENSION
 
 CENSUS_YEAR = Utils.get_env_int("CENSUS_YEAR", 0)
 ANCESTRY_START_RECORD_ID = Utils.get_env_int("ANCESTRY_START_RECORD_ID", 0)
-APID_DB = os.getenv("APID_DB", "")
-ANCESTRY_IMAGE_BASE_ID = os.getenv("ANCESTRY_IMAGE_BASE_ID", "")
+APID_DB = ""
+ANCESTRY_IMAGE_BASE_ID = ""
 BASE_ID = ANCESTRY_IMAGE_BASE_ID.rstrip('_-')
 STATE = ""
 COUNTY = ""

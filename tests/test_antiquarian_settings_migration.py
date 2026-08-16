@@ -10,16 +10,9 @@ def test_archivist_schema_matches_expected_shape():
 
     assert result == {
         "Which JSON to Build From": {
-            "JSON_FILE": "", "GEDCOM_OUTPUT_NAME": "Family_Register.ged",
-            "GEDCOM_OUTPUT_MODE": "Both", "APID_DB": "", "ANCESTRY_IMAGE_BASE_ID": "",
-        },
-        "Citation Overrides": {
-            "CITATION_TEXT": "", "CITATION_DETAIL": "",
-            "CALL_NUMBER": "", "REPOSITORY": "", "REPOSITORY_LOC": "",
-            "COLLECTION_URL": "", "COLLECTION_NAME": "", "PUBLISHER": "",
-            "PUB_LOC": "", "REGISTER_NAME": "", "REGISTER_SOURCE_ID": "1",
-            "VOLUME_TITLE": "", "VOLUME_NUM": "",
-        },
+            "JSON_FILE": "",
+            "GEDCOM_OUTPUT_MODE": "Both",
+        }
     }
 
 
@@ -28,7 +21,7 @@ def test_voyageur_schema_matches_expected_shape():
 
     assert result == {
         "Gather Settings": {"VOYAGEUR_SOURCE": "", "GATHER_URL": "", "GATHER_ON_COLLISION": "overwrite"},
-        "HBCA / Manitoba Archives": {
+        "HBCA Settings": {
             "HBCA_LETTER_FILTER": "",
             "HBCA_RESOLVE_KEYSTONE": "false",
             "HBCA_DOWNLOAD_KEYSTONE_MEDIA": "true",
@@ -40,24 +33,23 @@ def test_paleographer_schema_matches_expected_shape():
     result = Antiquarian._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
-        "Antigravity CLI": {"AGY_CLI_BIN": "agy"},
         "Data & Directories": {
             "PALEOGRAPHER_RECORD_TYPE": "",
             "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2",
+        },
+        "Parish Information": {
+            "PARISH_NAME": "",
+            "PARISH_NAME_SHORT": "",
+            "PARISH_CITY": "", "PARISH_STATE": "",
+            "DEFAULT_EVENT_LOCATION": "",
+            "REGISTER_NAME": "", "REGISTER_SOURCE_ID": "",
+            "VOLUME_TITLE": "", "VOLUME_NUM": "",
         },
         "Citation Overrides": {
             "CITATION_TEXT": "", "CITATION_DETAIL": "",
             "CALL_NUMBER": "", "REPOSITORY": "", "REPOSITORY_LOC": "",
             "COLLECTION_URL": "", "COLLECTION_NAME": "", "PUBLISHER": "",
-            "PUB_LOC": "", "REGISTER_NAME": "", "REGISTER_SOURCE_ID": "1",
-            "VOLUME_TITLE": "", "VOLUME_NUM": "",
-        },
-        "Parish Information": {
-            "CHURCH_MASTER_DB_NAME": "parish_register.json",
-            "PARISH_NAME": "St. Generic Catholic Church",
-            "PARISH_NAME_SHORT": "St. Generic Parish, Anytown, ST",
-            "PARISH_CITY": "Anytown", "PARISH_STATE": "State",
-            "DEFAULT_EVENT_LOCATION": "Anytown, Any County, State, USA",
+            "PUB_LOC": "",
         },
         "Scrip Information": {
             "SCRIP_MASTER_DB_NAME": "scrip_records.json",
@@ -101,9 +93,6 @@ def test_gazetteer_schema_matches_expected_shape():
     assert result == {
         "File Paths": {
             "GAZETTEER_RM_DATABASE": "Your Tree.rmtree",
-            "GAZETTEER_SHAPEFILE": "Antiquarian/Gazetteer/Reference/US_AtlasHCB_Counties/"
-            "US_HistCounties_Shapefile/US_HistCounties.shp",
-            "GAZETTEER_CA_SHAPEFILE_DIR": "Antiquarian/Gazetteer/CA_UNICEN_Counties",
         },
     }
 

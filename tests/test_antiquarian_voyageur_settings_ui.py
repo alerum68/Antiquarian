@@ -4,22 +4,20 @@ import Antiquarian
 from Antiquarian import Antiquarian as AntiquarianApp
 
 
-def test_visible_sections_includes_matching_provider_and_universal_gather_settings():
+def test_visible_sections_includes_universal_gather_settings_and_collision_setting():
     result = Antiquarian.Antiquarian._voyageur_visible_sections("Ancestry")
 
-    assert set(result.keys()) == {"Ancestry", "Gather Settings"}
-    assert "A_URL" in result["Ancestry"]
-    assert "GATHER_ON_COLLISION" in result["Ancestry"]
-    assert "VOYAGEUR_SOURCE" in result["Gather Settings"]
+    assert set(result.keys()) == {"Gather Settings"}
+    assert "GATHER_URL" in result["Gather Settings"]
+    assert "GATHER_ON_COLLISION" in result["Gather Settings"]
 
 
-def test_visible_sections_excludes_other_providers():
+def test_visible_sections_for_familysearch_shows_only_gather_settings():
     result = Antiquarian.Antiquarian._voyageur_visible_sections("FamilySearch")
 
-    assert "Ancestry" not in result
-    assert "LAC" not in result
-    assert "HBCA / Manitoba Archives" not in result
-    assert set(result.keys()) == {"FamilySearch", "Gather Settings"}
+    assert "HBCA Settings" not in result
+    assert set(result.keys()) == {"Gather Settings"}
+    assert "GATHER_ON_COLLISION" in result["Gather Settings"]
 
 
 def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
@@ -27,9 +25,16 @@ def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
     it must not leak into LAC's section just because Gather Settings is always included."""
     result = Antiquarian.Antiquarian._voyageur_visible_sections("LAC")
 
-    assert set(result.keys()) == {"LAC", "Gather Settings"}
-    assert "GATHER_ON_COLLISION" not in result["LAC"]
+    assert set(result.keys()) == {"Gather Settings"}
     assert "GATHER_ON_COLLISION" not in result["Gather Settings"]
+
+
+def test_visible_sections_for_keystone_shows_hbca_settings_and_no_collision_setting():
+    result = Antiquarian.Antiquarian._voyageur_visible_sections("Keystone Archives")
+
+    assert set(result.keys()) == {"Gather Settings", "HBCA Settings"}
+    assert "GATHER_ON_COLLISION" not in result["Gather Settings"]
+    assert "HBCA_LETTER_FILTER" in result["HBCA Settings"]
 
 
 @pytest.fixture(scope="module")
@@ -62,14 +67,13 @@ def _all_widget_texts(container) -> list:
     return texts
 
 
-def test_ancestry_source_shows_its_own_section_and_collision_setting(app):
+def test_ancestry_source_shows_the_collision_setting(app):
     app.string_vars["VOYAGEUR_SOURCE"].set("Ancestry")
     app._on_voyageur_source_change()
 
     texts = _all_widget_texts(app.voyageur_form_container)
-    assert "Ancestry" in texts
     assert any("On Existing File" in t for t in texts)
-    assert "FamilySearch" not in texts
+    assert "HBCA Settings" not in texts
 
 
 def test_lac_source_does_not_show_the_ancestry_only_collision_setting(app):
@@ -80,5 +84,13 @@ def test_lac_source_does_not_show_the_ancestry_only_collision_setting(app):
     app._on_voyageur_source_change()
 
     texts = _all_widget_texts(app.voyageur_form_container)
-    assert "LAC" in texts
+    assert not any("On Existing File" in t for t in texts)
+
+
+def test_keystone_source_shows_hbca_settings_and_not_the_collision_setting(app):
+    app.string_vars["VOYAGEUR_SOURCE"].set("Keystone Archives")
+    app._on_voyageur_source_change()
+
+    texts = _all_widget_texts(app.voyageur_form_container)
+    assert "HBCA Settings" in texts
     assert not any("On Existing File" in t for t in texts)
