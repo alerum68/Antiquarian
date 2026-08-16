@@ -1,33 +1,29 @@
 # Packaging & Distribution Architecture Design
 
-**Goal:** Package Scriptorium as a cross-platform compiled application with a powerful, dual-mode Windows installer that protects user data and maximizes subprocess performance.
+**Goal:** Package Scriptorium as a cross-platform `--onedir` PyInstaller app with a powerful, dual-mode Windows installer, automated dependency downloads, GitHub auto-updating, and CI/CD automated builds.
 
 ## Section 1: PyInstaller & Subprocess Routing
-Because Scriptorium heavily utilizes background tasks (like Voyageur and Paleographer), packaging the app as a single `--onefile` executable would cause severe performance penalties due to extraction delays on every subprocess launch.
+Because Scriptorium heavily utilizes background tasks, packaging the app as a single `--onefile` executable causes severe extraction delays on every subprocess launch.
+* **Build Mode:** We compile Scriptorium via PyInstaller in `--onedir` mode.
+* **Single-Binary Router:** `Scriptorium.py` is updated to handle a `--module` CLI flag. Instead of launching `.py` files, it calls itself (e.g., `Scriptorium.exe --module Voyageur`) and directly routes execution to the background task, bypassing the GUI.
+* **Living Prompts:** The `Paleographer/prompts` folder is copied directly into the `dist/` output folder instead of being baked into the `.exe`. This allows users to manually edit `.pmt` files in the distribution.
 
-* **Build Mode:** We will use a `build.py` script that compiles Scriptorium via PyInstaller in `--onedir` mode (creating an application folder).
-* **Single-Binary Router:** `Scriptorium.py` will be updated to handle a `--module` CLI flag. Instead of launching `.py` files, it will call itself (e.g., `Scriptorium.exe --module Voyageur`) and directly route execution to the requested background task, bypassing the GUI.
+## Section 2: Dual-Mode Installer & Dependencies (Inno Setup)
+The `installer.iss` script offers two paradigms:
+* **Standard Mode:** Installs binaries to `C:\Program Files\Scriptorium`. Scaffolds directories in the user's selected `Genealogy` directory and saves `.env` to `%LOCALAPPDATA%`.
+* **Portable Mode:** Bypasses `Program Files`. Installs everything directly into `[Genealogy_Dir]\Scriptorium`. Drops a `.portable` file and saves `.env` next to the `.exe`.
 
-## Section 2: Dual-Mode Installer (Inno Setup)
-We will provide an Inno Setup script (`installer.iss`) that offers two installation paradigms:
+**Automated Dependency Resolution:**
+* **Node.js / Antigravity CLI:** Installer checks for `npm`. If missing, it prompts the user, silently downloads the Node.js MSI, installs it, and runs `npm install -g antigravity-cli`.
+* **Gazetteer Databases:** Installer downloads the `US_AtlasHCB_Counties.zip` (503 MB) and the Canadian DB from the GitHub repo, and extracts them into `\Sys\Gazetteer`.
 
-### A. Standard Mode
-* Installs the application binaries to the secure, read-only `C:\Program Files\Scriptorium`.
-* Prompts the user for their **Genealogy Directory** and **RootsMagic Directory**.
-* Saves those paths in a `.env` configuration file located in `%LOCALAPPDATA%\Scriptorium`.
-* **Scaffolding:** When Scriptorium launches, it reads the `.env` and automatically creates `Media`, `JSON`, `Working`, and `GEDCOM` explicitly inside `[Genealogy_Directory]\Scriptorium`.
+## Section 3: First-Launch UX & Auto-Updating
+* **Tampermonkey:** On first launch, `Scriptorium.py` checks if Tampermonkey is configured. If not, it opens the browser to install it, then launches `\Sys\Voyageur.js` to trigger the script installation automatically.
+* **Auto-Updating:** On startup, `Scriptorium.py` checks `https://api.github.com/repos/alerum68/Scriptorium/releases/latest`. If a newer version is found, it prompts the user to download and run the new installer.
 
-### B. Portable Mode (Self-Contained)
-* Bypasses `Program Files` entirely.
-* Prompts the user for their **Genealogy Directory** and **RootsMagic Directory**.
-* Installs the entire application folder directly into `[Genealogy_Directory]\Scriptorium`.
-* Drops a hidden `.portable` trigger file into the directory.
-* Saves the `.env` configuration file directly next to the `.exe`.
-* **Scaffolding:** Because it is portable, `Media`, `JSON`, and `GEDCOM` are scaffolded directly inside that same install folder.
-
-*Note: The `build.py` script will also generate a raw `Scriptorium_Portable.zip` containing the `.portable` file for users who wish to bypass the installer entirely.*
-
-## Section 3: Configuration Refactor
-To support Standard Mode's read-only install directory, `Scriptorium.py`'s configuration logic will be refactored to look for the `.portable` file on startup:
-* **If `.portable` exists:** Read/write `.env` settings from `PROGRAM_DIR`.
-* **If `.portable` is missing:** Read/write `.env` settings from the OS user-data folder (`%LOCALAPPDATA%\Scriptorium` or Mac/Linux equivalent).
+## Section 4: CI/CD Pipeline (GitHub Actions)
+* A `.github/workflows/build.yml` pipeline triggers whenever a new GitHub Release tag is created.
+* GitHub automatically provisions Windows, Mac, and Linux VMs.
+* It builds the `.exe` (and Inno Setup installer), `.dmg`, and `.deb`.
+* It automatically attaches these compiled binaries to the GitHub release page.
+*(Future: SignPath Foundation will be integrated into this CI to sign the binaries for free).*
