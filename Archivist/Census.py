@@ -1545,7 +1545,8 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                 'APID_DB': ts.get('apid_db', '') or citation.get('apid_db', ''),
                 'Publisher': citation.get('publisher', ''), 'Publisher Location': citation.get('pub_loc', ''),
                 'Repository': citation.get('repository', ''), 'Repository Location': citation.get('repository_loc', ''),
-                'Collection Name': citation.get('collection_name', ''), 'Collection URL': citation.get('collection_url', ''),
+                'Collection Name': citation.get('collection_name', ''),
+                'Collection URL': citation.get('collection_url', ''),
                 'Family Number': family_id,
             }
             for p in record.get('participants', []):
