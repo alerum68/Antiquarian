@@ -1893,8 +1893,8 @@ class Scriptorium(ctk.CTk):
             if key in self.string_vars:
                 env_overrides[key] = resolve_path(base_dir, self.string_vars[key].get())
 
-        # Inject runtime overrides. Downstream modules (Paleographer/Archivist) 
-        # independently resolve their own schemas via .pmt field_remaps, so we 
+        # Inject runtime overrides. Downstream modules (Paleographer/Archivist)
+        # independently resolve their own schemas via .pmt field_remaps, so we
         # avoid computing record-type-specific logic here.
         run_env.update(env_overrides)
 

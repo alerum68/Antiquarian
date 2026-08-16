@@ -42,7 +42,6 @@ from _gather_helpers import (
     find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
-    move_with_retry,
     print_incomplete_pages_warning,
     resolve_census_image_dir,
     wait_for_final_json_event,
