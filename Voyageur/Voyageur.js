@@ -125,6 +125,9 @@
             accumulatedItems: state.accumulatedItems,
             seenItemIds: Array.from(state.seenItemIds),
             itemsAtLastCheckpoint: state.itemsAtLastCheckpoint,
+            pagesNeedingRetry: state.pagesNeedingRetry,
+            retryPhase: state.retryPhase,
+            currentRetryTarget: state.currentRetryTarget,
         }));
     }
 
@@ -142,6 +145,9 @@
             accumulatedItems: parsed.accumulatedItems || [],
             seenItemIds: new Set(parsed.seenItemIds || []),
             itemsAtLastCheckpoint: parsed.itemsAtLastCheckpoint || 0,
+            pagesNeedingRetry: parsed.pagesNeedingRetry || [],
+            retryPhase: parsed.retryPhase || false,
+            currentRetryTarget: parsed.currentRetryTarget || null,
         };
     }
 
@@ -1386,12 +1392,19 @@
         // runAncestryGather's own resumedState handling. isResumingFsState is read by
         // startBatch() below to skip its own unconditional reset, the same way
         // runAncestryGather's resumingFromReload guards startBatch() there.
+        let pagesNeedingRetry = [];
+        let inRetryPhase = false;
+        let currentRetryTarget = null;
+
         let isResumingFsState = false;
         const resumedFsState = loadFsReloadState(runId);
         if (resumedFsState) {
             accumulatedItems = resumedFsState.accumulatedItems;
             seenItemIds = resumedFsState.seenItemIds;
             itemsAtLastCheckpoint = resumedFsState.itemsAtLastCheckpoint;
+            pagesNeedingRetry = resumedFsState.pagesNeedingRetry;
+            inRetryPhase = resumedFsState.retryPhase;
+            currentRetryTarget = resumedFsState.currentRetryTarget;
             isResumingFsState = true;
             clearFsReloadState();
         }
@@ -1732,37 +1745,27 @@
             return wait.result;
         }
 
-        async function scrapeCurrentImage() {
-            const itemId = getItemId();
-            if (!itemId || seenItemIds.has(itemId)) return;
-
+        async function buildFsItemData(itemId) {
             const pageType = await detectFsPageType();
             let rows = [];
             let citationText = '';
             let catalogItems = [];
+            let incomplete = false;
 
             if (pageType === 'image-index') {
                 const apiWait = await waitForFsImageIndexResponse(itemId);
                 if (apiWait.result) {
                     rows = fsBuildRowsFromImageIndexResponse(apiWait.result);
-                    // The one UI read left in this whole plan: no JSON source for the total
-                    // image count was found on this endpoint (see the design spec's "Not yet
-                    // verified" list) - the page already renders it plainly ("Image 1 of 3").
                     const imageMatch = document.body.innerText.match(/Image\s+(\d+)\s+of\s+(\d+)/i);
                     citationText = fsBuildCitationTextFromImageIndexResponse(apiWait.result, {
                         imageNumber: imageMatch ? imageMatch[1] : undefined,
                         imageTotal: imageMatch ? imageMatch[2] : undefined,
                     });
                 } else {
-                    debugLog(`No Image-Index response arrived for item ${itemId} after `
-                        + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
-                    if (window.fsShowToast) {
-                        window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
-                    }
+                    incomplete = true;
+                    debugLog(`No Image-Index response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
+                    if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
-                // Still used for catalogItems (the Film/Digital Note table) - its own
-                // citationText is discarded in favor of the JSON-built one above; both page
-                // types share the same "Information" tab UI shell this function reads.
                 const catalog = await scrapeCitationAndCatalog();
                 catalogItems = catalog.catalogItems;
             } else if (pageType === 'names') {
@@ -1770,31 +1773,36 @@
                 if (apiWait.result) {
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
                 } else {
-                    debugLog(`No orchestration-API response arrived for item ${itemId} after `
-                        + `${apiWait.elapsedMs}ms - continuing with no household data for this image.`);
-                    if (window.fsShowToast) {
-                        window.fsShowToast('No index data received for this image - skipping.', 'error', 4000);
-                    }
+                    incomplete = true;
+                    debugLog(`No orchestration-API response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
+                    if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
                 const citation = await scrapeCitationAndCatalog();
                 citationText = citation.citationText;
                 catalogItems = citation.catalogItems;
             } else {
-                debugLog(`Neither Names nor Image Index tab found for item ${itemId} - `
-                    + 'unrecognized page shape, continuing with no data.');
-                if (window.fsShowToast) {
-                    window.fsShowToast('Unrecognized page - skipping.', 'error', 4000);
-                }
+                incomplete = true;
+                debugLog(`Neither Names nor Image Index tab found for item ${itemId} - unrecognized page shape.`);
+                if (window.fsShowToast) window.fsShowToast('Unrecognized page.', 'error', 4000);
             }
 
-            // Awaited before moving on to the next image, same convention as Ancestry's
-            // own per-page image download.
+            return {item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows, incomplete};
+        }
+
+        async function scrapeCurrentImage() {
+            const itemId = getItemId();
+            if (!itemId || seenItemIds.has(itemId)) return;
+
+            const itemData = await buildFsItemData(itemId);
             await downloadFsImage(itemId);
 
             seenItemIds.add(itemId);
-            accumulatedItems.push({item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows});
+            accumulatedItems.push(itemData);
+            if (itemData.incomplete) {
+                pagesNeedingRetry.push({item_id: itemId, url: window.location.href});
+            }
 
-            debugLog(`Scraped item ${itemId}: ${rows.length} index rows.`);
+            debugLog(`Scraped item ${itemId}: ${itemData.rows.length} index rows.`);
         }
 
         // FamilySearch's account-level "explore" record view (reached, confirmed live, via
@@ -1933,6 +1941,42 @@
             }
         }
 
+        async function finishBatch() {
+            if (pagesNeedingRetry.length > 0) {
+                await runFsRetryPass();
+                return;
+            }
+            const incomplete = fsIncompleteItemsSummary(accumulatedItems);
+            if (incomplete.length > 0) {
+                const idList = incomplete.map((i) => i.item_id).join(', ');
+                if (window.fsShowToast) {
+                    window.fsShowToast(`Incomplete images (no index data received): ${idList}`, 'error', 3600000);
+                }
+            }
+            clearFsReloadState();
+            downloadFinalJson();
+        }
+
+        async function runFsRetryPass() {
+            const target = pagesNeedingRetry.shift();
+            saveFsReloadState(runId, {
+                accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
+                pagesNeedingRetry, retryPhase: true, currentRetryTarget: target,
+            });
+            window.location.href = buildRetryNavigationUrl(target.url, runId);
+        }
+
+        async function retryCurrentItemThenContinue() {
+            const itemData = await buildFsItemData(currentRetryTarget.item_id);
+            if (!itemData.incomplete) {
+                const idx = accumulatedItems.findIndex((i) => i.item_id === currentRetryTarget.item_id);
+                if (idx !== -1) accumulatedItems[idx] = itemData;
+            }
+            await downloadFsImage(currentRetryTarget.item_id);
+            currentRetryTarget = null;
+            await finishBatch();
+        }
+
         function triggerFsJsonDownload(jsonString, jsonFileName) {
             // Same reasoning as the Ancestry side's triggerBlobDownload: GM_download's
             // "downloads" permission grant proved unreliable (resets on every script
@@ -2030,7 +2074,10 @@
             }
 
             const collectionTitle = document.title || 'FamilySearch Gather';
-            const payload = {source: 'FS', collection_title: collectionTitle, items: accumulatedItems};
+            const payload = {
+                source: 'FS', collection_title: collectionTitle, items: accumulatedItems,
+                incomplete_pages: fsIncompleteItemsSummary(accumulatedItems),
+            };
             const safeName = collectionTitle.replace(/[/\\?%*:|"<>]/g, '-').slice(0, 120);
             triggerFsJsonDownload(JSON.stringify(payload, null, 2), `FS - ${safeName}.json`);
 
@@ -2056,19 +2103,27 @@
 
         function startBatch() {
             isRunning = true;
-            // Skipped when resuming (see isResumingFsState above) - the whole point of
-            // restoring saved state is to carry accumulatedItems across this exact reset,
-            // the same way runAncestryGather's resumingFromReload guards its own startBatch.
             if (!isResumingFsState) {
                 accumulatedItems = [];
                 seenItemIds.clear();
                 itemsAtLastCheckpoint = 0;
+                pagesNeedingRetry = [];
             }
             isResumingFsState = false;
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'none';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'block';
             if (window._fsStatusLight) window._fsStatusLight.classList.add('running');
             if (window.fsShowToast) window.fsShowToast('Starting Gather...', 'success');
+
+            if (inRetryPhase) {
+                inRetryPhase = false;
+                retryCurrentItemThenContinue().catch((err) => {
+                    console.error('[Voyageur FS] Retry pass crashed:', err);
+                    downloadFinalJson();
+                });
+                return;
+            }
+
             runLoop().catch((err) => {
                 console.error('[Voyageur FS] Loop crashed:', err);
                 if (window.fsShowToast) window.fsShowToast(`Gather stopped: ${err.message || err}`, 'error', 4000);
@@ -2079,12 +2134,11 @@
         function stopBatch() {
             if (!isRunning) return;
             isRunning = false;
-            clearFsReloadState();
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'block';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'none';
             if (window._fsStatusLight) window._fsStatusLight.classList.remove('running');
             debugLog('Batch stopped.');
-            downloadFinalJson();
+            finishBatch().catch((err) => console.error('[Voyageur FS] finishBatch crashed:', err));
         }
 
         if (document.readyState === 'loading') {
@@ -2293,6 +2347,12 @@ function ancestryIncompletePagesSummary(pages) {
         .map((p) => ({page_number: p.page_number, image_id: p.image_id}));
 }
 
+function fsIncompleteItemsSummary(items) {
+    return (items || [])
+        .filter((i) => i.incomplete)
+        .map((i) => ({item_id: i.item_id}));
+}
+
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             placesMatch, saveReloadState, loadReloadState, clearReloadState,
@@ -2304,6 +2364,7 @@ function ancestryIncompletePagesSummary(pages) {
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
             ancestryCountryFromState, buildRetryNavigationUrl, ancestryIncompletePagesSummary,
+            fsIncompleteItemsSummary,
         };
     }
 
