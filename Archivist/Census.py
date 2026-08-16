@@ -243,7 +243,7 @@ def get_age(row: pd.Series) -> float:
     return age if age is not None else -1.0
 
 
-def spouse_evaluation(a: pd.Series, b: pd.Series) -> Tuple[bool, float, str]:
+def evaluate_spouse_match(a: pd.Series, b: pd.Series) -> Tuple[bool, float, str]:
     g_a = get_gender(a.get('Gender', ''))
     g_b = get_gender(b.get('Gender', ''))
     if 'U' in (g_a, g_b) or g_a == g_b:
@@ -350,7 +350,7 @@ def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.S
     i = 1
     if n > 1:
         sp_mem = members[1]
-        plausible, sp_conf, sp_reason = spouse_evaluation(head, sp_mem)
+        plausible, sp_conf, sp_reason = evaluate_spouse_match(head, sp_mem)
         head_gender = get_gender(head)
         sp_gender = get_gender(sp_mem)
         if not plausible and head_gender != sp_gender and 'U' not in (head_gender, sp_gender):
@@ -374,7 +374,7 @@ def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.S
         m = members[i]
         if i + 1 < n and (i + 1) not in consumed:
             nxt = members[i + 1]
-            sub_plausible, sub_sp_conf, sub_sp_reason = spouse_evaluation(m, nxt)
+            sub_plausible, sub_sp_conf, sub_sp_reason = evaluate_spouse_match(m, nxt)
             if sub_plausible:
                 fit_m = find_parent(units, m)
                 fit_nxt = find_parent(units, nxt)
