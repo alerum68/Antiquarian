@@ -20,7 +20,7 @@ Scriptorium assists with the process of turning historical records into structur
 
 Current capabilities include:
 
-* AI-assisted transcription from document images.
+* Automated transcription from document images.
 * Extraction of people, relationships, places, dates, and events.
 * Source and citation management.
 * Project organization for large record collections.
@@ -42,9 +42,11 @@ If your goal is simply to enter an occasional birth, marriage, or death record i
 
 ## Getting Started
 
-Scriptorium ships as a Windows installer, available from the [Releases](https://github.com/alerum68/Scriptorium/releases) page. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, Antigravity) on its own, so there's nothing to configure by hand before you start.
+Scriptorium ships as a dual-mode Windows installer powered by Inno Setup, available from the [Releases](https://github.com/alerum68/Scriptorium/releases) page. The installer packages the application as a single-binary PyInstaller router, meaning you do not need to manage Python environments or dependencies. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, AGY) on its own, so there's nothing to configure by hand before you start.
 
-Detailed installation and setup instructions are available in the project Wiki.
+For browser-based integration with external repositories, Scriptorium includes a Tampermonkey script that bridges web index searches directly into your local database.
+
+Detailed installation and setup instructions, along with CI/CD build artifacts from our GitHub Actions sandbox, are available in the project Wiki.
 
 In general, the workflow is straightforward:
 
@@ -61,7 +63,7 @@ In general, the workflow is straightforward:
 Scriptorium relies on a few external services, depending on how you choose to use it.
 
 * Windows 10 or Windows 11.
-* Antigravity (agy) for document processing. The installer sets this up for you if it isn't already on your machine; a Gemini API key is also supported as an alternative.
+* AGY (agy) for document processing. The installer sets this up for you if it isn't already on your machine; a AI API key is also supported as an alternative.
 * Internet access while processing records.
 * Optional subscriptions for external services such as Ancestry if you want to retrieve records directly from those platforms.
 

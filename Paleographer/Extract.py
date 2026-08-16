@@ -201,7 +201,7 @@ if EXTRACTION_ENGINE not in ("api", "agy"):
     raise RuntimeError(f"Unknown EXTRACTION_ENGINE '{EXTRACTION_ENGINE}' - expected 'api' or 'agy'.")
 
 # Initialize API client only if using the SDK backend.
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if EXTRACTION_ENGINE == "api" else None
+client = genai.Client(api_key=os.getenv("AI_API_KEY")) if EXTRACTION_ENGINE == "api" else None
 
 # ==========================================
 # CONFIGURATION
@@ -639,7 +639,7 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
 # BATCH PROCESSING (large multi-page documents)
 # ==============================================================================
 def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
-    """Submits new batch jobs and retrieves completed ones via Gemini's Batch API."""
+    """Submits new batch jobs and retrieves completed ones via AI Assistant's Batch API."""
     pending_jobs = master_data.setdefault("pending_batch_jobs", [])
 
     if pending_jobs:
@@ -700,7 +700,7 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
         {"job_name": job_name, "submitted_at": time.strftime("%Y-%m-%d %H:%M:%S"), "file_names": files})
     save_master_db(master_data)
     print(f"Submitted batch job '{job_name}' for {len(files)} file(s). Check back later; "
-          "re-run this same step to retrieve results once Gemini finishes.")
+          "re-run this same step to retrieve results once AI Assistant finishes.")
 
 
 # ==============================================================================
@@ -708,7 +708,7 @@ def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
 # ==============================================================================
 def main() -> None:
     if EXTRACTION_ENGINE == "agy":
-        print("Verifying Antigravity CLI authentication...")
+        print("Verifying AGY CLI authentication...")
         if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
             print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
                   "Connection' action in Scriptorium's Global Settings, or `agy` "

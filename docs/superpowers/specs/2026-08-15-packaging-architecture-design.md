@@ -14,7 +14,7 @@ The `installer.iss` script offers two paradigms:
 * **Portable Mode:** Bypasses `Program Files`. Installs everything directly into `[Genealogy_Dir]\Scriptorium`. Drops a `.portable` file and saves `.env` next to the `.exe`.
 
 **Automated Dependency Resolution:**
-* **Node.js / Antigravity CLI:** Installer checks for `npm`. If missing, it prompts the user, silently downloads the Node.js MSI, installs it, and runs `npm install -g antigravity-cli`.
+* **Node.js / AGY CLI:** Installer checks for `npm`. If missing, it prompts the user, silently downloads the Node.js MSI, installs it, and runs `npm install -g AGY-cli`.
 * **Gazetteer Databases:** Installer downloads the `US_AtlasHCB_Counties.zip` (503 MB) and the Canadian DB from the GitHub repo, and extracts them into `\Sys\Gazetteer`.
 
 ## Section 3: First-Launch UX & Auto-Updating

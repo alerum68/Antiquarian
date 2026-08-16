@@ -16,7 +16,7 @@
 - `engine.py` and `agy_engine.py` themselves are untouched — only how `Extract.py` reaches their functions changes (real import instead of folded-in duplicate).
 - Full `pytest` suite stays green after every task.
 - `test_engine.py`, `test_agy_engine.py`, `test_schema.py` are untouched — they already import the standalone `engine`/`agy_engine` files directly.
-- No AI attribution, "Co-Authored-By", or Claude stamps in commits.
+- No AI attribution, "Co-Authored-By", or AI Assistant stamps in commits.
 - Spec: `docs/superpowers/specs/2026-08-06-paleographer-structural-split-design.md`.
 
 ---
@@ -53,7 +53,7 @@ Use the Write tool. Start the file with:
 """
 Extract: record-type-generic document extraction for Paleographer.
 
-Uses the Gemini API (via engine.py) or the Antigravity CLI (via agy_engine.py) to
+Uses the AI Assistant API (via engine.py) or the AGY CLI (via agy_engine.py) to
 transcribe historical document images or PDFs of any record type and extract
 structured records into a JSON master database, following one universal schema.
 Which record type is active, and every piece of type-specific vocabulary (event
@@ -172,7 +172,7 @@ Copy `Paleographer.py` lines 1369–1747 verbatim, in order, keeping their exist
 # ==============================================================================
 def main() -> None:
     if EXTRACTION_ENGINE == "agy":
-        print("Verifying Antigravity CLI authentication...")
+        print("Verifying AGY CLI authentication...")
         if not agy_client.check_or_prompt_auth(AGY_MODEL_ID, cli_bin=AGY_CLI_BIN):
             print("[FATAL ERROR] Could not authenticate with agy. Run the 'Test Agy "
                   "Connection' action in Scriptorium's Global Settings, or `agy` "

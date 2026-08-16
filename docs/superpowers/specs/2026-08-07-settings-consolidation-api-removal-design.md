@@ -17,7 +17,7 @@ round of settings issues remains:
   thresholds, retry tuning) are buried in `.py` files with no UI exposure,
   forcing a code edit for values a user might reasonably want to tune.
 - Paleographer maintains two parallel extraction engines — the subscription
-  `agy` CLI path and a metered direct Gemini API path (`EXTRACTION_ENGINE`
+  `agy` CLI path and a metered direct AI Assistant API path (`EXTRACTION_ENGINE`
   env switch) — doubling the maintenance surface for a path that's no
   longer used.
 
@@ -99,12 +99,12 @@ placeholders, invisible to a `.py`-only search) found zero keys with no
 reference anywhere. No removal task beyond the ownership relocations in
 Section 2.
 
-### 5. Remove Paleographer's Gemini direct-API extraction engine
+### 5. Remove Paleographer's AI Assistant direct-API extraction engine
 
 Approved: eliminate the `EXTRACTION_ENGINE == "api"` path entirely, leaving
 `agy` as the sole extraction backend. `HBCRecords.py` is explicitly out of
 scope — confirmed twice by the user — it's a standalone script outside the
-six-tool GUI ecosystem and keeps its own direct Gemini API usage untouched.
+six-tool GUI ecosystem and keeps its own direct AI Assistant API usage untouched.
 
 **`Paleographer/Extract.py`:**
 - Delete the `EXTRACTION_ENGINE` env read and its validation branch.
@@ -131,7 +131,7 @@ six-tool GUI ecosystem and keeps its own direct Gemini API usage untouched.
   `build_debug_generation_config`, `build_continuation_context`, `CallCost`
   — all used by the `agy` path today via `agy_engine.py`.
 
-**Delete entirely:** `Paleographer/CacheCleanup.py` (pure Gemini-context-cache
+**Delete entirely:** `Paleographer/CacheCleanup.py` (pure AI Assistant-context-cache
 cleanup utility, no `agy` equivalent needed).
 
 **Settings removed** (Paleographer-owned only):
@@ -139,8 +139,8 @@ cleanup utility, no `agy` equivalent needed).
 `CACHE_DISCOUNT_MULTIPLIER`, `API_BUDGET`.
 
 **Settings kept** (in `GLOBAL_VARS`, unaffected):
-`GEMINI_API_KEY`, `MODEL_NAME` — these are global, not Paleographer-owned,
-and `HBCRecords.py` reads both directly (`os.getenv("GEMINI_API_KEY")`,
+`AI_API_KEY`, `MODEL_NAME` — these are global, not Paleographer-owned,
+and `HBCRecords.py` reads both directly (`os.getenv("AI_API_KEY")`,
 `os.getenv("MODEL_NAME")`). Since `HBCRecords.py` is out of scope, removing
 either would silently break it.
 
@@ -181,21 +181,21 @@ promising on paper but was falsified by a live test:**
 
 **Investigated and declined — project-level rules as a static prefix.**
 `agy`'s own first-party, locally-installed docs
-(`~/.gemini/antigravity-cli/builtin/skills/agy-customizations/docs/rules.md`)
-confirm a real "Rules" mechanism exists: `GEMINI.md`/`AGENTS.md` files,
+(`~/.AI Assistant/AGY-cli/builtin/skills/agy-customizations/docs/rules.md`)
+confirm a real "Rules" mechanism exists: `AI Assistant.md`/`AGENTS.md` files,
 discovered by walking from the current working directory up to the
 repository root (the folder containing `.git`), injected as always-on
 instructions. This is a genuinely different, real mechanism — not the
-`.antigravity.md`/`~/.gemini/GEMINI.md` paths from the pasted answer that
+`.AGY.md`/`~/.AI Assistant/AI Assistant.md` paths from the pasted answer that
 prompted this investigation, which don't match anything in the CLI's own
 shipped documentation and are likely unreliable.
 
 However, a live test disproved it works for how Paleographer actually
-calls `agy`. Test: created a repo-local `GEMINI.md` containing a distinct
+calls `agy`. Test: created a repo-local `AI Assistant.md` containing a distinct
 literal token, ran `agy --add-dir . --output-format json -p "..."` with
 `cwd` set inside the repo (so the `.git` walk-up succeeds) three times: (1)
 a trivial arithmetic prompt, (2) a second independent trivial prompt, (3) a
-prompt explicitly asking the agent to read `GEMINI.md`. Results:
+prompt explicitly asking the agent to read `AI Assistant.md`. Results:
 - The literal token never appeared in any response — the rule was not
   auto-injected into the model's instructions in headless/print mode.
 - Calls 1 and 2 (independent, non-continued, nearly identical ~19.4k-token
@@ -210,7 +210,7 @@ prompt explicitly asking the agent to read `GEMINI.md`. Results:
   not worth relaxing an existing, deliberate safety boundary to chase a
   cost optimization.
 
-Conclusion: whatever surface *does* auto-load `GEMINI.md`/`AGENTS.md` (the
+Conclusion: whatever surface *does* auto-load `AI Assistant.md`/`AGENTS.md` (the
 interactive TUI or IDE, most likely), Paleographer's headless/`-p` calls
 don't hit it. Not pursuing this further.
 
@@ -246,7 +246,7 @@ static/shared content as an unbroken prefix, with variable per-call content
 appended after — is already how `call_agy_extract` builds `full_prompt`
 (`prompt_text` first, `file_instruction` last). No change needed.
 
-**Declined — flatten instructions into a rendered PNG.** A real Gemini
+**Declined — flatten instructions into a rendered PNG.** A real AI Assistant
 pricing quirk (images price at a flat per-tile rate regardless of embedded
 text density) but it optimizes for *per-token metered billing* — the exact
 cost model this task is deliberately moving Paleographer away from by
@@ -257,7 +257,7 @@ it no longer uses.
 
 **"Cleared at end of run, or if aborted":** `agy` does persist each
 conversation as a local SQLite file under
-`~/.gemini/antigravity-cli/conversations/*.db` — discovered during the
+`~/.AI Assistant/AGY-cli/conversations/*.db` — discovered during the
 live test above, this contradicts an earlier draft of this section that
 assumed there was nothing to clean up. In practice this doesn't require
 explicit deletion for correctness: the adopted `--continue` scoping never

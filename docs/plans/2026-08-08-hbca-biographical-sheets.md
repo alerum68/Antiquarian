@@ -1,6 +1,6 @@
 # HBCA Biographical Sheets Integration Unified Plan
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode. Follow gemini.md for subagent usage for task.
+> **For AGY:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode. Follow AI Assistant.md for subagent usage for task.
 
 **Goal:** Implement the 2-pass Voyageur gathering system for HBCA sheets with tiered regex/LLM data extraction and media deduplication.
 

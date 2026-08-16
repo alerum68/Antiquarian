@@ -4,7 +4,7 @@ Shared Paleographer Engine.
 Houses every piece of machinery used to extract structured genealogical data
 from historical documents that has zero record-type-specific logic: prompt/
 schema resolution from a record type's .pmt file, image/PDF content routing,
-Gemini API calls (synchronous and batch), retry/backoff, context caching, and
+AI Assistant API calls (synchronous and batch), retry/backoff, context caching, and
 cost tracking. Adding a new record type never touches this file; it only
 ever requires a new .pmt file in prompts/.
 """
@@ -77,7 +77,7 @@ UNIVERSAL_PROMPT_SUFFIX = dedent("""
 
 
 class DailyQuotaExhausted(Exception):
-    """Raised when Gemini reports the daily quota is exhausted. The whole run should stop, not retry."""
+    """Raised when AI Assistant reports the daily quota is exhausted. The whole run should stop, not retry."""
 
 
 @dataclass
@@ -222,7 +222,7 @@ def build_merged_schema(core_schema: Dict[str, Any],
                         extra_fields: Dict[str, List[Dict[str, str]]]) -> Dict[str, Any]:
     """Deep-copies the universal core schema and injects a record type's extra fields
     into the open `type_specific_fields` slot at record and participant level, producing
-    a fully concrete schema for Gemini's response_schema."""
+    a fully concrete schema for AI Assistant's response_schema."""
     merged = copy.deepcopy(core_schema)
 
     def inject(container: Dict[str, Any], fields: List[Dict[str, str]]) -> None:
@@ -350,7 +350,7 @@ IMAGE_SUFFIXES = (".jpg", ".jpeg", ".png", ".tiff", ".tif")
 def has_usable_text_layer(pdf_path: Union[str, Path], sample_pages: int = 3,
                           min_alpha_ratio: float = 0.5, min_chars: int = 40) -> bool:
     """Probes a PDF's first few pages for a genuine, non-garbage text layer, to decide
-    whether its content can be extracted locally (pdfplumber) or must go to Gemini as a
+    whether its content can be extracted locally (pdfplumber) or must go to AI Assistant as a
     native document (a scanned/handwritten source has no real text layer at all)."""
     # noinspection broad-exception
     try:
@@ -373,7 +373,7 @@ def get_pdf_page_count(pdf_path: Union[str, Path]) -> int:
 
 def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path:
     """Runs PDFix's lossless structural optimization (garbage-collection + stream deflate)
-    against a throwaway temp copy before uploading to Gemini, to cut upload size/cost -
+    against a throwaway temp copy before uploading to AI Assistant, to cut upload size/cost -
     mirrors optimize_image()'s downscaling for images, but structural rather than pixel-
     based (embedded image DPI is untouched, so transcription quality is unaffected at any
     level). NEVER mutates the researcher's original source PDF: optimize_pdf() itself does
@@ -397,7 +397,7 @@ def optimize_pdf_for_upload(file_path: Path, compression_level: int = 2) -> Path
 def build_content_part_for_file(client: genai.Client, file_path: Path) -> Tuple[str, Any]:
     """Classifies a source file and returns (mode, content_part), where mode is one of
     "image", "pdf_native", or "pdf_text", and content_part is what should be appended to
-    the `contents` list alongside the prompt (a PIL Image, an uploaded Gemini File
+    the `contents` list alongside the prompt (a PIL Image, an uploaded AI Assistant File
     reference, or extracted text)."""
     suffix = file_path.suffix.lower()
     if suffix in IMAGE_SUFFIXES:
@@ -495,7 +495,7 @@ def run_with_retries(call_fn: Callable[[], Any], max_retries: int = 10, max_json
 # ==========================================
 def build_batch_request(model_id: str, contents: list, source_file: str,
                         gen_config_kwargs: Dict[str, Any]) -> types.InlinedRequest:
-    """Builds one Gemini batch request, tagging it with the source filename so the
+    """Builds one AI Assistant batch request, tagging it with the source filename so the
     result can be matched back to its file once the job completes."""
     return types.InlinedRequest(
         model=model_id, contents=contents, metadata={"source_file": source_file},
@@ -505,17 +505,17 @@ def build_batch_request(model_id: str, contents: list, source_file: str,
 
 def submit_batch_job(client: genai.Client, model_id: str, requests: List[types.InlinedRequest],
                      display_name: str = "paleographer-batch") -> str:
-    """Submits a list of pre-built requests as one Gemini batch job. Returns the job name
+    """Submits a list of pre-built requests as one AI Assistant batch job. Returns the job name
     to persist for a later check_batch_jobs()/retrieve_batch_results() call."""
     job = client.batches.create(model=model_id, src=requests,
                                 config=types.CreateBatchJobConfig(display_name=display_name))
     if not job.name:
-        raise RuntimeError("Gemini created a batch job but returned no job name.")
+        raise RuntimeError("AI Assistant created a batch job but returned no job name.")
     return job.name
 
 
 def check_batch_jobs(client: genai.Client, pending: List[dict]) -> Tuple[List[dict], List[dict]]:
-    """Checks every pending batch job entry ({"job_name": ..., ...}) against Gemini.
+    """Checks every pending batch job entry ({"job_name": ..., ...}) against AI Assistant.
     Returns (completed_entries, still_pending_entries). A failed, canceled, or expired
     job is surfaced via print and dropped rather than retried automatically or looped
     silently."""
@@ -555,7 +555,7 @@ def retrieve_batch_results(client: genai.Client, job_name: str) -> List[Tuple[st
 # ==========================================
 def create_context_cache(client: genai.Client, model_id: str, system_instruction: str,
                          ttl_seconds: int = 86400) -> Optional[str]:
-    """Uploads the system instruction as a Gemini Context Cache, for a cost discount on
+    """Uploads the system instruction as a AI Assistant Context Cache, for a cost discount on
     repeated calls. Returns None (and prints a warning) on failure, so callers can
     proceed without caching rather than crash."""
     try:

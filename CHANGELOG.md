@@ -247,7 +247,7 @@ cleanup with no new functionality.
     (`PDFix/tests/test_pdfix.py`) reproducing the exact original crash scenario.
 - **Paleographer**: scanned/handwritten PDFs (the `pdf_native` path in
   `build_content_part_for_file` - no usable text layer, so the whole file uploads to
-  Gemini as-is) now run through the same PDFix optimization against a throwaway temp
+  AI Assistant as-is) now run through the same PDFix optimization against a throwaway temp
   copy before upload, cutting upload size/cost. Defaults to the most aggressive
   compression level (`PALEOGRAPHER_PDF_COMPRESSION_LEVEL`) since the optimization is
   structural/lossless and never touches embedded image pixel data, so transcription
@@ -777,10 +777,10 @@ the way:
   and it appears in the Record Type dropdown automatically.
 - **Scrip Records**: a first-draft record type for Metis and Half-breed scrip commission
   applications, proving the design generalizes beyond sacramental church records.
-- **Gemini Batch API support**: large multi-page documents (like a full scrip case file)
+- **AI Assistant Batch API support**: large multi-page documents (like a full scrip case file)
   are submitted as a background batch job instead of a single real-time call, since a
   21-to-45-page bundle is too much for the synchronous API to handle reliably. Click
-  "Step 1: Gather Data (API)" again later to retrieve results once Gemini finishes.
+  "Step 1: Gather Data (API)" again later to retrieve results once AI Assistant finishes.
 - Much of what used to be asked of the AI (constructing IDs, mapping event types and
   roles to codes, formatting dates, stripping diacritics, filling in default values) is
   now done deterministically in Python after the AI supplies the raw facts, cutting
@@ -853,7 +853,7 @@ the way:
 ### Added
 - **Master GUI**: A unified, tabbed application to configure and run every tool from one window, with live
   console output, progress bars, and automatic `.env` management.
-- **Gemini Cache Cleanup** utility.
+- **AI Assistant Cache Cleanup** utility.
 - **Historical County Fixer**, correcting county/territory names in a RootsMagic tree to match historical
   boundaries for each event's date.
 - **RootsMagic Duplicate Finder**, using fuzzy name/age matching and family cross-referencing to flag likely

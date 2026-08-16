@@ -13,7 +13,7 @@
 - This is a pure rename: no field's actual behavior, prompt instructions, or content quality changes - only the key/field name.
 - No compatibility shim: once a location is renamed, the old name is deleted there, not kept as a fallback.
 - Parish's translation behavior is unchanged (still a full literal translation); Scrip's synopsis behavior is unchanged.
-- No AI attribution, "Co-Authored-By", or "Generated with Claude" text in any code, comment, or commit message.
+- No AI attribution, "Co-Authored-By", or "Generated with AI Assistant" text in any code, comment, or commit message.
 - Run the affected test suite locally and confirm it passes before considering any task done; run the full suite at the end of every task, not just the last one.
 - No comments explaining what code does - only ones explaining a non-obvious why (existing comments referencing the old names by name should be updated to the new names, not deleted, unless they no longer apply).
 

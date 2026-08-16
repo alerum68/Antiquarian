@@ -19,8 +19,8 @@
 
 - No behavior change to GEDCOM output for either flavor or either target software (RM/FTM) — every moved function is a verbatim lift; the Profile methods are extracted line-for-line from today's `is_scrip` branches, not rewritten. The only intentional exception: the `omit_source_id_prefix` flag mechanism itself is deleted, replaced by the Profile methods that implement the exact same branch outcomes.
 - Full `pytest` suite stays green after every task.
-- LAC-URL-adjacent code (`_scrip_template_field_value`'s `URL`/`RefNumber` branches, the `weblink_lines` calls that read `COLLECTION_URL`) is moved/read only — never executed against the live LAC site or via `LAC.py`/`BACLAC.py` during this work (standing constraint, unrelated Claude issue #81159).
-- No AI attribution, "Co-Authored-By", or Claude stamps in commits.
+- LAC-URL-adjacent code (`_scrip_template_field_value`'s `URL`/`RefNumber` branches, the `weblink_lines` calls that read `COLLECTION_URL`) is moved/read only — never executed against the live LAC site or via `LAC.py`/`BACLAC.py` during this work (standing constraint, unrelated AI Assistant issue #81159).
+- No AI attribution, "Co-Authored-By", or AI Assistant stamps in commits.
 - No comments restating what code does; only comments capturing non-obvious WHY (matches the existing file's own comment style — preserve existing WHY-comments verbatim when moving their attached code).
 - Spec: `docs/superpowers/specs/2026-08-07-archivist-structural-split-design.md`.
 

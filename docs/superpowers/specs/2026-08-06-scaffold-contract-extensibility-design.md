@@ -64,7 +64,7 @@ sent to an LLM — it just needs to parse.
 That means the fix for Census's invisibility isn't a new code path — it's
 authoring one new front-matter block, the same shape as Parish/Scrip's front
 matter. Unlike the original assumption, `Census.pmt`'s prose section (below the
-`---` front matter) is a real Gemini extraction prompt, not a placeholder: Census
+`---` front matter) is a real AI Assistant extraction prompt, not a placeholder: Census
 images get analyzed by Paleographer the same way Parish/Scrip images do, so the
 AI can fill in or correct data the Ancestry/FamilySearch index didn't capture (a
 column the transcriber skipped, a name transcribed differently than what's on the

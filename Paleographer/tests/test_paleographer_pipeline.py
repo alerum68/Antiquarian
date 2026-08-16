@@ -1,6 +1,6 @@
 """
 End-to-end simulation of Paleographer.py's full pipeline: file discovery -> content-part
-building -> prompt/schema assembly -> (fake) Gemini call -> post-processing -> master DB
+building -> prompt/schema assembly -> (fake) AI Assistant call -> post-processing -> master DB
 write. No real API call is ever made - google.genai.Client is replaced with a fake that
 returns a canned, schema-shaped response - but every other piece (the real Parish.pmt/
 Scrip.pmt prompt files, the real FactTypes.json vocabulary, engine.py's schema merging,
@@ -121,8 +121,8 @@ def _import_paleographer_fresh(monkeypatch, tmp_path, env_overrides, fake_page_d
         "MEDIA_DIR": "Media",
         "JSON_DIR": json_dir_name,
         "MASTER_DB_NAME": "master.json",
-        "MODEL_NAME": "gemini-test-model",
-        "GEMINI_API_KEY": "fake-key-not-used",
+        "MODEL_NAME": "AI Assistant-test-model",
+        "AI_API_KEY": "fake-key-not-used",
         # This whole fixture is specifically for exercising the api engine's FakeClient
         # mock - EXTRACTION_ENGINE's own default is now "agy", so this must be pinned
         # explicitly or every test here would try to make real agy calls instead.
@@ -583,8 +583,8 @@ def _import_paleographer_fresh_agy(monkeypatch, tmp_path, env_overrides, fake_st
         "MEDIA_DIR": "Media",
         "JSON_DIR": json_dir_name,
         "MASTER_DB_NAME": "master.json",
-        "MODEL_NAME": "gemini-test-model",
-        "GEMINI_API_KEY": "fake-key-not-used",
+        "MODEL_NAME": "AI Assistant-test-model",
+        "AI_API_KEY": "fake-key-not-used",
         "EXTRACTION_ENGINE": "agy",
         "AGY_MODEL_NAME": "gemini-3.1-pro-high",
         "API_BUDGET": "5.00",

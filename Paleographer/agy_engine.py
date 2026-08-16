@@ -1,5 +1,5 @@
 """
-Paleographer-specific glue for the agy (Antigravity CLI) extraction backend.
+Paleographer-specific glue for the agy (AGY CLI) extraction backend.
 
 Domain-specific counterpart to ScriptoriumMCP/agy_client.py's generic, headless "safely
 call agy" primitives: this module knows about Paleographer's own scratch-dir staging,

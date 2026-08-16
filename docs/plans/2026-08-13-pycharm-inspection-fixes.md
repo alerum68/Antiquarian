@@ -1,6 +1,6 @@
 # PyCharm Inspection Fixes & Automated Lint Suite Implementation Plan
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+> **For AGY:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
 **Goal:** Resolve all 504 PyCharm inspection errors (across 24 XML inspection types in `DEV/Issues`, ignoring Proofreading) and update the project's automated lint suite (`flake8`/`pyflakes`/`pycodestyle` integration in pytest) to enforce zero inspection violations on future commits.
 

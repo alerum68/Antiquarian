@@ -42,7 +42,7 @@ metadata_fields:
   District: "${SCRIP_DISTRICT}"
 batch_page_threshold: 5
 settings_sections:
-  - "Antigravity CLI"
+  - "AGY CLI"
   - "Scrip Information"
 field_remap:
   SCRIP_MASTER_DB_NAME: MASTER_DB_NAME

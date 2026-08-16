@@ -368,9 +368,9 @@ class FakeClient:
 
 def test_submit_batch_job_returns_job_name():
     client = FakeClient()
-    job_name = engine.submit_batch_job(client, "gemini-3.1-pro-preview", requests=["fake-request"])
+    job_name = engine.submit_batch_job(client, "AI Assistant-3.1-pro-preview", requests=["fake-request"])
     assert job_name == "batches/fake-job-1"
-    assert client.batches.created_with["model"] == "gemini-3.1-pro-preview"
+    assert client.batches.created_with["model"] == "AI Assistant-3.1-pro-preview"
 
 
 def test_check_batch_jobs_splits_completed_and_pending():

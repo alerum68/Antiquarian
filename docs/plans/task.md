@@ -1,7 +1,12 @@
 # Task Tracking
 
 | # | Status | Notes |
-|---|--------|-------|
+| 18 | ✅ | Packaging Task 1: Single-Binary Router & Tampermonkey Hook (`Scriptorium.py`) |
+| 19 | ✅ | Packaging Task 2: Config Storage & Directory Scaffolding Defaults |
+| 20 | ✅ | Packaging Task 3: Auto-Updater (`Scriptorium.py`) |
+| 21 | ✅ | Packaging Task 4: PyInstaller Build Script (`build.py`) |
+| 22 | ✅ | Packaging Task 5: Inno Setup Installer Script |
+| 23 | ✅ | Packaging Task 6: GitHub Actions CI/CD (Sandbox & Release) |
 | 1 | ⏭️ | Skip (no new folders/files) |
 | 2 | ✅ | Auto image dirs, hardcoded IMAGE_EXTENSION, removed env lookups |
 | 3 | ✅ | Removed CENSUS_IMAGE_DIR/IMAGE_EXTENSION from globals, separated Parish/Scrip settings |
@@ -86,8 +91,8 @@
 
 ## OpenCode Delegation Bridge (2026-08-13)
 * ✅ Task 1 fix: `.opencode/agents/implementer.md` and `.opencode/agents/code-reviewer.md` changed `mode: subagent` → `mode: all`. Root cause: OpenCode's CLI cannot invoke a `mode: subagent` agent directly via `opencode run --agent <name>` — it prints `agent "<name>" is a subagent, not a primary agent. Falling back to default agent` **and exits 0**, silently substituting the full-permission `build` agent instead. `mode: all` makes both agents directly runnable while still usable inside `build`'s internal SDD dispatch.
-* ✅ Task 2: new `.claude/agents/opencode-delegate.md` — Claude-side subagent wrapping `opencode run --agent implementer` (write mode, DeepSeek) and `opencode run --agent code-reviewer` (enforced read-only second opinion), mirroring `antigravity-delegate`'s shape. `tools: Bash, Read, Glob` only (no `Write`/`Edit` — all file changes happen through the delegated CLI).
-* ✅ Task 3: `.claude/CLAUDE.md` updated with the new three-way delegation section (Claude / Antigravity-Gemini / OpenCode-DeepSeek), replacing the old two-way section.
+* ✅ Task 2: new `.AI Assistant/agents/opencode-delegate.md` — AI Assistant-side subagent wrapping `opencode run --agent implementer` (write mode, DeepSeek) and `opencode run --agent code-reviewer` (enforced read-only second opinion), mirroring `AGY-delegate`'s shape. `tools: Bash, Read, Glob` only (no `Write`/`Edit` — all file changes happen through the delegated CLI).
+* ✅ Task 3: `.AI Assistant/AI Assistant.md` updated with the new three-way delegation section (AI Assistant / AGY-AI Assistant / OpenCode-DeepSeek), replacing the old two-way section.
 * ✅ Task 4 smoke tests, run directly via Bash (not through the new subagent, per design — validates the raw CLI path first):
   * Write-mode (`opencode run --agent implementer --auto`): created `DEV/tests/test_opencode_smoke.py` (gitignored, throwaway); independently verified via `python -m pytest` → **1 passed**; `grep -c "Falling back to default agent"` on the JSON transcript → **0**; last JSON event confirmed `step_finish`/`reason:"stop"`. File deleted after verification (`rm`, no git involved — `/DEV/` is gitignored).
   * Read-only (`opencode run --agent code-reviewer`): asked it to review the latest commit via its own `git log -1 --stat`/`git show` Bash calls; independently verified `grep -c "Falling back to default agent"` → **0**; `git status --short` showed only a pre-existing untracked plan file (`docs/superpowers/plans/2026-08-13-opencode-delegate.md`, mtime predates this dispatch) — confirmed via the JSON transcript that `code-reviewer` issued only `git log`/`git show` reads, no write-tool calls, so the working tree was genuinely unchanged by the dispatch.

@@ -11,7 +11,7 @@ explicit bug fix (`crosscheck`).
 
 ## Background
 
-An audit (Gemini/Antigravity digest, independently re-verified line-by-line
+An audit (AI Assistant/AGY digest, independently re-verified line-by-line
 against the actual repo) found dead code, a disconnected CLI mode, and
 duplicated logic spanning both modules. Two of the digest's claims were
 fabricated (`census_schema.py`'s `infer_spec_name`, `lac_client.py`'s
@@ -173,7 +173,7 @@ target for the other.
   `Paleographer/tests/` mocking `lac_client.search` and
   `voyageur_lac.download_pid_bundle` (no real network calls — consistent
   with the standing constraint against executing LAC/Canadiana network
-  code pending Claude issue #81159). Cover: own-PID resolution succeeds and
+  code pending AI Assistant issue #81159). Cover: own-PID resolution succeeds and
   merges into the record; own-PID resolution fails and appends a
   `review_reason` instead of raising; related-PID search finds results and
   appends to `source_documents`; search raises `LacSearchAuthError` and the

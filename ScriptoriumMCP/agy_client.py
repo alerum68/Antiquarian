@@ -1,14 +1,14 @@
 """
-ScriptoriumMCP: safe, synchronous Google Antigravity CLI (agy) invocation.
+ScriptoriumMCP: safe, synchronous Google AGY CLI (agy) invocation.
 
 A generic, domain-agnostic library any Scriptorium tool can use to call agy - the
-subscription-covered CLI backend for Gemini, distinct from the metered google-genai API
+subscription-covered CLI backend for AI Assistant, distinct from the metered google-genai API
 key path. Knows nothing about Parish.pmt, schemas, or genealogy; Paleographer's own
 agy_engine.py builds on top of this.
 
 Despite living in a folder named to mirror the separate, general-purpose
-antigravity-research-mcp tool (C:\\Users\\Jason Cole\\Documents\\PyCharm\\tools\\mcp\\
-antigravity-research-mcp - untouched, still used for ad hoc Claude Code research queries
+ai-research-mcp tool (C:\\Users\\Jason Cole\\Documents\\PyCharm\\tools\\mcp\\
+ai-research-mcp - untouched, still used for ad hoc AI Assistant research queries
 across any project), this is a plain importable Python module, not an MCP server:
 Paleographer runs as a standalone subprocess with no MCP client present at runtime, so a
 real MCP server would be unreachable. The safety mechanics below (resolve binary via
@@ -77,7 +77,7 @@ def resolve_binary(cli_bin: str = DEFAULT_CLI_BIN) -> str:
     resolved = shutil.which(cli_bin)
     if not resolved:
         raise AgyBinaryNotFoundError(
-            f"Could not find '{cli_bin}' on PATH. If the Antigravity CLI is installed "
+            f"Could not find '{cli_bin}' on PATH. If the AGY CLI is installed "
             f"under a different name or location, pass cli_bin= with the correct "
             f"binary name or absolute path."
         )
@@ -98,7 +98,7 @@ def _kill_process_tree(proc: subprocess.Popen, wait_seconds: int = KILL_WAIT_SEC
     to our stdout/stderr pipes (ordinary Windows handle inheritance, not something we
     opted into). With that grandchild still alive, a plain proc.wait() can hang
     indefinitely even though the direct child is already dead - the exact failure mode
-    antigravity-research-mcp's own lib.py was built to close via taskkill /T /F, ported
+    ai-research-mcp's own lib.py was built to close via taskkill /T /F, ported
     here synchronously."""
     if sys.platform == "win32":
         try:

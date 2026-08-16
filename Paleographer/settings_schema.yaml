@@ -1,8 +1,8 @@
 sections:
-  Antigravity CLI:
+  AGY CLI:
     AGY_CLI_BIN:
       default: "agy"
-      tooltip: "The Antigravity CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
+      tooltip: "The AGY CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
   Data & Directories:
     PALEOGRAPHER_RECORD_TYPE:
       default: ""

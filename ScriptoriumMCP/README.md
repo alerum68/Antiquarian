@@ -1,23 +1,23 @@
 # ScriptoriumMCP
 
-A generic, reusable, **synchronous** library for safely calling Google's Antigravity
+A generic, reusable, **synchronous** library for safely calling Google's AGY
 CLI (`agy`) from any Scriptorium tool. Right now Paleographer's `agy_engine.py` is the
 only consumer, but `agy_client.py` itself knows nothing about Parish.pmt, schemas, or
 genealogy - any future Scriptorium tool that wants to call `agy` can import it directly.
 
 ## Not an MCP server
 
-Despite the name (chosen to echo the separate, general-purpose `antigravity-research-mcp`
+Despite the name (chosen to echo the separate, general-purpose `ai-research-mcp`
 tool below), this is a **plain importable Python package, not an MCP server**.
 Paleographer runs as a standalone subprocess launched by Scriptorium.py's GUI with no
 MCP client present at runtime, so a real MCP server would be unreachable from it. The
 name is a naming convention, not a protocol claim.
 
-## Relationship to antigravity-research-mcp
+## Relationship to ai-research-mcp
 
 There's a separate, unrelated tool at
-`C:\Users\Jason Cole\Documents\PyCharm\tools\mcp\antigravity-research-mcp` - a real MCP
-server exposing a `research` tool for Claude Code's own ad hoc research queries across
+`C:\Users\Jason Cole\Documents\PyCharm\tools\mcp\ai-research-mcp` - a real MCP
+server exposing a `research` tool for AI Assistant's own ad hoc research queries across
 any project. It is **not touched or replaced by this folder** and stays registered
 independently. Both it and this package depend on the same underlying `agy` CLI
 install/authentication, which is why the setup steps below are documented once, here,
@@ -67,7 +67,7 @@ for both.
    explicitly on every call, never relying on `agy`'s own default - confirmed live that
    with no `--model` flag, `agy` defaults to a flash-tier model with noticeably worse
    OCR quality.
-5. **In Scriptorium**, set "Extraction Engine" (Global Settings) to "Antigravity CLI"
+5. **In Scriptorium**, set "Extraction Engine" (Global Settings) to "AGY CLI"
    (the default) and confirm "Agy Model Name" reads `gemini-3.1-pro-high`.
 
 ## Known behavior worth knowing about
@@ -93,6 +93,6 @@ for both.
   `pdfplumber`, already a project dependency) and stages all of them in one `--add-dir`
   call - the same mechanism already proven reliable for direct image input. This was
   verified live to correctly return one "sheet" per staged page in a single call.
-- **No async batch API equivalent exists** for `agy`, unlike the direct Gemini API
+- **No async batch API equivalent exists** for `agy`, unlike the direct AI Assistant API
   path. Every file - image or PDF, any page count - goes through the same synchronous
   call. Large multi-page PDFs should use a generous `AGY_TIMEOUT_SECONDS`.

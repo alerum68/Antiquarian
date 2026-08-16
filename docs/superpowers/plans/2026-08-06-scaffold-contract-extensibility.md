@@ -15,7 +15,7 @@
 - No changes to `Commissioner/models.py`, `Commissioner/fact_registry.py`, or `Commissioner/record_registry.py` — the `.pmt`-scanning mechanism already handles any file it finds.
 - No changes to `Voyageur/census_schema.py`, `Voyageur/field_maps/*.yaml`, `Paleographer.py`, or `engine.py` — this plan only adds a declaration file; wiring it into a live gather or analysis run is later work.
 - Full test suite must stay green after each task (`python -m pytest Commissioner/tests -q`, baseline 36 passing before this plan starts).
-- No AI attribution or Claude stamps in commits.
+- No AI attribution or AI Assistant stamps in commits.
 
 ---
 

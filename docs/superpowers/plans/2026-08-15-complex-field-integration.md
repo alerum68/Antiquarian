@@ -1,6 +1,6 @@
 # Complex Field Integration Implementation Plan
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+> **For AGY:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
 **Goal:** Implement complex mapping rules for advanced census fields (Income, dynamic Occupation, 1935 Residence) across Ancestry and FamilySearch pipelines, without structural `Commissioner` changes.
 

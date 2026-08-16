@@ -69,7 +69,7 @@ def test_paleographer_schema_matches_expected_shape():
     result = Scriptorium._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
-        "Antigravity CLI": {"AGY_CLI_BIN": "agy"},
+        "AGY CLI": {"AGY_CLI_BIN": "agy"},
         "Data & Directories": {
             "PALEOGRAPHER_RECORD_TYPE": "",
             "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2",

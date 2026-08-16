@@ -11,4 +11,4 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Provide safe fallbacks so Extract.py can be imported during test discovery
 os.environ.setdefault("MASTER_DB_NAME", "MasterDB.json")
-os.environ.setdefault("MODEL_NAME", "gemini-2.0-flash")
+os.environ.setdefault("MODEL_NAME", "AI Assistant-2.0-flash")

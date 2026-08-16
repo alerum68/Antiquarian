@@ -27,7 +27,7 @@
 
 - **Create:** `Archivist/settings_schema.yaml`, `Voyageur/settings_schema.yaml`, `Paleographer/settings_schema.yaml`, `Registrar/settings_schema.yaml`, `Gazetteer/settings_schema.yaml`, `PDFix/settings_schema.yaml` — one per tool, each with a top-level `sections:` key (section name → field name → `{default, tooltip?, widget?, picker?}`) and an optional top-level `label_overrides:` key (field name → display label).
 - **Modify:** `Scriptorium.py` — add `_load_tool_schema`; relocate `TOOLTIP_DESCRIPTIONS`/`CUSTOM_LABELS`/`PROGRAM_DIR_SENTINEL`/`TOOLBOX_DIR_SENTINEL`/filetypes constants/`PATH_PICKER_FIELDS`/`FIELD_WIDGETS` to sit between `GLOBAL_VARS` and `ARCHIVIST_VARS`; replace each of the six `*_VARS` literals with a `_load_tool_schema()` call and trim that tool's entries out of the four shared dicts; fix the stale Paleographer help text; delete the now-dead `RMTREE_FILETYPES`/`JSON_FILETYPES`/`GED_FILETYPES`/`SHP_FILETYPES` constants once nothing references them.
-- **Modify:** `Paleographer/prompts/Parish.pmt`, `Paleographer/prompts/Scrip.pmt` — add the new `"Antigravity CLI"` section to each file's `settings_sections:` list, so the two new Paleographer fields (owned by `Extract.py`, used by both record types) aren't silently hidden by the existing per-record-type section filter.
+- **Modify:** `Paleographer/prompts/Parish.pmt`, `Paleographer/prompts/Scrip.pmt` — add the new `"AGY CLI"` section to each file's `settings_sections:` list, so the two new Paleographer fields (owned by `Extract.py`, used by both record types) aren't silently hidden by the existing per-record-type section filter.
 - **Delete:** `Registrar/schema_ui_map.py` — dead, unimported scaffolding; its `UI_SCHEMA_MAPPINGS` descriptions are harvested into Registrar's new YAML tooltips in Task 5, then the file is removed.
 - **Create:** `tests/test_load_tool_schema.py` — pure-function unit tests for the loader against small YAML fixtures.
 - **Create:** `tests/test_settings_schema_completeness.py` — per-tool regression test: greps each tool's own source for every `os.getenv`/`os.environ.get` key and asserts it exists in that tool's `settings_schema.yaml`.
@@ -478,17 +478,17 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "PROGRAM_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
                    "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
                    "this one folder.",
-    "EXTRACTION_ENGINE": "Which backend performs the AI extraction. 'Antigravity CLI' shells out to the agy CLI - "
+    "EXTRACTION_ENGINE": "Which backend performs the AI extraction. 'AGY CLI' shells out to the agy CLI - "
                          "covered by a Google account subscription, no per-token API cost, but needs agy installed, "
-                         "on PATH, and signed in (use Test Agy Connection below). 'Gemini API' uses your "
-                         "GEMINI_API_KEY directly, billed per token.",
-    "AGY_MODEL_NAME": "The exact Antigravity CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
+                         "on PATH, and signed in (use Test Agy Connection below). 'AI Assistant API' uses your "
+                         "AI_API_KEY directly, billed per token.",
+    "AGY_MODEL_NAME": "The exact AGY CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
-    "GEMINI_API_KEY": "Your personal API key from Google AI Studio. Used to read and transcribe handwritten images.",
+    "AI_API_KEY": "Your personal API key from Google AI Studio. Used to read and transcribe handwritten images.",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
     "API_BUDGET": "A safety limit for your AI costs (e.g., '20' means $20). The script stops if it spends this much.",
-    "MODEL_NAME": "The AI model version you want to use (usually gemini-3.1-pro-preview or gemini-2.5-pro).",
+    "MODEL_NAME": "The AI model version you want to use (usually AI Assistant-3.1-pro-preview or AI Assistant-2.5-pro).",
     "RM_DIR": "The folder where your RootsMagic files live, relative to the Program Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
@@ -511,7 +511,7 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
 # ==========================================
 # Add keys here if you want them to display differently than standard Title Case.
 CUSTOM_LABELS = {
-    "GEMINI_API_KEY": "Google Gemini API Key",
+    "AI_API_KEY": "Google AI API Key",
     "PROGRAM_DIR": "Genealogy Root Directory",
     "RM_DIR": "RootsMagic Folder",
     "FTM_DIR": "Family Tree Maker Folder",
@@ -552,8 +552,8 @@ FIELD_WIDGETS = {
     "EXTRACTION_ENGINE": {
         "type": "segmented",
         "options": [
-            ("agy", "Antigravity CLI (subscription)"),
-            ("api", "Gemini API (pay-per-token)"),
+            ("agy", "AGY CLI (subscription)"),
+            ("api", "AI Assistant API (pay-per-token)"),
         ],
     },
 
@@ -892,7 +892,7 @@ git commit -m "Migrate Voyageur settings to settings_schema.yaml, fix LAC_ARCHIV
 
 ### Task 4: Migrate Paleographer to `settings_schema.yaml` + fix stale help text
 
-Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"`, matching `agy_client.DEFAULT_CLI_BIN`) and `AGY_TIMEOUT_SECONDS` (`Extract.py` line 273, default `"240"`, matching `agy_client.DEFAULT_TIMEOUT_SECONDS`) were missing from the UI. These are read by the shared `Extract.py` module used by BOTH the Parish and Scrip record-type flows, so the new "Antigravity CLI" section must be visible for both — meaning `Parish.pmt` and `Scrip.pmt`'s own `settings_sections:` front-matter lists (which `_get_pmt_settings_sections` uses to filter which `PALEOGRAPHER_VARS` sections show per record type) both need the new section name added, or the fields would be silently invisible in the GUI for every record type. Also fixes the confirmed stale help text: it currently only mentions "Enrich Metadata"/"Partition Collections" but the tab has a third button, "Resolve Names" (`Scriptorium.py` line 1584-1587), that the help text never mentions.
+Fixes the confirmed gap — `AGY_CLI_BIN` (`Extract.py` line 272, default `"agy"`, matching `agy_client.DEFAULT_CLI_BIN`) and `AGY_TIMEOUT_SECONDS` (`Extract.py` line 273, default `"240"`, matching `agy_client.DEFAULT_TIMEOUT_SECONDS`) were missing from the UI. These are read by the shared `Extract.py` module used by BOTH the Parish and Scrip record-type flows, so the new "AGY CLI" section must be visible for both — meaning `Parish.pmt` and `Scrip.pmt`'s own `settings_sections:` front-matter lists (which `_get_pmt_settings_sections` uses to filter which `PALEOGRAPHER_VARS` sections show per record type) both need the new section name added, or the fields would be silently invisible in the GUI for every record type. Also fixes the confirmed stale help text: it currently only mentions "Enrich Metadata"/"Partition Collections" but the tab has a third button, "Resolve Names" (`Scriptorium.py` line 1584-1587), that the help text never mentions.
 
 **Files:**
 - Create: `Paleographer/settings_schema.yaml`
@@ -913,7 +913,7 @@ def test_paleographer_schema_matches_expected_shape():
     result = Scriptorium._load_tool_schema(BASE_DIR / "Paleographer")
 
     assert result == {
-        "Antigravity CLI": {"AGY_CLI_BIN": "agy", "AGY_TIMEOUT_SECONDS": "240"},
+        "AGY CLI": {"AGY_CLI_BIN": "agy", "AGY_TIMEOUT_SECONDS": "240"},
         "Data & Directories": {
             "PALEOGRAPHER_RECORD_TYPE": "", "CHURCH_IMAGE_DIR": "Parish",
             "CHURCH_GEDCOM_NAME": "Parish.ged", "CHURCH_MASTER_DB_NAME": "parish_register.json",
@@ -971,10 +971,10 @@ Expected: the schema test FAILs with `FileNotFoundError`; the help-text test FAI
 
 ```yaml
 sections:
-  Antigravity CLI:
+  AGY CLI:
     AGY_CLI_BIN:
       default: "agy"
-      tooltip: "The command/path used to invoke the Antigravity CLI (agy). Leave as 'agy' unless it's not on your PATH."
+      tooltip: "The command/path used to invoke the AGY CLI (agy). Leave as 'agy' unless it's not on your PATH."
     AGY_TIMEOUT_SECONDS:
       default: "240"
       tooltip: "How many seconds to wait for a single agy transcription call before giving up (default 240)."
@@ -1097,7 +1097,7 @@ sections:
         base_dir_key: "JSON_DIR"
 ```
 
-- [ ] **Step 4: Add "Antigravity CLI" to both `.pmt` files' `settings_sections:` lists**
+- [ ] **Step 4: Add "AGY CLI" to both `.pmt` files' `settings_sections:` lists**
 
 In `Paleographer/prompts/Parish.pmt`, change:
 
@@ -1113,7 +1113,7 @@ to:
 
 ```yaml
 settings_sections:
-  - "Antigravity CLI"
+  - "AGY CLI"
   - "Data & Directories"
   - "Parish Information"
   - "Register Information"
@@ -1131,7 +1131,7 @@ to:
 
 ```yaml
 settings_sections:
-  - "Antigravity CLI"
+  - "AGY CLI"
   - "Scrip Information"
 ```
 
@@ -1296,7 +1296,7 @@ Expected: all PASS, including the two new Paleographer tests from Step 1.
 
 - [ ] **Step 9: Manual click-through**
 
-Launch `python Scriptorium.py`, open the Paleographer tab, switch the Record Type dropdown between `Parish.pmt` and `Scrip.pmt`, and for each confirm the "Antigravity CLI" section now appears alongside that type's usual sections. Click the ⓘ help icon and confirm the updated text mentions Resolve Names.
+Launch `python Scriptorium.py`, open the Paleographer tab, switch the Record Type dropdown between `Parish.pmt` and `Scrip.pmt`, and for each confirm the "AGY CLI" section now appears alongside that type's usual sections. Click the ⓘ help icon and confirm the updated text mentions Resolve Names.
 
 - [ ] **Step 10: Commit**
 

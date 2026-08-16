@@ -1,10 +1,10 @@
 # Scriptorium UI & Settings Overhaul Design
 
 ## 1. Overview
-The goal of this overhaul is to drastically simplify the Scriptorium interface by removing "developer-centric" settings, hardcoding them as sensible defaults, and upgrading remaining inputs to proper UI widgets (checkboxes, dropdowns) to prevent option overload for genealogists. We will also integrate a seamless "Sign in to Google" button for Antigravity (`agy`), deprecating raw Gemini API inputs.
+The goal of this overhaul is to drastically simplify the Scriptorium interface by removing "developer-centric" settings, hardcoding them as sensible defaults, and upgrading remaining inputs to proper UI widgets (checkboxes, dropdowns) to prevent option overload for genealogists. We will also integrate a seamless "Sign in to Google" button for AGY (`agy`), deprecating raw AI Assistant API inputs.
 
-## 2. Antigravity OAuth Integration
-- **Remove API Variables:** Remove all direct Gemini API variables from `Global Settings` (`EXTRACTION_ENGINE`, `GEMINI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`).
+## 2. AGY OAuth Integration
+- **Remove API Variables:** Remove all direct AI Assistant API variables from `Global Settings` (`EXTRACTION_ENGINE`, `AI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`).
 - **Remove API Logic:** Purge legacy API backend fallback code across the app, ensuring the app relies solely on `agy`.
 - **UI Addition:** Add a prominent "Sign in to Google" button on the Global Settings tab. When clicked, it will shell out to `agy login`, triggering the OAuth flow in the user's browser. The UI will poll `agy login --status` and update to show the connected user email upon success.
 

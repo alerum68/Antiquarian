@@ -124,7 +124,7 @@ C_BORDER = "#33363D"
 # ==========================================
 GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                     "EXTRACTION_ENGINE": "agy",
-                                    "GEMINI_API_KEY": "",
+                                    "AI_API_KEY": "",
                                     "API_BUDGET": "5.00",
                                     "MODEL_NAME": "",
                                     "COST_PER_1M_INPUT": "0.075",
@@ -157,7 +157,7 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Scriptorium code, your "
     "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
     "this one folder.",
-    "AGY_MODEL_NAME": "The exact Antigravity CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
+    "AGY_MODEL_NAME": "The exact AGY CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
                       "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
                       "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
@@ -664,7 +664,7 @@ class Scriptorium(ctk.CTk):
                            ".pmt file you've added to Paleographer/prompts).\n"
                            "2. Place your historical document images or PDFs into that type's "
                            "designated folder in your project.\n"
-                           "3. Ensure you have your Gemini API key saved in the Global Settings.\n"
+                           "3. Ensure you have your AI API key saved in the Global Settings.\n"
                            "4. Click 'Run Analysis (API)' to transcribe. For Scrip records, use 'Enrich Metadata' "
                            "to fetch live LAC catalog metadata, 'Partition Collections' to split records into "
                            "official LAC archival series files, or 'Resolve Names' to cross-reference and "
@@ -715,7 +715,7 @@ class Scriptorium(ctk.CTk):
                                               "These are the master settings shared across all of your tools.\n\n"
                                               "1. Set your 'GENEALOGY_DIR' first. This is the main folder for your "
                                               "genealogy files. All other folder paths build off of this one.\n"
-                                              "2. Add your Gemini API Key here so the AI transcription tool can "
+                                              "2. Add your AI API Key here so the AI transcription tool can "
                                               "function.\n"
                                               "3. Update your name and organization so the GEDCOM files properly "
                                               "credit your research.\n"
@@ -1502,7 +1502,7 @@ class Scriptorium(ctk.CTk):
 
         auth_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
         auth_frame.pack(fill="x", padx=20, pady=(20, 0))
-        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (Antigravity)", fg_color=C_ACCENT,
+        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (AGY)", fg_color=C_ACCENT,
                             text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
         btn.pack(side="left", padx=(0, 10))
         status_lbl = ctk.CTkLabel(auth_frame, text="Not connected.", text_color=C_TEXT_MUTED)

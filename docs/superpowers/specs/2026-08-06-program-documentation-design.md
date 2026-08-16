@@ -29,7 +29,7 @@ All documentation must read naturally, clearly, and pragmatically. It must avoid
   - No symmetrical, rigidly templated paragraphs.
   - Do not explain every internal mechanism before explaining how to perform the core action.
 - **Tone**: Direct, practical, concise, and technically precise. Explain what the tool does, how to use it, what parameters mean, and how to recover when something breaks.
-- **Attribution**: No AI attribution, "Co-Authored-By", or Claude/Gemini tags anywhere in prose, comments, or commit messages.
+- **Attribution**: No AI attribution, "Co-Authored-By", or AI Assistant/AI Assistant tags anywhere in prose, comments, or commit messages.
 
 ---
 
@@ -56,7 +56,7 @@ The wiki files reside in `C:\Users\Jason Cole\Documents\Genealogy\Scriptorium-Do
 
 4. **`Configuration-&-Settings.md`**:
    - Using the Global Settings tab in the application.
-   - API key management (Google Gemini API key).
+   - API key management (Google AI API key).
    - Working directories, raw download folders, and output destinations.
    - The `.env` file configuration reference.
 

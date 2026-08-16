@@ -15,8 +15,8 @@
 - Full `pytest` suite and `pycodestyle --max-line-length=120` must stay green after every task, not just at the end.
 - No behavior change anywhere except the `crosscheck` CLI mode fix (Task 6).
 - Deletions/consolidations (pure code moves) get no new tests — existing tests for moved/deleted code must still pass, or be deleted alongside (postprocess.py's own tests).
-- Do not run `Voyageur/LAC.py` or `Voyageur/BACLAC.py` against the real network, and do not open a browser to LAC/Canadiana — blocked pending Claude issue #81159. The `crosscheck` unit test (Task 6) mocks `lac_client.search` and `voyageur_lac.download_pid_bundle`; it must never make a real network call.
-- No AI attribution, "Co-Authored-By", or Claude stamps in any commit message.
+- Do not run `Voyageur/LAC.py` or `Voyageur/BACLAC.py` against the real network, and do not open a browser to LAC/Canadiana — blocked pending AI Assistant issue #81159. The `crosscheck` unit test (Task 6) mocks `lac_client.search` and `voyageur_lac.download_pid_bundle`; it must never make a real network call.
+- No AI attribution, "Co-Authored-By", or AI Assistant stamps in any commit message.
 - Do not touch `Voyageur/Voyageur.py` (confirmed-dead pre-split monolith) or `Commissioner/models.py` — both explicitly out of scope.
 - Do not add a `scaffold` LAC.py subcommand — that belongs to sub-project 3.
 
@@ -1066,8 +1066,8 @@ def paleographer_module(monkeypatch, tmp_path):
         "PROGRAM_DIR": str(program_dir),
         "JSON_DIR": "JSON",
         "PALEOGRAPHER_RECORD_TYPE": "Parish",
-        "MODEL_NAME": "gemini-test-model",
-        "GEMINI_API_KEY": "fake-key-not-used",
+        "MODEL_NAME": "AI Assistant-test-model",
+        "AI_API_KEY": "fake-key-not-used",
         "API_BUDGET": "5.00",
         "COST_PER_1M_INPUT": "0.075",
         "COST_PER_1M_OUTPUT": "0.30",

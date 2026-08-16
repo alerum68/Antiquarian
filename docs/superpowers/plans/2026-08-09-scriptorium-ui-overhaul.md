@@ -26,7 +26,7 @@ No test requirements were specified in the blueprint (this is primarily a UI and
 
 - [ ] **Step 1: Remove API and Boilerplate Variables from GLOBAL_VARS**
 
-In `Scriptorium.py`, edit `GLOBAL_VARS`. Remove `EXTRACTION_ENGINE`, `GEMINI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`. Also remove `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`.
+In `Scriptorium.py`, edit `GLOBAL_VARS`. Remove `EXTRACTION_ENGINE`, `AI_API_KEY`, `API_BUDGET`, `MODEL_NAME`, `COST_PER_1M_INPUT`, `COST_PER_1M_OUTPUT`, `CACHE_DISCOUNT_MULTIPLIER`. Also remove `SOFTWARE_NAME`, `SOFTWARE_VERS`, `COPYRIGHT_START`, `GEDCOM_NOTE`, `GEDCOM_CONC`, `REVIEW_COLOR`.
 Keep `AGY_MODEL_NAME`.
 Also remove their corresponding entries in `TOOLTIP_DESCRIPTIONS` and `CUSTOM_LABELS`.
 
@@ -62,7 +62,7 @@ In `Scriptorium.py`, inside `_build_tab_global(self, parent_frame):`, add the bu
         auth_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
         auth_frame.pack(fill="x", padx=20, pady=(20, 0))
         
-        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (Antigravity)", fg_color=C_ACCENT, text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
+        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (AGY)", fg_color=C_ACCENT, text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
         btn.pack(side="left", padx=(0, 10))
         
         status_lbl = ctk.CTkLabel(auth_frame, text="Not connected.", text_color=C_TEXT_MUTED)

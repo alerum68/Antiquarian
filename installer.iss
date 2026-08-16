@@ -51,7 +51,7 @@ begin
       Exec('msiexec.exe', '/i "' + ExpandConstant('{tmp}\node.msi') + '" /qn', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     end;
     
-    // Install antigravity-cli
+    // Install AGY-cli
     Exec('cmd.exe', '/c npm install -g @google/antigravity-cli', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     // Download Gazetteer DBs

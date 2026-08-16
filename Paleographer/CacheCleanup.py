@@ -1,11 +1,11 @@
 """
-Gemini API Cache Cleanup Utility.
+AI Assistant API Cache Cleanup Utility.
 
 Deletes all active context caches under the configured API key, so they
 don't sit around racking up storage costs.
 
 Environment variables:
-    GEMINI_API_KEY: set in the environment or a .env file.
+    AI_API_KEY: set in the environment or a .env file.
 """
 
 import os
@@ -22,7 +22,7 @@ from google import genai
 # its own subfolder's .env, so Paleographer stays runnable standalone.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("AI_API_KEY"))
 
 
 # ==========================================

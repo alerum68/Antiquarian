@@ -35,7 +35,7 @@ metadata_fields:
   Repository: "${HBCA_REPOSITORY}"
 batch_page_threshold: 1
 settings_sections:
-  - "Antigravity CLI"
+  - "AGY CLI"
   - "HBCA / Manitoba Archives"
 field_remap:
   HBCA_MASTER_DB_NAME: MASTER_DB_NAME

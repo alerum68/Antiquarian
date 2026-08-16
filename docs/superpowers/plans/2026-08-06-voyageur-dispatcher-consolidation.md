@@ -17,7 +17,7 @@
 - `FS.py`'s own `_read_text_with_retry`/`_unlink_with_retry` stay in `FS.py` — not duplicated into `_gather_helpers.py`.
 - No new LAC features. Only fix: forward `LAC_HARVEST_VOLUME` as `volume --volume X` and `LAC_URL` as `reel --url <url>`.
 - No fix to the separate, pre-existing `LAC_MAX_WORKERS`/`LAC_RECORD_TYPE`/`LAC_VOLUME` vs. `Scriptorium.py`'s actual env-var names mismatch — out of scope, already flagged in the spec for a future task.
-- No AI attribution, "Co-Authored-By", or Claude stamps in any commit message.
+- No AI attribution, "Co-Authored-By", or AI Assistant stamps in any commit message.
 - Full `pytest` suite (run from repo root) must stay green after every task, not just at the end.
 
 ---
@@ -953,7 +953,7 @@ Same as Step 2, using `FS_URL` and a real FamilySearch record page. Confirm both
 
 - [ ] **Step 4: Run an LAC volume harvest**
 
-Set `LAC_HARVEST_VOLUME` to a real volume number, click the LAC harvest button, and confirm the subprocess receives `LAC volume --volume <number>` and the harvest completes (per the project's existing LAC-network guidance — do not run this if LAC.py/network access is currently blocked per Claude issue #81159; if blocked, defer this step and note it).
+Set `LAC_HARVEST_VOLUME` to a real volume number, click the LAC harvest button, and confirm the subprocess receives `LAC volume --volume <number>` and the harvest completes (per the project's existing LAC-network guidance — do not run this if LAC.py/network access is currently blocked per AI Assistant issue #81159; if blocked, defer this step and note it).
 
 - [ ] **Step 5: Run an LAC reel harvest**
 

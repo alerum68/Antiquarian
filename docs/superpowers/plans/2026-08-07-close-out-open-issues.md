@@ -4,7 +4,7 @@
 
 > **SUPERSEDED:** This plan is historical. Its checklist steps marked `- [ ]` were superseded and never executed as written; see the live tracker `docs/plans/task.md` for the actual disposition.
 
-**Goal:** Close out the three open GitHub issues on this repo (#3 Voyageur field-map normalization, #4 Archivist unified tree ingestion, #5 Scriptorium FIELD_REMAP relocation) by finishing the specific remaining gaps each issue's own comment thread already identifies, and fix a repo-hygiene bug where `docs/superpowers/` is gitignored locally but 25 files under it are already tracked and pushed to GitHub. Issue #81159 (the LAC.py/Claude-Desktop GPU-crash blocker) is explicitly out of scope — nothing here touches `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or the LAC site.
+**Goal:** Close out the three open GitHub issues on this repo (#3 Voyageur field-map normalization, #4 Archivist unified tree ingestion, #5 Scriptorium FIELD_REMAP relocation) by finishing the specific remaining gaps each issue's own comment thread already identifies, and fix a repo-hygiene bug where `docs/superpowers/` is gitignored locally but 25 files under it are already tracked and pushed to GitHub. Issue #81159 (the LAC.py/AI Assistant-Desktop GPU-crash blocker) is explicitly out of scope — nothing here touches `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or the LAC site.
 
 **Architecture:** All three issues already have substantial progress landed (confirmed by reading their comment threads against the current code). What remains is: (1) a pure audit-and-close for #5, which is already done in code; (2) a small, testable extraction in Voyageur's census-gather orchestration to close #3's "no direct test coverage" gap; (3) wiring the already-existing generic `facts[]` fact vocabulary into Archivist's church-flavor GEDCOM renderer to close #4's "write-only for church records" gap; (4)-(5) two manual, non-automatable live-data verification checkpoints (#3's `familysearch_census.yaml` DRAFT status, and end-to-end real-gather verification for both #3 and #4) that require an actual live Ancestry/FamilySearch browser session and are the user's to run, not an implementer subagent's.
 
@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - Never touch `Voyageur/LAC.py`, `Voyageur/BACLAC.py`, or browse to the LAC site — issue #81159 is unresolved (see project memory `constraint_lac_scripts_blocked`).
-- No AI attribution, "Co-Authored-By", or Claude/Gemini stamps in code, commits, or PRs (CLAUDE.md).
-- Run the relevant tool's test suite locally before declaring any task finished (CLAUDE.md).
+- No AI attribution, "Co-Authored-By", or AI Assistant/AI Assistant stamps in code, commits, or PRs (AI Assistant.md).
+- Run the relevant tool's test suite locally before declaring any task finished (AI Assistant.md).
 - Closing or commenting on a GitHub issue is a visible, shared-state action — confirm with the human partner before running `gh issue close`/`gh issue comment`, even though this plan names the exact command to run.
 - Do not touch `parse_household`/`parse_household_relational`/era detection/the `role_semantic` vocabulary/citation assembly in `Archivist/Archivist.py` — these were independently confirmed correct against the design spec (issue #9) and are explicitly out of scope for every task below.
 
@@ -30,7 +30,7 @@
 - Consumes: nothing from other tasks.
 - Produces: nothing later tasks depend on.
 
-`.gitignore` already has a `/docs/superpowers/` line (sitting as an uncommitted local edit — `git diff HEAD -- .gitignore` shows it, confirmed via `git log --all -S"/docs/superpowers/" -- .gitignore` returning zero commits, i.e. it was never actually committed by anyone). A gitignore rule only stops *new* untracked files from being added — it does nothing for files already tracked before the rule existed, which is exactly why these 25 files are still on GitHub despite the rule. This is the same bug already fixed once for `CLAUDE.md` (commit `d70813f`, "Untrack CLAUDE.md - keep it local, not committed") — apply the identical fix here.
+`.gitignore` already has a `/docs/superpowers/` line (sitting as an uncommitted local edit — `git diff HEAD -- .gitignore` shows it, confirmed via `git log --all -S"/docs/superpowers/" -- .gitignore` returning zero commits, i.e. it was never actually committed by anyone). A gitignore rule only stops *new* untracked files from being added — it does nothing for files already tracked before the rule existed, which is exactly why these 25 files are still on GitHub despite the rule. This is the same bug already fixed once for `AI Assistant.md` (commit `d70813f`, "Untrack AI Assistant.md - keep it local, not committed") — apply the identical fix here.
 
 - [ ] **Step 1: Confirm the current tracked list and the uncommitted gitignore line**
 

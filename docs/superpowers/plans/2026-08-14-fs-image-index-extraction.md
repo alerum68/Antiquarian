@@ -19,7 +19,7 @@
 - `FS.py`'s `parse_citation()`, `parse_nara_citing_clause()`, `parse_census_browse_path()` are a deliberately untouched regression boundary — the new citation-text builder's only job is to produce a string those functions parse identically to a UI-scraped one.
 - Bump `@version` in `Voyageur.js`'s header on every task that ships a real behavior change (current: `0.3.24` as of this plan — check the actual current value before each bump).
 - Every JS change gets `node --check "Voyageur/Voyageur.js"` before commit.
-- Task 6 (live verification) cannot be run by a coding subagent — no browser tool access, and per this project's own established constraint, must not be driven via Chrome automation either (the gather loop is timing-sensitive; a Claude-driven/background tab inflates `setTimeout` 20x+, giving a false read). Must be run by the user directly.
+- Task 6 (live verification) cannot be run by a coding subagent — no browser tool access, and per this project's own established constraint, must not be driven via Chrome automation either (the gather loop is timing-sensitive; a AI Assistant-driven/background tab inflates `setTimeout` 20x+, giving a false read). Must be run by the user directly.
 
 ---
 
@@ -1146,7 +1146,7 @@ git commit -m "feat(voyageur): wire Image-Index extraction into the FS gather lo
 
 **Interfaces:** none.
 
-This task cannot be executed by a coding subagent (requires an authenticated FamilySearch session and a real browser), and per this project's own established finding, must not be driven through Claude-controlled Chrome automation either — the gather loop is timing-sensitive (`MutationObserver`-based waits, XHR/fetch interception, real page navigation), and a Claude-driven or backgrounded tab inflates `setTimeout` timing 20x+, which would give a false read on exactly the kind of interceptor-timing behavior this task exists to verify. Run this task in a real, user-driven browser session.
+This task cannot be executed by a coding subagent (requires an authenticated FamilySearch session and a real browser), and per this project's own established finding, must not be driven through AI Assistant-controlled Chrome automation either — the gather loop is timing-sensitive (`MutationObserver`-based waits, XHR/fetch interception, real page navigation), and a AI Assistant-driven or backgrounded tab inflates `setTimeout` timing 20x+, which would give a false read on exactly the kind of interceptor-timing behavior this task exists to verify. Run this task in a real, user-driven browser session.
 
 - [ ] **Step 1: Verify on an 1880+ record reached via Image Browser**
 

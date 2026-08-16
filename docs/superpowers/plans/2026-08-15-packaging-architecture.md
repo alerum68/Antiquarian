@@ -1,6 +1,6 @@
 # Packaging & Distribution Implementation Plan
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+> **For AGY:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
 **Goal:** Package Scriptorium as a cross-platform `--onedir` app with a powerful dual-mode Windows installer, automated dependency downloads, GitHub auto-updating, and automated CI/CD builds.
 
@@ -41,7 +41,7 @@
 ### Task 5: Inno Setup Installer Script
 **Files:** `installer.iss`
 **Step 1:** Create `installer.iss` with custom pages for `Genealogy` and `RootsMagic` directories, and the Standard vs Portable radio button.
-**Step 2:** Add `[Code]` logic to check for `npm`. If missing, download `node-v20.x-x64.msi` and `msiexec /i node.msi /qn`. Then `Exec()` the `npm install -g @google/antigravity-cli` command.
+**Step 2:** Add `[Code]` logic to check for `npm`. If missing, download `node-v20.x-x64.msi` and `msiexec /i node.msi /qn`. Then `Exec()` the `npm install -g @google/AGY-cli` command.
 **Step 3:** Use the Inno Download Plugin (or built-in `DownloadTemporaryFile`) to download `https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip` and the Canadian DB zip from GitHub raw, extracting them to `[Genealogy_Dir]\Scriptorium\Sys\Gazetteer`.
 
 ### Task 6: GitHub Actions CI/CD (Sandbox & Release)

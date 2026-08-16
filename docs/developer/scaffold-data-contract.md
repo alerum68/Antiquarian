@@ -46,7 +46,7 @@ The Master DB JSON is the primary intermediate data format used across Scriptori
 
 ## Scaffold Sheet Format
 
-When Voyageur downloads a microfilm roll, volume, or census district, it creates a scaffold Master DB JSON before any AI analysis takes place.
+When Voyageur downloads a microfilm roll, volume, or census district, it creates a scaffold Master DB JSON before any automated extraction takes place.
 
 A **scaffold sheet** contains document metadata but leaves `records` empty:
 

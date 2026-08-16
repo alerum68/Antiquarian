@@ -1,6 +1,6 @@
 """
 Structural validation of hand-written fixture documents against the merged
-schema. Fixtures avoid null values throughout: Gemini's "nullable" extension
+schema. Fixtures avoid null values throughout: AI Assistant's "nullable" extension
 isn't consulted by the standard jsonschema library the way it is by the
 live API, so a fixture testing that relaxation would need a custom
 validator; this test is a structural smoke check, not a full contract test.

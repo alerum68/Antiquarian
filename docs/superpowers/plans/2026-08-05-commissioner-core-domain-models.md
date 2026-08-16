@@ -12,7 +12,7 @@
 
 - Do not modify `Archivist.py`, `Paleographer.py`, `engine.py`, `Voyageur.py`, `FS.py`, or any other existing pipeline code. The one explicitly approved exception is `Paleographer/prompts/Scrip.pmt`, per the spec's `scrip_amount`/`scrip_type` split.
 - Do not delete or overwrite `Paleographer/schema.json` or `FactTypes.json` on disk — both stay exactly as they are; `Commissioner` only reads them for guardrail comparison.
-- No AI attribution, "Co-Authored-By", or "Generated with Claude" text in any code, comment, or commit message.
+- No AI attribution, "Co-Authored-By", or "Generated with AI Assistant" text in any code, comment, or commit message.
 - Run the full `Commissioner/tests/` suite locally and confirm it passes before considering any task done.
 - No comments explaining *what* code does — only ones explaining a non-obvious *why*, matching the rest of this codebase's style.
 - Every new file uses LF-agnostic content (the repo's git config already normalizes line endings; don't fight it).

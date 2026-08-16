@@ -1,6 +1,6 @@
 # PyCharm Inspection Fixes Part 2
 
-> **For Antigravity:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
+> **For AGY:** REQUIRED WORKFLOW: Use `.agent/workflows/execute-plan.md` to execute this plan in single-flow mode.
 
 **Goal:** Resolve the remaining PyCharm inspection errors that were skipped in Part 1 and update the automated lint suite.
 

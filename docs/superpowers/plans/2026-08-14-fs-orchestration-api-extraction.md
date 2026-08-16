@@ -782,7 +782,7 @@ git commit -m "feat(voyageur): wire FS gather to orchestration-API extraction, r
 
 **Interfaces:** none.
 
-This task cannot be executed by a coding subagent — it requires an authenticated FamilySearch session and a real browser. Run this task in the controlling session directly (the one with `claude-in-chrome` or equivalent access), regardless of how Tasks 1-3 were executed.
+This task cannot be executed by a coding subagent — it requires an authenticated FamilySearch session and a real browser. Run this task in the controlling session directly (the one with `AI Assistant-in-chrome` or equivalent access), regardless of how Tasks 1-3 were executed.
 
 - [ ] **Step 1: Verify on an 1880+ record (has `RELATIONSHIP_TO_HEAD` etc.)**
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **This plan is written for a cheaper model (Gemini Flash) to execute with minimal prior context on this codebase.** Every task below is self-contained: exact file paths, exact code, exact real test data (captured live against all 12 US federal and all 10 Canadian census years this session — nothing here is invented).
+> **This plan is written for a cheaper model (AI Assistant Flash) to execute with minimal prior context on this codebase.** Every task below is self-contained: exact file paths, exact code, exact real test data (captured live against all 12 US federal and all 10 Canadian census years this session — nothing here is invented).
 
 **Prerequisite — read before starting:** This plan extends `docs/superpowers/plans/2026-08-15-ancestry-index-panel-extraction.md` (the original Ancestry index-panel-data plan, covering 1850/1860/1880/1920 only). **That plan's Tasks 1-4 must be executed FIRST**, in the same order, before starting this one — this plan's diffs are written against the file state that plan produces (the `ANCESTRY_INDEX_FIELD_TO_COLUMN` constant with its Task-1 entries, and `field_maps/ancestry_census.yaml` with its Task-4 additions: `"Marital Status"`, `"Birth Month"`, `"Months Not Employed"`, `"Home Ownership"`, `"Home Mortgaged"`, `"Native Tongue"`, `"Speaks English"`, `"Employment Field"`). If those Tasks have not yet run, run them first, then return here.
 

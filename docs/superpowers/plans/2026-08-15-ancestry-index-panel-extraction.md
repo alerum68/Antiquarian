@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
-> **This plan is written for a cheaper model (Gemini Flash) to execute with minimal prior context on this codebase.** Every task below is self-contained: exact file paths, exact code, exact real test data (captured live against 4 real Ancestry census years this session — nothing here is invented). Read a task's own text before starting it; do not assume context from other tasks beyond what's stated in its own "Interfaces" block.
+> **This plan is written for a cheaper model (AI Assistant Flash) to execute with minimal prior context on this codebase.** Every task below is self-contained: exact file paths, exact code, exact real test data (captured live against 4 real Ancestry census years this session — nothing here is invented). Read a task's own text before starting it; do not assume context from other tasks beyond what's stated in its own "Interfaces" block.
 
 **Goal:** Add a second, API-based data source for Ancestry's per-image person-index data (`imageviewer/api/record/index-panel-data`) in `Voyageur.js`, running as a fallback pair alongside the existing DOM-table scraper — never replacing it.
 

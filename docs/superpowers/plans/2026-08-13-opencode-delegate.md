@@ -2,26 +2,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Give Claude Code a second, free, key-less delegation target — OpenCode CLI (already authenticated, no separate login) — by adding a `.claude/agents/opencode-delegate.md` subagent that shells out to `opencode run --agent implementer` (DeepSeek, write mode) or `opencode run --agent code-reviewer` (enforced read-only, second opinion), mirroring the existing `antigravity-delegate` subagent's shape.
+**Goal:** Give AI Assistant a second, free, key-less delegation target — OpenCode CLI (already authenticated, no separate login) — by adding a `.AI Assistant/agents/opencode-delegate.md` subagent that shells out to `opencode run --agent implementer` (DeepSeek, write mode) or `opencode run --agent code-reviewer` (enforced read-only, second opinion), mirroring the existing `AGY-delegate` subagent's shape.
 
-**Architecture:** Four sequential tasks, each gitignored-local except the final tracker update: (1) fix a real invocation bug found during investigation — `implementer`/`code-reviewer` are `mode: subagent` and OpenCode's CLI silently refuses to run subagents directly, so both must become `mode: all`; (2) write the new Claude-side subagent definition, whose invocation contract depends on (1) being correct; (3) document the new delegation target in `.claude/CLAUDE.md`; (4) prove the whole bridge works end-to-end with two throwaway smoke tests run directly via Bash (not through the new subagent), exactly as the design spec required, before anyone trusts the subagent definition in a real session.
+**Architecture:** Four sequential tasks, each gitignored-local except the final tracker update: (1) fix a real invocation bug found during investigation — `implementer`/`code-reviewer` are `mode: subagent` and OpenCode's CLI silently refuses to run subagents directly, so both must become `mode: all`; (2) write the new AI Assistant-side subagent definition, whose invocation contract depends on (1) being correct; (3) document the new delegation target in `.AI Assistant/AI Assistant.md`; (4) prove the whole bridge works end-to-end with two throwaway smoke tests run directly via Bash (not through the new subagent), exactly as the design spec required, before anyone trusts the subagent definition in a real session.
 
-**Tech Stack:** OpenCode CLI v1.18.16 (already installed, already authenticated via `~/.local/share/opencode/auth.json`), Claude Code subagent frontmatter (YAML), Markdown, PowerShell/Bash.
+**Tech Stack:** OpenCode CLI v1.18.16 (already installed, already authenticated via `~/.local/share/opencode/auth.json`), AI Assistant subagent frontmatter (YAML), Markdown, PowerShell/Bash.
 
 **Spec:** User-provided design brief, given in-session on 2026-08-13 ("Add OpenCode as a Free, Key-less Delegation Target"). No separate spec file — this plan's Goal/Architecture and the Global Constraints below are the spec's operative content, corrected against two empirical findings the spec's author did not have when writing it (see Global Constraints, items 4 and 5).
 
 ## Global Constraints
 
 - Never pass `-m`/`--model` to `opencode run` — always let `--agent <name>`'s own frontmatter `model:` win (`implementer` → `opencode/deepseek-v4-flash-free`, `code-reviewer` → `opencode/big-pickle`).
-- Always pass `--dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium"` (forward slashes — matches the existing `.claude/agents/general-purpose.md` convention) and `--format json`.
+- Always pass `--dir "C:/Users/Jason Cole/Documents/Genealogy/Scriptorium"` (forward slashes — matches the existing `.AI Assistant/agents/general-purpose.md` convention) and `--format json`.
 - `opencode-delegate` gets `tools: Bash, Read, Glob` — no `Write`/`Edit`. All file changes happen through the delegated CLI, never reconstructed by the subagent itself.
-- No `PreToolUse` hook / gate on `opencode-delegate`'s Bash tool (unlike `antigravity-delegate`'s `hooks.PreToolUse`) — this integration is project-scoped and gitignored, wrapping a CLI the user already runs directly and trusts; that threat model does not require gating.
+- No `PreToolUse` hook / gate on `opencode-delegate`'s Bash tool (unlike `AGY-delegate`'s `hooks.PreToolUse`) — this integration is project-scoped and gitignored, wrapping a CLI the user already runs directly and trusts; that threat model does not require gating.
 - **Finding (this plan, Task 1):** `implementer` and `code-reviewer` are `mode: subagent` in `.opencode/agents/*.md`. OpenCode's CLI cannot run a subagent directly — `opencode run --agent code-reviewer` prints `agent "code-reviewer" is a subagent, not a primary agent. Falling back to default agent` **and exits 0**, silently substituting the full-permission `build` agent instead. Confirmed empirically. This must be fixed (`mode: subagent` → `mode: all`, OpenCode's third mode: "available in all contexts" — both directly runnable and still usable inside `build`'s own internal SDD dispatch) before any dispatch contract that names `implementer`/`code-reviewer` explicitly is trustworthy.
 - **Finding (this plan, Task 1):** Because the fallback above is silent and exits 0, `opencode-delegate` must treat the literal stderr substring `Falling back to default agent` as a hard failure regardless of exit code or JSON stream content — a typo'd `--agent` name would otherwise silently run `build` (blanket write permission) with no error signal.
 - **Finding (this plan, Task 1):** `build` and `implementer` both carry `"permission": "*", "action": "allow", "pattern": "*"` in their effective permission (confirmed empirically: `implementer` wrote a file via direct CLI invocation with no `--auto` flag and no prompt). `--auto` is therefore a no-op for write-mode calls in this repo's current config — it is kept in the documented invocation anyway as a portability safety net (a different/future permission default could make it load-bearing), but the **real** safety mechanism for write-mode is branch/worktree isolation before invoking, and diff review after. `code-reviewer` alone carries a real `permission: edit: deny` override (confirmed empirically: it refused a direct write-tool probe, stating "Write tool: not available in my toolset") — it is the only genuinely enforced read-only target, and only after the `mode: all` fix makes it directly invocable.
-- All files this plan touches are gitignored except `docs/plans/task.md`: `.claude/` (`.gitignore:12` `/.claude/`) and `.opencode/` (`.gitignore`'s "Local-only" block). No git commit applies to any task in this plan. Per top-level Claude Code instructions, do not commit even the `docs/plans/task.md` update without explicit user request.
+- All files this plan touches are gitignored except `docs/plans/task.md`: `.AI Assistant/` (`.gitignore:12` `/.AI Assistant/`) and `.opencode/` (`.gitignore`'s "Local-only" block). No git commit applies to any task in this plan. Per top-level AI Assistant instructions, do not commit even the `docs/plans/task.md` update without explicit user request.
 - No change to `opencode.json`'s top-level `model` (stays `opencode/big-pickle`) — every invocation in this plan passes `--agent` explicitly, so the top-level default is never exercised by this integration.
-- No change to `AGENTS.md` — it documents OpenCode's own independent `/superpowers` workflow; this bridge is Claude-Code-specific and belongs only in `.claude/CLAUDE.md`.
+- No change to `AGENTS.md` — it documents OpenCode's own independent `/superpowers` workflow; this bridge is AI Assistant-Code-specific and belongs only in `.AI Assistant/AI Assistant.md`.
 
 ---
 
@@ -61,14 +61,14 @@ No commit — both files are gitignored (`.opencode/` is untracked per `.gitigno
 
 ---
 
-### Task 2: Create `.claude/agents/opencode-delegate.md`
+### Task 2: Create `.AI Assistant/agents/opencode-delegate.md`
 
 **Files:**
-- Create: `.claude/agents/opencode-delegate.md`
+- Create: `.AI Assistant/agents/opencode-delegate.md`
 
 **Interfaces:**
 - Consumes: Task 1's verified fact that `implementer`/`code-reviewer` accept direct `--agent` invocation.
-- Produces: the subagent Claude Code will select when a task's description matches "free, key-less delegation via OpenCode/DeepSeek."
+- Produces: the subagent AI Assistant will select when a task's description matches "free, key-less delegation via OpenCode/DeepSeek."
 
 - [x] **2a. Write the file exactly as follows:**
 
@@ -77,7 +77,7 @@ No commit — both files are gitignored (`.opencode/` is untracked per `.gitigno
 name: opencode-delegate
 description: |
   Use this subagent for bulk/mechanical work when the user wants a free,
-  key-less alternative to Antigravity — OpenCode CLI is already installed
+  key-less alternative to AGY — OpenCode CLI is already installed
   and authenticated on this machine (~/.local/share/opencode/auth.json),
   no API key or separate login needed. Routes write-mode work to this
   repo's own `.opencode/agents/implementer` (DeepSeek, opencode/deepseek-v4-flash-free)
@@ -92,7 +92,7 @@ description: |
 
   <example>
   Context: A mechanical multi-file change the user wants done without
-  spending Gemini/Antigravity quota or managing a second credential.
+  spending AI Assistant/AGY quota or managing a second credential.
   user: "Rename every FooBar reference to BazQux across the repo — use the free option, no API key."
   assistant: "I'll use opencode-delegate to run the implementer agent
   (DeepSeek, free, already authenticated) on a dedicated branch, then
@@ -100,7 +100,7 @@ description: |
   </example>
 
   <example>
-  Context: Claude wants a second opinion on a diff before merging, at zero
+  Context: AI Assistant wants a second opinion on a diff before merging, at zero
   API cost.
   user: "Get a free second opinion on this diff before we merge."
   assistant: "I'll use opencode-delegate to run the code-reviewer agent —
@@ -122,7 +122,7 @@ route one well-scoped unit of work to OpenCode's own `implementer` or
 `code-reviewer` agent and return its report verbatim. OpenCode/DeepSeek
 does the heavy lifting; you only orchestrate and relay. **You do not
 verify and you do not claim success** — verification is the caller's
-(Claude's) job.
+(AI Assistant's) job.
 
 ## Core rule — everything goes through `opencode run`
 
@@ -231,7 +231,7 @@ Run:
 cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
 python -c "
 import re, yaml
-text = open('.claude/agents/opencode-delegate.md', encoding='utf-8').read()
+text = open('.AI Assistant/agents/opencode-delegate.md', encoding='utf-8').read()
 m = re.match(r'^---\n(.*?)\n---\n', text, re.S)
 fm = yaml.safe_load(m.group(1))
 assert fm['name'] == 'opencode-delegate'
@@ -244,32 +244,32 @@ print('OK', fm['name'], fm['tools'], fm['model'])
 ```
 Expected: `OK opencode-delegate Bash, Read, Glob inherit` with no traceback.
 
-No commit — `.claude/` is gitignored (`.gitignore:12`).
+No commit — `.AI Assistant/` is gitignored (`.gitignore:12`).
 
 ---
 
-### Task 3: Document the new delegation target in `.claude/CLAUDE.md`
+### Task 3: Document the new delegation target in `.AI Assistant/AI Assistant.md`
 
 **Files:**
-- Modify: `.claude/CLAUDE.md`
+- Modify: `.AI Assistant/AI Assistant.md`
 
 - [x] **3a. Replace the existing section:**
 
 Old text (verbatim, to locate and replace):
 ```markdown
-# Agent Delegation (Claude vs. Gemini)
-* **Claude (You):** Act as the senior architect. Handle complex logic, final code reviews, and high-level architectural decisions. 
-* **Gemini (Antigravity):** Act as the junior developer. Use the `antigravity-for-claude-code` tool to delegate bulk file writing, low-level reasoning tasks, unit test generation, and large schema digests.
-* **Protocol:** Inform the user when deploying Gemini. After Gemini completes, summarize its results briefly, then implement.
+# Agent Delegation (AI Assistant vs. AI Assistant)
+* **AI Assistant (You):** Act as the senior architect. Handle complex logic, final code reviews, and high-level architectural decisions. 
+* **AI Assistant (AGY):** Act as the junior developer. Use the `AGY-for-AI Assistant-code` tool to delegate bulk file writing, low-level reasoning tasks, unit test generation, and large schema digests.
+* **Protocol:** Inform the user when deploying AI Assistant. After AI Assistant completes, summarize its results briefly, then implement.
 ```
 
 New text:
 ```markdown
-# Agent Delegation (Claude vs. Gemini vs. OpenCode)
-* **Claude (You):** Act as the senior architect. Handle complex logic, final code reviews, and high-level architectural decisions.
-* **Gemini (Antigravity):** Act as the junior developer. Use the `antigravity-for-claude-code` tool (`antigravity-delegate` subagent) to delegate bulk file writing, low-level reasoning tasks, unit test generation, and large schema digests. Requires the user's Antigravity/Gemini credentials.
-* **OpenCode (DeepSeek, free/key-less):** A second junior-developer option with no API key or separate login — already authenticated on this machine. Use the `opencode-delegate` subagent for the same class of bulk/mechanical write-mode work (routes to `.opencode/agents/implementer`, DeepSeek) when avoiding Gemini quota/credentials matters, or for a free second-opinion review (routes to `.opencode/agents/code-reviewer`, enforced read-only).
-* **Protocol:** Inform the user when deploying Gemini or OpenCode. After the delegate completes, verify its work (run tests, review the diff) before treating it as done — a delegate's self-report is a claim, not evidence — then summarize briefly and implement/finalize.
+# Agent Delegation (AI Assistant vs. AI Assistant vs. OpenCode)
+* **AI Assistant (You):** Act as the senior architect. Handle complex logic, final code reviews, and high-level architectural decisions.
+* **AI Assistant (AGY):** Act as the junior developer. Use the `AGY-for-AI Assistant-code` tool (`AGY-delegate` subagent) to delegate bulk file writing, low-level reasoning tasks, unit test generation, and large schema digests. Requires the user's AGY/AI Assistant credentials.
+* **OpenCode (DeepSeek, free/key-less):** A second junior-developer option with no API key or separate login — already authenticated on this machine. Use the `opencode-delegate` subagent for the same class of bulk/mechanical write-mode work (routes to `.opencode/agents/implementer`, DeepSeek) when avoiding AI Assistant quota/credentials matters, or for a free second-opinion review (routes to `.opencode/agents/code-reviewer`, enforced read-only).
+* **Protocol:** Inform the user when deploying AI Assistant or OpenCode. After the delegate completes, verify its work (run tests, review the diff) before treating it as done — a delegate's self-report is a claim, not evidence — then summarize briefly and implement/finalize.
 ```
 
 - [x] **3b. Verify the edit landed:**
@@ -277,11 +277,11 @@ New text:
 Run:
 ```bash
 cd "C:\Users\Jason Cole\Documents\Genealogy\Scriptorium"
-grep -n "OpenCode" .claude/CLAUDE.md
+grep -n "OpenCode" .AI Assistant/AI Assistant.md
 ```
 Expected: at least 3 matching lines (the section header and the two bullets mentioning OpenCode).
 
-No commit — `.claude/` is gitignored.
+No commit — `.AI Assistant/` is gitignored.
 
 ---
 
@@ -340,21 +340,21 @@ git status --short
 ```
 Expected: `grep -c` prints `0`; `git status --short` prints nothing (working tree unchanged — `code-reviewer` made no writes).
 
-- [x] **4f. Update `docs/plans/task.md`:** add a dated entry under a new `## OpenCode Delegation Bridge (2026-08-13)` heading summarizing: the `mode: all` fix and why it was necessary (subagents can't be invoked directly, silent 0-exit fallback), the new `.claude/agents/opencode-delegate.md`, the `.claude/CLAUDE.md` update, and both smoke tests' pass/fail result. Do not commit — the user has not asked for a commit on this work.
+- [x] **4f. Update `docs/plans/task.md`:** add a dated entry under a new `## OpenCode Delegation Bridge (2026-08-13)` heading summarizing: the `mode: all` fix and why it was necessary (subagents can't be invoked directly, silent 0-exit fallback), the new `.AI Assistant/agents/opencode-delegate.md`, the `.AI Assistant/AI Assistant.md` update, and both smoke tests' pass/fail result. Do not commit — the user has not asked for a commit on this work.
 
 ---
 
 ## Verification
 
 - [x] Task 1: both `.opencode/agents/*.md` files show `mode: all`; direct invocation of both produces no `Falling back to default agent` line; `code-reviewer` still refuses to write.
-- [x] Task 2: `.claude/agents/opencode-delegate.md` exists, frontmatter parses with `python -c "...yaml.safe_load..."` above, `tools` excludes `Write`/`Edit`, no `hooks` key.
-- [x] Task 3: `.claude/CLAUDE.md` contains the new three-way delegation section; old two-way section is gone.
+- [x] Task 2: `.AI Assistant/agents/opencode-delegate.md` exists, frontmatter parses with `python -c "...yaml.safe_load..."` above, `tools` excludes `Write`/`Edit`, no `hooks` key.
+- [x] Task 3: `.AI Assistant/AI Assistant.md` contains the new three-way delegation section; old two-way section is gone.
 - [x] Task 4: write-mode smoke test produced a real, passing pytest file (verified independently, not from the reply), then was deleted; read-only smoke test left `git status --short` empty; neither smoke test triggered the silent-fallback warning.
 - [x] `docs/plans/task.md` updated.
 
 ## Success Criteria
 
-- [x] Claude Code can delegate bulk/mechanical write-mode work to OpenCode/DeepSeek with no API key and no additional login, on a dedicated branch, with the diff reviewable before merge.
-- [x] Claude Code can get a free, OpenCode-enforced read-only second opinion via `code-reviewer` with no risk of accidental writes.
+- [x] AI Assistant can delegate bulk/mechanical write-mode work to OpenCode/DeepSeek with no API key and no additional login, on a dedicated branch, with the diff reviewable before merge.
+- [x] AI Assistant can get a free, OpenCode-enforced read-only second opinion via `code-reviewer` with no risk of accidental writes.
 - [x] Both paths fail loudly (not silently as `build`) on a bad `--agent` name or an un-fixed `mode: subagent` agent.
-- [x] `.claude/CLAUDE.md` documents both delegation targets and when to pick each.
+- [x] `.AI Assistant/AI Assistant.md` documents both delegation targets and when to pick each.
