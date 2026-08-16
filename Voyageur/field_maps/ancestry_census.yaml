@@ -1,0 +1,123 @@
+# Declarative normalization map for Ancestry's census index tables.
+#
+# Raw column header (verbatim, exactly as Ancestry's own table header text reads for a
+# given census year) -> a target in the shared record schema. Seeded from the header
+# variants already validated this project's Archivist build previously had to guess
+# among defensively (its CORE_COLUMNS/RELATIONSHIP_COLUMN_CANDIDATES/DYNAMIC_EVENT_RULES
+# tables) - real observed headers, not invented ones. Extend this file as new header
+# text is seen on a live gather; an unmapped header is flagged for review, never
+# silently dropped or guessed at (see census_schema.normalize_census_pages).
+#
+# Targets:
+#   participant_fields:   a flat field name on the unified schema's participant object
+#   participant_facts:    a fact_type from the shared FactTypes.json vocabulary - goes
+#                         into that participant's facts[] array instead of a flat field
+#   record_fields:        a key under the record's own type_specific_fields (household/
+#                         dwelling identity, not a per-person fact)
+
+participant_fields:
+  "Given Name": std_given
+  "Surname": std_surname
+  "Gender": sex
+  "Sex": sex
+  "Age": age
+  "Birth Year": birth_date
+  "Birth Place": birth_place
+  "Birthplace": birth_place
+  "Race": race
+  "Color": race
+  "Relationship to Head": role_name
+  "Relationship to Head of House": role_name
+  "Relationship": role_name
+  "Relation to Head": role_name
+  "Relation": role_name
+  "Line Number": type_specific_fields.line_number
+  "Line": type_specific_fields.line_number
+  # "House Number" is deliberately NOT mapped here - it's already claimed below (record_fields)
+  # as an alias for dwelling_number (the census's own sequential dwelling-visited count), a
+  # different concept from a literal street house number - mapping the same raw header text
+  # to both would be a real ambiguity, not a genuine second meaning.
+  "Street": type_specific_fields.street
+  "Street Address": type_specific_fields.street
+  "Address": type_specific_fields.street
+  "Married within Year": type_specific_fields.married_within_year
+  "Married Within Year": type_specific_fields.married_within_year
+  "Birth Month": type_specific_fields.birth_month
+  "Marital Status": type_specific_fields.marital_status
+  # "Widowed1" is deliberately NOT mapped here - it's one of the ambiguous
+  # numbered-duplicate fields (Widowed/Widowed1, seen in 1851/1861/1911 Ancestry
+  # Canadian data) the original field-coverage-extension plan explicitly flagged as
+  # "genuinely unclear whether this is the same question asked twice or a different
+  # sub-question - do not guess" (docs/superpowers/plans/2026-08-15-ancestry-index-panel-
+  # field-coverage-extension.md). Guessing it onto marital_status risks silently
+  # overwriting a genuine "Marital Status" column's value (participant_fields is a flat
+  # overwrite, not a combine, when both are present on the same record) with an
+  # unconfirmed value shape. Likely belongs under a future Marriage Details fact type
+  # instead, once one exists - not force-fit into marital_status now.
+
+participant_facts:
+  "Occupation": Occupation
+  "Occupation Category": Occupation
+  "Trade or Profession": Occupation
+  "Industry": Occupation
+  "Highest Grade of School Completed": Education
+  "Highest Grade Completed": Education
+  "Attended School": Education
+  "Immigration Year": Immigration
+  "Year of Immigration": Immigration
+  "Year of Naturalization": Naturalization
+  "Naturalization Status": Naturalization
+  "Naturalization": Naturalization
+  "Veteran Status": Military
+  "Military Service": Military
+  "Which War": Military
+  "Pension": Military
+  "Survivor of Union or Confederate Army/Navy": Military
+  "Maiden Name": Miscellaneous
+  "Quality": Miscellaneous
+  "Real Estate Value": Property
+  "Personal Estate Value": Property
+  "Cannot Read, Write": Education
+  "Disability Condition": Miscellaneous
+  "Deaf Dumb Blind Insane": Miscellaneous
+  "Idiotic Pauper Convict": Miscellaneous
+  "Father Foreign Born": Miscellaneous
+  "Mother Foreign Born": Miscellaneous
+  "Male Citizen Over 21": Miscellaneous
+  "Voting Rights Denied": Miscellaneous
+  "Religion": Religion
+  "Nationality": Nationality
+  "Months Not Employed": Miscellaneous
+  "Home Ownership": Miscellaneous
+  "Home Mortgaged": Miscellaneous
+  "Native Tongue": Miscellaneous
+  "Speaks English": Miscellaneous
+  "Employment Field": Miscellaneous
+  # Complex Field Integration Mappings
+  "Income": Property
+  "IncomeOtherSources": Property
+  "InsuranceCost": Property
+  "LifeInsuranceCost": Property
+  "MonthlyRental": Property
+  "AmountOfLand": Property
+  "NumberOfHorses": Property
+  "ValueOfLivestock": Property
+  "Tribe": Nationality
+  "Clan": Nationality
+  "IndianBlood": Nationality
+  "EducationCost": Education
+  "CauseOfDeath": Death
+  "CannotRead1": Education
+  "ResidenceCityInNineteenThirtyFive": Residence
+  "VesselVisitedNumber": Residence
+  "ShantyVisitedNumber": Residence
+
+
+record_fields:
+  "Family Number": family_number
+  "Household Number": family_number
+  "Family": family_number
+  "Household": family_number
+  "Dwelling Number": dwelling_number
+  "Dwelling": dwelling_number
+  "House Number": dwelling_number

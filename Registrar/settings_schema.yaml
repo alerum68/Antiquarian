@@ -1,0 +1,48 @@
+sections:
+  File Paths (Relative to RootsMagic Dir):
+    REGISTRAR_RM_DATABASE:
+      default: "Your Tree.rmtree"
+      tooltip: "Path to the RootsMagic .rmtree SQLite database file"
+      picker:
+        kind: open
+        base_dir_key: "RM_DIR"
+        filetypes: [["RootsMagic files", "*.rmtree"], ["All files", "*.*"]]
+
+  Matching Thresholds:
+    REGISTRAR_FUZZY_THRESHOLD:
+      default: "82"
+      tooltip: "General name matching threshold (0-100). Higher = stricter matches, fewer false positives. Lower = finds more possible duplicates."
+      widget: slider
+      min: 50
+      max: 100
+    REGISTRAR_MAX_AGE_GAP:
+      default: "5"
+      tooltip: "Maximum difference in calculated birth years to consider two people as potential duplicates."
+      widget: slider
+      min: 0
+      max: 20
+    REGISTRAR_FUZZY_THRESHOLD_STRICT:
+      default: "95"
+      tooltip: "Strict threshold for first-name matches when ignoring missing last names."
+      widget: slider
+      min: 75
+      max: 100
+    REGISTRAR_FAMILY_MATCH_THRESHOLD:
+      default: "75"
+      tooltip: "Threshold for boosting the score when parents/spouses/children also match."
+      widget: slider
+      min: 50
+      max: 100
+
+  RootsMagic UI Settings:
+    REGISTRAR_FOLDER_NAME:
+      default: "!Duplicate Review"
+      tooltip: "Name of the RootsMagic task folder (TagType=1) where duplicate tasks are grouped"
+    REGISTRAR_COLOR_SET:
+      default: "1"
+      tooltip: "RootsMagic color set index (1-based index determining PersonTable.Color{N} column)"
+    REGISTRAR_COLOR_VALUE:
+      default: "27"
+      tooltip: "Color ID assigned to flagged individuals in PersonTable (e.g. 27 = Slate)"
+label_overrides:
+  REGISTRAR_RM_DATABASE: "RootsMagic Database Path"

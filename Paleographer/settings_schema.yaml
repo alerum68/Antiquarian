@@ -1,0 +1,86 @@
+sections:
+  Data & Directories:
+    PALEOGRAPHER_RECORD_TYPE:
+      default: ""
+      tooltip: "Which record type (from Paleographer/prompts) to transcribe. Leave blank to use the default, Parish.pmt."
+      widget: dropdown
+      options: [["Parish.pmt", "Parish.pmt"], ["Scrip.pmt", "Scrip.pmt"]]
+    PALEOGRAPHER_PDF_COMPRESSION_LEVEL:
+      default: "2"
+      tooltip: "How aggressively PDFix's lossless structural optimization (garbage collection + stream deflate) runs on a scanned PDF before it's uploaded to the AI: 0=low, 1=medium, 2=high (recommended). This never touches embedded image resolution/DPI, so transcription quality is unaffected at any level."
+      widget: segmented
+      options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
+
+  Parish Information:
+    PARISH_NAME:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The full historical name of the church (e.g., St. Joseph Catholic Church)."
+    PARISH_NAME_SHORT:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. A shortened name for the parish, used in file titles."
+    PARISH_CITY:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The city where the parish is located."
+    PARISH_STATE:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The state or province where the parish is located."
+    DEFAULT_EVENT_LOCATION:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The default location assigned to events if none is specified."
+    REGISTER_NAME:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The name of the specific register or book."
+    REGISTER_SOURCE_ID:
+      default: ""
+      tooltip: "A numeric source ID, if you are synchronizing with an existing RootsMagic database."
+    VOLUME_TITLE:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. This specific volume/book's own title or label (e.g., 'Volume 1')."
+    VOLUME_NUM:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The volume number of the register."
+
+  Citation Overrides:
+    CITATION_TEXT:
+      default: ""
+      tooltip: "Only fill in if not downloaded from Voyageur, or else leave blank. The full text of the citation, if overriding default GEDCOM generation."
+    CITATION_DETAIL:
+      default: ""
+      tooltip: "Specific page/item details to append to the base citation."
+    CALL_NUMBER:
+      default: ""
+      tooltip: "Archive/Library call number for the source."
+    REPOSITORY:
+      default: ""
+      tooltip: "Name of the institution holding the original records."
+    REPOSITORY_LOC:
+      default: ""
+      tooltip: "Location (City, State) of the repository."
+    COLLECTION_URL:
+      default: ""
+      tooltip: "URL where the collection or item can be found online."
+    COLLECTION_NAME:
+      default: ""
+      tooltip: "Name of the broader collection the item belongs to."
+    PUBLISHER:
+      default: ""
+      tooltip: "Publisher of the database or image collection."
+    PUB_LOC:
+      default: ""
+      tooltip: "Location of the publisher."
+
+  Scrip Information:
+    SCRIP_MASTER_DB_NAME:
+      default: "scrip_records.json"
+      tooltip: "The filename for the JSON database storing the extracted scrip records."
+      picker:
+        kind: save
+        base_dir_key: "JSON_DIR"
+        filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
+        defaultextension: ".json"
+    SCRIP_COLLECTION_NAME:
+      default: "Library and Archives Canada, RG15 Scrip Records"
+      tooltip: "The name of the archival collection these scrip files came from."
+    SCRIP_DISTRICT:
+      default: ""
+      tooltip: "The scrip district or region this batch of applications belongs to, if known."

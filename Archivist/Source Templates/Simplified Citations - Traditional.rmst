@@ -1,0 +1,178 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<SourceTemplates>
+  <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
+  <Template Id="10010">
+    <Name>* Simple Citations: Traditional</Name>
+    <Description>(NOTE: All other templates using simplified citations should start with this one. Items may be REMOVED from copies of this template to create other ones but NOTHING should be added to those templates unless it is also added here.)
+
+This template is designed for citing traditional sources: books, newspapers, periodicals, etc. that were created by an individual or individuals.
+
+This custom template and the citation style it uses was created by Jeff La Marca.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[Author:Reverse]&lt;?[Author]|&lt;, [Role]&gt;&gt;&gt;&lt; ([Date])&gt;&lt;?[Author][Date]|.&gt;&lt;?[BookTitle][Title]| &lt;?[Title]|&quot;[Title]&lt;,&quot; &lt;i&gt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]&gt;|&quot;&gt;&gt;&lt;?[BookTitle]||&lt;/i&gt;.&quot;&gt;|&lt;i&gt;&lt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]|&gt;&gt;&gt;&gt;&lt;?[BookTitle]|&lt;/i&gt;.|&gt;&gt;&lt;?[BookTitle][Title]|&lt; [PublishLocation]&gt;&lt;: [Publisher]&gt;&lt;?[Publisher]|.|&gt;&gt; ||&lt; [Page].&gt;&lt; [SourceDetailPerson].&gt;&lt; [Location]&gt;&lt;?[Location]|.&gt;&lt;&lt; [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;
+
+</Footnote>
+    <ShortFootnote>&lt;[Author:Reverse]&lt;?[Author]|&lt;, [Role]&gt;&gt;&gt;&lt; ([Date])&gt;&lt;?[Author][Date]|.&gt;&lt;?[BookTitle][Title]| &lt;?[Title]|&quot;[Title]&lt;,&quot; &lt;i&gt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]&gt;|&quot;&gt;&gt;&lt;?[BookTitle]||&lt;/i&gt;.&quot;&gt;|&lt;i&gt;&lt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]|&gt;&gt;&gt;&gt;&lt;?[BookTitle]|&lt;/i&gt;.|&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[Author:Reverse]&lt;?[Author]|&lt;, [Role]&gt;&gt;&gt;&lt; ([Date])&gt;&lt;?[Author][Date]|.&gt;&lt;?[BookTitle][Title]| &lt;?[Title]|&quot;[Title]&lt;,&quot; &lt;i&gt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]&gt;|&quot;&gt;&gt;&lt;?[BookTitle]||&lt;/i&gt;.&quot;&gt;|&lt;i&gt;&lt;[BookTitle]&lt;?[BookTitle]|&lt;: [Subtitle]|&gt;&gt;&gt;&gt;&lt;?[BookTitle]|&lt;/i&gt;.|&gt;&gt;&lt;?[BookTitle][Title]|&lt; [PublishLocation]&gt;&lt;: [Publisher]&gt;&lt;?[Publisher]|.|&gt;&gt; ||&lt; [Page].&gt;&lt; [SourceDetailPerson].&gt;&lt; [Location]&gt;&lt;?[Location]|.&gt;&lt;&lt; [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;
+</Bibliography>
+    <Field>
+      <Type>Name</Type>
+      <Name>Author</Name>
+      <Display>Author(s)/Editor(s)*</Display>
+      <Hint>name of author(s) or editor(s). refer to hints for info on entering more than one name</Hint>
+      <Detail>False</Detail>
+      <LongHint>Use this field only if document or source comes from an item that could be used in a traditional biblography or reference list. If more than one name is provided, they should be should be entered into this field with a semicolon (so that they&apos;ll be formatted properly in citations. For example, if three names are to be listed, they should be entered as:
+
+     John Brown; John Doe; Susy Smith
+
+In the event that the name of an agency or other organization is entered, it should be enclosed in forward slashes (/) so that it will be displayed properly in the citation, for example:
+
+/Wall Street Journal/</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Role</Name>
+      <Display>Role*</Display>
+      <Hint>e.g., compiler, editor, transcriber, translator</Hint>
+      <Detail>False</Detail>
+      <LongHint>This is an optional field that is used to indicate the person(s) played a role other than that of an author.</LongHint>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date</Display>
+      <Hint>date created, issued, or published</Hint>
+      <Detail>False</Detail>
+      <LongHint>Enter the date when this source was created, initially indexed, or first came into being.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>BookTitle</Name>
+      <Display>Source/Book Title*</Display>
+      <Hint>Enter name of book, newspaper, periodical, etc.</Hint>
+      <Detail>False</Detail>
+      <LongHint>Optional field. Use ONLY if source is an item that can be used in a traditional biblography or reference list. </LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Subtitle</Name>
+      <Display>Source Subtitle*</Display>
+      <Hint/>
+      <Detail>False</Detail>
+      <LongHint>This is an optional field. Enter name of the book&apos;s subtitle if one exists.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Title</Name>
+      <Display>Title*</Display>
+      <Hint>Specific article, document, or chapter title</Hint>
+      <Detail>False</Detail>
+      <LongHint>Optional field. Use only if document or source comes from an item that can be used in a traditional biblography or reference list. 
+
+The specific name of the article, chapter, or other title should be entered.
+</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Publisher</Name>
+      <Display>Publisher*</Display>
+      <Hint>Name of publisher (traditional sources only)</Hint>
+      <Detail>False</Detail>
+      <LongHint>Optional field - used only to list names of traditional publishers - books, magazines, newspapers, etc.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>PublishLocation</Name>
+      <Display>Publish. Location*</Display>
+      <Hint>List city and state (or city and country)</Hint>
+      <Detail>False</Detail>
+      <LongHint>Used only for traditional sources (e.g., books, newspapers, periodicals).
+
+Location where item was published, printed, or created.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Page</Name>
+      <Display>Page Number(s)</Display>
+      <Hint>p. 25, pp. 52, sheet B-4, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>If the document has a page number, list it here.
+
+Found in traditional and non-traditional sources.</LongHint>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>SourceDetailPerson</Name>
+      <Display>Person</Display>
+      <Hint>enter name of individual (refer to hint for details on when to use)</Hint>
+      <Detail>True</Detail>
+      <LongHint>This is an optional element and should only be used if more than one person&apos;s name (or that of a group) is listed on the master source. This element is also used to recognize the person&apos;s inclusion in a book or periodical..</LongHint>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>Location</Name>
+      <Display>Location</Display>
+      <Hint>e.g., city, county, state, country</Hint>
+      <Detail>True</Detail>
+      <LongHint>Provide location where source was created (if not mentioned above), it&apos;s physical location (e.g., grave site), or where the event occurred (locatation of baptism, place of census, marriage location, etc.)</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>i.e., Ancestry.com, National Archives and Records Administration, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>This field should only be used for hard-to-find, one-of-a-kind documents, or individually held sources. If this source was found on the Internet, then the name of the web site should be listed here. This is an OPTIONAL field and should not be used for traditional materials (books, articles, etc.) that can easily be found using standard reference search techniques (such as looking through a library card catalog).
+
+Examples:
+
+    Ancestry.com
+    National Archives and Records Administration
+
+In the event that there is just one known copy of a source (and it is unlikely that other copies exist), state:
+
+    &quot;privately held by [name of owner]&quot;
+
+If an individual has possession of a source and that other copies of that source may exist (although locating these copies would be difficult, if not impossible), state:
+
+    &quot;copy in possession of [name of owner]&quot;</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint>http://www.ancestry.com</Hint>
+      <Detail>True</Detail>
+      <LongHint>Provide the address of the home page of the website where this document was found (optional - list the full path to the document but remember that this will not always remain the same and, dependent upon the web site, is also subject to change).</LongHint>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date File Accessed</Display>
+      <Hint>enter the date this source was accessed or viewed</Hint>
+      <Detail>True</Detail>
+      <LongHint>In the event that this source was found online, enter the date it was viewed.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Misc. Ref. Num.</Display>
+      <Hint>&quot;document # 123&quot;, &quot;case # 456&quot;, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>Examples of numbers that might be included here are:
+
+driver license
+Social Security number
+Grave plot number
+Passport number</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>PersonalID</Name>
+      <Display>Personal ID</Display>
+      <Hint>e.g. STGe0123</Hint>
+      <Detail>True</Detail>
+      <LongHint>Copies of EVERYTHING should be kept. List your personal Library Document ID number here (use whatever numbering/cataloging method you like, just be consistent).</LongHint>
+    </Field>
+  </Template>
+</SourceTemplates>

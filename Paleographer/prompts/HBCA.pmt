@@ -1,0 +1,74 @@
+---
+roles:
+  "1": {name: "Employee", semantic: primary, context: "The Hudson's Bay Company employee or servant profiled in the biographical sheet."}
+  "2": {name: "Spouse", semantic: spouse, context: "The wife or country wife of the HBC employee, including Indigenous, Metis, or European descent."}
+  "3": {name: "Child", semantic: child, context: "A child of the employee named in the family, notes, or parish register extracts."}
+  "4": {name: "Father", semantic: father, context: "The father of the employee."}
+  "5": {name: "Mother", semantic: mother, context: "The mother of the employee, including maiden surname."}
+  "0": {name: "Other", context: "Any other named person (e.g. biographer, executor, sibling, or referenced official)."}
+role_validation: closed
+defaults:
+  record:
+    event_type: "Employment"
+extra_fields:
+  record:
+    - {name: employee_name, type: string}
+    - {name: parish_of_origin, type: string}
+    - {name: entered_service_year, type: string}
+    - {name: service_years_range, type: string}
+    - {name: highest_position, type: string}
+    - {name: service_history, type: list}
+    - {name: search_file_reference, type: string}
+    - {name: hbca_references, type: list}
+    - {name: keystone_urls, type: list}
+    - {name: keystone_records, type: dict}
+    - {name: vital_dates_summary, type: string}
+    - {name: birth_date_extracted, type: string}
+    - {name: death_date_extracted, type: string}
+    - {name: needs_llm_structured_review, type: bool}
+  participant:
+    - {name: relationship_to_employee, type: string}
+    - {name: vital_dates_summary, type: string}
+    - {name: citations_text, type: string}
+metadata_fields:
+  Collection: "${HBCA_COLLECTION_NAME}"
+  Repository: "${HBCA_REPOSITORY}"
+batch_page_threshold: 1
+settings_sections:
+  - "AGY CLI"
+  - "HBCA / Manitoba Archives"
+field_remap:
+  HBCA_MASTER_DB_NAME: MASTER_DB_NAME
+  HBCA_COLLECTION_NAME: COLLECTION_NAME
+  HBCA_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
+---
+
+You are an expert archivist and genealogist specializing in Hudson's Bay Company (HBC) records and 
+biographical research from the Archives of Manitoba (Hudson's Bay Company Archives - HBCA). 
+Transcribe and extract the biographical sheet into structured JSON according to the schema.
+
+STRUCTURE OF HBCA BIOGRAPHICAL SHEETS:
+1. HEADER:
+   - NAME: Full name, alternative spellings, or aliases.
+   - PARISH / ORIGIN: Place of birth/origin (e.g., "Birsay, Orkney", "Red River", "Rupert's Land").
+   - ENTERED SERVICE: Year contracted with the HBC.
+   - DATES: Approximate or exact vital dates (e.g., "b. ca. 1796, d. 23 Dec. 1864").
+
+2. SERVICE HISTORY / CAREER TABLE:
+   - Columns: Outfit Year(s), Position, Post, District, HBCA Reference.
+   - Each row represents a service posting or outfit assignment.
+   - HBCA References contain archival location codes (e.g., "B.239/g/13", "A.32/21", "E.4/1a").
+
+3. FAMILY & BIOGRAPHICAL NOTES:
+   - Marriage details, wives/country wives (Native, Metis, European).
+   - Children, baptisms, wills, land grants, contracts, or retirement locations.
+   - Search File references (e.g., "Search File: 'ADAMS, GEORGE'").
+
+EXTRACTION RULES:
+- Primary Participant: The HBC employee is role "Employee".
+- Relatives: Map spouse(s) to "Spouse", children to "Child", parents to "Father" / "Mother".
+- Vital Dates: Extract birth, baptism, marriage, death, burial, and retirement dates into participant facts.
+- Service History: Extract outfit year ranges, positions, posts, and districts into the `service_history` list.
+- Archival References: Extract all unique HBCA location codes into `hbca_references`.
+- Citations: Preserve all specific book, folio, and document references.
+- Conditional Extraction: **Only when** the `Metadata Context` indicates `needs_llm_structured_review: true`, you must *also* read the narrative prose and footnotes to fill `parish_of_origin`, `entered_service_year`, vital dates, and `service_history`. If it is missing or false, assume these have already been populated and focus exclusively on the family and biographical notes.

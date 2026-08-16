@@ -1,0 +1,83 @@
+0 HEAD
+1 FILE .ged
+1 SOUR RootsMagic
+2 VERS 11.0
+2 NAME RootsMagic
+2 CORP RootsMagic, Inc.
+1 DEST RootsMagic
+1 DATE 07 AUG 2026
+2 TIME 14:11:32
+1 SUBM @SUBM1@
+1 COPR Copyright (c) 2018-2026 Michif Genealogical Society. All rights reserved.
+1 NOTE This file contains original historical translations and research.
+2 CONC Please do not upload this raw GEDCOM to public, collaborative trees without permission and attribution.
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @SUBM1@ SUBM
+1 NAME Jason Cole
+2 ADDR https://www.facebook.com/groups/149982655772008
+1 NOTE Michif Genealogical Society
+0 @ISCRIP-5473@ INDI
+1 _UID SCRIP-5473
+1 REFN SCRIP-5473
+1 NAME Roger /Letendre/
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX M
+1 EVEN Claim: 3126; Affidavit #: 5473; Scrip #: 12761 ($160); Claim Basis: Half-breed Head
+2 TYPE Scrip
+2 DATE 1880
+2 PLAC Winnipeg
+2 _PROOF proven
+2 SOUR @S001@
+3 _TITL Letendre, Roger: Claim: 3126; Affidavit: 5473; Scrip: 12761 [Personal ("Roger", Letendre)]
+3 PAGE Claim 3126; Affdt 5473
+3 DATA
+3 REFN SCRIP-5473
+3 QUAY 3
+3 _QUAL
+4 _SOUR O
+4 _INFO P
+4 _EVID D
+3 OBJE @M4128831214@
+2 _SHAR @ISCRIP-5473_1@
+3 ROLE Witness
+1 FAMC @FFAM_SCRIP-5473@
+0 @ISCRIP-5473_1@ INDI
+1 _UID SCRIP-5473_1
+1 REFN SCRIP-5473_1
+1 NAME Baptiste /Sabiston/
+1 SOUR @S1@
+2 NAME Researcher: Jason Cole
+2 _TITL Researcher: Jason Cole
+1 SEX M
+0 @FFAM_SCRIP-5473@ FAM
+1 CHIL @ISCRIP-5473@
+0 @M4128831214@ OBJE
+1 FILE C:/Users/Jason Cole/Documents/Genealogy/Census/BAC-LAC_fonandcol_1502188.pdf
+2 FORM pdf
+2 TITL Letendre, Roger: Claim: 3126; Affidavit: 5473; Scrip: 12761
+0 @M7424354781@ OBJE
+1 FILE C:/Media/Commissioner/1502999/e099999999.pdf
+2 FORM pdf
+2 TITL Scrip Certificate
+0 @S1@ SOUR
+1 TITL Michif Genealogical Society
+1 AUTH
+1 PUBL Researcher: Jason Cole.
+1 _WEBTAG
+2 NAME Facebook Group
+2 URL https://www.facebook.com/groups/149982655772008
+1 _WEBTAG
+2 NAME Ancestry Group
+2 URL https://www.ancestry.com/groups/85343
+0 @S001@ SOUR
+1 ABBR  
+1 REFN 001
+1 TITL , ,  ; , , .
+1 _SUBQ  - .
+1 _BIBL . . , .
+0 TRLR

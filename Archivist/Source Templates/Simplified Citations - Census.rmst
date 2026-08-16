@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<SourceTemplates>
+  <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
+  <Template Id="10008">
+    <Name>* Simple Citations: Census Records</Name>
+    <Description>(NOTE: changes made to the content of this template should also be made to the master template. Alterations made for the sole purpose of allowing the content to print correctly do not need to be made.)
+
+This template is designed for citing census records. 
+
+This custom template and the citation style it uses was created by Jeff La Marca.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt; &lt;([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [Person]&gt;.|&lt; [Person].&gt;&gt;&lt;?[PublishLocation]|&lt; [PublishLocation]&gt;&lt;: [Publisher]&gt;.&gt; ||&lt; [Page].&gt;&lt; [SourceDetailPerson].&gt;&lt; [Location]&gt;&lt;&lt;; enumeration district [CensusED]&gt;&lt;, [HouseholdID]&gt;&gt;&lt;?[Location]|.&gt;&lt;&lt; [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt; &lt;([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [Person]&gt;.|&lt; [Person].&gt;&gt;
+</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt; &lt;([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [Person]&gt;.|&lt; [Person].&gt;&gt;&lt;?[PublishLocation]|&lt; [PublishLocation]&gt;&lt;: [Publisher]&gt;.&gt; ||&lt; [Page].&gt;&lt; [SourceDetailPerson].&gt;&lt; [Location]&gt;&lt;&lt;; enumeration district [CensusED]&gt;&lt;, [HouseholdID]&gt;&gt;&lt;?[Location]|.&gt;&lt;&lt; [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Bibliography>
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>i.e., Bellevue Hospital for the Criminally Insane, End of the Road Cemetery, California, etc.</Hint>
+      <Detail>False</Detail>
+      <LongHint>List the agency, organization, state, or other entity that created and/or has sole responsibility for maintenance of this source.
+
+Examples might include the names of:
+
+    cemetery,
+    church,
+    hospital, 
+    mortuary,
+    school,
+    state or other large government entity.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. or Office</Display>
+      <Hint>Department of Vital Statistics, Department of Motor Vehicles, etc.</Hint>
+      <Detail>False</Detail>
+      <LongHint>Optional field. Some sources come from very large entities (esp. govermental records). Examples might be Dept. of Vital Records or Dept. of Motor Vehicles.</LongHint>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date</Display>
+      <Hint>date created or published</Hint>
+      <Detail>False</Detail>
+      <LongHint>Enter the date when this source was created, initially indexed, or first came into being.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>Title or description of document</Hint>
+      <Detail>False</Detail>
+      <LongHint>Used for documents and sources where a person or persons name are the main topic. 
+
+Examples:
+
+   Birth Certificate
+   Diploma
+   Golf Club Membership Card
+   Headstone
+   Letter (or Personal Correspondence)
+   Marriage Certificate
+   Passsenger Ship List, S.S. Trojan Prince
+   Photograph
+   1880 U.S. Census
+
+Use &quot;title casing&quot; for capitalization. The field should be kept as generic as possible. A few sources may require clarification. For example, passenger ship records should list the name of the ship. Date or other very specific information should not be included except for cenus records (the year distinguishes one census from another).</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Person</Name>
+      <Display>Person(s) of Interest</Display>
+      <Hint>John Doe, John Doe Family, etc.</Hint>
+      <Detail>False</Detail>
+      <LongHint>If this source refers to a specific individual, list his or her name.
+
+If this source refers to a group of individuals of primary interest, list by the head of household&apos;s name (e.g. John Doe Family).</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Publisher</Name>
+      <Display>Publisher*</Display>
+      <Hint>Name of publisher (traditional sources only)</Hint>
+      <Detail>False</Detail>
+      <LongHint>Optional field - used only to list names of traditional publishers - books, magazines, newspapers, etc.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>PublishLocation</Name>
+      <Display>Publish. Location*</Display>
+      <Hint>List city and state (or city and country)</Hint>
+      <Detail>False</Detail>
+      <LongHint>Used only for traditional sources (e.g., books, newspapers, periodicals).
+
+Location where item was published, printed, or created.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Page</Name>
+      <Display>Page Number(s)</Display>
+      <Hint>p. 25, pp. 52, sheet B-4, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>If the document has a page number, list it here.
+
+Found in traditional and non-traditional sources.</LongHint>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>SourceDetailPerson</Name>
+      <Display>Person</Display>
+      <Hint>enter name of individual (refer to hint for details on when to use)</Hint>
+      <Detail>True</Detail>
+      <LongHint>This is an optional element and should only be used if more than one person&apos;s name (or that of a group) is listed on the master source. This element is also used to recognize the person&apos;s inclusion in a book or periodical..</LongHint>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>Location</Name>
+      <Display>Location</Display>
+      <Hint>e.g., city, county, state, country</Hint>
+      <Detail>True</Detail>
+      <LongHint>Provide location where source was created (if not mentioned above), it&apos;s physical location (e.g., grave site), or where the event occurred (locatation of baptism, place of census, marriage location, etc.)</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>CensusED</Name>
+      <Display>Census Enum. Dist.</Display>
+      <Hint>e.g. 25</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>HouseholdID</Name>
+      <Display>Census House. ID</Display>
+      <Hint>dwelling 245, family 123</Hint>
+      <Detail>True</Detail>
+      <LongHint>Optional. Used only for census records.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>i.e., Ancestry.com, National Archives and Records Administration, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>This field should only be used for hard-to-find, one-of-a-kind documents, or individually held sources. If this source was found on the Internet, then the name of the web site should be listed here. This is an OPTIONAL field and should not be used for traditional materials (books, articles, etc.) that can easily be found using standard reference search techniques (such as looking through a library card catalog).
+
+Examples:
+
+    Ancestry.com
+    National Archives and Records Administration
+
+In the event that there is just one known copy of a source (and it is unlikely that other copies exist), state:
+
+    &quot;privately held by [name of owner]&quot;
+
+If an individual has possession of a source and that other copies of that source may exist (although locating these copies would be difficult, if not impossible), state:
+
+    &quot;copy in possession of [name of owner]&quot;</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint>http://www.ancestry.com</Hint>
+      <Detail>True</Detail>
+      <LongHint>Provide the address of the home page of the website where this document was found (optional - list the full path to the document but remember that this will not always remain the same and, dependent upon the web site, is also subject to change).</LongHint>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date File Accessed</Display>
+      <Hint>enter the date this source was accessed or viewed</Hint>
+      <Detail>True</Detail>
+      <LongHint>In the event that this source was found online, enter the date it was viewed.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Misc. Ref. Num.</Display>
+      <Hint>&quot;document # 123&quot;, &quot;case # 456&quot;, etc.</Hint>
+      <Detail>True</Detail>
+      <LongHint>Examples of numbers that might be included here are:
+
+driver license
+Social Security number
+Grave plot number
+Passport number</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>PersonalID</Name>
+      <Display>Personal ID</Display>
+      <Hint>e.g. STGe0123</Hint>
+      <Detail>True</Detail>
+      <LongHint>Copies of EVERYTHING should be kept. List your personal Library Document ID number here (use whatever numbering/cataloging method you like, just be consistent).</LongHint>
+    </Field>
+  </Template>
+</SourceTemplates>

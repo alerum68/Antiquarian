@@ -1,74 +1,119 @@
-# Michif Genealogical Society Toolbox
+# Antiquarian
 
-A desktop toolkit that takes the tedious parts of genealogy research: transcribing historical documents,
-converting records into family tree files, downloading archival images, and cleaning up your database. It
-automates all of it, so you can spend more time on the research itself.
+Historical records are being digitized faster than ever. Parish registers, census schedules, newspapers, court records, and government files can now be downloaded with a few clicks. The problem is that a scanned image is still just an image. You can read it, but you can't easily search across thousands of pages, discover connections between people, or answer questions that span an entire collection.
 
-Everything is controlled from a single application window. No command line, no code editing required.
+Antiquarian grew out of that problem.
 
-## What It Does
+The original goal was simple: make large collections of historical records useful for research instead of leaving them trapped in PDFs and image files.
 
-Launch the Toolbox and you'll find a tab for each tool below. Enter your settings once, and the app remembers
-them for next time.
+While working through Métis Scrip applications, I realized that every file contained pieces of a much larger story. A parent mentioned in one application appeared as a witness in another. Communities overlapped. Families resurfaced years later in entirely different records. The information existed, but finding those connections depended on remembering where they had been seen before.
 
-**Census Records**
-- **Census Extractor**: Point it at an Ancestry.com census page and it downloads the record images and data
-  for you automatically.
-- **Census Converter**: Turns that census data into a ready-to-import family tree file (GEDCOM), automatically
-  grouping people into households and flagging anything that needs a second look.
+Antiquarian helps organize that information as you work. Instead of producing another transcription to store in a folder, it builds a collection that can be searched, explored, corrected, and expanded over time.
 
-**Church Registers**
-- **Register Transcriber**: Reads photos of handwritten historical church registers (baptisms, marriages, and
-  burials, including French and Latin) and translates and transcribes them into a structured, searchable
-  record.
-- **Register to GEDCOM**: Converts those transcribed records into a family tree file, complete with source
-  citations and linked witnesses or godparents.
+It is intended for projects measured in hundreds or thousands of records rather than a handful of documents. That might be a church register, a township census, a collection of probate files, or an archive that has never been indexed before. Whatever the source, the objective is the same: spend more time researching the records and less time managing them.
 
-**Archival Images**
-- **LAC Downloader**: Paste a link from Library and Archives Canada or Heritage Canadiana and it downloads
-  every page image from that microfilm roll in full resolution, neatly organized into its own folder.
+---
 
-**Tree Maintenance**
-- **Duplicate Finder**: Scans your RootsMagic tree for people who may have been entered twice, using smart
-  name and age matching, and creates review tasks for anything it finds.
-- **County Fixer**: Automatically corrects county and territory names in your tree to match historical
-  boundaries for the actual date of each event.
+## What Antiquarian does
+
+Antiquarian assists with the process of turning historical records into structured research data.
+
+Current capabilities include:
+
+* Automated transcription from document images.
+* Extraction of people, relationships, places, dates, and events.
+* Source and citation management.
+* Project organization for large record collections.
+* GEDCOM export for genealogy software, including RootsMagic and Family Tree Maker.
+
+Development is ongoing, and additional record types and export formats are planned.
+
+---
+
+## Is this the right tool?
+
+Probably, if your work involves collections of historical records.
+
+For example, you may be creating a searchable index of parish registers, reconstructing a historical community from census records, preserving the contents of a local archive, or building a research database from a series of government files.
+
+If your goal is simply to enter an occasional birth, marriage, or death record into your family tree, Antiquarian is probably more than you need.
+
+---
 
 ## Getting Started
 
-### What You'll Need
-- **Python 3.8 or newer**
-- **[TamperMonkey](https://www.tampermonkey.net/)** (a free browser extension), used by the Census Extractor
-- The **[Newberry Atlas of Historical County Boundaries](https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip)**, if you plan to use the County Fixer. Download and extract it into a
-  subfolder alongside `CountyFix.py`.
+Antiquarian ships as a dual-mode Windows installer powered by Inno Setup, available from the [Releases](https://github.com/alerum68/Antiquarian/releases) page. The installer packages the application as a single-binary PyInstaller router, meaning you do not need to manage Python environments or dependencies. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, AGY) on its own, so there's nothing to configure by hand before you start.
 
-### Installation
-1. Install the required Python packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Install `CensusExtractor.js` in your browser's TamperMonkey dashboard.
-3. Launch the Toolbox:
-   ```bash
-   python MGSToolbox.py
-   ```
+For browser-based integration with external repositories, Antiquarian includes a Tampermonkey script that bridges web index searches directly into your local database.
 
-That's it. The app handles all configuration from there. Enter your folder paths, API key, and preferences
-in the Global Settings tab, and every tool will use them automatically. 
+Detailed installation and setup instructions, along with CI/CD build artifacts from our GitHub Actions sandbox, are available in the project Wiki.
 
-## A Note on Safety
+In general, the workflow is straightforward:
 
-The **Duplicate Finder** and **County Fixer** make direct changes to your RootsMagic database file. Please:
+1. Create a project.
+2. Import document images.
+3. Process and review the extracted information.
+4. Continue building your collection.
+5. Export your work when you're ready.
 
-- **Close RootsMagic completely** before running either tool.
-- **Always back up your tree** before making changes.
+---
 
-This software is provided as-is, with no warranty. The author is not responsible for any data loss or database
-corruption.
+## Requirements
+
+Antiquarian relies on a few external services, depending on how you choose to use it.
+
+* Windows 10 or Windows 11.
+* AGY (agy) for document processing. The installer sets this up for you if it isn't already on your machine; a AI API key is also supported as an alternative.
+* Internet access while processing records.
+* Optional subscriptions for external services such as Ancestry if you want to retrieve records directly from those platforms.
+
+Some features may require additional software or accounts. These are documented in the Wiki.
+
+---
+
+## Documentation
+
+### User Guides
+
+Comprehensive guides for setup, configuration, and module workflows are available on the project Wiki:
+
+* [Getting Started](https://github.com/alerum68/Antiquarian/wiki/Getting-Started)
+* [Configuration & Settings](https://github.com/alerum68/Antiquarian/wiki/Configuration-&-Settings)
+* [Voyageur User Guide](https://github.com/alerum68/Antiquarian/wiki/Voyageur-User-Guide)
+* [Paleographer User Guide](https://github.com/alerum68/Antiquarian/wiki/Paleographer-User-Guide)
+* [Archivist User Guide](https://github.com/alerum68/Antiquarian/wiki/Archivist-User-Guide)
+* [Registrar & Gazetteer](https://github.com/alerum68/Antiquarian/wiki/Registrar-&-Gazetteer)
+* [PDFix Utility](https://github.com/alerum68/Antiquarian/wiki/PDFix-Utility)
+* [Troubleshooting & FAQ](https://github.com/alerum68/Antiquarian/wiki/Troubleshooting-&-FAQ)
+
+### Developer Documentation
+
+Technical specifications and architecture guides are maintained in the `docs/developer/` directory:
+
+* [Architecture Overview](docs/developer/architecture-overview.md)
+* [Commissioner Domain Models](docs/developer/commissioner-domain-models.md)
+* [Prompt Template Specification](docs/developer/pmt-specification.md)
+* [Scaffold Data Contract](docs/developer/scaffold-data-contract.md)
+* [Developer Workflow](docs/developer/development-workflow.md)
+
+---
+
+## Project Status
+
+Antiquarian is under active development.
+
+Suggestions, bug reports, and discussions are always welcome. If you work with historical records and have encountered a workflow that Antiquarian could improve, I'd like to hear about it.
+
+---
+
+## Roadmap
+
+See [ROADMAP.md](ROADMAP.md) for future plans for Antiquarian.
+
+---
 
 ## License
 
-This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). In short: you're free to
-use, modify, and share it for any noncommercial purpose (personal genealogy research, other historical or
-genealogical societies, education, etc.), but it may not be used to build or sell a commercial product or
-service. See the [LICENSE](LICENSE) file for the full terms.
+This project is licensed under the [GNU General Public License v3.0](LICENSE). In short: you're free to use,
+modify, and distribute it, including commercially, but any distributed version or derivative work must also
+be licensed under the GPLv3 with its source made available. See the [LICENSE](LICENSE) file for the full terms.

@@ -1,0 +1,178 @@
+{
+  "type": "object",
+  "properties": {
+    "collection_title": { "type": "string" },
+    "sheets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "page_id": { "type": "string" },
+          "document_metadata": {
+            "type": "object",
+            "properties": {
+              "file_name": { "type": "string" },
+              "file_type": { "type": "string" },
+              "volume": { "type": "string" },
+              "pages": { "type": "string" },
+              "source_name": {
+                "type": "string",
+                "description": "The name of the institution this document is from, if this sheet states it (e.g. a parish/church's own printed heading or running title), read exactly as written. Null if this sheet never states it."
+              },
+              "source_location": { "type": "string" }
+            }
+          },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "record_id": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Leave null. Derived downstream from event_type and record_number, not chosen by you."
+                },
+                "page": { "type": "string" },
+                "record_number": { "type": "string" },
+                "event_type": {
+                  "type": "string",
+                  "description": "Choose exactly one value from this record type's valid event vocabulary, given in the system instructions."
+                },
+                "year": { "type": "string" },
+                "event_date": {
+                  "type": "string",
+                  "description": "Your best English-language reading of the date exactly as it appears (e.g. 'December 12, 1850'). Final ISO formatting is handled downstream, not by you."
+                },
+                "event_place": { "type": "string", "nullable": true },
+                "citation_details": { "type": "string" },
+                "citation_text": { "type": "string" },
+                "review": {
+                  "type": "boolean",
+                  "description": "True if any part of this record (dates, place, transcription, translation, or any participant) is uncertain, guessed, illegible, or otherwise needs a human to double-check it."
+                },
+                "review_reason": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Short plain-English note (under 15 words) explaining why this record needs review. Null if review is false."
+                },
+                "continues_on_next_image": {
+                  "type": "boolean",
+                  "description": "True ONLY for the LAST record on this image, when its content appears to end abruptly at the very bottom of the visible page - cut off mid-sentence, no natural closing or signature - suggesting it continues onto content you cannot see. False for every other record, and false for the last record too if it has a normal, complete ending. See UNIVERSAL OUTPUT RULES for how this is used."
+                },
+                "continues_from_previous_image": {
+                  "type": "boolean",
+                  "description": "True ONLY if a 'CONTINUATION FROM PREVIOUS IMAGE' context block was given to you AND this record's content is what completes it - in that case this must be the FIRST record you output, containing the FULL merged content (the given prior content plus what you read here), and record_number/year copied from the given context. False in every other case, including when no such context was given at all."
+                },
+                "type_specific_fields": {
+                  "type": "object",
+                  "properties": {},
+                  "description": "Additional fields specific to this record type, defined by its .pmt file's front matter. For a pre-1850 US census record with only a named head of household, this is also where an unnamed household_tally (age/sex/race bracket counts) belongs - not fabricated participant entries."
+                },
+                "participants": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "role_number": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Leave null. The numeric role code is derived downstream from role_name, not chosen by you."
+                      },
+                      "role_name": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Choose exactly one value from this record type's valid role vocabulary, given in the system instructions. Null only when the source itself provides no relationship/role data at all for this person (e.g. a pre-1880 US census record) - never leave null merely because a role is unclear; use \"Other\" for that instead."
+                      },
+                      "std_given": {
+                        "type": "string",
+                        "description": "Your best linguistic standardization of the given name, diacritics included. Diacritic stripping is handled downstream, not by you."
+                      },
+                      "std_surname": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Your best linguistic standardization of the surname, diacritics included. Diacritic stripping is handled downstream, not by you."
+                      },
+                      "raw_given": { "type": "string", "nullable": true },
+                      "raw_surname": { "type": "string", "nullable": true },
+                      "dit_name": { "type": "string", "nullable": true },
+                      "alternate_names": {
+                        "type": "array",
+                        "nullable": true,
+                        "description": "A later annotator's marginal note suggesting a different spelling of this person's name (not the priest's own original entry, and not a disagreement to resolve - both readings are kept). Leave empty/null if the margin has no such note. Do not use this for your own uncertainty about the body text's own reading - that's std_given/std_surname plus review/review_reason.",
+                        "items": {
+                          "type": "object",
+                          "properties": { "value": { "type": "string" } }
+                        }
+                      },
+                      "prefix": { "type": "string", "nullable": true },
+                      "suffix": { "type": "string", "nullable": true },
+                      "sex": {
+                        "type": "string",
+                        "enum": ["M", "F", "U"],
+                        "description": "Infer from role/given name if not explicitly stated. Use \"U\" only when genuinely indeterminate (e.g. an unfamiliar name with no role or contextual clue) - never leave this unset."
+                      },
+                      "is_priest": { "type": "boolean" },
+                      "age": { "type": "string", "nullable": true },
+                      "age_unit": {
+                        "type": "string",
+                        "enum": ["years", "months", "days"],
+                        "nullable": true,
+                        "description": "Unit for the age field. Infant baptism/burial ages are often given in months or days rather than years - set this explicitly whenever age is present; leave both null if no age is stated."
+                      },
+                      "occupation": { "type": "string", "nullable": true },
+                      "race": { "type": "string", "nullable": true },
+                      "religion": { "type": "string", "nullable": true },
+                      "residence": { "type": "string", "nullable": true },
+                      "birth_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Your best English-language reading of the date exactly as it appears. Final ISO formatting is handled downstream, not by you."
+                      },
+                      "birth_place": { "type": "string", "nullable": true },
+                      "death_date": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Your best English-language reading of the date exactly as it appears. Final ISO formatting is handled downstream, not by you."
+                      },
+                      "death_place": { "type": "string", "nullable": true },
+                      "review": {
+                        "type": "boolean",
+                        "description": "True if THIS participant's own data (name reading, dates, role assignment, etc.) is uncertain, guessed, illegible, or otherwise needs a human to double-check it."
+                      },
+                      "review_reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Short plain-English note (under 15 words) explaining why this participant needs review. Null if review is false."
+                      },
+                      "facts": {
+                        "type": "array",
+                        "nullable": true,
+                        "description": "Any fact about this participant beyond the fields above, named from this record type's valid event vocabulary (the same vocabulary event_type is drawn from) - e.g. an immigration year, a naturalization status. Leave empty/null when nothing beyond the fields above applies; do not duplicate a fact already covered by a named field (occupation, birth_date, etc.) here.",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "fact_type": { "type": "string" },
+                            "value": { "type": "string", "nullable": true },
+                            "date": { "type": "string", "nullable": true },
+                            "place": { "type": "string", "nullable": true }
+                          },
+                          "required": ["fact_type"]
+                        }
+                      },
+                      "type_specific_fields": {
+                        "type": "object",
+                        "properties": {},
+                        "description": "Additional fields specific to this record type, defined by its .pmt file's front matter."
+                      }
+                    },
+                    "required": ["role_name", "std_given", "is_priest", "sex"]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,50 @@
+name: Build and Release Antiquarian
+
+on:
+  push:
+    branches:
+      - Unify
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Run PyInstaller Build Script
+        run: python build.py
+
+      - name: Compile Inno Setup Installer
+        run: iscc installer.iss
+
+      - name: Upload Sandbox Artifact
+        if: github.ref == 'refs/heads/Unify'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antiquarian-Installer-Sandbox
+          path: Output/Antiquarian_Installer.exe
+          retention-days: 7
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Output/Antiquarian_Installer.exe
+            Antiquarian_Portable.zip
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
