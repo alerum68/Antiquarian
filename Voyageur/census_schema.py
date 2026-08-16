@@ -53,7 +53,7 @@ def _titlecase_callback(word: str, **_kwargs) -> str | None:
     return None
 
 
-def cap_case(text: str) -> str:
+def capitalize_text_string(text: str) -> str:
     if not text:
         return ""
     val = str(text).strip()
@@ -179,7 +179,7 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
                 target in ("role_name", "race", "birth_place", "death_place", "residence", "occupation", "religion")
                 and isinstance(val, str)
             ):
-                val = cap_case(val)
+                val = capitalize_text_string(val)
             if target.startswith("type_specific_fields."):
                 participant["type_specific_fields"][target.split(".", 1)[1]] = val
             else:
@@ -190,7 +190,7 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
         if raw_key in columns and str(columns[raw_key]).strip():
             raw_v = str(columns[raw_key]).strip()
             val = (
-                cap_case(raw_v)
+                capitalize_text_string(raw_v)
                 if fact_type in ("Occupation", "Education", "Military", "Property", "Miscellaneous")
                 else raw_v
             )
