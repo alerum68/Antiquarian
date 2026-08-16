@@ -301,3 +301,19 @@ def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_f
 
 def write_archivist_json_file(final_json_name: str) -> None:
     set_key(str(Path(__file__).resolve().parent.parent / "Archivist" / ".env"), "JSON_FILE", final_json_name)
+
+
+def print_incomplete_pages_warning(entries: list, label: str) -> None:
+    if not entries:
+        return
+    border = "!" * 70
+    print(f"\n{border}")
+    print(f"[WARNING] {len(entries)} {label} incomplete - no index data received:")
+    for entry in entries:
+        page_number = entry.get("page_number")
+        identifier = entry.get("image_id") or entry.get("item_id", "")
+        if page_number is not None:
+            print(f"  - page {page_number} (image {identifier})")
+        else:
+            print(f"  - item {identifier}")
+    print(f"{border}\n")

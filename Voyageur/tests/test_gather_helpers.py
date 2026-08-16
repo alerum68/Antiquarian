@@ -364,3 +364,24 @@ def test_write_archivist_json_file_writes_expected_key(monkeypatch):
     assert key == "JSON_FILE"
     assert value == "1900 - Ohio.json"
     assert path.endswith(os.path.join("Archivist", ".env"))
+
+
+def test_print_incomplete_pages_warning_prints_bordered_banner(capsys):
+    entries = [{"page_number": 12, "image_id": "4240106-00130"}, {"page_number": 15, "image_id": "4240106-00133"}]
+    gh.print_incomplete_pages_warning(entries, "page(s)")
+    out = capsys.readouterr().out
+    assert "2 page(s) incomplete" in out
+    assert "page 12 (image 4240106-00130)" in out
+    assert "page 15 (image 4240106-00133)" in out
+    assert "!" * 70 in out
+
+
+def test_print_incomplete_pages_warning_prints_item_id_when_no_page_number(capsys):
+    gh.print_incomplete_pages_warning([{"item_id": "1:1:MCVW-DP2"}], "item(s)")
+    out = capsys.readouterr().out
+    assert "item 1:1:MCVW-DP2" in out
+
+
+def test_print_incomplete_pages_warning_no_output_when_empty(capsys):
+    gh.print_incomplete_pages_warning([], "page(s)")
+    assert capsys.readouterr().out == ""

@@ -16,6 +16,7 @@ from _gather_helpers import (
     launch_gather_browser,
     move_downloaded_images,
     move_with_retry,
+    print_incomplete_pages_warning,
     resolve_census_image_dir,
     wait_for_final_json_event,
     write_archivist_json_file,
@@ -215,6 +216,7 @@ def main() -> Path:
     if json_status == "moved":
         with open(final_json, "r", encoding="utf-8") as f:
             raw_gather = json.load(f)
+        print_incomplete_pages_warning(raw_gather.get("incomplete_pages", []), "page(s)")
         normalized = normalize_ancestry_census_gather(raw_gather, dbid)
         with open(final_json, "w", encoding="utf-8") as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)

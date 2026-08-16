@@ -43,6 +43,7 @@ from _gather_helpers import (
     launch_gather_browser,
     move_downloaded_images,
     move_with_retry,
+    print_incomplete_pages_warning,
     resolve_census_image_dir,
     wait_for_final_json_event,
     write_archivist_json_file,
@@ -870,6 +871,7 @@ def main() -> None:
     raw_json_file = wait_for_final_json_event(downloads_dir, json_prefix, "raw gather JSON")
 
     raw_data = json.loads(_read_text_with_retry(raw_json_file))
+    print_incomplete_pages_warning(raw_data.get("incomplete_pages", []), "item(s)")
     print("\n[System] Converting raw scrape into Gather JSON...")
     final_data, clean_name = convert_raw_gather_to_final(raw_data)
 
