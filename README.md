@@ -24,7 +24,7 @@ Current capabilities include:
 * Extraction of people, relationships, places, dates, and events.
 * Source and citation management.
 * Project organization for large record collections.
-* GEDCOM export for genealogy software, including RootsMagic.
+* GEDCOM export for genealogy software, including RootsMagic and Family Tree Maker.
 
 Development is ongoing, and additional record types and export formats are planned.
 
@@ -41,6 +41,8 @@ If your goal is simply to enter an occasional birth, marriage, or death record i
 ---
 
 ## Getting Started
+
+Scriptorium ships as a Windows installer, available from the [Releases](https://github.com/alerum68/Scriptorium/releases) page. A portable ZIP is offered alongside it for anyone who would rather not install anything. Either way, the setup process walks you through picking a Genealogy folder and takes care of the supporting software (Node.js, Antigravity) on its own, so there's nothing to configure by hand before you start.
 
 Detailed installation and setup instructions are available in the project Wiki.
 
@@ -59,9 +61,8 @@ In general, the workflow is straightforward:
 Scriptorium relies on a few external services, depending on how you choose to use it.
 
 * Windows 10 or Windows 11.
-* Antigravity (agy) for document processing.
+* Antigravity (agy) for document processing. The installer sets this up for you if it isn't already on your machine; a Gemini API key is also supported as an alternative.
 * Internet access while processing records.
-* Antigravity initialized via the CLI.
 * Optional subscriptions for external services such as Ancestry if you want to retrieve records directly from those platforms.
 
 Some features may require additional software or accounts. These are documented in the Wiki.
