@@ -130,12 +130,12 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                     "COST_PER_1M_INPUT": "0.075",
                                     "COST_PER_1M_OUTPUT": "0.30",
                                     "CACHE_DISCOUNT_MULTIPLIER": "0.10"},
-               "Global Directories": {"GENEALOGY_DIR": "C:/Path/To/Your/Genealogy/Folder",
-                                      "RM_DIR": "Roots Magic 11",
-                                      "FTM_DIR": "Family Tree Maker",
-                                      "MEDIA_DIR": "Media/Project",
-                                      "JSON_DIR": "Working/Project/JSON",
-                                      "GEDCOM_OUTPUT_PATH": "GEDCOM/Project"},
+               "Global Directories": {"GENEALOGY_DIR": "",
+                                      "RM_DIR": "Antiquarian/RM",
+                                      "FTM_DIR": "Antiquarian/FTM",
+                                      "MEDIA_DIR": "Antiquarian/Media",
+                                      "JSON_DIR": "Antiquarian/JSON",
+                                      "GEDCOM_OUTPUT_PATH": "Antiquarian/GEDCOM"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
                "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
@@ -157,9 +157,10 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "GENEALOGY_DIR": "Your single base Genealogy folder. Everything else, including the Antiquarian code, your "
     "Roots Magic / Family Tree Maker databases, Media, and GEDCOM output, lives directly inside "
     "this one folder.",
-    "AGY_MODEL_NAME": "The exact AGY CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
-                      "every call. agy's own default is a flash-tier model with noticeably lower OCR quality, and "
-                      "shorthand values like 'pro' or 'flash' are not valid - only exact IDs from `agy models` work.",
+    "AGY_MODEL_NAME": "The exact Antigravity CLI model ID (e.g. gemini-3.1-pro-high) - always passed explicitly on "
+                      "every call. Antigravity's own default is a flash-tier model with noticeably lower OCR "
+                      "quality, and shorthand values like 'pro' or 'flash' are not valid - only exact IDs from "
+                      "`agy models` work.",
     "MEDIA_DIR": "The base folder where your genealogy media is stored.",
     "RM_DIR": "The folder where your RootsMagic files live, relative to the Program Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
@@ -1008,10 +1009,8 @@ class Antiquarian(ctk.CTk):
             self.tabs_built.add(tab_name)
         frame.tkraise()
         if self._console_expanded:
-            # frame.tkraise() just restacked this tab above the overlay too (they're
-            # siblings in content_area) - if the console was left open while switching
-            # tabs, re-show it on top, repositioned for the new tab's own header height.
-            self._show_console_overlay()
+            self._console_expanded = False
+            self.console_overlay.place_forget()
         for name, btn in self._nav_buttons.items():
             if name == tab_name:
                 btn.configure(fg_color=C_ACCENT, text_color=C_ON_ACCENT)
@@ -1417,6 +1416,18 @@ class Antiquarian(ctk.CTk):
         if canvas is not None and hasattr(canvas, "unbind"):
             canvas.unbind("<MouseWheel>")
 
+        # Synchronize programatic changes to the underlying string var back to the UI
+        def _on_string_var_change(*args):
+            try:
+                new_val = float(self.string_vars[key].get())
+                if abs(slider.get() - new_val) > 1e-5:
+                    slider.set(new_val)
+                    value_var.set(f"{new_val:g}{suffix}")
+            except ValueError:
+                pass
+
+        self.string_vars[key].trace_add("write", _on_string_var_change)
+
     def _resolve_base_dir(self, base_dir_key: str) -> str:
         """Resolves a directory setting (like JSON_DIR) against GENEALOGY_DIR the same way
         execute_script does, so a file browser opens in the same folder the script itself
@@ -1474,21 +1485,6 @@ class Antiquarian(ctk.CTk):
         except ValueError:
             self.string_vars[key].set(str(selected_path).replace("\\", "/"))
 
-    def _run_agy_login(self, status_label):
-        status_label.configure(text="Logging in...", text_color=C_ACCENT)
-        self.update_idletasks()
-        try:
-            subprocess.run(["agy", "login"], check=True,
-                           creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            result = subprocess.run(["agy", "login", "--status"], capture_output=True, text=True,
-                                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-            if "Logged in as" in result.stdout:
-                status_label.configure(text=result.stdout.strip(), text_color=C_SUCCESS)
-            else:
-                status_label.configure(text="Not connected.", text_color=C_DANGER)
-        except Exception as e:
-            status_label.configure(text=f"Error: {e}", text_color=C_DANGER)
-
     def _build_tab_global(self, parent_frame: ctk.CTkFrame):
         self._build_tab_header(parent_frame, "Global Settings", "SHARED",
                                "The API key, folders, and researcher credit every tool above shares, "
@@ -1496,21 +1492,12 @@ class Antiquarian(ctk.CTk):
 
         # Build buttons first so they dock safely to the bottom
         btn_box = self._create_action_box(parent_frame)
-        ctk.CTkButton(btn_box, text="Test Agy Connection", fg_color=C_ACCENT_STRONG, hover_color=C_ACCENT,
+        ctk.CTkButton(btn_box, text="Test Antigravity Connection", fg_color=C_ACCENT_STRONG, hover_color=C_ACCENT,
                       text_color=C_ON_ACCENT,
                       command=lambda: self.execute_script("AGY_TEST_SCRIPT", "test")).pack(side="left", padx=5)
 
-        auth_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
-        auth_frame.pack(fill="x", padx=20, pady=(20, 0))
-        btn = ctk.CTkButton(auth_frame, text="Sign in to Google (AGY)", fg_color=C_ACCENT,
-                            text_color=C_ON_ACCENT, hover_color=C_ACCENT_STRONG)
-        btn.pack(side="left", padx=(0, 10))
-        status_lbl = ctk.CTkLabel(auth_frame, text="Not connected.", text_color=C_TEXT_MUTED)
-        status_lbl.pack(side="left")
-        btn.configure(command=lambda: threading.Thread(
-            target=self._run_agy_login, args=(status_lbl,), daemon=True).start())
-
-        self._build_form_ui(parent_frame, GLOBAL_VARS)
+        api_keys = set(GLOBAL_VARS.get("API & Processing", {}).keys())
+        self._build_form_ui(parent_frame, GLOBAL_VARS, skip_keys=api_keys)
 
     def _build_tab_archivist(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Archivist", "BUILD",
@@ -1808,8 +1795,23 @@ class Antiquarian(ctk.CTk):
         btn_box = self._create_action_box(frame)
         ctk.CTkButton(btn_box, text="Run Script", fg_color="#2b7a4b", hover_color="#1e5935", text_color=C_TEXT,
                       command=lambda: self.execute_script("REGISTRAR_SCRIPT", "standalone")).pack(side="left", padx=5)
+        ctk.CTkButton(btn_box, text="Reset Defaults", fg_color="#555555", hover_color="#333333", text_color=C_TEXT,
+                      command=self._reset_registrar_defaults).pack(side="left", padx=5)
 
         self._build_form_ui(frame, REGISTRAR_VARS)
+
+    def _reset_registrar_defaults(self):
+        """Restores the fine-tuning thresholds back to recommended defaults."""
+        defaults = {
+            "REGISTRAR_FUZZY_THRESHOLD": "82",
+            "REGISTRAR_MAX_AGE_GAP": "5",
+            "REGISTRAR_FUZZY_THRESHOLD_STRICT": "95",
+            "REGISTRAR_FAMILY_MATCH_THRESHOLD": "75"
+        }
+        for key, val in defaults.items():
+            if key in self.string_vars:
+                self.string_vars[key].set(val)
+        self.save_settings("Registrar", REGISTRAR_VARS)
 
     def _build_tab_gazetteer(self, frame: ctk.CTkFrame):
         self._build_tab_header(frame, "Gazetteer", "UTILITY",
@@ -1938,12 +1940,11 @@ class Antiquarian(ctk.CTk):
             # Voyageur.py is a thin dispatcher; the mode IS the source code (A/FS/LAC).
             args.append(mode)
             if mode == "LAC":
-                vol = self.string_vars.get("LAC_HARVEST_VOLUME", ctk.StringVar(value="")).get().strip()
-                url = self.string_vars.get("LAC_URL", ctk.StringVar(value="")).get().strip()
-                if vol:
-                    args.extend(["volume", "--volume", vol])
-                elif url:
-                    args.extend(["reel", "--url", url])
+                gather_url = self.string_vars.get("GATHER_URL", ctk.StringVar(value="")).get().strip()
+                if "heritage.canadiana.ca" in gather_url:
+                    args.extend(["reel", "--url", gather_url])
+                elif gather_url:
+                    args.extend(["volume", "--volume", gather_url])
 
         target_cwd = os.path.dirname(target_script_path) if os.path.exists(target_script_path) else None
 
@@ -1961,7 +1962,7 @@ class Antiquarian(ctk.CTk):
         except ValueError:
             module_name = script_path
 
-        new_cmd = [sys.executable, "--module", module_name] + safe_cmd[1:]
+        new_cmd = [sys.executable, __file__, "--module", module_name] + safe_cmd[1:]
 
         script_name = os.path.basename(script_path)
         self.console.put(f"\n[System] Starting {script_name}...\n")

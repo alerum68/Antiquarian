@@ -50,8 +50,8 @@ SHAPEFILE_PATH = _shape if os.path.isabs(_shape) else os.path.join(PROGRAM_DIR, 
 _ca_shape_dir = os.getenv("GAZETTEER_CA_SHAPEFILE_DIR", "Antiquarian/Gazetteer/CA_UNICEN_Counties")
 CA_SHAPEFILE_DIR = _ca_shape_dir if os.path.isabs(_ca_shape_dir) else os.path.join(PROGRAM_DIR, _ca_shape_dir)
 
-DEBUG_MODE = str(os.getenv("GAZETTEER_DEBUG_MODE", "True")).lower() in ('true', '1', 'yes')
-CREATE_BACKUP = str(os.getenv("GAZETTEER_CREATE_BACKUP", "False")).lower() in ('true', '1', 'yes')
+DEBUG_MODE = False
+CREATE_BACKUP = True
 
 
 # ==========================================

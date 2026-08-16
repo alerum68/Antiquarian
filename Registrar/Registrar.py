@@ -41,13 +41,13 @@ def _get_env_int(key: str, default: int) -> int:
 
 
 # Threshold for people WITH birth years.
-FUZZY_THRESHOLD: int = _get_env_int("REGISTRAR_FUZZY_THRESHOLD", 82)
-# Max age gap for Pass 1.
-MAX_AGE_GAP: int = _get_env_int("REGISTRAR_MAX_AGE_GAP", 5)
-# Strict threshold for people WITHOUT birth years.
-FUZZY_THRESHOLD_STRICT: int = _get_env_int("REGISTRAR_FUZZY_THRESHOLD_STRICT", 95)
-# Threshold for verifying if relatives' names match.
-FAMILY_MATCH_THRESHOLD: int = _get_env_int("REGISTRAR_FAMILY_MATCH_THRESHOLD", 75)
+FUZZY_THRESHOLD = _get_env_int("REGISTRAR_FUZZY_THRESHOLD", 82)
+# Maximum allowed birth year difference for Pass 1 matching
+MAX_AGE_GAP = _get_env_int("REGISTRAR_MAX_AGE_GAP", 5)
+# Strict name token set ratio cutoff score for Pass 2 (missing birth year)
+FUZZY_THRESHOLD_STRICT = _get_env_int("REGISTRAR_FUZZY_THRESHOLD_STRICT", 95)
+# Name similarity threshold for verifying linked relative names
+FAMILY_MATCH_THRESHOLD = _get_env_int("REGISTRAR_FAMILY_MATCH_THRESHOLD", 75)
 
 FOLDER_NAME: str = os.getenv("REGISTRAR_FOLDER_NAME", "!Duplicate Review")
 # RootsMagic uses 0-indexed color sets.

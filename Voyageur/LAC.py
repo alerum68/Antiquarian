@@ -51,10 +51,10 @@ def _safe_path(base: str, *parts: str) -> str:
 PROGRAM_DIR = os.environ.get("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent)).strip()
 GENEALOGY_DIR = os.environ.get("GENEALOGY_DIR", "").strip()
 MEDIA_DIR = _safe_path(GENEALOGY_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
-CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("LAC_CHECKPOINT_DIR", "Working/LAC"))
-COOKIE_FILE = _safe_path(PROGRAM_DIR, os.environ.get("LAC_COOKIE_FILE", "Working/LAC/lac_cookies.txt"))
-DEFAULT_ARCHIVAL_NUMBER = os.environ.get("LAC_ARCHIVAL_NUMBER", "RG15")
-CDP_PORT = int(os.environ.get("LAC_CDP_PORT", str(lac_client.DEFAULT_CDP_PORT)))
+CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, "Working/LAC")
+COOKIE_FILE = _safe_path(PROGRAM_DIR, "Working/LAC/lac_cookies.txt")
+DEFAULT_ARCHIVAL_NUMBER = "RG15"
+CDP_PORT = 9222
 
 
 def resolve_generic_setting(document_type: str, generic_key: str, default: str = "") -> str:
@@ -725,7 +725,7 @@ def _run_volume(args: argparse.Namespace) -> None:
     print(f"[System] Starting LAC Volume retrieval for Volume {args.volume}...")
     document_type = _resolve_record_type(args.record_type)
     master_db_path = resolve_master_db_path(document_type, PROGRAM_DIR)
-    collection_title = os.environ.get("VOLUME_TITLE") or f"LAC Volume {args.volume}"
+    collection_title = f"LAC Volume {args.volume}"
 
     try:
         cookies = load_cookies(args.cookie_file)
@@ -760,7 +760,7 @@ def _run_reel(args: argparse.Namespace) -> None:
     master_db_path = resolve_master_db_path(document_type, PROGRAM_DIR)
 
     roll, manifest = parse_url(args.url)
-    collection_title = os.environ.get("VOLUME_TITLE") or f"LAC Reel {roll}"
+    collection_title = f"LAC Reel {roll}"
     output_directory = setup_directories(program_dir, args.media_dir, roll)
     manifest_json = download_manifest(manifest)
     download_images(manifest_json, output_directory, roll, master_db_path, document_type, collection_title)
@@ -771,7 +771,7 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     volume_parser = subparsers.add_parser("volume", help="Harvest an LAC archival volume by number.")
-    volume_parser.add_argument("--volume", default=os.environ.get("LAC_VOLUME", ""),
+    volume_parser.add_argument("--volume", default="",
                                help="LAC Volume number to harvest (e.g., 1325).")
     volume_parser.add_argument("--archival-number", default=DEFAULT_ARCHIVAL_NUMBER,
                                help="Archival series number (default: RG15).")
@@ -781,17 +781,17 @@ def main() -> None:
                                help="Base output media directory.")
     volume_parser.add_argument("--workers", type=int, default=8,
                                help="Number of concurrent workers for volume downloading (default 1).")
-    volume_parser.add_argument("--record-type", default=os.environ.get("LAC_RECORD_TYPE", ""),
+    volume_parser.add_argument("--record-type", default="",
                                help="Commissioner record type this volume harvest is for: parish or scrip.")
     volume_parser.set_defaults(func=_run_volume)
 
     reel_parser = subparsers.add_parser("reel", help="Download a Canadiana IIIF reel by URL.")
     reel_parser.add_argument(
-        "--url", default=os.environ.get("LAC_URL", ""),
+        "--url", default=os.environ.get("GATHER_URL", ""),
         help="Canadiana IIIF URL (e.g., https://heritage.canadiana.ca/view/oocihm.lac_reel_c2170).")
     reel_parser.add_argument("--media-dir", default=MEDIA_DIR,
                              help="Base output media directory.")
-    reel_parser.add_argument("--record-type", default=os.environ.get("LAC_RECORD_TYPE", ""),
+    reel_parser.add_argument("--record-type", default="",
                              help="Commissioner record type this reel harvest is for: parish or scrip.")
     reel_parser.set_defaults(func=_run_reel)
 

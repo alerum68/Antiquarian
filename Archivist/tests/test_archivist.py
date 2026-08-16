@@ -1002,30 +1002,6 @@ def test_build_general_citation_scrip_emits_commissioners_review_note():
         General.set_active_profile(General.GeneralProfile())
 
 
-def test_apply_record_type_field_remap_scrip_maps_scrip_gedcom_name(monkeypatch):
-    monkeypatch.delenv("GEDCOM_OUTPUT_NAME", raising=False)
-    monkeypatch.setenv("SCRIP_GEDCOM_NAME", "Custom_Scrip.ged")
-    orig_call = General.CALL_NUMBER
-    orig_url = General.COLLECTION_URL
-    orig_name = General.COLLECTION_NAME
-    orig_repo = General.REPOSITORY
-    orig_repo_loc = General.REPOSITORY_LOC
-    orig_image_dir = General.IMAGE_DIR
-    orig_output_name = Utils.GEDCOM_OUTPUT_NAME
-    try:
-        Utils.GEDCOM_OUTPUT_NAME = "Family_Register.ged"
-        General.apply_record_type_field_remap("Scrip")
-        assert Utils.GEDCOM_OUTPUT_NAME == "Custom_Scrip.ged"
-    finally:
-        General.CALL_NUMBER = orig_call
-        General.COLLECTION_URL = orig_url
-        General.COLLECTION_NAME = orig_name
-        General.REPOSITORY = orig_repo
-        General.REPOSITORY_LOC = orig_repo_loc
-        General.IMAGE_DIR = orig_image_dir
-        Utils.GEDCOM_OUTPUT_NAME = orig_output_name
-
-
 def test_apply_record_type_field_remap_hbca_auto_resolves_image_dir(monkeypatch):
     """IMAGE_DIR has no user-facing override (not even via env var) - it's always
     auto-resolved to Media/<record type>, matching Paleographer/Extract.py's own

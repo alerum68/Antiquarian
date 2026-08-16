@@ -124,20 +124,6 @@ def test_build_hbca_scaffold_sheet_does_not_duplicate_keystone_urls():
     assert sheet["records"][0]["type_specific_fields"]["keystone_urls"] == ["https://keystone.example/rec1"]
 
 
-def test_hbca_image_dir_reads_from_env(monkeypatch):
-    """HBCA_IMAGE_DIR was a hardcoded literal, never actually read from the environment,
-    despite being exposed as a configurable setting in settings_schema.yaml - the GUI
-    control had no effect. Reloading the module fresh with the env var set is required
-    since HBCA_IMAGE_DIR is resolved once at import time, same as the file's other
-    module-level settings constants."""
-    monkeypatch.setenv("HBCA_IMAGE_DIR", "CustomHBCAFolder")
-    spec = importlib.util.spec_from_file_location("voyageur_hbca_reload", _hbca_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    assert module.HBCA_IMAGE_DIR == "CustomHBCAFolder"
-
-
 def test_checkpoint_roundtrip(tmp_path):
     cp_file = tmp_path / "hbca_checkpoint.json"
     downloaded = {"adams_george.pdf", "ballenden_john.pdf"}

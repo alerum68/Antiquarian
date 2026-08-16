@@ -20,14 +20,5 @@ sections:
       picker:
         kind: directory
         base_dir_key: "__PROGRAM_DIR__"
-  Settings:
-    GAZETTEER_DEBUG_MODE:
-      default: "False"
-      tooltip: "Set to 'True' to print extra diagnostic information to the console while processing."
-      widget: toggle
-    GAZETTEER_CREATE_BACKUP:
-      default: "True"
-      tooltip: "Set to 'True' to automatically create a backup of your RootsMagic file before fixing it (Highly Recommended!)."
-      widget: toggle
 label_overrides:
   GAZETTEER_RM_DATABASE: "RootsMagic Database Path"

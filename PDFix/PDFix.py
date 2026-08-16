@@ -54,7 +54,7 @@ def _get_env_float(key: str, default: float = 0.0) -> float:
 COMPRESSION_LEVEL = _get_env_int("PDFIX_COMPRESSION_LEVEL", 2)
 CREATE_BACKUP = str(os.getenv("PDFIX_CREATE_BACKUP", "True")).lower() in ("true", "1", "yes")
 REPAIR_MODE = str(os.getenv("PDFIX_REPAIR_MODE", "False")).lower() in ("true", "1", "yes")
-_size_threshold = _get_env_float("PDFIX_SIZE_THRESHOLD_MB", 0.0)
+_size_threshold = 0.0
 SIZE_THRESHOLD_MB = _size_threshold if _size_threshold > 0 else None
 
 # Module-level so Paleographer/engine.py can import it directly for the pre-send

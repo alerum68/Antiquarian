@@ -152,7 +152,7 @@ def main() -> Path:
 
     program_dir = os.getenv("PROGRAM_DIR", str(Path(__file__).resolve().parent.parent))
     genealogy_dir = os.getenv("GENEALOGY_DIR", "")
-    url = os.getenv("A_URL", "").strip()
+    url = os.getenv("GATHER_URL", "").strip()
     json_dir = os.getenv("JSON_DIR", "Antiquarian/Working/Project/JSON")
     on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
     # Matches Antiquarian.py's own default ("Census", resolved against

@@ -636,8 +636,8 @@ def main() -> None:
     args, _ = parser.parse_known_args()
 
     if args.mode == "crosscheck":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
-                                    os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
+        target = resolve_json_input(args.json_path or os.getenv("SCRIP_MASTER_DB_NAME") or "scrip_records.json",
+                                    os.getenv("JSON_DIR", str(Path(__file__).resolve().parent.parent / "JSON")))
         print(f"Cross-checking claims in dataset: {target}...")
         try:
             cookies = voyageur_lac.load_cookies(args.cookie_file)
@@ -657,8 +657,8 @@ def main() -> None:
 
     # noinspection DuplicatedCode
     if args.mode == "enrich":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
-                                    os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
+        target = resolve_json_input(args.json_path or os.getenv("SCRIP_MASTER_DB_NAME") or "scrip_records.json",
+                                    os.getenv("JSON_DIR", str(Path(__file__).resolve().parent.parent / "JSON")))
         print(f"Enriching dataset: {target}...")
         with open(target, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -669,8 +669,8 @@ def main() -> None:
         return
 
     if args.mode == "partition":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
-                                    os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
+        target = resolve_json_input(args.json_path or os.getenv("SCRIP_MASTER_DB_NAME") or "scrip_records.json",
+                                    os.getenv("JSON_DIR", str(Path(__file__).resolve().parent.parent / "JSON")))
         out_dir = Path(args.output_dir) if args.output_dir else target.parent / "partitioned"
         print(f"Partitioning dataset {target} into {out_dir}...")
         with open(target, "r", encoding="utf-8") as f:
@@ -683,8 +683,8 @@ def main() -> None:
 
     # noinspection DuplicatedCode
     if args.mode == "resolve-names":
-        target = resolve_json_input(args.json_path or os.getenv("MASTER_DB") or "master_database.json",
-                                    os.getenv("OUTPUT_DIR", str(Path(__file__).resolve().parent / "output")))
+        target = resolve_json_input(args.json_path or os.getenv("SCRIP_MASTER_DB_NAME") or "scrip_records.json",
+                                    os.getenv("JSON_DIR", str(Path(__file__).resolve().parent.parent / "JSON")))
         print(f"Resolving names in dataset: {target}...")
         with open(target, "r", encoding="utf-8") as f:
             data = json.load(f)

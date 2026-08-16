@@ -1,8 +1,8 @@
 sections:
-  AGY CLI:
+  Antigravity CLI:
     AGY_CLI_BIN:
       default: "agy"
-      tooltip: "The AGY CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
+      tooltip: "The Antigravity CLI binary/command used for AI extraction (default 'agy'). Override only if agy is not on your PATH."
   Data & Directories:
     PALEOGRAPHER_RECORD_TYPE:
       default: ""
@@ -14,21 +14,8 @@ sections:
       tooltip: "How aggressively PDFix's lossless structural optimization (garbage collection + stream deflate) runs on a scanned PDF before it's uploaded to the AI: 0=low, 1=medium, 2=high (recommended). This never touches embedded image resolution/DPI, so transcription quality is unaffected at any level."
       widget: segmented
       options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
-    MASTER_DB:
-      default: ""
-      tooltip: "Path to the JSON master database used by the Scrip enrichment/partitioning tools. Leave blank to use the default 'master_database.json'."
-    OUTPUT_DIR:
-      default: ""
-      tooltip: "Directory where partitioned/enriched output files are written. Leave blank to use the default output folder."
+
   Parish Information:
-    CHURCH_GEDCOM_NAME:
-      default: "Parish.ged"
-      tooltip: "The filename for the generated GEDCOM file."
-      picker:
-        kind: save
-        base_dir_key: "GEDCOM_OUTPUT_PATH"
-        filetypes: [["GEDCOM files", "*.ged"], ["All files", "*.*"]]
-        defaultextension: ".ged"
     CHURCH_MASTER_DB_NAME:
       default: "parish_register.json"
       tooltip: "The filename for the JSON database storing the extracted records."
@@ -49,50 +36,17 @@ sections:
     PARISH_STATE:
       default: "State"
       tooltip: "The state or province where the parish is located."
-    PARISH_FILE_NAME:
-      default: "Parish_Anytown"
-      tooltip: "The base filename used for parish exports."
     DEFAULT_EVENT_LOCATION:
       default: "Anytown, Any County, State, USA"
       tooltip: "The default location assigned to events if none is specified."
   Register Information:
-    REGISTER_SOURCE_ID:
-      default: "1"
-      tooltip: "The source ID assigned to this specific register volume."
-    REGISTER_NAME:
-      default: "Baptisms, marriages and burials, 1850-1900"
-      tooltip: "What this register contains and covers (e.g., 'Baptisms, marriages and burials, 1850-1900'). Used throughout the generated source citations, distinct from Volume Title."
     VOLUME_TITLE:
       default: "Volume 1"
       tooltip: "This specific volume/book's own title or label (e.g., 'Volume 1'). Used alongside Register Name in the generated source citations."
     VOLUME_NUM:
       default: "1"
       tooltip: "The volume number of the register."
-  Church Citation (Source):
-    CHURCH_CALL_NUMBER:
-      default: "Call #1234567"
-      tooltip: "The call number for the church register collection."
-    CHURCH_COLLECTION_URL:
-      default: "https://www.familysearch.org/search/collection"
-      tooltip: "A link back to FamilySearch or Ancestry where you found these images."
-    CHURCH_COLLECTION_NAME:
-      default: "Generic Historical Collection"
-      tooltip: "The name of the specific collection these images belong to (e.g., 'Quebec, Catholic Parish Registers'). Do not include the repository/website name here, that's set separately below."
-    CHURCH_REPOSITORY:
-      default: "FamilySearch.org"
-      tooltip: "The archive or website hosting this collection (e.g., FamilySearch.org, Library and Archives Canada, Ancestry.com)."
-    CHURCH_REPOSITORY_LOC:
-      default: "Granite Mountain, UT"
-      tooltip: "The physical location or address of that repository, used in the citation (e.g., 'Granite Mountain, UT' for FamilySearch, 'Ottawa, ON' for LAC)."
   Scrip Information:
-    SCRIP_GEDCOM_NAME:
-      default: "Scrip.ged"
-      tooltip: "The filename for the generated GEDCOM file."
-      picker:
-        kind: save
-        base_dir_key: "GEDCOM_OUTPUT_PATH"
-        filetypes: [["GEDCOM files", "*.ged"], ["All files", "*.*"]]
-        defaultextension: ".ged"
     SCRIP_MASTER_DB_NAME:
       default: "scrip_records.json"
       tooltip: "The filename for the JSON database storing the extracted scrip records."
@@ -107,6 +61,3 @@ sections:
     SCRIP_DISTRICT:
       default: ""
       tooltip: "The scrip district or region this batch of applications belongs to, if known."
-label_overrides:
-  CHURCH_REPOSITORY: "Repository Name"
-  CHURCH_REPOSITORY_LOC: "Repository Location"

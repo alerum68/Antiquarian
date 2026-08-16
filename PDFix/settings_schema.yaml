@@ -11,14 +11,7 @@ sections:
       tooltip: "How aggressively to garbage-collect and deflate-compress PDF structure: 0=low, 1=medium, 2=high (recommended). This is lossless - it never touches image resolution/DPI."
       widget: segmented
       options: [["0", "Low"], ["1", "Medium"], ["2", "High"]]
-    PDFIX_SIZE_THRESHOLD_MB:
-      default: "0"
-      tooltip: "Only optimize PDFs larger than this size, in MB. Leave as 0 to optimize every PDF regardless of size."
-      widget: slider
-      min: 0
-      max: 100
-      step: 1
-      suffix: "MB"
+
   Safety:
     PDFIX_CREATE_BACKUP:
       default: "True"

@@ -76,20 +76,20 @@ PROGRAM_DIR = os.environ.get("PROGRAM_DIR", str(Path(__file__).resolve().parent.
 GENEALOGY_DIR = os.environ.get("GENEALOGY_DIR", "").strip()
 
 DEFAULT_INDEX_URL = "https://www.gov.mb.ca/chc/archives/hbca/biographical/index.html"
-INDEX_URL = os.environ.get("HBCA_INDEX_URL", DEFAULT_INDEX_URL).strip() or DEFAULT_INDEX_URL
-HBCA_IMAGE_DIR = os.environ.get("HBCA_IMAGE_DIR", "HBCA").strip() or "HBCA"
-HBCA_MASTER_DB_NAME = resolve_generic_setting("HBCA", "MASTER_DB_NAME", "MasterDB_HBCA.json")
-CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, os.environ.get("HBCA_CHECKPOINT_DIR", "Working/HBCA"))
+INDEX_URL = DEFAULT_INDEX_URL
+HBCA_IMAGE_DIR = "HBCA"
+HBCA_MASTER_DB_NAME = "MasterDB_HBCA.json"
+CHECKPOINT_DIR = _safe_path(PROGRAM_DIR, "Working/HBCA")
 MEDIA_DIR = _safe_path(GENEALOGY_DIR, os.environ.get("MEDIA_DIR", "Media").strip())
 
-KEYSTONE_BASE_URL = os.environ.get("KEYSTONE_BASE_URL", "https://pam.minisisinc.com/scripts/mwimain.dll").strip()
+KEYSTONE_BASE_URL = "https://pam.minisisinc.com/scripts/mwimain.dll"
 HBCA_RESOLVE_KEYSTONE = (
     os.environ.get("HBCA_RESOLVE_KEYSTONE", "false").lower() in ("true", "1", "yes")
 )
 HBCA_DOWNLOAD_KEYSTONE_MEDIA = (
     os.environ.get("HBCA_DOWNLOAD_KEYSTONE_MEDIA", "true").lower() in ("true", "1", "yes")
 )
-HBCA_MAX_WORKERS = int(os.getenv("HBCA_MAX_WORKERS", "8"))
+HBCA_MAX_WORKERS = 8
 
 
 # ==========================================
