@@ -138,8 +138,8 @@ def validate_master_db_against_commissioner(master_data: Dict[str, Any], documen
     census_schema.py's validate_against_commissioner() (Sub-project 2) - a failure here is
     logged and swallowed, never raised, and the MASTER_DB write proceeds regardless."""
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(master_data, document_type, collection_title)
+        from Commissioner.record_registry import validate_collection_softly
+        validate_collection_softly(master_data, document_type, collection_title)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 

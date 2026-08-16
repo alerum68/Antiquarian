@@ -324,8 +324,8 @@ def validate_against_commissioner(normalized: dict, collection_title: str) -> No
     import here would crash their whole run on startup - a far worse failure than the
     soft-fail this function exists to guarantee."""
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(normalized, "Census", collection_title)
+        from Commissioner.record_registry import validate_collection_softly
+        validate_collection_softly(normalized, "Census", collection_title)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {collection_title!r}: {e}")
 

@@ -685,7 +685,7 @@ def save_checkpoint(checkpoint_file: Path, downloaded_files: Set[str]) -> None:
 
 def append_scaffold_sheet(master_db_path: Path, sheet: dict) -> None:
     """Loads or creates MasterDB_HBCA.json and appends a scaffold sheet if not present."""
-    from Commissioner.record_registry import validate_soft
+    from Commissioner.record_registry import validate_collection_softly
 
     master_db_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -705,7 +705,7 @@ def append_scaffold_sheet(master_db_path: Path, sheet: dict) -> None:
     if sheet.get("page_id") not in existing_page_ids:
         data.setdefault("sheets", []).append(sheet)
 
-    validate_soft(data, "HBCA", str(master_db_path))
+    validate_collection_softly(data, "HBCA", str(master_db_path))
 
     temp_path = master_db_path.with_suffix(".tmp")
     with open(temp_path, "w", encoding="utf-8") as f:

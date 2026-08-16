@@ -161,7 +161,7 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
     return collection
 
 
-def validate_soft(data: dict, document_type: str, label: str) -> None:
+def validate_collection_softly(data: dict, document_type: str, label: str) -> None:
     """Runs parse_collection() as a visibility check; validation failures are logged and swallowed."""
     try:
         parse_collection(data, document_type)

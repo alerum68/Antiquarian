@@ -323,8 +323,8 @@ def load_master_db() -> Dict[str, Any]:
 
 def save_master_db(master_data: Dict[str, Any]) -> None:
     try:
-        from Commissioner.record_registry import validate_soft
-        validate_soft(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)
+        from Commissioner.record_registry import validate_collection_softly
+        validate_collection_softly(master_data, master_data.get("record_type_name", TYPE_CFG.name), COLLECTION_TITLE)
     except Exception as e:
         print(f"[WARN] Commissioner validation failed for {COLLECTION_TITLE!r}: {e}")
 
