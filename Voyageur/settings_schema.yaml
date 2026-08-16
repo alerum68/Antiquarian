@@ -1,0 +1,35 @@
+sections:
+  Gather Settings:
+    VOYAGEUR_SOURCE:
+      default: ""
+      tooltip: "Which repository to gather from. Adding a new one is a new Voyageur sub-script, nothing else changes here."
+    GATHER_URL:
+      default: ""
+      tooltip: "The web address (URL) of the specific record or collection you want to gather."
+    GATHER_ON_COLLISION:
+      default: "overwrite"
+      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file."
+      widget: segmented
+      options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
+  HBCA Settings:
+    HBCA_LETTER_FILTER:
+      default: ""
+      tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."
+
+    HBCA_RESOLVE_KEYSTONE:
+      default: "false"
+      tooltip: "Query Archives of Manitoba Keystone database to resolve microfilm/finding aid links for cited location codes."
+      widget: toggle
+    HBCA_DOWNLOAD_KEYSTONE_MEDIA:
+      default: "true"
+      tooltip: "When Keystone resolving is enabled, download any digitized microfilm copy media files found."
+      widget: toggle
+
+label_overrides:
+  VOYAGEUR_SOURCE: "Gather From"
+  GATHER_URL: "Gather URL"
+  GATHER_ON_COLLISION: "On Existing File"
+  HBCA_INDEX_URL: "HBCA Biographical Index URL"
+  HBCA_LETTER_FILTER: "Letter Filter (optional)"
+  HBCA_RESOLVE_KEYSTONE: "Resolve Keystone Records"
+  HBCA_DOWNLOAD_KEYSTONE_MEDIA: "Download Keystone Media"

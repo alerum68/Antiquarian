@@ -1,0 +1,692 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SourceTemplates>
+  <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc. All rights reserved.</Copyright>
+
+  <!-- TEMPLATE 1: MANITOBA SCRIP -->
+  <Template Id="20001">
+    <Name>* Simple Citations: Métis Scrip (Manitoba, 1870–1876)</Name>
+    <Description>Designed for citing Manitoba Act scrip grants (1870-1876), organized by Library and Archives Canada under RG 15, Series D-II-8-a. Uses the Simplified Citations architecture.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, affidavit no. [AffidavitNumber]&gt;&lt;, [Parish]&gt;&lt;, [ScripType] scrip&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [ClaimantName]&lt;, aff. no. [AffidavitNumber]&gt;&gt;.|&lt;: [ClaimantName].&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt;&lt; [Repository].&gt;</Bibliography>
+    
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>e.g., Department of the Interior</Hint>
+      <Detail>False</Detail>
+      <LongHint>The overarching government department or ministry.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. / Commission</Display>
+      <Hint>e.g., Manitoba Scrip Commission</Hint>
+      <Detail>False</Detail>
+      <LongHint>The name of the overarching commission granting the scrip.</LongHint>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date Range</Display>
+      <Hint>e.g., 1870–1876</Hint>
+      <Detail>False</Detail>
+      <LongHint>The operational date range of the commission.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>e.g., Manitoba Métis Scrip Applications</Hint>
+      <Detail>False</Detail>
+      <LongHint>Title of the record collection on LAC.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Collection</Name>
+      <Display>Collection / Series</Display>
+      <Hint>e.g., Department of the Interior fonds, RG 15, Series D-II-8-a</Hint>
+      <Detail>False</Detail>
+      <LongHint>Archival fonds and series classification.</LongHint>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>e.g., Library and Archives Canada, Ottawa, Ontario</Hint>
+      <Detail>False</Detail>
+      <LongHint>Archival institution holding the records.</LongHint>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>ClaimantName</Name>
+      <Display>Claimant Name</Display>
+      <Hint>Name of the scrip applicant</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>AffidavitNumber</Name>
+      <Display>Affidavit Number</Display>
+      <Hint>e.g., 1234</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>Parish</Name>
+      <Display>Parish / Location</Display>
+      <Hint>e.g., St. Francois Xavier</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ScripType</Name>
+      <Display>Scrip Type (Land/Money)</Display>
+      <Hint>e.g., Land (160 acres), Land (240 acres), Money ($160)</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Volume</Name>
+      <Display>Volume</Display>
+      <Hint>e.g., 1320</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Microfilm</Name>
+      <Display>Microfilm</Display>
+      <Hint>e.g., C-14929</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint>Link to the LAC digital record</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date Accessed</Display>
+      <Hint>e.g., 3 Aug 2026</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Reference / Item ID</Display>
+      <Hint>e.g., Item ID 1502188</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+
+  <!-- TEMPLATE 2: NORTH-WEST SCRIP -->
+  <Template Id="20002">
+    <Name>* Simple Citations: Métis Scrip (North-West, 1885 &amp; 1900-1901)</Name>
+    <Description>Designed for citing North-West Half-Breed scrip grants, organized by Library and Archives Canada under RG 15, Series D-II-8-c. Uses the Simplified Citations architecture.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, claim no. [ClaimNumber]&gt;&lt;, scrip note [ScripNumber]&gt;&lt;, [Location]&gt;&lt;, issued [IssueDate]&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [ClaimantName]&lt;, claim no. [ClaimNumber]&gt;&gt;.|&lt;: [ClaimantName].&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt;&lt; [Repository].&gt;</Bibliography>
+    
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>e.g., Department of the Interior</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. / Commission</Display>
+      <Hint>e.g., North-West Half-Breed Claims Commission</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date Range</Display>
+      <Hint>e.g., 1885 &amp; 1900-1901</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>e.g., North-West Territories Métis Scrip Applications</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Collection</Name>
+      <Display>Collection / Series</Display>
+      <Hint>e.g., Department of the Interior fonds, RG 15, Series D-II-8-c</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>e.g., Library and Archives Canada, Ottawa, Ontario</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>ClaimantName</Name>
+      <Display>Claimant Name</Display>
+      <Hint>Name of the scrip applicant</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ClaimNumber</Name>
+      <Display>Claim Number</Display>
+      <Hint>e.g., 543</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ScripNumber</Name>
+      <Display>Scrip Note Number</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>IssueDate</Name>
+      <Display>Issue Date</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>Location</Name>
+      <Display>Location / Parish</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Volume</Name>
+      <Display>Volume</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Microfilm</Name>
+      <Display>Microfilm</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date Accessed</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Reference / Item ID</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+
+  <!-- TEMPLATE 3: TREATY 8 SCRIP -->
+  <Template Id="20003">
+    <Name>* Simple Citations: Métis Scrip (Treaty 8, 1899-1908)</Name>
+    <Description>Designed for citing Treaty 8 scrip and adhesions, organized by Library and Archives Canada under RG 15, Series D-II-8-i. Uses the Simplified Citations architecture.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, claim no. [ClaimNumber]&gt;&lt;, [ScripAmount] scrip note [ScripNoteNumber]&gt;&lt; delivered [DeliveryDate]&gt;&lt; at [DeliveryPlace]&gt;&lt;; vol. [Volume]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [ClaimantName]&lt;, claim no. [ClaimNumber]&gt;&gt;.|&lt;: [ClaimantName].&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt;&lt; [Repository].&gt;</Bibliography>
+    
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>e.g., Department of the Interior</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. / Commission</Display>
+      <Hint>e.g., Treaty No. 8 Scrip Commission</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date Range</Display>
+      <Hint>e.g., 1899–1908</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>e.g., Treaty No. 8 Métis Scrip Applications</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Collection</Name>
+      <Display>Collection / Series</Display>
+      <Hint>e.g., Department of the Interior fonds, RG 15, Series D-II-8-i</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>e.g., Library and Archives Canada, Ottawa, Ontario</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>ClaimantName</Name>
+      <Display>Claimant Name</Display>
+      <Hint>Name of the scrip applicant</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ClaimNumber</Name>
+      <Display>Claim Number</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ScripAmount</Name>
+      <Display>Scrip Amount (80/160 acres)</Display>
+      <Hint>e.g., 80 acres, 160 acres, or $240</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ScripNoteNumber</Name>
+      <Display>Scrip Note Number</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>DeliveryDate</Name>
+      <Display>Delivery Date</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>DeliveryPlace</Name>
+      <Display>Delivery Place</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Volume</Name>
+      <Display>Volume</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date Accessed</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Reference / Item ID</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+
+  <!-- TEMPLATE 4: SCRIP CERTIFICATE -->
+  <Template Id="20004">
+    <Name>* Simple Citations: Métis Scrip (Certificates &amp; Payments)</Name>
+    <Description>Designed for citing the physical scrip certificates or receipts issued to the claimant, organized under LAC RG 15 Series D-II-8-e, D-II-8-f, or D-II-8-j. Uses the Simplified Citations architecture.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, [ScripType] scrip certificate no. [CertificateNumber]&gt;&lt; for [Amount]&gt;&lt;, issued [IssueDate]&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [ClaimantName]&lt;, cert. no. [CertificateNumber]&gt;&gt;.|&lt;: [ClaimantName].&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt;&lt; [Repository].&gt;</Bibliography>
+    
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>e.g., Department of the Interior</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. / Commission</Display>
+      <Hint>e.g., Scrip Commission</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date Range</Display>
+      <Hint>e.g., 1870–1906</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>e.g., Métis Scrip Certificates and Payments</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Collection</Name>
+      <Display>Collection / Series</Display>
+      <Hint>e.g., Department of the Interior fonds, RG 15, Series D-II-8-e</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>e.g., Library and Archives Canada, Ottawa, Ontario</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>ClaimantName</Name>
+      <Display>Claimant Name</Display>
+      <Hint>Name on the certificate</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>ScripType</Name>
+      <Display>Scrip Type</Display>
+      <Hint>e.g., Land, Money</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>CertificateNumber</Name>
+      <Display>Certificate Number</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Amount</Name>
+      <Display>Amount</Display>
+      <Hint>e.g., 160 acres, $240</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>IssueDate</Name>
+      <Display>Issue Date</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Volume</Name>
+      <Display>Volume</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Microfilm</Name>
+      <Display>Microfilm</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date Accessed</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Reference / Item ID</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+
+  <!-- TEMPLATE 5: DOMINION LAND GRANT / PATENT -->
+  <Template Id="20005">
+    <Name>* Simple Citations: Dominion Land Grants &amp; Patents</Name>
+    <Description>Designed for citing final Letters Patent issued by the dominion government, utilizing the Dominion Lands System (Section, Township, Range, Meridian) and Liber/Folio identifiers. Uses the Simplified Citations architecture.</Description>
+    <Category>Simplified Citations for Genealogical Sources</Category>
+    <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [GranteeName]&gt;&lt;?[OriginalClaimant]| (assignee of [OriginalClaimant])|&gt;&lt;, land grant, [LandDescription]&gt;&lt;, issued [IssueDate]&gt;&lt;; liber [Liber], folio [Folio]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
+    <ShortFootnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription]&lt;: [GranteeName]&lt;, liber [Liber], folio [Folio]&gt;&gt;.|&lt;: [GranteeName].&gt;&gt;</ShortFootnote>
+    <Bibliography>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt;&lt; [Repository].&gt;</Bibliography>
+    
+    <Field>
+      <Type>Name</Type>
+      <Name>PrimaryCreator</Name>
+      <Display>Primary Creator</Display>
+      <Hint>e.g., Department of the Interior</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Department</Name>
+      <Display>Dept. / Branch</Display>
+      <Hint>e.g., Dominion Lands Branch</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Date</Name>
+      <Display>Date Range</Display>
+      <Hint>e.g., 1870–1930</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>SourceDescription</Name>
+      <Display>Source Description</Display>
+      <Hint>e.g., Dominion Lands Patents</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Collection</Name>
+      <Display>Collection / Series</Display>
+      <Hint>e.g., Dominion Land Grants, RG 15</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Repository</Name>
+      <Display>Repository</Display>
+      <Hint>e.g., Library and Archives Canada, Ottawa, Ontario</Hint>
+      <Detail>False</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>GranteeName</Name>
+      <Display>Grantee Name</Display>
+      <Hint>The person receiving the patent</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Name</Type>
+      <Name>OriginalClaimant</Name>
+      <Display>Original Scrip Claimant</Display>
+      <Hint>Leave blank if Grantee is the Métis claimant</Hint>
+      <Detail>True</Detail>
+      <LongHint>Often, Métis scrip was assigned or sold. Use this to link the final land patent back to the original Métis claimant.</LongHint>
+    </Field>
+    <Field>
+      <Type>Place</Type>
+      <Name>LandDescription</Name>
+      <Display>Legal Land Description</Display>
+      <Hint>e.g., NW part of Sec 14, Twp 5, Rge 3, W1</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>IssueDate</Name>
+      <Display>Issue Date</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Liber</Name>
+      <Display>Liber (Book)</Display>
+      <Hint>e.g., 42</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Folio</Name>
+      <Display>Folio (Page)</Display>
+      <Hint>e.g., 108</Hint>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>Microfilm</Name>
+      <Display>Microfilm</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>URL</Name>
+      <Display>URL</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Date</Type>
+      <Name>Accessed</Name>
+      <Display>Date Accessed</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+    <Field>
+      <Type>Text</Type>
+      <Name>RefNumber</Name>
+      <Display>Reference / Item ID</Display>
+      <Hint/>
+      <Detail>True</Detail>
+      <LongHint/>
+    </Field>
+  </Template>
+
+</SourceTemplates>

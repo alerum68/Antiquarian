@@ -1,0 +1,17 @@
+sections:
+  Which JSON to Build From:
+    JSON_FILE:
+      default: ""
+      tooltip: "Only needed to build from a specific JSON file Voyageur already gathered. Leave blank to automatically use the most recently created JSON file in your JSON folder."
+      picker:
+        kind: open
+        base_dir_key: "JSON_DIR"
+        filetypes: [["JSON files", "*.json"], ["All files", "*.*"]]
+    GEDCOM_OUTPUT_MODE:
+      default: "Both"
+      tooltip: "Output mode for generated GEDCOM records (e.g., Both)."
+      widget: segmented
+      options: [["RM", "RootsMagic"], ["FTM", "FTM"], ["Both", "Both"]]
+label_overrides:
+  JSON_FILE: "Input JSON File"
+  GEDCOM_OUTPUT_MODE: "GEDCOM Format"

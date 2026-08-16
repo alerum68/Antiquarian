@@ -10,13 +10,47 @@ venv/
 # IDE / tooling
 /.idea/
 /.claude/
+/CLAUDE.md
+/.mcp.json
+/.agent/
+/.gemini/
+.agentsroom/handoff-transcript-*.txt
+.agentsroom/handoff-summary-*.md
+.agents/mcp_config.json
+/.agentsroom/
+/opencode.json
+
+# Local-only (never version controlled)
+/.opencode/
+/Working/
+/AGENTS.md
 
 # OS junk
 .DS_Store
 Thumbs.db
 
 # Generated / downloaded data
-/ChurchRegisters/JSON/
-/LACDownloader/manifest/
+/RootsMagic 11/
+/Voyageur/manifest/
 /identifier.sqlite
-/CountyFix/US_AtlasHCB_Counties/
+/Gazetteer/US_AtlasHCB_Counties/
+/Gazetteer/CA_UNICEN_Counties/*.shp
+/Gazetteer/CA_UNICEN_Counties/*.shx
+/Gazetteer/CA_UNICEN_Counties/*.dbf
+/Gazetteer/CA_UNICEN_Counties/*.prj
+/JSON/
+/Archivist/source_id_registry.json
+
+# Local dev scratch space (sample data, test files, etc.)
+/DEV/
+.worktrees/
+worktrees/
+
+/.superpowers/
+/.gsd/
+/GSD-STYLE.md
+/PROJECT_RULES.md
+/model_capabilities.yaml
+/scripts/opencode-serve.log
+/scripts/opencode-serve.ps1
+/scripts/

@@ -1,0 +1,11 @@
+sections:
+  File Paths:
+    GAZETTEER_RM_DATABASE:
+      default: "Your Tree.rmtree"
+      tooltip: "The filename of your RootsMagic tree (e.g., 'Your Tree.rmtree') located in your RootsMagic Folder."
+      picker:
+        kind: open
+        base_dir_key: "RM_DIR"
+        filetypes: [["RootsMagic files", "*.rmtree"], ["All files", "*.*"]]
+label_overrides:
+  GAZETTEER_RM_DATABASE: "RootsMagic Database Path"

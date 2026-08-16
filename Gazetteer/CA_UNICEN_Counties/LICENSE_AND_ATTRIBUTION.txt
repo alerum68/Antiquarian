@@ -1,0 +1,62 @@
+Canadian Census Division (CD) historical boundaries, 1851-1921
+================================================================
+
+Eight shapefiles (cd_1851 .. cd_1921), one per Canadian census year, at the
+Census Division (CD - roughly equivalent to a US county) level. Projection:
+WGS84 / EPSG:4326. "CBF-Harmonized Shorelines" series (coastlines kept
+consistent across years for cleaner time-series joins).
+
+Source / distribution
+----------------------
+Downloaded from the UNI-CEN Project (Unified Infrastructure for Canadian
+Census Research), Western University, via Borealis Dataverse:
+  https://borealisdata.ca/dataverse/unicen_boundaries
+  https://observatory.uwo.ca/unicen
+
+Each file's own `source` column reads "TCP", confirming the underlying
+geometry originates from The Canadian Peoples / Les populations canadiennes
+project (the same project behind the CCRI-branded CD_1911 file also present
+in this repo's history) - UNI-CEN's contribution is harmonizing shorelines
+and re-projecting to WGS84 across all 8 years in one consistent schema.
+
+License / terms
+----------------
+Borealis lists these datasets under "Custom Dataset Terms": open access,
+no login required to download, with the stated expectation that "proper
+credit is given via citation" (standard academic community-norms citation
+requirement, not a restrictive license).
+
+The underlying TCP data itself is separately licensed CC BY 4.0.
+
+Suggested citation (cite both):
+
+  UNI-CEN Project, 2023, "UNI-CEN Boundaries (CBF-Harmonized Shorelines) -
+  Census Division (CD) - <YEAR> - Esri Shapefile format (WGS84 /
+  EPSG:4326)", Borealis, V1. (see per-year DOIs below)
+
+  The Canadian Historical GIS (Temporal Census Polygons) - Cunfer, Billard,
+  McClean, Richard, St-Hilaire. The Canadian Peoples / Les populations
+  canadiennes project. CC BY 4.0. https://doi.org/10.5683/SP3/PKUZJN
+
+Per-year dataset DOIs
+---------------------
+1851  https://doi.org/10.5683/SP3/JKTI37
+1861  https://doi.org/10.5683/SP3/BR3A00
+1871  https://doi.org/10.5683/SP3/SHBDK6
+1881  https://doi.org/10.5683/SP3/9EJKG9
+1891  https://doi.org/10.5683/SP3/FRXFWQ
+1901  https://doi.org/10.5683/SP3/KWUCH3
+1911  https://doi.org/10.5683/SP3/WVNPXH
+1921  https://doi.org/10.5683/SP3/L2MNVW
+
+Columns
+-------
+geosid    - unique ID; first 2 letters are the province/territory code
+            (AB, BC, MB, NB, NS, ON, PE, QC, SK, ...) - no separate
+            province column
+time      - census year (string)
+level     - numeric level code (3 = CD for this series)
+geoname   - the CD's own name (e.g. "Calgary", "Yale & Cariboo")
+lat_c/lon_c, lat_r/lon_r - centroid coordinates
+areakm    - polygon area in square km
+source    - "TCP" for every row in every year
