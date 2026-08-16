@@ -166,7 +166,7 @@ def split_name_and_dit(full: str) -> Tuple[str, str, Optional[str]]:
     return "", full, dit_name
 
 
-def sex_code(raw: str) -> str:
+def normalize_sex_code(raw: str) -> str:
     raw = (raw or "").strip().lower()
     if raw.startswith("f"):
         return "F"
@@ -238,7 +238,7 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
             continue
         fsftid = row.get("attached_fsftid", "") if role_name == "Primary" else ""
         person_ark = row.get("person_ark", "") if role_name == "Primary" else ""
-        participant = build_participant(role_name, full, sex_code(columns.get(SEX_COLUMN_MAP[name_col], "")),
+        participant = build_participant(role_name, full, normalize_sex_code(columns.get(SEX_COLUMN_MAP[name_col], "")),
                                         fsftid, person_ark)
         participants.append(participant)
         if role_name == "Primary":
