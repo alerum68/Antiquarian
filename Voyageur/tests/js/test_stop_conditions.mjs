@@ -39,7 +39,9 @@ test('reload state: save then load round-trips on the same page URL', () => {
         batchPageCounter: 2,
         seenPids: new Set(['p1', 'p2']),
         firstPagePlace: {state: 'Dakota Territory', county: 'Pembina', city: 'Not Stated', enumeration_district: '076'},
-        indexReloadAttempts: 1,
+        pagesNeedingRetry: [{page_number: 1, image_id: 'a1', url: 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00129'}],
+        retryPhase: true,
+        currentRetryTarget: {page_number: 3, image_id: 'a3', url: 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00131'},
     });
 
     const restored = loadReloadState();
@@ -48,13 +50,15 @@ test('reload state: save then load round-trips on the same page URL', () => {
     assert.ok(restored.seenPids instanceof Set);
     assert.deepEqual([...restored.seenPids].sort(), ['p1', 'p2']);
     assert.deepEqual(restored.firstPagePlace, {state: 'Dakota Territory', county: 'Pembina', city: 'Not Stated', enumeration_district: '076'});
-    assert.equal(restored.indexReloadAttempts, 1);
+    assert.deepEqual(restored.pagesNeedingRetry, [{page_number: 1, image_id: 'a1', url: 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00129'}]);
+    assert.equal(restored.retryPhase, true);
+    assert.deepEqual(restored.currentRetryTarget, {page_number: 3, image_id: 'a3', url: 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00131'});
 });
 
 test('reload state: load returns null when the page URL has changed since saving', () => {
     globalThis.sessionStorage._store = {};
     globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
-    saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, indexReloadAttempts: 1});
+    saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, pagesNeedingRetry: [], retryPhase: false, currentRetryTarget: null});
 
     globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00131';
     assert.equal(loadReloadState(), null);
@@ -63,7 +67,7 @@ test('reload state: load returns null when the page URL has changed since saving
 test('reload state: clearReloadState removes saved state', () => {
     globalThis.sessionStorage._store = {};
     globalThis.window.location.href = 'https://www.ancestry.com/imageviewer/collections/6742/images/4240106-00130';
-    saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, indexReloadAttempts: 1});
+    saveReloadState({accumulatedPages: [], batchPageCounter: 1, seenPids: new Set(), firstPagePlace: null, pagesNeedingRetry: [], retryPhase: false, currentRetryTarget: null});
 
     clearReloadState();
     assert.equal(loadReloadState(), null);

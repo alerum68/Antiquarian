@@ -76,13 +76,12 @@
             batchPageCounter: state.batchPageCounter,
             seenPids: Array.from(state.seenPids),
             firstPagePlace: state.firstPagePlace,
-            indexReloadAttempts: state.indexReloadAttempts,
+            pagesNeedingRetry: state.pagesNeedingRetry,
+            retryPhase: state.retryPhase,
+            currentRetryTarget: state.currentRetryTarget,
         }));
     }
 
-    // Returns null (rather than restoring) whenever the saved state doesn't obviously
-    // belong to the page we're now on - a real reload keeps the URL identical, so any
-    // mismatch means this is a different navigation, not the reload we saved this for.
     function loadReloadState() {
         const raw = sessionStorage.getItem(RELOAD_STATE_KEY);
         if (!raw) return null;
@@ -98,7 +97,9 @@
             batchPageCounter: parsed.batchPageCounter || 1,
             seenPids: new Set(parsed.seenPids || []),
             firstPagePlace: parsed.firstPagePlace || null,
-            indexReloadAttempts: parsed.indexReloadAttempts || 0,
+            pagesNeedingRetry: parsed.pagesNeedingRetry || [],
+            retryPhase: parsed.retryPhase || false,
+            currentRetryTarget: parsed.currentRetryTarget || null,
         };
     }
 
@@ -551,8 +552,9 @@
         let seenPids = new Set();
         let lastPageSignature = "INITIAL_STATE_NOT_SET";
         let firstPagePlace = null;
-        let indexReloadAttempts = 0;
-        const MAX_INDEX_RELOAD_ATTEMPTS = 3;
+        let pagesNeedingRetry = [];
+        let inRetryPhase = false;
+        let currentRetryTarget = null;
 
         // A location.reload() triggered by the index-not-loaded retry (see
         // runExtractionLoop) re-runs this whole script from scratch. Restore whatever was
@@ -565,7 +567,9 @@
             batchPageCounter = resumedState.batchPageCounter;
             seenPids = resumedState.seenPids;
             firstPagePlace = resumedState.firstPagePlace;
-            indexReloadAttempts = resumedState.indexReloadAttempts;
+            pagesNeedingRetry = resumedState.pagesNeedingRetry;
+            inRetryPhase = resumedState.retryPhase;
+            currentRetryTarget = resumedState.currentRetryTarget;
             resumingFromReload = true;
             clearReloadState();
         }
@@ -1002,6 +1006,7 @@
         }
 
 
+
         async function extractCurrentPageData() {
             let imageId = getBaseImageId();
             let country = "USA", state = "", county = "", city = "", placeDetails = "", enumerationDistrict = "";
@@ -1170,7 +1175,10 @@
                 return;
             }
             const {year, locationStr} = getYearAndLocation();
-            const payload = {census_year: year, location: locationStr, pages: accumulatedPages};
+            const payload = {
+                census_year: year, location: locationStr, pages: accumulatedPages,
+                incomplete_pages: ancestryIncompletePagesSummary(accumulatedPages),
+            };
             triggerJsonDownload(JSON.stringify(payload, null, 2), `${year} - ${locationStr} - ANC.json`);
             if (window.showToast) window.showToast("Success! Master JSON Downloaded.", "success", 5000);
         }
@@ -1199,155 +1207,40 @@
 
         async function runExtractionLoop() {
             while (isAutoExtracting) {
-
-                // Checked up front (rather than only after extraction, as before) because
-                // its answer bounds how cautious the blank-page check below needs to be.
-                // Confirmed live: the Next button is still printed (just disabled) on a
-                // genuinely blank/unindexed page - it's only ever missing/disabled on the
-                // true last frame of the whole roll. So a confirmed-absent Next button here
-                // means this page's own content, whatever it turns out to be, is the last
-                // thing this gather will ever see - there's no "silently skip past a real
-                // page in the middle of the roll" risk the way the old fixed ceiling
-                // regression had, since there's nowhere left to skip to.
                 const nextBtnSelector = 'button[aria-label="Next image"], .pagination.right button.page, .nextButton, button[title="Next image"]';
-                const nextBtnWait = await waitForCondition(() => document.querySelector(nextBtnSelector),
-                    {timeoutMs: 5000});
+                const nextBtnWait = await waitForCondition(() => document.querySelector(nextBtnSelector), {timeoutMs: 5000});
                 const nextBtn = nextBtnWait.result;
                 const isNextDisabled = isNextBtnDisabled(nextBtn);
-                const isLastPage = !nextBtn || isNextDisabled;
 
-                if (DEBUG_MODE) {
-                    console.log(`[MGS DEBUG] nextBtn found: ${!!nextBtn} (${nextBtnWait.elapsedMs}ms) | disabled: ${!!isNextDisabled} | isLastPage: ${isLastPage}`);
+                if (window.showToast) window.showToast(`Transcribing page ${batchPageCounter}...`, "success", 1500);
+                const extractResult = await extractCurrentPageData();
+                if (extractResult.placeBoundaryCrossed) {
+                    debugLog(`Place boundary crossed at page ${batchPageCounter}. Stopping and discarding this page.`);
+                    if (window.showToast) window.showToast("New town detected - stopping batch.", "error", 3000);
+                    stopBatch();
+                    break;
                 }
-
-                // Event-driven: resolves the instant the button actually appears/enables
-                // rather than on a fixed timer, via waitForCondition's MutationObserver.
-                //
-                // Ceiling reverted to 15s after a real regression: live testing showed a
-                // genuinely indexed page (40 real rows, confirmed by adjacent pages having
-                // the identical structure) take 13.3s just to navigate, and a shortened 6s
-                // ceiling here wrongly classified it as unindexed and silently skipped its
-                // data. A slower blank-page detection is a far smaller cost than silently
-                // losing real genealogical data, so this errs long again - except on a
-                // confirmed-last page (see isLastPage above), where that risk doesn't
-                // apply, so a short ceiling costs nothing but time.
-                const toggleWait = await waitForCondition(() => document.getElementById('indexPanelToggle'),
-                    {timeoutMs: isLastPage ? 3000 : 15000});
-                let toggleBtn = toggleWait.result;
-
-                const isToggleBtnDisabled = () => toggleBtn.disabled || toggleBtn.classList.contains('disabled');
-
-                let enableWait = {elapsedMs: 0, timedOut: false};
-                if (toggleBtn) {
-                    enableWait = await waitForCondition(() => !isToggleBtnDisabled(), {timeoutMs: 15000});
-                }
-
-                // A blank page never renders the toggle button at all, not just a disabled one;
-                // treat "never found" the same as "found but disabled" so blank pages skip
-                // straight to the download/next-page step instead of burning the row-wait
-                // below waiting for a table that will never appear.
-                const isUnindexed = !toggleBtn || isToggleBtnDisabled();
-
-                if (DEBUG_MODE) {
-                    console.log(`[MGS DEBUG] page ${batchPageCounter} indexing check | toggleBtn found: ${!!toggleBtn} (${toggleWait.elapsedMs}ms) | enable wait: ${enableWait.elapsedMs}ms | isUnindexed: ${isUnindexed}`);
-                    if (isUnindexed) {
-                        console.warn(`[MGS DEBUG] SKIPPING extraction on page ${batchPageCounter}: treated as unindexed. toggleBtn: ${toggleBtn ? toggleBtn.outerHTML.slice(0, 150) : 'null'}`);
+                if (extractResult.pageEntry) {
+                    accumulatedPages.push(extractResult.pageEntry);
+                    if (extractResult.pageEntry.incomplete) {
+                        pagesNeedingRetry.push({
+                            page_number: extractResult.pageEntry.page_number,
+                            image_id: extractResult.pageEntry.image_id,
+                            url: window.location.href,
+                        });
                     }
                 }
 
-                // Ancestry sometimes fails to render the index on a genuinely indexed page
-                // while the script is running (confirmed live) - indistinguishable from a
-                // truly blank page by the toggleBtn check above. A reload recovers the
-                // former; a real blank page still shows unindexed after reloading too, so
-                // this can't tell the two apart on a single attempt - it can only bound how
-                // many times it's willing to guess "transient" before accepting "blank".
-                if (isUnindexed && indexReloadAttempts < MAX_INDEX_RELOAD_ATTEMPTS) {
-                    indexReloadAttempts++;
-                    if (window.showToast) {
-                        window.showToast(`No index detected - reloading (attempt ${indexReloadAttempts}/${MAX_INDEX_RELOAD_ATTEMPTS})...`, 'error', 2000);
-                    }
-                    saveReloadState({accumulatedPages, batchPageCounter, seenPids, firstPagePlace, indexReloadAttempts});
-                    location.reload();
-                    return;
-                }
-                // Either the index loaded, or every reload attempt still came back
-                // unindexed - the retry ceiling has been reached, so this page is now
-                // treated as genuinely blank. Reset for whichever page comes next.
-                indexReloadAttempts = 0;
-
-                if (!isUnindexed) {
-                    const indexPanel = document.getElementById('indexPanel');
-                    if (indexPanel && indexPanel.classList.contains('noDisplay')) {
-                        // Reaching here already proves toggleBtn is truthy (isUnindexed above
-                        // is !toggleBtn || toggleBtn.disabled || ...), so no need to re-guard it.
-                        toggleBtn.click();
-                        // No settle delay needed - the row-wait below is itself event-driven
-                        // and will catch the panel's content whenever it actually renders.
-                    }
-
-                    const rowWait = await waitForCondition(() => {
-                        let currentRows = document.querySelectorAll('table tr, .grid-row, [role="row"]');
-                        if (currentRows.length <= 1) return null;
-
-                        let dataRows = Array.from(currentRows).filter(r => !r.classList.contains('indexPanelHeaderRow') && r.querySelectorAll('th, [role="columnheader"]').length === 0);
-                        if (dataRows.length === 0) return null;
-
-                        let firstRowText = (dataRows[0].innerText || dataRows[0].textContent).trim();
-                        let lastRowText = (dataRows[dataRows.length - 1].innerText || dataRows[dataRows.length - 1].textContent).trim();
-                        let currentSignature = firstRowText + " | " + lastRowText;
-
-                        if (currentSignature !== lastPageSignature && currentSignature.length > 5) {
-                            lastPageSignature = currentSignature;
-                            return currentRows;
-                        }
-                        return null;
-                    }, {timeoutMs: 30000});
-                    const rows = rowWait.result;
-
-                    if (DEBUG_MODE) {
-                        console.log(`[MGS DEBUG] row wait ${rowWait.timedOut ? 'TIMED OUT' : 'resolved'} after ${rowWait.elapsedMs}ms`);
-                    }
-
-                    if (rowWait.timedOut) {
-                        debugLog("Timed out waiting for React table to update.");
-                    } else if (rows && rows.length > 1) {
-                        if (window.showToast) window.showToast(`Transcribing page ${batchPageCounter}...`, "success", 1500);
-                        const extractResult = await extractCurrentPageData();
-                        if (extractResult.placeBoundaryCrossed) {
-                            debugLog(`Place boundary crossed at page ${batchPageCounter}. Stopping and discarding this page.`);
-                            if (window.showToast) window.showToast("New town detected - stopping batch.", "error", 3000);
-                            stopBatch();
-                            break;
-                        }
-                        if (extractResult.pageEntry) accumulatedPages.push(extractResult.pageEntry);
-                    }
-                }
-
-                // Awaited: letting this run in the background while the loop moved on to
-                // the next page navigation let a page's image download overlap with the
-                // next page's own fetch/navigation - the version of this script that ran
-                // reliably always finished one image fully before moving on. That
-                // reliability matters more than the few seconds saved per page.
                 await downloadCurrentImage();
 
                 if (batchPageCounter % CHECKPOINT_INTERVAL_PAGES === 0) {
                     downloadCheckpointJson();
                 }
 
-                // The top-of-loop check above is only ever a speculative hint for the
-                // toggle-wait ceiling - it runs before extraction has given the page any
-                // time to render, so a "not found yet" there does NOT mean "confirmed
-                // absent". The actual stop-vs-continue decision always re-checks fresh
-                // here, at the same point in the page lifecycle the original (pre-restructure)
-                // code checked it, so it keeps exactly the same timing/safety margin for
-                // telling "no next button yet" apart from "no next button, period" - only
-                // reusing the earlier reference when it's still confirmed attached (i.e. we
-                // already know the answer and a second wait would just be redundant).
                 let finalNextBtn = nextBtn;
                 let finalIsNextDisabled = isNextDisabled;
                 if (!finalNextBtn || !document.body.contains(finalNextBtn)) {
-                    const recheck = await waitForCondition(() => document.querySelector(nextBtnSelector),
-                        {timeoutMs: 5000});
+                    const recheck = await waitForCondition(() => document.querySelector(nextBtnSelector), {timeoutMs: 5000});
                     finalNextBtn = recheck.result;
                     finalIsNextDisabled = isNextBtnDisabled(finalNextBtn);
                 }
@@ -1355,36 +1248,63 @@
                 if (finalNextBtn && !finalIsNextDisabled) {
                     const prevUrl = window.location.href;
                     if (window.showToast) window.showToast("Advancing to next page...", "success", 1000);
-
                     if (typeof unsafeWindow !== 'undefined') {
                         unsafeWindow.__mgs_pids = [];
                     }
-
                     finalNextBtn.click();
-
-                    const navWait = await waitForCondition(() => window.location.href !== prevUrl,
-                        {timeoutMs: 15000});
-
-                    if (DEBUG_MODE) {
-                        console.log(`[MGS DEBUG] navigation ${navWait.timedOut ? 'TIMED OUT' : 'succeeded'} after ${navWait.elapsedMs}ms | new url: ${window.location.href}`);
-                    }
-
+                    const navWait = await waitForCondition(() => window.location.href !== prevUrl, {timeoutMs: 15000});
                     if (navWait.timedOut) {
                         if (window.showToast) window.showToast("Navigation timed out. Stopping.", "error");
                         stopBatch();
                         break;
                     }
-
                     batchPageCounter++;
                 } else {
-                    if (DEBUG_MODE) {
-                        console.log(`[MGS DEBUG] Stopping: nextBtn was ${!finalNextBtn ? 'not found' : 'found but disabled'}.`);
-                    }
                     stopBatch();
                     break;
                 }
             }
         }
+        async function finishBatch() {
+            if (pagesNeedingRetry.length > 0) {
+                await runAncestryRetryPass();
+                return;
+            }
+            const incomplete = ancestryIncompletePagesSummary(accumulatedPages);
+            if (incomplete.length > 0) {
+                const pageList = incomplete.map((p) => p.page_number).join(', ');
+                if (window.showToast) {
+                    window.showToast(`Incomplete pages (no index data received): ${pageList}`, 'error', 3600000);
+                }
+            }
+            clearReloadState();
+            downloadFinalJson();
+        }
+
+        async function runAncestryRetryPass() {
+            const target = pagesNeedingRetry.shift();
+            saveReloadState({
+                accumulatedPages, batchPageCounter, seenPids, firstPagePlace,
+                pagesNeedingRetry, retryPhase: true, currentRetryTarget: target,
+            });
+            window.location.href = buildRetryNavigationUrl(target.url, runId);
+        }
+
+        async function retryCurrentPageThenContinue() {
+            batchPageCounter = currentRetryTarget.page_number;
+            const extractResult = await extractCurrentPageData();
+            if (!extractResult.placeBoundaryCrossed && extractResult.pageEntry && extractResult.pageEntry.people.length > 0) {
+                const idx = accumulatedPages.findIndex((p) => p.page_number === currentRetryTarget.page_number);
+                if (idx !== -1) {
+                    accumulatedPages[idx] = extractResult.pageEntry;
+                    accumulatedPages[idx].incomplete = false;
+                }
+            }
+            await downloadCurrentImage();
+            currentRetryTarget = null;
+            await finishBatch();
+        }
+
 
         function startBatch() {
             isAutoExtracting = true;
@@ -1393,7 +1313,7 @@
                 seenPids.clear();
                 batchPageCounter = 1;
                 firstPagePlace = null;
-                indexReloadAttempts = 0;
+                pagesNeedingRetry = [];
                 lastPageSignature = "INITIAL_STATE_NOT_SET";
             }
             resumingFromReload = false;
@@ -1402,6 +1322,16 @@
             if (window._stopBtn) window._stopBtn.style.display = 'block';
             if (window._statusLight) window._statusLight.classList.add('running');
             if (window.showToast) window.showToast("Starting Batch Extraction...", "success");
+
+            if (inRetryPhase) {
+                inRetryPhase = false;
+                retryCurrentPageThenContinue().catch((err) => {
+                    console.error('[MGS] Retry pass crashed:', err);
+                    downloadFinalJson();
+                });
+                return;
+            }
+
             runExtractionLoop().catch((err) => {
                 console.error('[MGS] Extraction loop crashed:', err);
                 if (window.showToast) window.showToast(`Extraction stopped: ${err.message || err}`, 'error', 4000);
@@ -1416,9 +1346,7 @@
             if (window._stopBtn) window._stopBtn.style.display = 'none';
             if (window._statusLight) window._statusLight.classList.remove('running');
             debugLog("Batch stopped.");
-            // Every page's image download is already fully awaited before the loop moves
-            // on (see runExtractionLoop), so there's never one still in flight here.
-            downloadFinalJson();
+            finishBatch().catch((err) => console.error('[MGS] finishBatch crashed:', err));
         }
 
         if (document.readyState === 'loading') {
@@ -2354,6 +2282,16 @@ function ancestryRowsFromIndexPanelResponse(apiResponse) {
         };
     });
 }
+function buildRetryNavigationUrl(url, runIdValue) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}mgs_auto=1&mgs_run=${runIdValue}`;
+}
+
+function ancestryIncompletePagesSummary(pages) {
+    return (pages || [])
+        .filter((p) => p.incomplete)
+        .map((p) => ({page_number: p.page_number, image_id: p.image_id}));
+}
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
@@ -2365,7 +2303,7 @@ function ancestryRowsFromIndexPanelResponse(apiResponse) {
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
-            ancestryCountryFromState,
+            ancestryCountryFromState, buildRetryNavigationUrl, ancestryIncompletePagesSummary,
         };
     }
 
