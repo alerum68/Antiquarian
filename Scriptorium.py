@@ -36,10 +36,20 @@ SCRIPT_PATHS = {
 }
 
 
+def get_config_dir() -> Path:
+    if (BASE_DIR / ".portable").exists():
+        return BASE_DIR
+    local_app_data = os.environ.get("LOCALAPPDATA")
+    if local_app_data:
+        return Path(local_app_data) / "Scriptorium"
+    return Path.home() / "AppData" / "Local" / "Scriptorium"
+
+
 def env_path_for(subfolder: Optional[str]) -> Path:
-    """Resolves the .env path for a settings group: the project root if subfolder is None,
+    """Resolves the .env path for a settings group: the config root if subfolder is None,
     otherwise that tool's own subfolder, so each tool's config stays self-contained."""
-    return BASE_DIR / subfolder / ".env" if subfolder else BASE_DIR / ".env"
+    config_dir = get_config_dir()
+    return config_dir / subfolder / ".env" if subfolder else config_dir / ".env"
 
 
 def batch_set_env(env_path: Path, updates: Dict[str, str]) -> None:
@@ -721,6 +731,14 @@ class Scriptorium(ctk.CTk):
 
         self._build_layout()
         self._load_env_to_vars()
+
+        # Scaffold default directories
+        prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
+        if prog_dir_var:
+            prog_dir = prog_dir_var.get().strip()
+            if prog_dir:
+                for sub in ["Media", "JSON", "GEDCOM", os.path.join("Sys", "Gazetteer")]:
+                    os.makedirs(os.path.join(prog_dir, "Scriptorium", sub), exist_ok=True)
 
         # Force a geometry update before building the first tab.
         # This fixes a known CustomTkinter bug where CTkScrollableFrame
