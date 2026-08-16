@@ -19,5 +19,27 @@ def test_normalize_ancestry_census_gather_derives_title_and_record_type():
     normalized = A.normalize_ancestry_census_gather(raw_gather)
 
     assert normalized["record_type_name"] == "Census_1880"
-    assert normalized["collection_title"] == "1880 US Federal Census - Kent County, Michigan"
+    assert normalized["collection_title"] == "1880 USA Census - Kent County, Michigan"
     assert len(normalized["sheets"]) == 1
+
+
+def test_normalize_ancestry_census_gather_derives_canadian_title_from_page_country():
+    """Regression: confirmed live (2026-08-15, dbId 1578, Ontario) that collection_title
+    hardcoded "US Federal Census" regardless of the gather's own country - the title must
+    instead reflect whatever Voyageur.js's own ancestryCountryFromState() recorded on the
+    raw page."""
+    raw_gather = {
+        "census_year": "1871", "location": "Ontario",
+        "pages": [{
+            "page_number": 1, "state": "Ontario", "county": "Frontenac", "city": "",
+            "country": "Canada", "repository": "Ancestry.com",
+            "people": [
+                {"columns": {"Given Name": "Charles", "Surname": "Bernard", "Gender": "M",
+                             "Age": "40", "Family Number": "1"}, "pid": "p1"},
+            ],
+        }],
+    }
+
+    normalized = A.normalize_ancestry_census_gather(raw_gather)
+
+    assert normalized["collection_title"] == "1871 Canada Census - Ontario"

@@ -39,6 +39,16 @@ REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
 COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
+# Set from the gathered data's own 'Country' column in run_census_flavor() - never
+# hardcoded. Drives DEFAULT_COLLECTION_NAME's country-aware fallback text below.
+COUNTRY = ""
+# The label used everywhere COLLECTION_NAME itself is blank (weblink names, source
+# title, this session's fallback-of-last-resort) - computed once per run in
+# run_census_flavor() from the gathered data's own COUNTRY, not hardcoded to "United
+# States Federal Census" the way every one of these call sites used to be
+# independently. Confirmed live (2026-08-15, dbId 1578, Ontario) that the old hardcoded
+# text mislabeled every Canadian gather.
+DEFAULT_COLLECTION_NAME = ""
 PUBLISHER = os.getenv("PUBLISHER", "")
 PUB_LOC = os.getenv("PUB_LOC", "")
 
@@ -792,7 +802,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             page_parts.append(fam_num)
         page_parts.append(person_str)
 
-        collection_title = COLLECTION_NAME or f'{CENSUS_YEAR} United States Federal Census'
+        collection_title = COLLECTION_NAME or DEFAULT_COLLECTION_NAME
         cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
 
         detail_fields = [
@@ -1068,7 +1078,7 @@ def build_census_task(rec_id: str, giv: str, sur: str, record_label: str, reason
         task_citation = Utils.dedent_citation_lines(citation_block)
 
     link_url = f"https://www.ancestry.com/search/collections/{APID_DB}/records/{rec_id}"
-    weblink = Utils.weblink_lines(link_url, COLLECTION_NAME or f'{CENSUS_YEAR} United States Federal Census',
+    weblink = Utils.weblink_lines(link_url, COLLECTION_NAME or DEFAULT_COLLECTION_NAME,
                                   target_software)
 
     task_records = [f"0 {task_id} _TASK",
@@ -1083,7 +1093,7 @@ def build_census_task(rec_id: str, giv: str, sur: str, record_label: str, reason
 
 def get_census_sources(target_software: str) -> List[str]:
     tid = 10008
-    source_title = COLLECTION_NAME or f"{CENSUS_YEAR} U.S. Federal Census"
+    source_title = COLLECTION_NAME or DEFAULT_COLLECTION_NAME
     repository = Utils.clean_val(REPOSITORY) or "Ancestry.com Operations, Inc."
     primary_creator = ("United States. Bureau of the Census"
                        if ("U.S." in source_title or "United States" in source_title)
@@ -1535,6 +1545,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                 'APID_DB': ts.get('apid_db', '') or citation.get('apid_db', ''),
                 'Publisher': citation.get('publisher', ''), 'Publisher Location': citation.get('pub_loc', ''),
                 'Repository': citation.get('repository', ''), 'Repository Location': citation.get('repository_loc', ''),
+                'Collection Name': citation.get('collection_name', ''), 'Collection URL': citation.get('collection_url', ''),
                 'Family Number': family_id,
             }
             for p in record.get('participants', []):
@@ -1580,7 +1591,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
 def run_census_flavor(data: dict) -> None:
     global STATE, COUNTY, TOWNSHIP, ENUMERATION_DISTRICT, ROLL_NUMBER, FILM_NUMBER, CENSUS_YEAR, CENSUS_ERA
     global APID_DB, COLLECTION_NAME, COLLECTION_URL, PUBLISHER, PUB_LOC, CALL_NUMBER, REPOSITORY_LOC, REPOSITORY
-    global IMAGE_DIR, CENSUS_SOURCE_ID
+    global IMAGE_DIR, CENSUS_SOURCE_ID, COUNTRY, DEFAULT_COLLECTION_NAME
 
     if "pages" in data:
         census_df = load_census_dataframe(data)
@@ -1620,9 +1631,22 @@ def run_census_flavor(data: dict) -> None:
     else:
         CENSUS_SOURCE_ID = Utils.resolve_source_id(record_type_name, COLLECTION_NAME)
 
+    # Country-aware, never hardcoded: read back whatever the gather itself recorded in
+    # its own 'Country' column (Ancestry: Voyageur.js's ancestryCountryFromState();
+    # FamilySearch: FS.py's own "canada" in collection_title.lower() check) rather than
+    # assuming USA. Confirmed live (2026-08-15, dbId 1578, Ontario) that the old
+    # unconditional "United States Federal Census" text mislabeled every Canadian
+    # gather's citation weblinks/source title/image-organizing fallback alike.
+    COUNTRY = get_json_fallback(census_df, ['Country'], COUNTRY)
+    # Generic "{country} Census" - not a fixed US-or-Canada choice, so any country this
+    # project ever gathers plugs in the same way with no country list to maintain.
+    # Defaults to "USA" only when country is absent/unrecognized (this project's
+    # long-standing default). Matches Voyageur's own census_collection_folder_name()
+    # convention (Voyageur/_gather_helpers.py) so citation text and image-folder naming
+    # never diverge.
+    DEFAULT_COLLECTION_NAME = f'{CENSUS_YEAR} {COUNTRY or "USA"} Census' if CENSUS_YEAR else COLLECTION_NAME
     COLLECTION_NAME = get_json_fallback(census_df, ['Collection Name', 'Collection_Name', 'Collection'],
-                                        COLLECTION_NAME) or (f'{CENSUS_YEAR} United States Federal Census'
-                                                             if CENSUS_YEAR else COLLECTION_NAME)
+                                        COLLECTION_NAME) or DEFAULT_COLLECTION_NAME
     COLLECTION_URL = get_json_fallback(census_df, ['Collection URL', 'Collection_URL', 'URL'], COLLECTION_URL) or (
         f"https://www.ancestry.com/search/collections/{APID_DB}" if APID_DB else COLLECTION_URL)
     PUBLISHER = get_json_fallback(census_df, ['Publisher', 'Census Publisher'], PUBLISHER)
@@ -1640,7 +1664,21 @@ def run_census_flavor(data: dict) -> None:
     location_str = payload_location
     if IMAGE_DIR and CENSUS_YEAR and location_str:
         location_folder = re.sub(r'^USA\s*-\s*', '', location_str)
-        nested_dir = Path(IMAGE_DIR) / f"{CENSUS_YEAR} US Federal Census" / location_folder
+        # Try the current folder-naming scheme first - the real collection name
+        # (sanitized the same way Voyageur's own census_collection_folder_name() does)
+        # when one was captured, else the generic "{year} {country} Census" template;
+        # fall back to the legacy unconditional "{year} US Federal Census" name every
+        # gather - any country - used before this fix, so already-gathered images stay
+        # linkable without requiring a re-gather.
+        current_folder_name = (
+            re.sub(r'[/\\?%*:|"<>]', "-", COLLECTION_NAME).strip() if COLLECTION_NAME
+            else f'{CENSUS_YEAR} {COUNTRY or "USA"} Census'
+        )
+        nested_dir = Path(IMAGE_DIR) / current_folder_name / location_folder
+        if not nested_dir.is_dir():
+            legacy_dir = Path(IMAGE_DIR) / f"{CENSUS_YEAR} US Federal Census" / location_folder
+            if legacy_dir.is_dir():
+                nested_dir = legacy_dir
         if nested_dir.is_dir():
             IMAGE_DIR = str(nested_dir)
 

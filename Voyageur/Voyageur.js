@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Scriptorium
-// @version      0.3.28
+// @version      0.3.29
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1172,6 +1172,7 @@
                 state = pathArr[0] || "";
                 county = pathArr[1] || "";
                 city = pathArr[2] || "";
+                country = ancestryCountryFromState(state);
                 const ed = getEnumerationDistrict(pathArr, info?.structureType);
                 enumerationDistrict = ed.value;
                 placeDetails = pathArr.slice(3).filter((_, i) => (i + 3) !== ed.index).join(" - ") || "";
@@ -2478,6 +2479,30 @@
     // Test-only: exposes pure, DOM-free helpers for the Node test harness (see
     // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
     // there - the guard is load-bearing, not defensive boilerplate.
+// extractCurrentPageData() used to hardcode country = "USA" unconditionally - confirmed
+// live (2026-08-15 Canadian gather, dbId 1578, Ontario) this mislabeled every Canadian
+// Ancestry record as American, all the way through to the generated GEDCOM's citation
+// text. Matches Gazetteer.CA_PROVINCE_NAMES (Gazetteer/Gazetteer.py) plus the historical
+// fur-trade-era names already added to Archivist/Census.py's
+// CANADIAN_PROVINCES_AND_TERRITORIES this session - kept in sync by hand across the two
+// languages rather than sharing one file, same as this project's other small
+// cross-language constant duplications (e.g. get_census_era's US-history thresholds).
+const CANADIAN_PROVINCES_AND_TERRITORIES = new Set([
+    'alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland',
+    'nova scotia', 'northwest territories', 'north-west territories', 'ontario',
+    'prince edward island', 'quebec', 'saskatchewan', 'yukon', 'nunavut',
+]);
+
+// browsePath's own province/state text (e.g. "Ontario", "Dakota Territory") is the only
+// signal available at gather time - Ancestry's index-panel-data API has no dedicated
+// country field of its own. Defaults to "USA" (the collection this project has gathered
+// most, and every pre-Canada-support gather's own established behavior) when state is
+// empty or unrecognized, rather than leaving it blank.
+function ancestryCountryFromState(state) {
+    const normalized = (state || '').trim().toLowerCase();
+    return CANADIAN_PROVINCES_AND_TERRITORIES.has(normalized) ? 'Canada' : 'USA';
+}
+
 // Ancestry's imageviewer/api/record/index-panel-data endpoint uses a stable, self-
 // describing fieldName vocabulary that does NOT change across census years (only which
 // fields are present varies) - confirmed live against real 1850, 1860, 1880, and 1920
@@ -2646,6 +2671,7 @@ function ancestryRowsFromIndexPanelResponse(apiResponse) {
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
+            ancestryCountryFromState,
         };
     }
 

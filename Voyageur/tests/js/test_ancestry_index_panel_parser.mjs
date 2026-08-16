@@ -6,7 +6,22 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
     ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
+    ancestryCountryFromState,
 } = require('./harness.js');
+
+test('ancestryCountryFromState: Canadian provinces/territories resolve to Canada, everything else to USA', () => {
+    assert.equal(ancestryCountryFromState('Ontario'), 'Canada');
+    assert.equal(ancestryCountryFromState('Nova Scotia'), 'Canada');
+    assert.equal(ancestryCountryFromState('Manitoba'), 'Canada');
+    // Case-insensitive - browsePath text casing isn't guaranteed.
+    assert.equal(ancestryCountryFromState('QUEBEC'), 'Canada');
+    assert.equal(ancestryCountryFromState('Dakota Territory'), 'USA');
+    assert.equal(ancestryCountryFromState('Minnesota'), 'USA');
+    // Absent/unrecognized state defaults to USA, matching every pre-Canada-support
+    // gather's own established behavior.
+    assert.equal(ancestryCountryFromState(''), 'USA');
+    assert.equal(ancestryCountryFromState(undefined), 'USA');
+});
 
 // Real captured 1850 fieldLabels (dbId 8054, Pembina, Minnesota Territory) - 17 fields,
 // no LineNumber-less collision, includes "Industry" (an existing ancestry_census.yaml

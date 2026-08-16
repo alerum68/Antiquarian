@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 import census_schema
 from _gather_helpers import (
+    census_collection_folder_name,
     cleanup_checkpoint_files,
     find_orphaned_gather_runs,
     launch_gather_browser,
@@ -47,9 +48,22 @@ def normalize_ancestry_census_gather(raw_gather: dict, dbid: str = "") -> dict:
     """Translates a raw Ancestry census gather into the shared record schema, deriving
     collection_title/record_type_name from the gather's own census_year/location - the
     exact translation main() applies at gather time, pulled out here so it's testable
-    without a browser session."""
+    without a browser session. Only ever used as a last-resort fallback title -
+    census_schema.normalize_census_pages() prefers each page's own real
+    citation.collection_name (Ancestry's own scraped citation text) over this whenever
+    one was actually captured.
+
+    country is read back from the raw gather's own first page (Voyageur.js's
+    ancestryCountryFromState() is the only place that determines it) rather than
+    re-derived or hardcoded here, plugged directly into the label - never a fixed
+    US-or-Canada choice, so any country this project ever gathers is handled the same
+    way with no country list to maintain. Confirmed live (2026-08-15 Canadian gather,
+    dbId 1578, Ontario) that hardcoding "US Federal Census" unconditionally mislabeled
+    every Canadian record all the way through to the generated GEDCOM's citation text."""
     census_year_raw = raw_gather.get("census_year", "")
-    collection_title = f"{census_year_raw} US Federal Census - {raw_gather.get('location', '')}".strip(" -")
+    first_page_country = next(
+        (p.get("country") for p in raw_gather.get("pages", []) if p.get("country")), "USA")
+    collection_title = f"{census_year_raw} {first_page_country} Census - {raw_gather.get('location', '')}".strip(" -")
     normalized = census_schema.normalize_and_validate_census(
         raw_gather, "ancestry_census", collection_title, f"Census_{census_year_raw}")
     if dbid:
@@ -96,7 +110,23 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
         census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
         raw_location = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
         location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
-        census_folder = f"{census_year} US Federal Census"
+        # Best-effort only, matching this function's own header-normalization-skipped
+        # philosophy (see docstring) - a recovered run's own dbid/country weren't
+        # reliably known even before this fix; opportunistically read them back from
+        # whatever JSON shape actually landed, falling back to the generic default
+        # (census_collection_folder_name()'s own blank-country handling) rather than
+        # guessing when the file isn't in the expected shape.
+        collection_name, country = "", ""
+        try:
+            with open(recovered_json, "r", encoding="utf-8") as f:
+                recovered_data = json.load(f)
+            collection_name = recovered_data.get("citation", {}).get("collection_name", "")
+            country = next(
+                (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
+                 for s in recovered_data.get("sheets", []) if s.get("records")), "")
+        except (OSError, json.JSONDecodeError, IndexError, AttributeError):
+            pass
+        census_folder = census_collection_folder_name(census_year, country, collection_name)
         img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
@@ -175,12 +205,21 @@ def main() -> Path:
     # json_status == "skipped": that means an existing final_json was kept as-is (collision
     # policy), and it was already normalized whenever it was first produced - leaving it
     # untouched is what "skip" is supposed to mean.
+    # Real collection_name/country for the image-folder name below (see
+    # census_collection_folder_name()) - read from the gather itself, never hardcoded.
+    # Only available when this run actually normalized the data (json_status ==
+    # "moved"); a "skipped" run kept an existing file as-is and never re-read it, so the
+    # folder-name helper's own generic fallback (blank collection_name/country) applies
+    # instead - a rare edge case, since a fresh gather almost always produces "moved".
+    collection_name, country = "", ""
     if json_status == "moved":
         with open(final_json, "r", encoding="utf-8") as f:
             raw_gather = json.load(f)
         normalized = normalize_ancestry_census_gather(raw_gather, dbid)
         with open(final_json, "w", encoding="utf-8") as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
+        collection_name = normalized.get("citation", {}).get("collection_name", "")
+        country = next((p.get("country", "") for p in raw_gather.get("pages", [])), "")
 
     # Persist this as the JSON_FILE setting immediately, before anything below (the image
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
@@ -198,7 +237,7 @@ def main() -> Path:
     raw_location = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
 
     location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
-    census_folder = f"{census_year} US Federal Census"
+    census_folder = census_collection_folder_name(census_year, country, collection_name)
 
     # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
     # PROGRAM_DIR directly. Resolved here independently (rather than relying on

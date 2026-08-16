@@ -9,6 +9,7 @@ used to be duplicated between A.py and FS.py's own main().
 """
 
 import os
+import re
 import shutil
 import sys
 import threading
@@ -243,6 +244,40 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     return len(moved), skipped, final_failed_names
 
 
+def sanitize_for_path_segment(text: str) -> str:
+    """Strips only the characters Windows genuinely forbids in a path segment
+    (`< > : " / \\ | ? *`), preserving spaces/commas/etc. for readability - same
+    character class FS.py's own build_clean_census_filename() already uses for the
+    equivalent problem (a live site's free-text collection name becoming a folder/file
+    name), reused here for consistency rather than a second, differently-scoped
+    sanitizer."""
+    return re.sub(r'[/\\?%*:|"<>]', "-", text).strip()
+
+
+def census_collection_folder_name(census_year: str, country: str, collection_name: str = "") -> str:
+    """Builds the image-folder name shared by A.py's and FS.py's own
+    main()/_recover_orphaned_runs() image-saving paths, and read back by
+    Archivist/Census.py's own nested_dir lookup - the single source of truth for this
+    string so all call sites stay in sync.
+
+    Prefers the gather's own real collection_name (Ancestry: the citation text
+    scrapeSourceCitation() captures; FamilySearch: FS's own collection_title, e.g.
+    "United States, Census, 1860") when available - the actual source name beats a
+    generated label, and needs no country-detection logic of its own to be correct for
+    any country. Falls back to "{year} {country} Census" only when no real
+    collection_name was captured for this gather. country is whatever the gather itself
+    recorded (Ancestry: Voyageur.js's ancestryCountryFromState(); FamilySearch: FS.py's
+    own "canada" in collection_title.lower() check), plugged in directly - never a fixed
+    US-or-Canada choice, so any country this project ever gathers is handled the same
+    way with no country list to maintain; defaults to "USA" (this project's
+    long-standing default) only when country is absent/unrecognized. Confirmed live
+    (2026-08-15, dbId 1578, Ontario) that the old unconditional "US Federal Census"
+    folder name mislabeled every non-US gather."""
+    if collection_name:
+        return sanitize_for_path_segment(collection_name)
+    return f"{census_year} {country or 'USA'} Census"
+
+
 def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
                              location_folder: str) -> Path:
     if os.path.isabs(base_img_setting):
@@ -252,7 +287,14 @@ def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_f
         base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
             Path(genealogy_dir) / media_setting if genealogy_dir else Path(media_setting))
         base_img_dir = base_media_dir / base_img_setting
-    img_target_dir = base_img_dir / census_folder / location_folder
+    # location_folder arrives as a single " - "-joined string (e.g. "Ontario - Frontenac
+    # - Rockwood Lunatic Asylum", state - county - city) - nest each real segment as its
+    # own subfolder (State\County\City) rather than one folder literally named with
+    # embedded " - " text, e.g. "1880 USA Census\Michigan\Kent County" not
+    # "1880 USA Census\Kent County, Michigan".
+    location_parts = [p.strip() for p in location_folder.split(' - ') if p.strip()]
+    img_target_dir = base_img_dir.joinpath(census_folder, *location_parts) if location_parts \
+        else base_img_dir / census_folder
     img_target_dir.mkdir(parents=True, exist_ok=True)
     return img_target_dir
 
