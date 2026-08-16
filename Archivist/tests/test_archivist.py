@@ -6,6 +6,8 @@ is always the marriage bride, ...) with a small fixed role_semantic vocabulary
 participant, the same way for any record type.
 """
 
+import os
+
 # noinspection PyUnresolvedReferences
 import Utils
 # noinspection PyUnresolvedReferences
@@ -1024,8 +1026,12 @@ def test_apply_record_type_field_remap_scrip_maps_scrip_gedcom_name(monkeypatch)
         Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
-def test_apply_record_type_field_remap_hbca_maps_image_dir(monkeypatch):
-    monkeypatch.setenv("HBCA_IMAGE_DIR", "HBCA")
+def test_apply_record_type_field_remap_hbca_auto_resolves_image_dir(monkeypatch):
+    """IMAGE_DIR has no user-facing override (not even via env var) - it's always
+    auto-resolved to Media/<record type>, matching Paleographer/Extract.py's own
+    SOURCE_DIR convention for where that type's images were actually extracted from. A
+    stray HBCA_IMAGE_DIR env var (e.g. left over from a legacy .env) must NOT change it."""
+    monkeypatch.setenv("HBCA_IMAGE_DIR", "SomeOtherPath")
     orig_call = General.CALL_NUMBER
     orig_url = General.COLLECTION_URL
     orig_name = General.COLLECTION_NAME
@@ -1035,7 +1041,7 @@ def test_apply_record_type_field_remap_hbca_maps_image_dir(monkeypatch):
     orig_output_name = Utils.GEDCOM_OUTPUT_NAME
     try:
         General.apply_record_type_field_remap("HBCA")
-        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "HBCA")
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "HBCA")
     finally:
         General.CALL_NUMBER = orig_call
         General.COLLECTION_URL = orig_url
@@ -1046,8 +1052,8 @@ def test_apply_record_type_field_remap_hbca_maps_image_dir(monkeypatch):
         Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
-def test_apply_record_type_field_remap_parish_maps_image_dir(monkeypatch):
-    monkeypatch.setenv("CHURCH_IMAGE_DIR", "Parish")
+def test_apply_record_type_field_remap_parish_auto_resolves_image_dir(monkeypatch):
+    monkeypatch.delenv("CHURCH_IMAGE_DIR", raising=False)
     orig_call = General.CALL_NUMBER
     orig_url = General.COLLECTION_URL
     orig_name = General.COLLECTION_NAME
@@ -1057,7 +1063,7 @@ def test_apply_record_type_field_remap_parish_maps_image_dir(monkeypatch):
     orig_output_name = Utils.GEDCOM_OUTPUT_NAME
     try:
         General.apply_record_type_field_remap("Parish")
-        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "Parish")
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Parish")
     finally:
         General.CALL_NUMBER = orig_call
         General.COLLECTION_URL = orig_url
@@ -1068,7 +1074,7 @@ def test_apply_record_type_field_remap_parish_maps_image_dir(monkeypatch):
         Utils.GEDCOM_OUTPUT_NAME = orig_output_name
 
 
-def test_apply_record_type_field_remap_scrip_maps_image_dir(monkeypatch):
+def test_apply_record_type_field_remap_scrip_auto_resolves_image_dir(monkeypatch):
     monkeypatch.setenv("SCRIP_IMAGE_DIR", "Scrip Records/pdf_out")
     orig_call = General.CALL_NUMBER
     orig_url = General.COLLECTION_URL
@@ -1079,7 +1085,9 @@ def test_apply_record_type_field_remap_scrip_maps_image_dir(monkeypatch):
     orig_output_name = Utils.GEDCOM_OUTPUT_NAME
     try:
         General.apply_record_type_field_remap("Scrip")
-        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, "Scrip Records/pdf_out")
+        # The SCRIP_IMAGE_DIR env var set above is deliberately ignored - Scrip.pmt no
+        # longer declares an IMAGE_DIR field_remap entry at all.
+        assert General.IMAGE_DIR == Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), "Scrip")
     finally:
         General.CALL_NUMBER = orig_call
         General.COLLECTION_URL = orig_url

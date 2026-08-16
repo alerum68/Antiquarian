@@ -25,11 +25,10 @@ def test_hbca_valid_roles():
 def test_hbca_field_remap():
     remap = get_field_remap("HBCA")
     assert remap.get("HBCA_MASTER_DB_NAME") == "MASTER_DB_NAME"
-    # IMAGE_DIR is still remapped, not auto-resolved - see
-    # test_record_registry.test_get_field_remap_parish's comment for why (Archivist/
-    # General.py's own IMAGE_DIR resolution has no other source for a non-Census
-    # document type).
-    assert remap.get("HBCA_IMAGE_DIR") == "IMAGE_DIR"
+    # IMAGE_DIR has no user-facing override at all - see
+    # test_record_registry.test_get_field_remap_parish's comment (auto-resolved to
+    # Media/<record type> by Archivist/General.py, no field_remap entry needed).
+    assert "HBCA_IMAGE_DIR" not in remap
 
 
 def test_hbca_record_extra_fields():

@@ -48,7 +48,6 @@ field_remap:
   SCRIP_MASTER_DB_NAME: MASTER_DB_NAME
   SCRIP_COLLECTION_NAME: COLLECTION_NAME
   SCRIP_GEDCOM_NAME: GEDCOM_OUTPUT_NAME
-  SCRIP_IMAGE_DIR: IMAGE_DIR
 ---
 
 You are an expert genealogist and archivist specializing in Canadian Metis and Half-breed

@@ -36,8 +36,13 @@ COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("IMAGE_DIR", "")
-                            or "Census")
+# No user-facing override: apply_record_type_field_remap() below auto-resolves this to
+# Media/<record type>, matching Paleographer/Extract.py's own SOURCE_DIR convention
+# (Media/TYPE_CFG.name) - the same place that type's images were written to during
+# extraction. This module-level default is only what's in effect before that per-type
+# resolution runs (or when it can't - e.g. an unrecognized record_type_name), and is
+# deliberately the bare Media directory, not a specific type's subfolder.
+IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"))
 
 
 class Profile(Protocol):
@@ -1211,8 +1216,12 @@ def apply_record_type_field_remap(record_type_name: str) -> None:
     COLLECTION_NAME = resolved.get("COLLECTION_NAME") or COLLECTION_NAME
     REPOSITORY = resolved.get("REPOSITORY") or REPOSITORY
     REPOSITORY_LOC = resolved.get("REPOSITORY_LOC") or REPOSITORY_LOC
-    if resolved.get("IMAGE_DIR"):
-        IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, resolved["IMAGE_DIR"])
+    # No env-var override (deliberate - see IMAGE_DIR's own module-level comment):
+    # record_type_name IS this record type's own .pmt stem (pmt_path.is_file() above
+    # already confirmed it), so it's also the exact subfolder name Paleographer/
+    # Extract.py's own SOURCE_DIR already wrote this type's images to
+    # (Media/TYPE_CFG.name) - reusing it here needs no field_remap entry of its own.
+    IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"), record_type_name)
     if resolved.get("GEDCOM_OUTPUT_NAME") and not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
         Utils.GEDCOM_OUTPUT_NAME = resolved["GEDCOM_OUTPUT_NAME"]
 

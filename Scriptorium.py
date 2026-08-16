@@ -1821,12 +1821,15 @@ class Scriptorium(ctk.CTk):
 
         # Nothing else to compute here: every prefixed setting (CHURCH_*/SCRIP_*/CENSUS_*)
         # is already in run_env from the blanket string_vars dump above (with the nested
-        # image-dir ones now resolved to full paths, via nested_dir_keys). Paleographer.py
-        # and Archivist.py each resolve their own generic runtime settings (IMAGE_DIR,
-        # MASTER_DB_NAME, CALL_NUMBER, GEDCOM_OUTPUT_NAME, etc.) directly from those env
-        # vars via their own field_remap table (declared in the active .pmt's front
-        # matter) - the same resolution they use when run standalone, with no dependency
-        # on this GUI computing anything family/record-type-specific on their behalf.
+        # RM/FTM-database and PDFix-target ones now resolved to full paths, via
+        # nested_dir_keys). Paleographer.py and Archivist.py each resolve their own
+        # generic runtime settings (MASTER_DB_NAME, CALL_NUMBER, GEDCOM_OUTPUT_NAME, etc.)
+        # directly from those env vars via their own field_remap table (declared in the
+        # active .pmt's front matter) - the same resolution they use when run standalone,
+        # with no dependency on this GUI computing anything family/record-type-specific on
+        # their behalf. IMAGE_DIR is the one exception: it has no user-facing override at
+        # all, auto-resolved by Archivist/General.py to Media/<record type> from the
+        # active .pmt's own name.
         run_env.update(env_overrides)
 
         self._set_ui_state("disabled")

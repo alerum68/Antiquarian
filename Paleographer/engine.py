@@ -174,7 +174,10 @@ def parse_type_config(pmt_path: Path) -> TypeConfig:
     """Parses a .pmt file's YAML front matter and prose body. The front matter carries
     per-type role vocabulary, defaults, schema extensions, metadata field templates, and
     a field_remap table (which of this record type's own prefixed settings-tab keys map
-    to which generic runtime env var - e.g. CHURCH_IMAGE_DIR -> IMAGE_DIR); event/fact
+    to which generic runtime env var - e.g. CHURCH_GEDCOM_NAME -> GEDCOM_OUTPUT_NAME);
+    IMAGE_DIR is deliberately NOT part of this table - Archivist/General.py auto-resolves
+    it to Media/<this .pmt's own name>, matching this module's own SOURCE_DIR convention
+    below, with no per-type override; event/fact
     vocabulary comes from the shared FactTypes.json instead (see load_event_types), since
     it's RootsMagic's own vocabulary rather than something that varies by document type.
     The prose body is the free-form system-instruction text handed to the LLM.
