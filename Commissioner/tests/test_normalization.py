@@ -39,7 +39,7 @@ def test_derive_record_identity_set_type_code_true_sets_it():
 
 
 def test_cap_case_preserves_known_acronym():
-    assert normalization.cap_case("hbc trading post") == "HBC Trading Post"
+    assert normalization.capitalize_text_string("hbc trading post") == "HBC Trading Post"
 
 
 def test_parse_to_iso_full_date():

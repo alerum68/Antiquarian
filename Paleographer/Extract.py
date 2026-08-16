@@ -53,7 +53,7 @@ def derive_role_numbers(record: Dict[str, Any], roles_table: Dict[str, Dict[str,
     for participant in record.get("participants", []):
         raw_role_name = participant.get("role_name")
         if raw_role_name:
-            participant["role_name"] = normalization.cap_case(raw_role_name)
+            participant["role_name"] = normalization.capitalize_text_string(raw_role_name)
         if participant.get("role_number"):
             continue
         role_number = normalization.derive_role_number(raw_role_name or "", roles_table)
@@ -111,7 +111,7 @@ def _label_for(record: Dict[str, Any]) -> str:
     """Best available label for a record's own source document."""
     document_type = (record.get("type_specific_fields") or {}).get("document_type")
     if document_type:
-        return normalization.cap_case(document_type)
+        return normalization.capitalize_text_string(document_type)
     page = record.get("page")
     page_str = str(page).strip() if page is not None else ""
     return f"Page {page_str}" if page_str else "Untitled section"

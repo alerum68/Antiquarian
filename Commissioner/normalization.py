@@ -27,7 +27,7 @@ def _titlecase_callback(word: str, **_kwargs) -> Optional[str]:
     return None
 
 
-def cap_case(text: str) -> str:
+def capitalize_text_string(text: str) -> str:
     if not text:
         return ""
     val = str(text).strip()

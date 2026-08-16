@@ -188,7 +188,7 @@ def build_participant(role_name: str, raw_name: str, sex: str,
         type_specific_fields["person_ark"] = person_ark
     return {
         "role_number": None,
-        "role_name": normalization.cap_case(role_name),
+        "role_name": normalization.capitalize_text_string(role_name),
         "std_given": given,
         "std_surname": surname or None,
         "raw_given": None,
@@ -257,7 +257,7 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
             primary["type_specific_fields"]["legitimacy"] = legitimacy
 
     raw_event_type = (columns.get("Event Type") or "").strip()
-    event_type = normalization.cap_case(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
+    event_type = normalization.capitalize_text_string(EVENT_TYPE_ALIASES.get(raw_event_type, raw_event_type))
     event_date_raw = (columns.get("Event Date") or "").strip()
 
     page = (columns.get("Page Number") or "").strip() or item_id
@@ -271,7 +271,7 @@ def row_to_record(row: dict, item_id: str, row_index: int) -> dict:
         "event_type": event_type,
         "year": (normalization.parse_to_iso(event_date_raw) or "")[:4] or None,
         "event_date": normalization.parse_to_iso(event_date_raw) or event_date_raw or None,
-        "event_place": normalization.cap_case((columns.get("Event Place") or "").strip()) or None,
+        "event_place": normalization.capitalize_text_string((columns.get("Event Place") or "").strip()) or None,
         "citation_details": "",
         "citation_text": "",
         "review": False,
