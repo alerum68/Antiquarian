@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 
+
 def build():
     # Package the Scriptorium binary natively. --onedir prevents extraction penalties
     # for background subprocesses during runtime.
@@ -24,8 +25,8 @@ def build():
     ], check=True)
 
     dist_dir = os.path.join("dist", "Scriptorium")
-    
-    # Expose the raw prompts directory so power users can modify .pmt templates directly 
+
+    # Expose the raw prompts directory so power users can modify .pmt templates directly
     # without recompiling the executable.
     print("Copying Prompts...")
     prompts_src = os.path.join("Paleographer", "prompts")
@@ -44,8 +45,9 @@ def build():
     # Bundle a portable version for users bypassing the Inno Setup installer
     print("Zipping Scriptorium_Portable.zip...")
     shutil.make_archive("Scriptorium_Portable", "zip", "dist", "Scriptorium")
-    
+
     print("Build complete.")
+
 
 if __name__ == "__main__":
     build()
