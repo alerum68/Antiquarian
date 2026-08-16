@@ -39,12 +39,45 @@ sections:
     DEFAULT_EVENT_LOCATION:
       default: "Anytown, Any County, State, USA"
       tooltip: "The default location assigned to events if none is specified."
-  Register Information:
+  Citation Overrides:
+    CITATION_TEXT:
+      default: ""
+      tooltip: "The full text of the citation, if overriding default GEDCOM generation."
+    CITATION_DETAIL:
+      default: ""
+      tooltip: "Specific page/item details to append to the base citation."
+    CALL_NUMBER:
+      default: ""
+      tooltip: "Archive/Library call number for the source."
+    REPOSITORY:
+      default: ""
+      tooltip: "Name of the institution holding the original records."
+    REPOSITORY_LOC:
+      default: ""
+      tooltip: "Location (City, State) of the repository."
+    COLLECTION_URL:
+      default: ""
+      tooltip: "URL where the collection or item can be found online."
+    COLLECTION_NAME:
+      default: ""
+      tooltip: "Name of the broader collection the item belongs to."
+    PUBLISHER:
+      default: ""
+      tooltip: "Publisher of the database or image collection."
+    PUB_LOC:
+      default: ""
+      tooltip: "Location of the publisher."
+    REGISTER_NAME:
+      default: ""
+      tooltip: "The name of the specific register or book."
+    REGISTER_SOURCE_ID:
+      default: "1"
+      tooltip: "A numeric source ID, if you are synchronizing with an existing RootsMagic database."
     VOLUME_TITLE:
-      default: "Volume 1"
+      default: ""
       tooltip: "This specific volume/book's own title or label (e.g., 'Volume 1'). Used alongside Register Name in the generated source citations."
     VOLUME_NUM:
-      default: "1"
+      default: ""
       tooltip: "The volume number of the register."
   Scrip Information:
     SCRIP_MASTER_DB_NAME:

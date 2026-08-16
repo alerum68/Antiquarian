@@ -45,15 +45,19 @@ def test_paleographer_schema_matches_expected_shape():
             "PALEOGRAPHER_RECORD_TYPE": "",
             "PALEOGRAPHER_PDF_COMPRESSION_LEVEL": "2",
         },
+        "Citation Overrides": {
+            "CITATION_TEXT": "", "CITATION_DETAIL": "",
+            "CALL_NUMBER": "", "REPOSITORY": "", "REPOSITORY_LOC": "",
+            "COLLECTION_URL": "", "COLLECTION_NAME": "", "PUBLISHER": "",
+            "PUB_LOC": "", "REGISTER_NAME": "", "REGISTER_SOURCE_ID": "1",
+            "VOLUME_TITLE": "", "VOLUME_NUM": "",
+        },
         "Parish Information": {
             "CHURCH_MASTER_DB_NAME": "parish_register.json",
             "PARISH_NAME": "St. Generic Catholic Church",
             "PARISH_NAME_SHORT": "St. Generic Parish, Anytown, ST",
             "PARISH_CITY": "Anytown", "PARISH_STATE": "State",
             "DEFAULT_EVENT_LOCATION": "Anytown, Any County, State, USA",
-        },
-        "Register Information": {
-            "VOLUME_TITLE": "Volume 1", "VOLUME_NUM": "1",
         },
         "Scrip Information": {
             "SCRIP_MASTER_DB_NAME": "scrip_records.json",

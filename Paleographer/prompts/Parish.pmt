@@ -27,7 +27,7 @@ settings_sections:
   - "Antigravity CLI"
   - "Data & Directories"
   - "Parish Information"
-  - "Register Information"
+  - "Citation Overrides"
 # Maps this record type's own prefixed settings-tab keys (grouped under the sections
 # above, saved to Paleographer/.env) to the generic runtime env var name Paleographer.py
 # and Archivist.py each actually read from their own .env - so neither script depends on
