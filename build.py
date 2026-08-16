@@ -58,24 +58,44 @@ def build():
     os.makedirs(sys_dst, exist_ok=True)
     shutil.copy(os.path.join("Voyageur", "Voyageur.js"), os.path.join(sys_dst, "Voyageur.js"))
 
+    # Portable_Setup.exe: a small standalone tool (see portable_setup.py) that fetches the
+    # Newberry shapefiles and installs AGY CLI - the same two things installer.iss's own
+    # wizard already does at install time for Standard/installer-Portable installs. The raw
+    # zip runs no installer at all, so it needs its own copy of that provisioning, kept
+    # deliberately separate from Antiquarian.py itself (the main app never auto-triggers
+    # downloads or elevation prompts on its own).
+    print("Building Portable_Setup.exe...")
+    subprocess.run([
+        "python", "-m", "PyInstaller",
+        "--name", "Portable_Setup",
+        "--onefile",
+        "--console",
+        "--noconfirm",
+        "--clean",
+        "portable_setup.py"
+    ], check=True)
+
     # Bundle a portable version for users bypassing the Inno Setup installer. The zip's own
     # filename is versioned, but the folder inside it stays plain "Antiquarian" - unzipping
     # two different versions side by side shouldn't produce two differently-named folders.
     #
-    # A ".portable" marker goes in only for the zip's own lifetime, not dist_dir itself -
-    # installer.iss's [Files] section reads from this same dist_dir for the standard/
-    # portable installer .exe, whose own Portable Installation writes this marker
-    # conditionally based on the wizard's own choice; baking it in here unconditionally
-    # would make every install (including Standard/Program Files) misdetect as portable.
+    # Both the ".portable" marker and Portable_Setup.exe go in only for the zip's own
+    # lifetime, not dist_dir itself - installer.iss's [Files] section reads from this same
+    # dist_dir for the standard/portable installer .exe, which already provisions
+    # shapefiles/AGY itself and writes ".portable" conditionally based on the wizard's own
+    # choice; baking either in here unconditionally would leak into every install.
     portable_marker = os.path.join(dist_dir, ".portable")
     with open(portable_marker, "w", encoding="utf-8"):
         pass
+    portable_setup_dst = os.path.join(dist_dir, "Portable_Setup.exe")
+    shutil.copy(os.path.join("dist", "Portable_Setup.exe"), portable_setup_dst)
     try:
         zip_base = f"Antiquarian_Portable_{version}"
         print(f"Zipping {zip_base}.zip...")
         shutil.make_archive(zip_base, "zip", "dist", "Antiquarian")
     finally:
         os.remove(portable_marker)
+        os.remove(portable_setup_dst)
 
     # Hand the version to the next CI step (Inno Setup compile) via a real env var, so
     # installer.iss's AppVersion/output filename stay in sync with this same version
