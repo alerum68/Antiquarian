@@ -36,12 +36,7 @@ COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
 REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
-# No user-facing override: apply_record_type_field_remap() below auto-resolves this to
-# Media/<record type>, matching Paleographer/Extract.py's own SOURCE_DIR convention
-# (Media/TYPE_CFG.name) - the same place that type's images were written to during
-# extraction. This module-level default is only what's in effect before that per-type
-# resolution runs (or when it can't - e.g. an unrecognized record_type_name), and is
-# deliberately the bare Media directory, not a specific type's subfolder.
+# Default image directory (overridden per-record-type in apply_record_type_field_remap)
 IMAGE_DIR = Utils.safe_path(Utils.GENEALOGY_DIR, os.getenv("MEDIA_DIR", "Media"))
 
 
@@ -78,12 +73,7 @@ class Profile(Protocol):
 def build_generic_primary_event_lines(rec: dict, part: dict, event_tag: str, witnesses: List[dict],
                                       vol: str, media_uid: str, target_software: str,
                                       alt_names: list, raw_event_date: str, age: str) -> List[str]:
-    """The non-Scrip primary-event GEDCOM block (today's `Archivist.py:3138-3158`
-    else-branch). Exposed as a module function, not only a GeneralProfile method,
-    because Scrip.ScripProfile.build_primary_event_lines also needs it verbatim for the
-    non-EVEN case (today's `if is_scrip and event_tag == 'EVEN':` only special-cased
-    EVEN - every other event_tag fell through to this same generic block even when
-    is_scrip was True)."""
+    """Builds the primary-event GEDCOM block for non-Scrip events."""
     event_type = Utils.clean_val(rec.get('event_type'))
     lines = []
     event_value = ""

@@ -34,11 +34,7 @@ def get_env_int(key: str, default: int) -> int:
 
 
 def safe_path(base: str, *parts: str) -> str:
-    """Safely joins paths, allowing absolute paths to override the base. If every part is
-    blank, returns "" rather than the bare base, so optional overrides (like
-    GEDCOM_OUTPUT_PATH left blank) can still signal "no override" to their callers.
-    Always joins with '/', not os.path.join's native separator - these paths end up
-    embedded in GEDCOM text output (FILE tags etc.), which must be OS-independent."""
+    """Safely joins paths, allowing absolute paths to override the base."""
     non_blank = [p for p in parts if p]
     if not non_blank:
         return ""
@@ -48,10 +44,8 @@ def safe_path(base: str, *parts: str) -> str:
     return res
 
 
-# Shared, generic settings (used regardless of which flavor of JSON is loaded).
-# Research/attribution metadata is hardcoded per the UI-overhaul design: these keys were
-# removed from Global Settings and nothing pins them via env, so they are plain module
-# constants now (General.py / Census.py reference them unchanged).
+# Shared, generic settings.
+# Research/attribution metadata is hardcoded as plain module constants.
 ORG_NAME = os.getenv("ORG_NAME", "")
 RESEARCHER = os.getenv("RESEARCHER", "")
 SOFTWARE_NAME = "RootsMagic"
@@ -93,12 +87,7 @@ SOURCE_ID_REGISTRY_PATH = Path(__file__).resolve().parent / "source_id_registry.
 
 
 def resolve_source_id(record_type_name: str, collection_name: str = "") -> int:
-    """Returns this document's stable 4-digit Source ID. A precoded census year or the
-    slave schedule returns its fixed id immediately, regardless of collection_name.
-    Anything else is looked up in (and, the first time, assigned into) a small persistent
-    registry keyed on (record_type_name, collection_name), so re-scanning the same
-    collection (e.g. Assumption Parish scanned three times) reuses its existing id instead
-    of drifting to a new one each time."""
+    """Returns this document's stable 4-digit Source ID, retrieving or assigning it from the persistent registry."""
     if record_type_name in PRECODED_SOURCE_IDS:
         return PRECODED_SOURCE_IDS[record_type_name]
 
@@ -128,21 +117,13 @@ with open(Path(__file__).resolve().parent.parent / "Commissioner" / "FactTypes.j
 
 
 def get_event_gedcom_tag(event_type: str) -> str:
-    """Looks up the GEDCOM tag for a record's own event_type (e.g. 'Baptism' -> 'BAPM',
-    'Marriage' -> 'MARR'), checking the person bucket first since most record types are
-    person-level events. Falls back to 'EVEN' (a generic custom event) for a fact type not
-    found in either bucket, rather than guessing or raising."""
+    """Looks up the GEDCOM tag for an event_type, falling back to 'EVEN'."""
     entry = FACT_TYPES.get('person', {}).get(event_type) or FACT_TYPES.get('family', {}).get(event_type)
     return entry.get('gedcom_tag', 'EVEN') if entry else 'EVEN'
 
 
 def is_family_event(event_type: str) -> bool:
-    """True when event_type is a family-level fact (Marriage and its variants) rather than
-    a person-level one - the only thing this distinction controls is whether the record's
-    own primary event attaches to the FAM record it creates or to the primary participant's
-    own INDI record. Family-position linking (FAMC/FAMS/associations) itself never depends
-    on this - a spouse/parent/child role forms the same family structure regardless of what
-    kind of record mentioned it."""
+    """Returns True if the event_type is a family-level fact (e.g., Marriage)."""
     return event_type in FACT_TYPES.get('family', {})
 
 
@@ -199,10 +180,7 @@ def clean_place(val: CellValue) -> str:
 
 
 def split_full_name(full_name: str) -> Tuple[str, str]:
-    """Splits a combined "Given Surname" string - the shape Ancestry's per-person Detail
-    panel gives for a crowdsourced alternate-name submission, unlike the index table's
-    own separate Given Name/Surname columns - into given/surname parts. Uses the last
-    whitespace-separated token as the surname."""
+    """Splits a combined 'Given Surname' string into given and surname parts."""
     parts = full_name.strip().split()
     if len(parts) < 2:
         return full_name.strip(), ""
@@ -353,9 +331,7 @@ def wrap_text(text: str, tag: str = "5 CONT") -> str:
 
 
 def resolve_gedcom_output_targets() -> List[str]:
-    """Which GEDCOM flavor(s) to actually generate this run, from GEDCOM_OUTPUT_MODE
-    ("RM", "FTM", or "Both" - default "Both", preserving this tool's original
-    always-generate-both behavior when the setting is left unset)."""
+    """Returns the targeted GEDCOM output formats based on GEDCOM_OUTPUT_MODE."""
     if GEDCOM_OUTPUT_MODE == "RM":
         return ["RM"]
     if GEDCOM_OUTPUT_MODE == "FTM":
@@ -364,10 +340,7 @@ def resolve_gedcom_output_targets() -> List[str]:
 
 
 def resolve_gedcom_output_path(target_software: str) -> Path:
-    """Resolves the output .ged path for a given software flavor (RM/FTM), rooted in
-    GEDCOM_OUTPUT_PATH if set, otherwise that flavor's own RM_DIR/FTM_DIR. The " - RM"/
-    " - FTM" disambiguating suffix is only added when both flavors are actually being
-    generated this run - a single-flavor run has nothing to disambiguate from."""
+    """Resolves the output .ged path for a given software flavor (RM/FTM)."""
     base_name, ext = Path(GEDCOM_OUTPUT_NAME).stem, Path(GEDCOM_OUTPUT_NAME).suffix
     out_dir = Path(str(GEDCOM_OUTPUT_PATH)) if GEDCOM_OUTPUT_PATH else (
         Path(str(RM_DIR)) if target_software == "RM" else Path(str(FTM_DIR)))

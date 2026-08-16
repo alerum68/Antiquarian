@@ -55,10 +55,7 @@ _DATE_PATTERNS = [
 
 
 def parse_to_iso(reading: Optional[str]) -> Optional[str]:
-    """Parses a plain English-language date reading into YYYY-MM-DD (or a coarser YYYY-MM /
-    YYYY if day/month aren't stated). Passes through a date already given in ISO form
-    unchanged. Returns None if the reading can't be confidently parsed, rather than
-    guessing."""
+    """Parses an English-language date reading into ISO format (YYYY-MM-DD, YYYY-MM, or YYYY)."""
     if not reading:
         return None
     text = reading.strip()
@@ -93,11 +90,7 @@ def parse_to_iso(reading: Optional[str]) -> Optional[str]:
 
 def derive_record_identity(record: Dict[str, Any], event_types_table: Dict[str, Dict[str, str]],
                            set_type_code: bool = False) -> None:
-    """Sets record_id (id_prefix + record_number) from event_type, looked up in
-    event_types_table. When set_type_code is True, also sets record_type_code=entry['code']
-    - needed by Voyageur/FS.py's callers; Paleographer.py's callers derive event/family-
-    bucket handling directly from event_type via FactTypes.json and don't set
-    record_type_code (a deliberate prior decision, not an oversight)."""
+    """Sets record_id and optionally record_type_code from event_type."""
     event_type = record.get("event_type")
     entry: Optional[Dict[str, str]] = event_types_table.get(event_type) if event_type else None
     if not entry:
@@ -112,8 +105,7 @@ def derive_record_identity(record: Dict[str, Any], event_types_table: Dict[str, 
 
 
 def derive_role_number(role_name: str, roles_table: Dict[str, Dict[str, Optional[str]]]) -> Optional[str]:
-    """Looks up a participant's role_number from their plain-word role_name (case-insensitive
-    match on the role's display name)."""
+    """Looks up a participant's role_number from their plain-word role_name."""
     name_to_number = {(role.get("name") or "").strip().lower(): number for number, role in roles_table.items()}
     return name_to_number.get((role_name or "").strip().lower())
 

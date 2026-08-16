@@ -67,11 +67,7 @@ def _field_type_for(document_type: str, field: dict) -> Any:
 
 
 def _build_extra_model(model_name: str, document_type: str, fields: List[dict]) -> Type[BaseModel]:
-    """Builds the validation-only model for a document type's extra fields.
-
-    `extra="forbid"` is deliberate: this model is never used to *replace* the caller's
-    type_specific_fields dict, only to check it, so an undeclared key must fail loudly
-    rather than be silently ignored (and thereby silently dropped)."""
+    """Builds the validation-only model for a document type's extra fields."""
     field_definitions = {
         field["name"]: (Optional.__getitem__(_field_type_for(document_type, field)), None)
         for field in fields
@@ -166,11 +162,7 @@ def parse_collection(raw_json: dict, document_type: str) -> Collection:
 
 
 def validate_soft(data: dict, document_type: str, label: str) -> None:
-    """Runs parse_collection() as a visibility check, never a gate: a validation failure is
-    logged and swallowed here so a Commissioner-side schema gap can never block a real
-    Voyageur gather or a Paleographer MASTER_DB write. Shared by every soft-fail call site -
-    see the sub-project 4 design spec
-    (docs/superpowers/specs/2026-08-06-paleographer-commissioner-soft-fail-design.md)."""
+    """Runs parse_collection() as a visibility check; validation failures are logged and swallowed."""
     try:
         parse_collection(data, document_type)
     except Exception as e:
@@ -178,11 +170,7 @@ def validate_soft(data: dict, document_type: str, label: str) -> None:
 
 
 def build_empty_sheet(file_name: str, file_type: str, page_id: Optional[str] = None) -> dict:
-    """Builds a Commissioner-shaped placeholder sheet dict: a real document_metadata (the
-    image reference) wrapping exactly one empty-content Record (participants: [], every
-    other field its model default). Paleographer's own get_processed_files treats a sheet
-    with no record carrying non-empty participants as unprocessed, so this placeholder gets
-    picked up and replaced by a real AI pass rather than silently skipped forever."""
+    """Builds a placeholder sheet dict to mark an image for AI processing."""
     return {
         "page_id": page_id if page_id is not None else file_name,
         "document_metadata": {
@@ -214,12 +202,7 @@ def build_empty_sheet(file_name: str, file_type: str, page_id: Optional[str] = N
 
 
 def get_field_remap(document_type: str) -> Dict[str, str]:
-    """Returns document_type's own .pmt front matter field_remap table (e.g.
-    {"CHURCH_MASTER_DB_NAME": "MASTER_DB_NAME", ...}). Reuses the same lightweight
-    _load_pmt_front_matter() the rest of this module already uses, rather than
-    Paleographer/engine.py's own TYPE_CFG - engine.py transitively imports google.genai,
-    pdfplumber, PIL, PDFix, and ScriptoriumMCP.agy_client, a dependency chain LAC.py (a
-    standalone, light-dependency script) must not be forced to pull in."""
+    """Returns document_type's own .pmt front matter field_remap table."""
     _get_schema(document_type)  # raises UnknownDocumentTypeError early if unrecognized
     front_matter = _load_pmt_front_matter(PMT_DIR / f"{document_type}.pmt")
     return front_matter.get("field_remap") or {}

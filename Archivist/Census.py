@@ -39,15 +39,9 @@ REPOSITORY = os.getenv("REPOSITORY", "")
 REPOSITORY_LOC = os.getenv("REPOSITORY_LOC", "")
 COLLECTION_URL = os.getenv("COLLECTION_URL", "")
 COLLECTION_NAME = os.getenv("COLLECTION_NAME", "")
-# Set from the gathered data's own 'Country' column in run_census_flavor() - never
-# hardcoded. Drives DEFAULT_COLLECTION_NAME's country-aware fallback text below.
+# Derived from Country column in run_census_flavor()
 COUNTRY = ""
-# The label used everywhere COLLECTION_NAME itself is blank (weblink names, source
-# title, this session's fallback-of-last-resort) - computed once per run in
-# run_census_flavor() from the gathered data's own COUNTRY, not hardcoded to "United
-# States Federal Census" the way every one of these call sites used to be
-# independently. Confirmed live (2026-08-15, dbId 1578, Ontario) that the old hardcoded
-# text mislabeled every Canadian gather.
+# Display fallback when COLLECTION_NAME is missing
 DEFAULT_COLLECTION_NAME = ""
 PUBLISHER = os.getenv("PUBLISHER", "")
 PUB_LOC = os.getenv("PUB_LOC", "")
@@ -779,11 +773,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
     fsftid = get_row_val(row, ['FSFTID'], '')
     fs_url = get_row_val(row, ['FamilySearch_URL'], '')
-    # A genuinely tree-attached FSFTID always wins; otherwise, only for a row we already
-    # know is FamilySearch-sourced (fs_url present), fall back to this record's own person
-    # ark as the citation's FamilySearch identifier - bare, not the URL-required "1:1:"-
-    # prefixed form (that prefix belongs only in the actual clickable weblink below, never
-    # in a displayed identifier). Never fabricated for Ancestry-only rows (no fs_url).
+    # Prefer existing FSFTID; otherwise, use record ark for FS-sourced records
     citation_fsftid = fsftid or (strip_ark_type_prefix(rec_id) if fs_url else '')
 
     ancestry_url = get_row_val(row, ['Extracted_URL'], '') or (

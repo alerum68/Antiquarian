@@ -1,15 +1,5 @@
 """
 Extract: record-type-generic document extraction for Paleographer.
-
-Uses the Gemini API (via engine.py) or the Antigravity CLI (via agy_engine.py) to
-transcribe historical document images or PDFs of any record type and extract
-structured records into a JSON master database, following one universal schema.
-Which record type is active, and every piece of type-specific vocabulary (event
-types, roles, defaults, schema extensions), comes entirely from a single .pmt file
-in prompts/; this module never changes when a new record type is added.
-
-Scriptorium.py launches Paleographer.py (the dispatcher) as a subprocess with
-cwd=Paleographer/, so engine and agy_engine import here as plain sibling modules.
 """
 
 import agy_engine
@@ -27,15 +17,12 @@ from dotenv import load_dotenv
 # noinspection PyUnresolvedReferences
 from google import genai
 
-# The Toolbox's own subprocess launcher sets PYTHONIOENCODING=utf-8, but this module also
-# supports being run directly (its debug mode), where stdout would otherwise fall back to
-# the system's default codepage and crash on emoji/checkmarks.
+# Reconfigure stdout to utf-8 to prevent crashing on emoji/checkmarks in debug mode.
 # noinspection DuplicatedCode
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-# ScriptoriumMCP lives in a sibling tool folder, not an installed package - add the repo
-# root to sys.path so it can be imported by absolute path.
+# Add repo root to sys.path to allow absolute imports for ScriptoriumMCP.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
@@ -44,8 +31,7 @@ from ScriptoriumMCP import agy_client  # noqa: E402
 from Commissioner import normalization  # noqa: E402
 
 
-# Global settings come from the project root's .env; this tool's own settings come from
-# its own subfolder's .env, so Paleographer stays runnable standalone.
+# Load global settings from project root .env and local settings from subfolder .env.
 ROOT_ENV = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(ROOT_ENV, override=True)
 load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
@@ -55,8 +41,7 @@ load_dotenv(Path(__file__).resolve().parent / ".env", override=True)
 # POSTPROCESS
 # ==============================================================================
 def strip_diacritics(text: Optional[str]) -> Optional[str]:
-    """Mechanically strips diacritics/accents, keeping only plain ASCII letters/numbers/
-    punctuation. Applies to any std_* field regardless of record type."""
+    """Strips diacritics, keeping only plain ASCII characters."""
     if text is None:
         return None
     normalized = unicodedata.normalize("NFKD", text)
@@ -210,17 +195,12 @@ def apply_defaults(target: Dict[str, Any], defaults_table: Dict[str, str]) -> No
 # CONFIGURATION
 # ==============================================================================
 
-# EXTRACTION_ENGINE picks which backend actually performs the AI extraction: "agy" (the
-# default) shells out to the Antigravity CLI, subscription-covered rather than metered
-# per-token; "api" uses the direct google-genai SDK against GEMINI_API_KEY. Read early
-# since it decides whether a genai client is even constructed below.
+# Selects the backend for AI extraction ("agy" for CLI, "api" for SDK).
 EXTRACTION_ENGINE: str = (os.getenv("EXTRACTION_ENGINE", "agy") or "agy").strip().lower()
 if EXTRACTION_ENGINE not in ("api", "agy"):
     raise RuntimeError(f"Unknown EXTRACTION_ENGINE '{EXTRACTION_ENGINE}' - expected 'api' or 'agy'.")
 
-# Only constructed for the api engine - the agy engine never calls
-# build_content_part_for_file at all (rasterization replaces it for both images and
-# PDFs), so client is never touched/dereferenced on that path regardless of file type.
+# Initialize API client only if using the SDK backend.
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY")) if EXTRACTION_ENGINE == "api" else None
 
 # ==========================================
@@ -272,8 +252,7 @@ DEBUG_FILE: Union[str, None] = sys.argv[1] if (
     and not sys.argv[1].startswith("-")
 ) else None
 
-# agy-engine-only settings. AGY_MODEL_ID is always passed explicitly to every agy call,
-# never left to agy's own default.
+# Agy-specific settings.
 AGY_MODEL_ID: str = os.getenv("AGY_MODEL_NAME") or agy_engine.DEFAULT_MODEL
 AGY_CLI_BIN: str = os.getenv("AGY_CLI_BIN") or agy_client.DEFAULT_CLI_BIN
 AGY_TIMEOUT_SECONDS: int = 240
@@ -355,10 +334,7 @@ def save_master_db(master_data: Dict[str, Any]) -> None:
 
 
 def _sheet_is_placeholder(sheet: Dict[str, Any]) -> bool:
-    """A sheet counts as a real, already-processed sheet only if at least one of its
-    records has a non-empty participants list - a scaffold sheet Voyageur wrote
-    (Commissioner.record_registry.build_empty_sheet) has no such record, and must be
-    reprocessed rather than skipped forever."""
+    """Returns True if the sheet is an unprocessed scaffold missing participant data."""
     return not any(record.get("participants") for record in sheet.get("records", []))
 
 
@@ -465,8 +441,7 @@ def list_source_files() -> List[str]:
 
 
 def is_batch_eligible(file_path: Path) -> bool:
-    """A PDF crosses the batch threshold if it has more pages than the active type's
-    (or engine's default) threshold. Images are never batch-eligible."""
+    """Returns True if a PDF exceeds the batch page threshold. Images are never eligible."""
     if file_path.suffix.lower() != ".pdf":
         return False
     return engine.get_pdf_page_count(file_path) > TYPE_CFG.batch_page_threshold
@@ -573,8 +548,7 @@ def process_one_file_sync(filename: str, active_cache_name: Optional[str],
 
 # noinspection DuplicatedCode
 def pop_trailing_cutoff_record(sheets: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """If the last record of the last sheet is flagged continues_on_next_image, pops it
-    out and returns it. None if there's nothing pending."""
+    """Pops and returns the last record if it continues onto the next image."""
     if not sheets:
         return None
     last_sheet = sheets[-1]
@@ -596,8 +570,7 @@ def consumed_leading_continuation(sheets: List[Dict[str, Any]]) -> bool:
 
 
 def reattach_leftover_record(sheets: List[Dict[str, Any]], leftover: Dict[str, Any]) -> None:
-    """Nothing on the new image continued the pending record - save it back as its own
-    one-record sheet, ahead of this file's own sheets."""
+    """Reattaches an uncontinued pending record as its own one-record sheet."""
     sheet_info = leftover.pop("_pending_sheet_info", {}) or {}
     sheets.insert(0, {"page_id": sheet_info.get("page_id", ""),
                       "document_metadata": sheet_info.get("document_metadata", {}), "records": [leftover]})
@@ -666,9 +639,7 @@ def run_synchronous_batch(files: List[str], master_data: Dict[str, Any]) -> None
 # BATCH PROCESSING (large multi-page documents)
 # ==============================================================================
 def run_batch_mode(files: List[str], master_data: Dict[str, Any]) -> None:
-    """Batch-eligible files go through Gemini's Batch API instead of the synchronous
-    loop. One run both retrieves any previously-submitted job and submits newly-pending
-    files, then returns without blocking on Gemini."""
+    """Submits new batch jobs and retrieves completed ones via Gemini's Batch API."""
     pending_jobs = master_data.setdefault("pending_batch_jobs", [])
 
     if pending_jobs:
