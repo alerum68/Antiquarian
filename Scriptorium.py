@@ -11,6 +11,8 @@ import tkinter as tk
 from functools import partial
 from pathlib import Path
 from tkinter import filedialog
+import tkinter.messagebox as messagebox
+import webbrowser
 from typing import Union, Dict, Callable, List, Optional
 
 import customtkinter as ctk
@@ -725,6 +727,26 @@ class Scriptorium(ctk.CTk):
         # crashes with a math error if drawn before the window has a height.
         self.update_idletasks()
         self._switch_tab("Voyageur")
+
+        global_env = dotenv_values(env_path_for(None))
+        if global_env.get("TAMPERMONKEY_INSTALLED") != "True":
+            self.after(500, self._prompt_tampermonkey)
+
+    def _prompt_tampermonkey(self):
+        msg = ("Scriptorium requires the Tampermonkey browser extension to gather Ancestry records.\n\n"
+               "Would you like to install it and the Voyageur script now?")
+        if messagebox.askyesno("Tampermonkey Required", msg):
+            webbrowser.open("https://www.tampermonkey.net/")
+            prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
+            if prog_dir_var:
+                prog_dir = prog_dir_var.get().strip()
+                js_path = os.path.join(prog_dir, "Scriptorium", "Sys", "Voyageur.js")
+                if os.path.exists(js_path):
+                    try:
+                        os.startfile(js_path)
+                    except Exception as e:
+                        print(f"Could not open Voyageur.js: {e}")
+            batch_set_env(env_path_for(None), {"TAMPERMONKEY_INSTALLED": "True"})
 
     def _on_closing(self):
         """Forcefully terminates the window and kills any zombie threads running in background."""
@@ -1888,14 +1910,23 @@ class Scriptorium(ctk.CTk):
         run_env['PYTHONUNBUFFERED'] = '1'
         run_env['PYTHONIOENCODING'] = 'utf-8'
 
-        script_name = os.path.basename(safe_cmd[0])
+        script_path = safe_cmd[0]
+        try:
+            rel_path = Path(script_path).relative_to(BASE_DIR)
+            module_name = str(rel_path).replace("\\", ".").replace("/", ".").replace(".py", "")
+        except ValueError:
+            module_name = script_path
+
+        new_cmd = [sys.executable, "--module", module_name] + safe_cmd[1:]
+
+        script_name = os.path.basename(script_path)
         self.console.put(f"\n[System] Starting {script_name}...\n")
         self.console.put("-" * 50 + "\n")
 
         self._cancel_requested = False
         succeeded = False
         try:
-            self.active_process = subprocess.Popen([sys.executable] + safe_cmd, stdin=subprocess.PIPE,
+            self.active_process = subprocess.Popen(new_cmd, stdin=subprocess.PIPE,
                                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=0,
                                                    env=run_env, cwd=target_cwd)
 
@@ -1959,5 +1990,17 @@ class Scriptorium(ctk.CTk):
 
 
 if __name__ == "__main__":
+    import argparse
+    import runpy
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--module", type=str)
+    args, unknown = parser.parse_known_args()
+
+    if args.module:
+        sys.argv = [args.module] + unknown
+        runpy.run_module(args.module, run_name="__main__")
+        sys.exit(0)
+
     app = Scriptorium()
     app.mainloop()
