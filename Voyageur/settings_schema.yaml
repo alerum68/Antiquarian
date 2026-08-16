@@ -3,82 +3,19 @@ sections:
     VOYAGEUR_SOURCE:
       default: ""
       tooltip: "Which repository to gather from. Adding a new one is a new Voyageur sub-script, nothing else changes here."
-  Ancestry:
-    A_URL:
+    GATHER_URL:
       default: ""
-      tooltip: "The web address (URL) of the specific Ancestry.com census page you want to gather."
+      tooltip: "The web address (URL) of the specific record or collection you want to gather."
     GATHER_ON_COLLISION:
       default: "overwrite"
-      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file. Applies to Ancestry and FamilySearch gathers only - LAC and HBCA don't read this setting."
+      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file."
       widget: segmented
       options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
-  FamilySearch:
-    FS_URL:
-      default: ""
-      tooltip: "The web address (URL) of the specific FamilySearch record page you want to gather."
-    GATHER_ON_COLLISION:
-      default: "overwrite"
-      tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file. Applies to Ancestry and FamilySearch gathers only - LAC and HBCA don't read this setting."
-      widget: segmented
-      options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
-  LAC:
-    LAC_URL:
-      default: ""
-      tooltip: "Paste the complete Heritage Canadiana link (e.g., https://heritage.canadiana.ca/iiif/oocihm.lac_reel_c2170/)."
-    LAC_IMAGE_DIR:
-      default: "LAC"
-      tooltip: "The subfolder name (e.g., 'LAC') inside your Base Media Directory. A subfolder per roll number is created automatically inside it. Can also be an absolute path."
-      picker:
-        kind: directory
-        base_dir_key: "MEDIA_DIR"
-    LAC_HARVEST_VOLUME:
-      default: ""
-      tooltip: "Volume number at Library and Archives Canada to harvest (e.g. '1320' or '1325-1330')."
-    LAC_ARCHIVAL_NUMBER:
-      default: "RG15"
-      tooltip: "Archival series prefix used when harvesting an LAC volume (default 'RG15')."
-    LAC_COOKIE_FILE:
-      default: "Working/LAC/lac_cookies.txt"
-      tooltip: "Path (relative to Program Dir) to the text file used to persist LAC search session cookies."
-    LAC_CHECKPOINT_DIR:
-      default: "Working/LAC"
-      tooltip: "Subfolder (relative to Program Dir) where LAC harvest checkpoints are saved."
-    LAC_CDP_PORT:
-      default: "9222"
-      tooltip: "Port used by the Chrome DevTools Protocol connection when driving the LAC harvest browser."
-    LAC_RECORD_TYPE:
-      default: ""
-      tooltip: "Record type for LAC volume harvesting - determines which Commissioner record type (Parish or Scrip) the harvested PIDs are scaffolded as."
-      widget: segmented
-      options: [["", "(unset)"], ["parish", "Parish"], ["scrip", "Scrip"]]
-    LAC_VOLUME:
-      default: ""
-      tooltip: "Volume number alias for LAC harvesting."
-    VOLUME_TITLE:
-      default: ""
-      tooltip: "Title description of the volume being harvested."
   HBCA / Manitoba Archives:
-    HBCA_INDEX_URL:
-      default: "https://www.gov.mb.ca/chc/archives/hbca/biographical/index.html"
-      tooltip: "URL to the Hudson's Bay Company Archives biographical sheets index page."
-    HBCA_IMAGE_DIR:
-      default: "HBCA"
-      tooltip: "The subfolder name (e.g., 'HBCA') inside your Base Media Directory where biographical sheet PDFs are saved."
-      picker:
-        kind: directory
-        base_dir_key: "MEDIA_DIR"
-    HBCA_MASTER_DB_NAME:
-      default: "MasterDB_HBCA.json"
-      tooltip: "Name of the Master DB JSON file where extracted HBCA records are stored."
-    HBCA_CHECKPOINT_DIR:
-      default: "Working/HBCA"
-      tooltip: "Subfolder (relative to Program Dir) where HBCA download checkpoints are saved."
     HBCA_LETTER_FILTER:
       default: ""
       tooltip: "Optional filter to download sheets starting with specific letter(s), space-separated (e.g. 'A B' or 'M'). Leave blank for all."
-    HBCA_MAX_WORKERS:
-      default: "8"
-      tooltip: "Number of parallel workers used when gathering HBCA biographical sheets."
+
     HBCA_RESOLVE_KEYSTONE:
       default: "false"
       tooltip: "Query Archives of Manitoba Keystone database to resolve microfilm/finding aid links for cited location codes."
@@ -87,18 +24,12 @@ sections:
       default: "true"
       tooltip: "When Keystone resolving is enabled, download any digitized microfilm copy media files found."
       widget: toggle
-    KEYSTONE_BASE_URL:
-      default: "https://pam.minisisinc.com/scripts/mwimain.dll"
-      tooltip: "Base URL for the Archives of Manitoba Keystone database search."
+
 label_overrides:
   VOYAGEUR_SOURCE: "Gather From"
+  GATHER_URL: "Gather URL"
   GATHER_ON_COLLISION: "On Existing File"
-  A_URL: "Ancestry Census URL"
-  LAC_URL: "Heritage Canadiana URL"
-  FS_URL: "FamilySearch Record URL"
   HBCA_INDEX_URL: "HBCA Biographical Index URL"
-  HBCA_IMAGE_DIR: "HBCA Media Directory"
-  HBCA_MASTER_DB_NAME: "HBCA Master DB File"
   HBCA_LETTER_FILTER: "Letter Filter (optional)"
   HBCA_RESOLVE_KEYSTONE: "Resolve Keystone Records"
   HBCA_DOWNLOAD_KEYSTONE_MEDIA: "Download Keystone Media"
