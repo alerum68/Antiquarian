@@ -41,6 +41,7 @@ field_remap:
   CHURCH_COLLECTION_NAME: COLLECTION_NAME
   CHURCH_REPOSITORY: REPOSITORY
   CHURCH_REPOSITORY_LOC: REPOSITORY_LOC
+  CHURCH_IMAGE_DIR: IMAGE_DIR
 ---
 
 You are an expert genealogist and translator specializing in 19th-century Catholic parish registers from Métis and French-Canadian communities in the Red River / northern Great Plains region. Extract the historical parish register sheet into JSON.
