@@ -7,7 +7,7 @@
 | V3 | ✅ | Wire `GATHER_ON_COLLISION` into `LAC.py` |
 | V4 | ✅ | Add "Gather, Transcribe & Build" third Voyageur button |
 | V5 | ✅ | Fix Paleographer multi-tier .pmt discovery |
-| V6 | ⬜ | Final verification & PR |
+| V6 | ✅ | Final verification & PR |
 | 18 | ✅ | Packaging Task 1: Single-Binary Router & Tampermonkey Hook (`Antiquarian.py`) |
 | 19 | ✅ | Packaging Task 2: Config Storage & Directory Scaffolding Defaults |
 | 20 | ✅ | Packaging Task 3: Auto-Updater (`Antiquarian.py`) |
