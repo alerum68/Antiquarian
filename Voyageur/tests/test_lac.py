@@ -678,8 +678,14 @@ def test_download_pid_bundle_skips_existing_file_when_collision_is_skip(tmp_path
     existing = pid_dir / "asset_abc.jpg"
     existing.write_bytes(b"cached_content")
 
-    monkeypatch.setattr(LAC.lac_client, "get_record_metadata", lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""}))
-    monkeypatch.setattr(LAC.lac_client, "get_manifest", lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})])
+    monkeypatch.setattr(
+        LAC.lac_client, "get_record_metadata",
+        lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""})
+    )
+    monkeypatch.setattr(
+        LAC.lac_client, "get_manifest",
+        lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})]
+    )
 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("should not download existing asset")
@@ -701,8 +707,14 @@ def test_download_pid_bundle_overwrites_existing_file_when_collision_is_overwrit
     existing = pid_dir / "asset_abc.jpg"
     existing.write_bytes(b"cached_content")
 
-    monkeypatch.setattr(LAC.lac_client, "get_record_metadata", lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""}))
-    monkeypatch.setattr(LAC.lac_client, "get_manifest", lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})])
+    monkeypatch.setattr(
+        LAC.lac_client, "get_record_metadata",
+        lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""})
+    )
+    monkeypatch.setattr(
+        LAC.lac_client, "get_manifest",
+        lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})]
+    )
 
     def mock_download_asset(*_args, **_kwargs):
         return b"fresh_content"

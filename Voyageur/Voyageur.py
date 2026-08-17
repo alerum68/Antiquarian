@@ -7,7 +7,13 @@ provider's own main() sees exactly the CLI arguments Antiquarian.py meant for it
 """
 
 import sys
+from pathlib import Path
 
+# When executed via Antiquarian.py's runpy router, cwd is the project root, so
+# Voyageur/ isn't in sys.path by default. Add it so sibling imports (A, FS) work.
+_MODULE_DIR = str(Path(__file__).resolve().parent)
+if _MODULE_DIR not in sys.path:
+    sys.path.insert(0, _MODULE_DIR)
 SOURCES = ("A", "FS", "LAC", "HBCA")
 
 

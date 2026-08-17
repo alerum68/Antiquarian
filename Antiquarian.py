@@ -1543,19 +1543,34 @@ class Antiquarian(ctk.CTk):
 
         self._build_form_ui(frame, ARCHIVIST_VARS)
 
-    @staticmethod
-    def _list_record_types() -> List[str]:
-        """Lists every .pmt file in Paleographer/prompts, for the record-type dropdown.
-        Adding a new record type is exactly this: drop a new .pmt file in that folder,
-        nothing else, and it shows up here automatically."""
-        prompts_dir = Path(__file__).resolve().parent / "Paleographer" / "prompts"
-        if not prompts_dir.is_dir():
-            return ["Parish.pmt"]
-        found = sorted((p.name for p in prompts_dir.glob("*.pmt")), key=str.lower)
-        return found or ["Parish.pmt"]
+    def _prompt_search_dirs(self) -> List[Path]:
+        """Mirrors Paleographer/engine.py's .pmt search path, highest priority first."""
+        dirs = []
 
-    @staticmethod
-    def _read_pmt_front_matter(record_type_value: str) -> dict:
+        prog_var = self.string_vars.get("PROGRAM_DIR")
+        prog_dir = prog_var.get().strip() if prog_var else ""
+        gen_var = self.string_vars.get("GENEALOGY_DIR")
+        gen_dir = gen_var.get().strip() if gen_var else ""
+
+        if gen_dir:
+            dirs.append(Path(gen_dir) / "Prompts")
+        if prog_dir:
+            dirs.append(Path(prog_dir) / "Prompts")
+        dirs.append(Path(__file__).resolve().parent / "Paleographer" / "prompts")
+        return dirs
+
+    def _list_record_types(self) -> List[str]:
+        """Lists every .pmt file found in the multi-tier prompt search path."""
+        found = set()
+        for d in self._prompt_search_dirs():
+            if d.is_dir():
+                for p in d.glob("*.pmt"):
+                    found.add(p.name)
+        if not found:
+            return ["Parish.pmt"]
+        return sorted(list(found), key=str.lower)
+
+    def _read_pmt_front_matter(self, record_type_value: str) -> dict:
         """Reads a .pmt file's own YAML front matter directly - the same declarative data
         Paleographer.py/Archivist.py themselves read (via engine.parse_type_config /
         apply_record_type_field_remap) to resolve their own settings and vocabulary. The
@@ -1565,7 +1580,16 @@ class Antiquarian(ctk.CTk):
         name = record_type_value.strip() or "Parish.pmt"
         if not name.endswith(".pmt"):
             name += ".pmt"
-        pmt_path = Path(__file__).resolve().parent / "Paleographer" / "prompts" / name
+
+        pmt_path = None
+        for d in self._prompt_search_dirs():
+            candidate = d / name
+            if candidate.is_file():
+                pmt_path = candidate
+                break
+
+        if not pmt_path:
+            return {}
         try:
             raw = pmt_path.read_text(encoding="utf-8")
         except OSError:
@@ -1786,14 +1810,26 @@ class Antiquarian(ctk.CTk):
             self.voyageur_gather_btn.configure(text=f"Gather from {label}",
                                                command=lambda: self.execute_script("VOYAGEUR_SCRIPT", code))
 
-        if hasattr(self, "voyageur_send_to_archivist_btn"):
+        if hasattr(self, "voyageur_gather_build_btn"):
             # Chains straight into Generate GEDCOM (the same "gedcom_auto" mode the
             # Archivist tab's own button uses) only once the gather actually finishes
             # cleanly - see execute_script's on_success.
-            self.voyageur_send_to_archivist_btn.configure(
+            self.voyageur_gather_build_btn.configure(
                 command=lambda: self.execute_script(
                     "VOYAGEUR_SCRIPT", code,
                     on_success=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")))
+
+        if hasattr(self, "voyageur_gather_transcribe_build_btn"):
+            # Chains Voyageur -> Paleographer (API mode) -> Archivist (gedcom_auto)
+            self.voyageur_gather_transcribe_build_btn.configure(
+                command=lambda: self.execute_script(
+                    "VOYAGEUR_SCRIPT", code,
+                    on_success=lambda: self.execute_script(
+                        "ANALYSIS_SCRIPT", "paleographer_api",
+                        on_success=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")
+                    )
+                )
+            )
 
         if hasattr(self, "voyageur_form_container"):
             for child in self.voyageur_form_container.winfo_children():
@@ -1824,10 +1860,15 @@ class Antiquarian(ctk.CTk):
                                                  text_color=C_TEXT)
         self.voyageur_gather_btn.pack(side="left", padx=5)
 
-        self.voyageur_send_to_archivist_btn = ctk.CTkButton(
-            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935",
+        self.voyageur_gather_build_btn = ctk.CTkButton(
+            btn_box, text="Gather & Build", fg_color="#2b7a4b", hover_color="#1e5935",
             text_color=C_TEXT)
-        self.voyageur_send_to_archivist_btn.pack(side="left", padx=5)
+        self.voyageur_gather_build_btn.pack(side="left", padx=5)
+
+        self.voyageur_gather_transcribe_build_btn = ctk.CTkButton(
+            btn_box, text="Gather, Transcribe & Build", fg_color="#7A5B2B", hover_color="#5B431E",
+            text_color=C_TEXT)
+        self.voyageur_gather_transcribe_build_btn.pack(side="left", padx=5)
 
         # Persistent container the filtered settings form gets rebuilt into whenever the
         # source changes, so switching repositories only shows the fields that source uses.
