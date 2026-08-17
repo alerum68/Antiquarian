@@ -75,7 +75,14 @@ if __name__ == "__main__":
     with open(input_path, "r", encoding="utf-8") as json_fh:
         loaded_data = json.load(json_fh)
 
-    is_census = loaded_data.get("record_type_name", "").startswith("Census_") or "pages" in loaded_data
+    record_type = loaded_data.get("record_type_name") or loaded_data.get("record_family") or ""
+    collection_title = loaded_data.get("collection_title", "").lower()
+    is_census = (
+        record_type.startswith("Census_") or 
+        record_type == "census" or 
+        "pages" in loaded_data or 
+        "census" in collection_title
+    )
     if is_census:
         if not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
             Utils.GEDCOM_OUTPUT_NAME = input_path.stem + ".ged"

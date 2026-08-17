@@ -125,9 +125,9 @@ SEX_COLUMN_MAP = {
 # generalizes Antiquarian.py's existing _record_type_family() keyword-matching so Archivist's
 # single "Generate GEDCOM" button can dispatch without a manual per-type pick.
 RECORD_FAMILY_KEYWORDS = {
+    "census": ["census", "population schedule"],
     "church": ["church", "baptism", "baptême", "marriage", "mariage", "burial", "sépulture",
                "parish", "paroiss", "christening", "confirmation"],
-    "census": ["census", "population schedule"],
     "scrip": ["scrip"],
     "wills": ["will", "probate", "estate", "testament"],
 }
@@ -406,7 +406,7 @@ def parse_citation(text: str) -> Dict[str, str]:
 def detect_record_family(text: str) -> str:
     lowered = text.lower()
     for family, keywords in RECORD_FAMILY_KEYWORDS.items():
-        if any(k in lowered for k in keywords):
+        if any(re.search(rf"\b{re.escape(k)}", lowered) for k in keywords):
             return family
     return "other"
 
