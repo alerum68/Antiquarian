@@ -1375,6 +1375,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
                 ged.append(f"2 DATE {get_birth_date(row, birth_year)}")
             if birth_place:
                 ged.append(f"2 PLAC {birth_place}")
+            ged.append("2 _PROOF proposed")
             ged.extend(cit)
 
         alt_birth_places = parse_alternate_entries(row, 'AlternateBirthPlaces')
@@ -1389,7 +1390,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             ged.extend(occ_evt)
 
         if race := Utils.capitalize_text_string(row.get('Race', row.get('Color', ''))):
-            ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
+            ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proposed"] + cit)
 
         nat_val = Utils.clean_val(row.get('Nationality'))
         if not nat_val and birth_place and is_foreign_birthplace(birth_place):
