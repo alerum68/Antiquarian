@@ -1,5 +1,36 @@
 """Tests for A.py's census-gather normalization call site (Issue #3 test-coverage gap)."""
 import A
+from A import parse_ancestry_url
+
+
+def test_parse_ancestry_url_view_style():
+    url = "https://search.ancestry.com/cgi-bin/sse.dll?db=somedb&indiv=try&view/1234:567"
+    assert parse_ancestry_url(url) == ("567", "1234")
+
+
+def test_parse_ancestry_url_collections_with_pid():
+    url = ("https://www.ancestry.com/imageviewer/collections/7667/images/4211353_00001"
+           "?queryId=527a29b7&usePUB=true&pId=17613762")
+    assert parse_ancestry_url(url) == ("7667", "17613762")
+
+
+def test_parse_ancestry_url_dbid_and_h_query_params():
+    url = "https://www.ancestry.com/some/path?dbid=60525&h=123456"
+    assert parse_ancestry_url(url) == ("60525", "123456")
+
+
+def test_parse_ancestry_url_collections_without_pid_uses_image_number():
+    """Regression: newer Ancestry imageviewer URLs drop &pId= and put the image number
+    straight in the path instead (.../images/<num>-<slug>), which the older patterns
+    couldn't match - produced "Could not parse database ID (dbid) or record ID (h)
+    from the URL" on an otherwise-valid gather URL."""
+    url = ("https://www.ancestry.com/imageviewer/collections/62308/images/"
+           "43290879-North_Dakota-051775-0001?usePUB=true&_phsrc=MpD179")
+    assert parse_ancestry_url(url) == ("62308", "43290879")
+
+
+def test_parse_ancestry_url_unparseable_returns_none_none():
+    assert parse_ancestry_url("https://www.ancestry.com/search/") == (None, None)
 
 
 def test_normalize_ancestry_census_gather_derives_title_and_record_type():

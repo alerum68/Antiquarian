@@ -668,4 +668,3 @@ def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch,
 
     master_data = LAC.load_master_db(master_db_path, "Test Collection", "Parish")
     assert len(master_data["sheets"]) == 1
-

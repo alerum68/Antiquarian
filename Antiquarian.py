@@ -148,7 +148,8 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                       "FTM_DIR": "",
                                       "MEDIA_DIR": "Media",
                                       "JSON_DIR": "JSON",
-                                      "GEDCOM_OUTPUT_PATH": "GEDCOM"},
+                                      "GEDCOM_OUTPUT_PATH": "GEDCOM",
+                                      "PROMPTS_DIR": "Prompts"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
                "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
@@ -178,6 +179,9 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "RM_DIR": "The folder where your RootsMagic files live, relative to the Genealogy Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
+    "PROMPTS_DIR": "The folder (relative to the Genealogy Root Directory) holding your .pmt record-type "
+                   "prompt files. Paleographer/Archivist look here first, then fall back to the copy bundled "
+                   "with the app - override this only if you keep customized .pmt files of your own.",
     "RESEARCHER": "Your name. This will be added to the GEDCOM file to give you credit as the transcriber.",
     "ORG_NAME": "The name of your Historical Society, Library, or personal organization to include in GEDCOM headers.",
     "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
@@ -200,6 +204,7 @@ CUSTOM_LABELS = {
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
     "JSON_DIR": "JSON Download Folder",
+    "PROMPTS_DIR": "Prompts Folder",
     "AGY_MODEL_NAME": "Antigravity Model Name"}
 
 # ==========================================
@@ -219,6 +224,7 @@ PATH_PICKER_FIELDS = {
     "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
     "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
+    "PROMPTS_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
 }
 
 # ==========================================
@@ -1544,18 +1550,20 @@ class Antiquarian(ctk.CTk):
         self._build_form_ui(frame, ARCHIVIST_VARS)
 
     def _prompt_search_dirs(self) -> List[Path]:
-        """Mirrors Paleographer/engine.py's .pmt search path, highest priority first."""
+        """Mirrors Paleographer/engine.py's .pmt search path, highest priority first.
+        PROGRAM_DIR itself is never a GUI field (see _run_subprocess) - it's always
+        APP_DIR, the app's actual install location, so this reads that directly rather
+        than a nonexistent string_vars entry."""
         dirs = []
 
-        prog_var = self.string_vars.get("PROGRAM_DIR")
-        prog_dir = prog_var.get().strip() if prog_var else ""
         gen_var = self.string_vars.get("GENEALOGY_DIR")
         gen_dir = gen_var.get().strip() if gen_var else ""
+        prompts_var = self.string_vars.get("PROMPTS_DIR")
+        prompts_subdir = (prompts_var.get().strip() if prompts_var else "") or "Prompts"
 
         if gen_dir:
-            dirs.append(Path(gen_dir) / "Prompts")
-        if prog_dir:
-            dirs.append(Path(prog_dir) / "Prompts")
+            dirs.append(Path(gen_dir) / prompts_subdir)
+        dirs.append(APP_DIR / "Prompts")
         dirs.append(Path(__file__).resolve().parent / "Paleographer" / "prompts")
         return dirs
 
@@ -2049,9 +2057,13 @@ class Antiquarian(ctk.CTk):
         run_env['PYTHONIOENCODING'] = 'utf-8'
         # The app's own install location - not a GUI-editable setting, so it never rides
         # along via string_vars like the rest of run_env. Tools that resolve fixed,
-        # ships-with-the-app paths (e.g. Gazetteer's shapefiles) read this rather than a
-        # settings key.
-        run_env.setdefault('PROGRAM_DIR', str(BASE_DIR))
+        # ships-with-the-app paths (e.g. Gazetteer's shapefiles, Paleographer's Prompts
+        # fallback) read this rather than a settings key. Must be APP_DIR, not BASE_DIR:
+        # BASE_DIR is __file__-relative, which lands inside PyInstaller's _internal bundle
+        # dir when frozen (see APP_DIR's own definition above) - a portable install's
+        # bundled Prompts folder lives next to the .exe, not in there, so PROGRAM_DIR
+        # pointed at BASE_DIR silently couldn't find it.
+        run_env.setdefault('PROGRAM_DIR', str(APP_DIR))
 
         script_path = safe_cmd[0]
         try:
