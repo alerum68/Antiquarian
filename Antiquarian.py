@@ -1760,17 +1760,13 @@ class Antiquarian(ctk.CTk):
 
     @staticmethod
     def _voyageur_visible_sections(label: str) -> Dict[str, Dict[str, str]]:
-        """Fields shown for the given VOYAGEUR_SOURCE label: its own provider section
-        plus "Gather Settings", shown regardless of which provider is selected."""
+        """Fields shown for the given VOYAGEUR_SOURCE label: the universal \"Gather Settings\"
+        section (shown for all sources, including GATHER_ON_COLLISION which every Voyageur
+        sub-script now reads) plus the provider's own section if it has one."""
         result = {}
 
         if "Gather Settings" in VOYAGEUR_VARS:
-            gather_settings = dict(VOYAGEUR_VARS["Gather Settings"])
-            # GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py and the
-            # HBCA/Keystone script never read it, so it must not leak into their form.
-            if label not in ("Ancestry", "FamilySearch"):
-                gather_settings.pop("GATHER_ON_COLLISION", None)
-            result["Gather Settings"] = gather_settings
+            result["Gather Settings"] = dict(VOYAGEUR_VARS["Gather Settings"])
 
         section_name = "HBCA Settings" if label == "Keystone Archives" else label
         if section_name in VOYAGEUR_VARS:
