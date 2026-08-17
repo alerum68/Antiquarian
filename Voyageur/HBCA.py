@@ -574,30 +574,26 @@ def download_keystone_media(
     target_dir: Path,
     session: Optional[requests.Session] = None,
 ) -> List[str]:
-    """Downloads digitized microfilm or document media files from Keystone.
-    Respects GATHER_ON_COLLISION: 'skip' keeps existing files, 'overwrite' re-fetches them."""
+    """Downloads digitized microfilm or document media files from Keystone."""
     target_dir.mkdir(parents=True, exist_ok=True)
     client = session or requests.Session()
     headers = {"User-Agent": "Antiquarian/1.0 (Genealogy Keystone Media Downloader)"}
     downloaded_paths: List[str] = []
-    on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
 
     for url in media_urls:
         filename = Path(url.split("?")[0]).name or f"media_{len(downloaded_paths)+1}.jpg"
         dest_file = target_dir / filename
-        if on_collision == "skip" and dest_file.exists():
-            downloaded_paths.append(str(dest_file))
-            continue
-        try:
-            resp = client.get(url, headers=headers, timeout=30)
-            if resp.status_code == 200:
-                atomic_write_bytes(dest_file, resp.content)
-            else:
-                print(f"[WARN] Failed to download media from {url}: HTTP {resp.status_code}")
+        if not dest_file.exists():
+            try:
+                resp = client.get(url, headers=headers, timeout=30)
+                if resp.status_code == 200:
+                    atomic_write_bytes(dest_file, resp.content)
+                else:
+                    print(f"[WARN] Failed to download media from {url}: HTTP {resp.status_code}")
+                    continue
+            except Exception as e:
+                print(f"[WARN] Failed to download media from {url}: {e}")
                 continue
-        except Exception as e:
-            print(f"[WARN] Failed to download media from {url}: {e}")
-            continue
         if dest_file.exists():
             downloaded_paths.append(str(dest_file))
 
@@ -742,7 +738,6 @@ def gather_hbca_sheets(
     )
     checkpoint_dir = checkpoint_dir or Path(CHECKPOINT_DIR)
     media_dir = media_dir or Path(MEDIA_DIR)
-    on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
 
     image_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -782,9 +777,7 @@ def gather_hbca_sheets(
         target_file.parent.mkdir(parents=True, exist_ok=True)
 
         session = requests.Session()
-        if on_collision == "skip" and target_file.exists():
-            pass  # keep existing file; still proceed to text extraction below
-        else:
+        if not target_file.exists():
             log(f"Downloading {entry.file_name} from {entry.pdf_url}...")
             try:
                 pdf_resp = session.get(entry.pdf_url, headers=headers, timeout=30)

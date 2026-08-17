@@ -272,10 +272,7 @@ def download_images(manifest_data: Dict[str, Any], out_dir: str, roll_num: str,
 
             print(f"\rDownloading [{i}/{total}]...", end="", flush=True)
 
-            on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
-            if on_collision == "skip" and os.path.exists(filepath):
-                pass
-            else:
+            if not os.path.exists(filepath):
                 img_resp = session.get(img_id, timeout=20)
                 img_resp.raise_for_status()
                 atomic_write_bytes(Path(filepath), img_resp.content)
@@ -315,14 +312,10 @@ def download_pid_bundle(pid: str, media_dir: str,
     pid_dir.mkdir(parents=True, exist_ok=True)
 
     entries: List[Dict[str, Any]] = []
-    on_collision = os.getenv("GATHER_ON_COLLISION", "overwrite").strip().lower()
-
     for asset in assets:
         ext = "pdf" if asset.op == "pdf" else "jpg"
         file_path = pid_dir / f"{asset.asset_id}.{ext}"
-        if on_collision == "skip" and file_path.exists():
-            pass
-        else:
+        if not file_path.exists():
             data = lac_client.download_asset(asset.asset_id, asset.op)
             atomic_write_bytes(file_path, data)
 
