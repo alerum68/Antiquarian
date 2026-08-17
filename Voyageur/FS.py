@@ -29,6 +29,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 
 import pandas as pd
 import yaml
@@ -823,6 +824,15 @@ def main() -> None:
     if not url:
         print("[ERROR] Please enter a FamilySearch record URL in the Toolbox settings first.")
         sys.exit(1)
+
+    # Normalize FamilySearch URL to force the "index" view instead of the "explore" view
+    # (Voyageur.js extraction relies on the index panel being open)
+    parsed_url = urlparse(url)
+    query_params = dict(parse_qsl(parsed_url.query))
+    query_params["view"] = "index"
+    for key in ["groupId", "grid"]:
+        query_params.pop(key, None)
+    url = urlunparse(parsed_url._replace(query=urlencode(query_params)))
 
     # Voyageur.js used GM_download to land these in their own Downloads subfolder, but
     # confirmed live this was unreliable - GM_download's own "downloads" permission grant
