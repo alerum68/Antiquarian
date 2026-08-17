@@ -117,7 +117,7 @@ def build_detailed_census_filename(year: str, normalized_data: dict, provider: s
     for sheet in normalized_data.get("sheets", []):
         for record in sheet.get("records", []):
             fields = record.get("type_specific_fields", {}) or {}
-            parts = [f"{year} Census" if year else "Census"]
+            parts = [f"Census {year}" if year else "Census"]
             if fields.get("country"):
                 parts.append(fields["country"])
             if fields.get("state"):
