@@ -24,6 +24,10 @@ import zipfile
 from pathlib import Path
 
 NEWBERRY_SHAPEFILE_URL = "https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip"
+# The original Borealis Dataverse source has no single-zip download (8 separate per-year
+# DOIs) - this is a pre-zipped mirror hosted as a GitHub Release asset in this same repo.
+CA_SHAPEFILE_URL = (
+    "https://github.com/alerum68/Antiquarian/releases/download/gazetteer-ca-data-v1/CA_UNICEN_Counties.zip")
 AGY_INSTALL_COMMAND = [
     "powershell.exe", "-NoProfile", "-Command",
     "irm https://antigravity.google/cli/install.ps1 | iex",
@@ -38,30 +42,41 @@ def own_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-def fetch_shapefiles(target_dir: Path) -> None:
-    gazetteer_dir = target_dir / "Gazetteer"
-    gazetteer_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = target_dir / "US_AtlasHCB_Counties.zip"
-
-    print(f"Downloading US Newberry Atlas historical county boundaries to {gazetteer_dir}...")
-    print("This is a large file (roughly 500 MB) - please be patient.")
+def _download_and_extract(url: str, zip_path: Path, extract_dir: Path, label: str) -> None:
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Downloading {label} to {extract_dir}...")
     try:
-        urllib.request.urlretrieve(NEWBERRY_SHAPEFILE_URL, zip_path)
+        urllib.request.urlretrieve(url, zip_path)
     except Exception as e:
-        print(f"[ERROR] Could not download shapefiles: {e}")
+        print(f"[ERROR] Could not download {label}: {e}")
         return
 
     print("Extracting...")
     try:
         with zipfile.ZipFile(zip_path) as zf:
-            zf.extractall(gazetteer_dir)
+            zf.extractall(extract_dir)
     except Exception as e:
-        print(f"[ERROR] Could not extract shapefiles: {e}")
+        print(f"[ERROR] Could not extract {label}: {e}")
         return
     finally:
         zip_path.unlink(missing_ok=True)
 
-    print("Shapefiles installed.")
+    print(f"{label} installed.")
+
+
+def fetch_shapefiles(target_dir: Path) -> None:
+    gazetteer_dir = target_dir / "Gazetteer"
+
+    print("This includes a large file (roughly 500 MB) - please be patient.")
+    _download_and_extract(
+        NEWBERRY_SHAPEFILE_URL, target_dir / "US_AtlasHCB_Counties.zip",
+        gazetteer_dir, "US Newberry Atlas historical county boundaries")
+
+    # Extracts into its own CA_UNICEN_Counties subfolder, matching Gazetteer.py's
+    # CA_SHAPEFILE_DIR expectation (the zip is flat, not nested).
+    _download_and_extract(
+        CA_SHAPEFILE_URL, target_dir / "CA_UNICEN_Counties.zip",
+        gazetteer_dir / "CA_UNICEN_Counties", "Canadian UNI-CEN Census Division boundaries")
 
 
 def ensure_agy_installed() -> None:

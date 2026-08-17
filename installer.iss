@@ -89,6 +89,11 @@ begin
 
     // Download the US Newberry Atlas historical county boundaries
     DownloadTemporaryFile('https://publications.newberry.org/ahcb/downloads/gis/US_AtlasHCB_Counties.zip', ExpandConstant('{tmp}\US_AtlasHCB_Counties.zip'), '', nil);
+
+    // Download the Canadian UNI-CEN Census Division boundaries. The original Borealis
+    // Dataverse source has no single-zip download (8 separate per-year DOIs) - this is a
+    // pre-zipped mirror hosted as a GitHub Release asset in this same repo instead.
+    DownloadTemporaryFile('https://github.com/alerum68/Antiquarian/releases/download/gazetteer-ca-data-v1/CA_UNICEN_Counties.zip', ExpandConstant('{tmp}\CA_UNICEN_Counties.zip'), '', nil);
   end;
   Result := True;
 end;
@@ -109,11 +114,12 @@ begin
     GazDir := ExpandConstant('{app}\Gazetteer');
     ForceDirectories(GazDir);
     // We would ideally extract the zip here, but Inno Setup requires a plugin or PowerShell
-    // to extract. Using a PowerShell snippet to extract. The Canadian county dataset isn't
-    // bundled here - it's multiple per-year files with no single-zip source to fetch (see
-    // Gazetteer/CA_UNICEN_Counties/LICENSE_AND_ATTRIBUTION.txt) - Gazetteer already runs
-    // US-only when that folder is absent, exactly as it would here.
+    // to extract. Using a PowerShell snippet to extract.
     Exec('powershell.exe', '-NoProfile -Command "Expand-Archive -Force -Path ''' + ExpandConstant('{tmp}\US_AtlasHCB_Counties.zip') + ''' -DestinationPath ''' + GazDir + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+    // Canadian boundaries extract into their own CA_UNICEN_Counties subfolder, matching
+    // Gazetteer.py's CA_SHAPEFILE_DIR expectation (the zip is flat, not nested).
+    Exec('powershell.exe', '-NoProfile -Command "Expand-Archive -Force -Path ''' + ExpandConstant('{tmp}\CA_UNICEN_Counties.zip') + ''' -DestinationPath ''' + ExpandConstant('{app}\Gazetteer\CA_UNICEN_Counties') + '''"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     GenDir := GenealogyPage.Values[0];
     RmDir := Rmpage.Values[0];
