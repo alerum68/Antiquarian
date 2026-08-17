@@ -16,6 +16,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from dotenv import set_key
 from watchdog.events import FileSystemEventHandler
@@ -108,6 +109,38 @@ def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
             else:
                 entry['final'] = p
     return runs
+
+
+def build_detailed_census_filename(year: str, normalized_data: dict, provider: str) -> Optional[str]:
+    """Builds a '(Year) Census - (Country) - (State) - (County) - (City, township, ED) - (Provider).json'
+    filename matching the specific request."""
+    for sheet in normalized_data.get("sheets", []):
+        for record in sheet.get("records", []):
+            fields = record.get("type_specific_fields", {}) or {}
+            parts = [f"{year} Census" if year else "Census"]
+            if fields.get("country"):
+                parts.append(fields["country"])
+            if fields.get("state"):
+                parts.append(fields["state"])
+            if fields.get("county"):
+                parts.append(fields["county"])
+            
+            city_ed = []
+            if fields.get("city"):
+                city_ed.append(fields["city"])
+            if fields.get("enumeration_district"):
+                city_ed.append(fields["enumeration_district"])
+            if city_ed:
+                parts.append(", ".join(city_ed))
+            
+            if provider:
+                parts.append(provider)
+            
+            if len(parts) > 1:
+                safe = " - ".join(parts)
+                safe = re.sub(r'[/\\?%*:|"<>]', "-", safe).strip()
+                return f"{safe}.json"
+    return None
 
 
 def build_gather_launch_url(url: str, run_id: str) -> str:

@@ -1674,30 +1674,5 @@ def run_census_flavor(data: dict) -> None:
         if nested_dir.is_dir():
             IMAGE_DIR = str(nested_dir)
 
-    if not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
-        parts = [f"{CENSUS_YEAR} Census" if CENSUS_YEAR else "Census"]
-        if COUNTRY:
-            parts.append(COUNTRY)
-        if STATE:
-            parts.append(STATE)
-        if COUNTY:
-            parts.append(COUNTY)
-        
-        city_ed = []
-        if TOWNSHIP:
-            city_ed.append(TOWNSHIP)
-        if ENUMERATION_DISTRICT:
-            city_ed.append(ENUMERATION_DISTRICT)
-        if city_ed:
-            parts.append(", ".join(city_ed))
-        
-        provider = "Ancestry" if APID_DB else "FamilySearch" if ('FSFTID' in census_df.columns and (census_df['FSFTID'].astype(str).str.strip() != '').any()) else ""
-        if provider:
-            parts.append(provider)
-        
-        base_name = " - ".join(parts)
-        base_name = re.sub(r'[/\\?%*:|"<>]', "-", base_name).strip()
-        Utils.GEDCOM_OUTPUT_NAME = f"{base_name}.ged"
-
     for software in Utils.resolve_gedcom_output_targets():
         build_gedcom_from_census(census_df, software)

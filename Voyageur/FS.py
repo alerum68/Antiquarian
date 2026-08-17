@@ -723,24 +723,6 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
-def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[str]:
-    """Builds a "{year} - {state} - {county} - {city} - FS.json" name (matching A.py/
-    Ancestry's own "{year} - {locationStr} - ANC" convention, so both sources' output files
-    are named the same way and the provider is obvious at a glance) from the first record
-    carrying any of those fields, instead of the raw browser-provided name (document.title,
-    which for a FamilySearch collection page often includes the page's own ark URL).
-    Returns None if no sheet/record has any of these fields at all, so the caller can fall
-    back rather than silently invent a location."""
-    for sheet in normalized_data.get("sheets", []):
-        for record in sheet.get("records", []):
-            fields = record.get("type_specific_fields", {}) or {}
-            parts = [year] + [fields[key] for key in ("state", "county", "city") if fields.get(key)]
-            if len(parts) > 1:
-                safe = " - ".join(parts)
-                safe = re.sub(r'[/\\?%*:|"<>]', "-", safe)
-                return f"{safe} - FS.json"
-    return None
-
 
 def normalize_familysearch_census_gather(raw_census: dict, collection_title: str) -> dict:
     """Translates a raw FamilySearch census gather (already grouped into Voyageur's own
@@ -768,7 +750,8 @@ def convert_raw_gather_to_final(raw_data: dict) -> Tuple[dict, Optional[str]]:
     if record_family == "census":
         raw_census = build_census_json(raw_data, items_raw, catalog_items)
         final_data = normalize_familysearch_census_gather(raw_census, raw_data.get("collection_title", ""))
-        clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
+        from _gather_helpers import build_detailed_census_filename
+        clean_name = build_detailed_census_filename(raw_census.get("census_year", ""), final_data, "FamilySearch")
     else:
         final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
         validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))

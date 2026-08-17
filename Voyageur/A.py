@@ -230,6 +230,15 @@ def main() -> Path:
             raw_gather = json.load(f)
         print_incomplete_pages_warning(raw_gather.get("incomplete_pages", []), "page(s)")
         normalized = normalize_ancestry_census_gather(raw_gather, dbid)
+        
+        from _gather_helpers import build_detailed_census_filename
+        clean_name = build_detailed_census_filename(raw_gather.get("census_year", ""), normalized, "Ancestry")
+        if clean_name:
+            new_final_json = final_json.with_name(clean_name)
+            if new_final_json != final_json:
+                final_json.replace(new_final_json)
+                final_json = new_final_json
+
         with open(final_json, "w", encoding="utf-8") as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
         collection_name = normalized.get("citation", {}).get("collection_name", "")
