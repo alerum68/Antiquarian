@@ -429,7 +429,7 @@ def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_
         cit = arc.build_census_citation(fs_row, "1:1:MF36-Z6D", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert any(ln == "3 _FSFTID MF36-Z6D" for ln in cit), f"{target}: missing bare _FSFTID: {cit}"
+        assert any(ln == "1 _FSFTID MF36-Z6D" for ln in cit), f"{target}: missing bare _FSFTID: {cit}"
 
     monkeypatch.setattr(arc, "APID_DB", "2442")
     anc_row = _citation_row(FSFTID="")

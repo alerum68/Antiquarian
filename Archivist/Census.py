@@ -816,7 +816,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
                         f"4 NAME Anc- {collection_title}",
                         f"4 URL {ancestry_url}"])
         if citation_fsftid:
-            cit.append(f"3 _FSFTID {citation_fsftid}")
+            cit.append(f"1 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME FS- {collection_title}",
@@ -832,7 +832,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         if APID_DB and rec_id:
             cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
         if citation_fsftid:
-            cit.append(f"3 _FSFTID {citation_fsftid}")
+            cit.append(f"1 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend([f"3 _LINK {fs_url}", f"3 NOTE {fs_url}"])
         cit.append(f"3 OBJE {m_id}")
@@ -1672,6 +1672,31 @@ def run_census_flavor(data: dict) -> None:
                 nested_dir = legacy_dir
         if nested_dir.is_dir():
             IMAGE_DIR = str(nested_dir)
+
+    if not os.getenv("GEDCOM_OUTPUT_NAME", "").strip():
+        parts = [f"{CENSUS_YEAR} Census" if CENSUS_YEAR else "Census"]
+        if COUNTRY:
+            parts.append(COUNTRY)
+        if STATE:
+            parts.append(STATE)
+        if COUNTY:
+            parts.append(COUNTY)
+        
+        city_ed = []
+        if TOWNSHIP:
+            city_ed.append(TOWNSHIP)
+        if ENUMERATION_DISTRICT:
+            city_ed.append(ENUMERATION_DISTRICT)
+        if city_ed:
+            parts.append(", ".join(city_ed))
+        
+        provider = "Ancestry" if APID_DB else "FamilySearch" if ('FSFTID' in census_df.columns and (census_df['FSFTID'].astype(str).str.strip() != '').any()) else ""
+        if provider:
+            parts.append(provider)
+        
+        base_name = " - ".join(parts)
+        base_name = re.sub(r'[/\\?%*:|"<>]', "-", base_name).strip()
+        Utils.GEDCOM_OUTPUT_NAME = f"{base_name}.ged"
 
     for software in Utils.resolve_gedcom_output_targets():
         build_gedcom_from_census(census_df, software)

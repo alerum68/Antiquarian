@@ -32,6 +32,9 @@
 | 29 | ✅ | UI Overhaul Task 4: Paleographer Metadata Injection |
 | 30 | ✅ | UI Overhaul Task 5: Archivist Schema & Dependency Simplification |
 | 31 | 🏗️ | UI Overhaul Task 6: Help & Tooltips Refresh |
+| 32 | ✅ | Fix NameError `_MODULE_DIR` not defined in `Archivist.py` |
+| 33 | ✅ | Fix `JSON_DIR` nesting by making it relative to `GENEALOGY_DIR` instead of `TOOLBOX_DIR` |
+| 34 | ✅ | Dynamic Census GEDCOM naming based on extracted metadata (Year, Country, State, County, Place, Provider) |
 
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified

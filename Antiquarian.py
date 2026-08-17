@@ -222,7 +222,7 @@ PATH_PICKER_FIELDS = {
     "RM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "FTM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
-    "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
+    "JSON_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "PROMPTS_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
 }
