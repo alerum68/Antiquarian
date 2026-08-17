@@ -645,6 +645,7 @@ def test_download_images_leaves_no_truncated_file_when_write_fails(monkeypatch, 
 
 
 def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch, tmp_path):
+    monkeypatch.setenv("GATHER_ON_COLLISION", "skip")
     manifest_data = {
         "sequences": [{"canvases": [
             {"images": [{"resource": {"@id": "https://example.com/img1.jpg"}}]},
@@ -664,3 +665,61 @@ def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch,
 
     master_data = LAC.load_master_db(master_db_path, "Test Collection", "Parish")
     assert len(master_data["sheets"]) == 1
+
+
+def test_download_pid_bundle_skips_existing_file_when_collision_is_skip(tmp_path, monkeypatch):
+    """When GATHER_ON_COLLISION=skip, download_pid_bundle must not call download_asset for
+    a file that already exists on disk."""
+    monkeypatch.setenv("GATHER_ON_COLLISION", "skip")
+
+    pid = "12345"
+    pid_dir = tmp_path / pid
+    pid_dir.mkdir()
+    existing = pid_dir / "asset_abc.jpg"
+    existing.write_bytes(b"cached_content")
+
+    monkeypatch.setattr(
+        LAC.lac_client, "get_record_metadata",
+        lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""})
+    )
+    monkeypatch.setattr(
+        LAC.lac_client, "get_manifest",
+        lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})]
+    )
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("should not download existing asset")
+    monkeypatch.setattr(LAC.lac_client, "download_asset", fail_if_called)
+
+    result = LAC.download_pid_bundle(pid, str(tmp_path))
+    assert existing.read_bytes() == b"cached_content"
+    assert result["source_documents"][0]["media_path"] == str(existing)
+
+
+def test_download_pid_bundle_overwrites_existing_file_when_collision_is_overwrite(tmp_path, monkeypatch):
+    """When GATHER_ON_COLLISION=overwrite, download_pid_bundle must fetch and replace
+    a file that already exists on disk."""
+    monkeypatch.setenv("GATHER_ON_COLLISION", "overwrite")
+
+    pid = "12345"
+    pid_dir = tmp_path / pid
+    pid_dir.mkdir()
+    existing = pid_dir / "asset_abc.jpg"
+    existing.write_bytes(b"cached_content")
+
+    monkeypatch.setattr(
+        LAC.lac_client, "get_record_metadata",
+        lambda _pid: type("Meta", (), {"title": "T", "reel_numbers": "", "series_code": ""})
+    )
+    monkeypatch.setattr(
+        LAC.lac_client, "get_manifest",
+        lambda _pid: [type("Asset", (), {"asset_id": "asset_abc", "op": "jpg", "label": "L"})]
+    )
+
+    def mock_download_asset(*_args, **_kwargs):
+        return b"fresh_content"
+    monkeypatch.setattr(LAC.lac_client, "download_asset", mock_download_asset)
+
+    result = LAC.download_pid_bundle(pid, str(tmp_path))
+    assert existing.read_bytes() == b"fresh_content"
+    assert result["source_documents"][0]["media_path"] == str(existing)

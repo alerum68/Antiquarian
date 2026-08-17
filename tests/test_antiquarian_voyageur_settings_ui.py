@@ -20,20 +20,19 @@ def test_visible_sections_for_familysearch_shows_only_gather_settings():
     assert "GATHER_ON_COLLISION" in result["Gather Settings"]
 
 
-def test_visible_sections_for_lac_does_not_include_ancestry_only_settings():
-    """GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py never reads it, so
-    it must not leak into LAC's section just because Gather Settings is always included."""
+def test_visible_sections_for_lac_includes_collision_setting():
+    """GATHER_ON_COLLISION is now shown for LAC - LAC.py reads and honours it."""
     result = Antiquarian.Antiquarian._voyageur_visible_sections("LAC")
 
     assert set(result.keys()) == {"Gather Settings"}
-    assert "GATHER_ON_COLLISION" not in result["Gather Settings"]
+    assert "GATHER_ON_COLLISION" in result["Gather Settings"]
 
 
-def test_visible_sections_for_keystone_shows_hbca_settings_and_no_collision_setting():
+def test_visible_sections_for_keystone_shows_hbca_settings_and_collision_setting():
     result = Antiquarian.Antiquarian._voyageur_visible_sections("Keystone Archives")
 
     assert set(result.keys()) == {"Gather Settings", "HBCA Settings"}
-    assert "GATHER_ON_COLLISION" not in result["Gather Settings"]
+    assert "GATHER_ON_COLLISION" in result["Gather Settings"]
     assert "HBCA_LETTER_FILTER" in result["HBCA Settings"]
 
 
@@ -76,21 +75,21 @@ def test_ancestry_source_shows_the_collision_setting(app):
     assert "HBCA Settings" not in texts
 
 
-def test_lac_source_does_not_show_the_ancestry_only_collision_setting(app):
-    """Regression test for the exact bug a review caught: an earlier version of this
-    feature put GATHER_ON_COLLISION in the always-shown Gather Settings section, which
-    made it appear for LAC even though LAC.py never reads that env var."""
+def test_lac_source_shows_collision_setting(app):
+    """LAC.py now reads GATHER_ON_COLLISION, so the On Existing File control must appear."""
     app.string_vars["VOYAGEUR_SOURCE"].set("LAC")
     app._on_voyageur_source_change()
 
     texts = _all_widget_texts(app.voyageur_form_container)
-    assert not any("On Existing File" in t for t in texts)
+    assert any("On Existing File" in t for t in texts)
 
 
-def test_keystone_source_shows_hbca_settings_and_not_the_collision_setting(app):
+def test_keystone_source_shows_hbca_settings_and_collision_setting(app):
+    """HBCA.py now reads GATHER_ON_COLLISION, so On Existing File must appear alongside
+    HBCA Settings for Keystone Archives."""
     app.string_vars["VOYAGEUR_SOURCE"].set("Keystone Archives")
     app._on_voyageur_source_change()
 
     texts = _all_widget_texts(app.voyageur_form_container)
     assert "HBCA Settings" in texts
-    assert not any("On Existing File" in t for t in texts)
+    assert any("On Existing File" in t for t in texts)

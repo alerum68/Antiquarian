@@ -1,6 +1,13 @@
 # Task Tracking
 
 | # | Status | Notes |
+| V0 | ✅ | Voyageur/Paleo Fixes: Create branch `fix/voyageur-paleo-settings` |
+| V1 | ✅ | Expose `GATHER_ON_COLLISION` for all Voyageur sources |
+| V2 | ✅ | Wire `GATHER_ON_COLLISION` into `HBCA.py` |
+| V3 | ✅ | Wire `GATHER_ON_COLLISION` into `LAC.py` |
+| V4 | ✅ | Add "Gather, Transcribe & Build" third Voyageur button |
+| V5 | ✅ | Fix Paleographer multi-tier .pmt discovery |
+| V6 | ✅ | Final verification & PR |
 | 18 | ✅ | Packaging Task 1: Single-Binary Router & Tampermonkey Hook (`Antiquarian.py`) |
 | 19 | ✅ | Packaging Task 2: Config Storage & Directory Scaffolding Defaults |
 | 20 | ✅ | Packaging Task 3: Auto-Updater (`Antiquarian.py`) |
