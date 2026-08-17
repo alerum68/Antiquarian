@@ -10,14 +10,22 @@ every record type except Scrip, which gets Scrip.ScripProfile.
 """
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Callable, Dict
 
-import Census
-import General
-import HBCA
-import Scrip
-import Utils
+# When executed via Antiquarian.py's runpy router, cwd is the project root, so
+# Archivist/ isn't in sys.path by default. Add it so sibling imports (Census, General,
+# HBCA, Scrip, Utils) work - mirrors Voyageur.py's own fix for the same router quirk.
+_MODULE_DIR = str(Path(__file__).resolve().parent)
+if _MODULE_DIR not in sys.path:
+    sys.path.insert(0, _MODULE_DIR)
+
+import Census  # noqa: E402
+import General  # noqa: E402
+import HBCA  # noqa: E402
+import Scrip  # noqa: E402
+import Utils  # noqa: E402
 
 _JSON_DIR_SETTING = os.getenv("JSON_DIR", "")
 JSON_DIR = (

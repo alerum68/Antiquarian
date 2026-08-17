@@ -30,6 +30,9 @@ def build():
         "--noconfirm",
         "--clean",
         "--icon", "Antiquarian.ico",
+        # customtkinter's hook is known to silently drop assets (themes, fonts) depending
+        # on the runner state - pin the assets dir explicitly so blue.json is always present.
+        "--add-data", "venv/Lib/site-packages/customtkinter;customtkinter",
         "--add-data", "Commissioner/assets/theme.json;Commissioner/assets",
         "--add-data", "Archivist/settings_schema.yaml;Archivist",
         "--add-data", "Voyageur/settings_schema.yaml;Voyageur",

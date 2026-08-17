@@ -37,6 +37,12 @@ def parse_ancestry_url(url: str):
     if col_match and pid_match:
         return col_match.group(1), pid_match.group(1)
 
+    # Newer imageviewer URLs drop pId entirely and put the image number straight in the
+    # path instead: .../collections/<dbid>/images/<imageNum>-<slug>.
+    img_match = re.search(r'collections/(\d+)/images/(\d+)', url)
+    if img_match:
+        return img_match.group(1), img_match.group(2)
+
     parsed = urllib.parse.urlparse(url)
     qs = urllib.parse.parse_qs(parsed.query)
     if 'dbid' in qs and 'h' in qs:
@@ -165,7 +171,13 @@ def main() -> Path:
 
     dbid, start_id = parse_ancestry_url(url)
     if not dbid or not start_id:
-        print("[ERROR] Could not parse database ID (dbid) or record ID (h) from the URL.")
+        if "ancestry.com" not in url.lower():
+            print("[ERROR] The Gather URL doesn't look like an Ancestry link. "
+                  "'Ancestry' is selected as the source in the Voyageur settings, but the "
+                  "URL in the Gather URL field points elsewhere - check that field and the "
+                  "source dropdown agree.")
+        else:
+            print("[ERROR] Could not parse database ID (dbid) or record ID (h) from the URL.")
         sys.exit(1)
 
     print(f"[System] Extracted -> DBID: {dbid} | Start ID: {start_id}")

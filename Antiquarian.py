@@ -148,7 +148,8 @@ GLOBAL_VARS = {"API & Processing": {"AGY_MODEL_NAME": "gemini-3.1-pro-high",
                                       "FTM_DIR": "",
                                       "MEDIA_DIR": "Media",
                                       "JSON_DIR": "JSON",
-                                      "GEDCOM_OUTPUT_PATH": "GEDCOM"},
+                                      "GEDCOM_OUTPUT_PATH": "GEDCOM",
+                                      "PROMPTS_DIR": "Prompts"},
                # Everything identifying who's doing the research and how it's attributed,
                # in one card - was two ("Metadata & Organization", "Standard Links").
                "Researcher & Organization": {"RESEARCHER": "Your Name", "ORG_NAME": "Your Historical Society",
@@ -178,6 +179,9 @@ TOOLTIP_DESCRIPTIONS = {  # Global Settings
     "RM_DIR": "The folder where your RootsMagic files live, relative to the Genealogy Dir.",
     "JSON_DIR": "The folder where downloaded JSON data files are kept.",
     "GEDCOM_OUTPUT_PATH": "The folder where the finished, ready-to-import GEDCOM files will be saved.",
+    "PROMPTS_DIR": "The folder (relative to the Genealogy Root Directory) holding your .pmt record-type "
+                   "prompt files. Paleographer/Archivist look here first, then fall back to the copy bundled "
+                   "with the app - override this only if you keep customized .pmt files of your own.",
     "RESEARCHER": "Your name. This will be added to the GEDCOM file to give you credit as the transcriber.",
     "ORG_NAME": "The name of your Historical Society, Library, or personal organization to include in GEDCOM headers.",
     "ROOT_SOURCE_ID": "The master SOUR (Source) ID used in RootsMagic for the researcher credit (e.g., @S1@).",
@@ -200,6 +204,7 @@ CUSTOM_LABELS = {
     "FTM_DIR": "Family Tree Maker Folder",
     "MEDIA_DIR": "Base Media Directory",
     "JSON_DIR": "JSON Download Folder",
+    "PROMPTS_DIR": "Prompts Folder",
     "AGY_MODEL_NAME": "Antigravity Model Name"}
 
 # ==========================================
@@ -219,6 +224,7 @@ PATH_PICKER_FIELDS = {
     "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
     "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
+    "PROMPTS_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
 }
 
 # ==========================================
@@ -1543,19 +1549,36 @@ class Antiquarian(ctk.CTk):
 
         self._build_form_ui(frame, ARCHIVIST_VARS)
 
-    @staticmethod
-    def _list_record_types() -> List[str]:
-        """Lists every .pmt file in Paleographer/prompts, for the record-type dropdown.
-        Adding a new record type is exactly this: drop a new .pmt file in that folder,
-        nothing else, and it shows up here automatically."""
-        prompts_dir = Path(__file__).resolve().parent / "Paleographer" / "prompts"
-        if not prompts_dir.is_dir():
-            return ["Parish.pmt"]
-        found = sorted((p.name for p in prompts_dir.glob("*.pmt")), key=str.lower)
-        return found or ["Parish.pmt"]
+    def _prompt_search_dirs(self) -> List[Path]:
+        """Mirrors Paleographer/engine.py's .pmt search path, highest priority first.
+        PROGRAM_DIR itself is never a GUI field (see _run_subprocess) - it's always
+        APP_DIR, the app's actual install location, so this reads that directly rather
+        than a nonexistent string_vars entry."""
+        dirs = []
 
-    @staticmethod
-    def _read_pmt_front_matter(record_type_value: str) -> dict:
+        gen_var = self.string_vars.get("GENEALOGY_DIR")
+        gen_dir = gen_var.get().strip() if gen_var else ""
+        prompts_var = self.string_vars.get("PROMPTS_DIR")
+        prompts_subdir = (prompts_var.get().strip() if prompts_var else "") or "Prompts"
+
+        if gen_dir:
+            dirs.append(Path(gen_dir) / prompts_subdir)
+        dirs.append(APP_DIR / "Prompts")
+        dirs.append(Path(__file__).resolve().parent / "Paleographer" / "prompts")
+        return dirs
+
+    def _list_record_types(self) -> List[str]:
+        """Lists every .pmt file found in the multi-tier prompt search path."""
+        found = set()
+        for d in self._prompt_search_dirs():
+            if d.is_dir():
+                for p in d.glob("*.pmt"):
+                    found.add(p.name)
+        if not found:
+            return ["Parish.pmt"]
+        return sorted(list(found), key=str.lower)
+
+    def _read_pmt_front_matter(self, record_type_value: str) -> dict:
         """Reads a .pmt file's own YAML front matter directly - the same declarative data
         Paleographer.py/Archivist.py themselves read (via engine.parse_type_config /
         apply_record_type_field_remap) to resolve their own settings and vocabulary. The
@@ -1565,7 +1588,16 @@ class Antiquarian(ctk.CTk):
         name = record_type_value.strip() or "Parish.pmt"
         if not name.endswith(".pmt"):
             name += ".pmt"
-        pmt_path = Path(__file__).resolve().parent / "Paleographer" / "prompts" / name
+
+        pmt_path = None
+        for d in self._prompt_search_dirs():
+            candidate = d / name
+            if candidate.is_file():
+                pmt_path = candidate
+                break
+
+        if not pmt_path:
+            return {}
         try:
             raw = pmt_path.read_text(encoding="utf-8")
         except OSError:
@@ -1760,17 +1792,13 @@ class Antiquarian(ctk.CTk):
 
     @staticmethod
     def _voyageur_visible_sections(label: str) -> Dict[str, Dict[str, str]]:
-        """Fields shown for the given VOYAGEUR_SOURCE label: its own provider section
-        plus "Gather Settings", shown regardless of which provider is selected."""
+        """Fields shown for the given VOYAGEUR_SOURCE label: the universal "Gather Settings"
+        section (shown for all sources, including GATHER_ON_COLLISION which every Voyageur
+        sub-script now reads) plus the provider's own section if it has one."""
         result = {}
 
         if "Gather Settings" in VOYAGEUR_VARS:
-            gather_settings = dict(VOYAGEUR_VARS["Gather Settings"])
-            # GATHER_ON_COLLISION only means anything to A.py/FS.py - LAC.py and the
-            # HBCA/Keystone script never read it, so it must not leak into their form.
-            if label not in ("Ancestry", "FamilySearch"):
-                gather_settings.pop("GATHER_ON_COLLISION", None)
-            result["Gather Settings"] = gather_settings
+            result["Gather Settings"] = dict(VOYAGEUR_VARS["Gather Settings"])
 
         section_name = "HBCA Settings" if label == "Keystone Archives" else label
         if section_name in VOYAGEUR_VARS:
@@ -1790,14 +1818,26 @@ class Antiquarian(ctk.CTk):
             self.voyageur_gather_btn.configure(text=f"Gather from {label}",
                                                command=lambda: self.execute_script("VOYAGEUR_SCRIPT", code))
 
-        if hasattr(self, "voyageur_send_to_archivist_btn"):
+        if hasattr(self, "voyageur_gather_build_btn"):
             # Chains straight into Generate GEDCOM (the same "gedcom_auto" mode the
             # Archivist tab's own button uses) only once the gather actually finishes
             # cleanly - see execute_script's on_success.
-            self.voyageur_send_to_archivist_btn.configure(
+            self.voyageur_gather_build_btn.configure(
                 command=lambda: self.execute_script(
                     "VOYAGEUR_SCRIPT", code,
                     on_success=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")))
+
+        if hasattr(self, "voyageur_gather_transcribe_build_btn"):
+            # Chains Voyageur -> Paleographer (API mode) -> Archivist (gedcom_auto)
+            self.voyageur_gather_transcribe_build_btn.configure(
+                command=lambda: self.execute_script(
+                    "VOYAGEUR_SCRIPT", code,
+                    on_success=lambda: self.execute_script(
+                        "ANALYSIS_SCRIPT", "paleographer_api",
+                        on_success=lambda: self.execute_script("ARCHIVIST_SCRIPT", "gedcom_auto")
+                    )
+                )
+            )
 
         if hasattr(self, "voyageur_form_container"):
             for child in self.voyageur_form_container.winfo_children():
@@ -1828,10 +1868,15 @@ class Antiquarian(ctk.CTk):
                                                  text_color=C_TEXT)
         self.voyageur_gather_btn.pack(side="left", padx=5)
 
-        self.voyageur_send_to_archivist_btn = ctk.CTkButton(
-            btn_box, text="Gather and Send to Archivist", fg_color="#2b7a4b", hover_color="#1e5935",
+        self.voyageur_gather_build_btn = ctk.CTkButton(
+            btn_box, text="Gather & Build", fg_color="#2b7a4b", hover_color="#1e5935",
             text_color=C_TEXT)
-        self.voyageur_send_to_archivist_btn.pack(side="left", padx=5)
+        self.voyageur_gather_build_btn.pack(side="left", padx=5)
+
+        self.voyageur_gather_transcribe_build_btn = ctk.CTkButton(
+            btn_box, text="Gather, Transcribe & Build", fg_color="#7A5B2B", hover_color="#5B431E",
+            text_color=C_TEXT)
+        self.voyageur_gather_transcribe_build_btn.pack(side="left", padx=5)
 
         # Persistent container the filtered settings form gets rebuilt into whenever the
         # source changes, so switching repositories only shows the fields that source uses.
@@ -2012,9 +2057,13 @@ class Antiquarian(ctk.CTk):
         run_env['PYTHONIOENCODING'] = 'utf-8'
         # The app's own install location - not a GUI-editable setting, so it never rides
         # along via string_vars like the rest of run_env. Tools that resolve fixed,
-        # ships-with-the-app paths (e.g. Gazetteer's shapefiles) read this rather than a
-        # settings key.
-        run_env.setdefault('PROGRAM_DIR', str(BASE_DIR))
+        # ships-with-the-app paths (e.g. Gazetteer's shapefiles, Paleographer's Prompts
+        # fallback) read this rather than a settings key. Must be APP_DIR, not BASE_DIR:
+        # BASE_DIR is __file__-relative, which lands inside PyInstaller's _internal bundle
+        # dir when frozen (see APP_DIR's own definition above) - a portable install's
+        # bundled Prompts folder lives next to the .exe, not in there, so PROGRAM_DIR
+        # pointed at BASE_DIR silently couldn't find it.
+        run_env.setdefault('PROGRAM_DIR', str(APP_DIR))
 
         script_path = safe_cmd[0]
         try:

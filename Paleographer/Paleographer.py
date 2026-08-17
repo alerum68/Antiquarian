@@ -9,6 +9,14 @@ cwd=Paleographer/, so Extract.py and ScripTools.py import as plain sibling modul
 """
 
 import sys
+from pathlib import Path
+
+# When executed via Antiquarian.py's runpy router, cwd is the project root, so
+# Paleographer/ isn't in sys.path by default. Add it so sibling imports (Extract,
+# ScripTools) work - mirrors Voyageur.py's own fix for the same router quirk.
+_MODULE_DIR = str(Path(__file__).resolve().parent)
+if _MODULE_DIR not in sys.path:
+    sys.path.insert(0, _MODULE_DIR)
 
 ENRICHMENT_MODES = ("enrich", "crosscheck", "partition", "resolve-names")
 

@@ -654,6 +654,10 @@ def test_download_images_dedups_scaffold_when_image_already_on_disk(monkeypatch,
     os.makedirs(out_dir, exist_ok=True)
     (Path(out_dir) / "roll1_0001.jpg").write_bytes(b"already-downloaded")
 
+    # Voyageur/.env sets GATHER_ON_COLLISION=overwrite which would leak into this test;
+    # clear it so the default ('skip') applies and the dedup check can fire.
+    monkeypatch.delenv("GATHER_ON_COLLISION", raising=False)
+
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("should not re-download an existing image")
     monkeypatch.setattr(LAC.requests, "Session", lambda: type("FakeSession", (), {"get": fail_if_called})())
