@@ -35,6 +35,8 @@
 | 32 | ✅ | Fix NameError `_MODULE_DIR` not defined in `Archivist.py` |
 | 33 | ✅ | Fix `JSON_DIR` nesting by making it relative to `GENEALOGY_DIR` instead of `TOOLBOX_DIR` |
 | 34 | ✅ | Dynamic Census GEDCOM naming based on extracted metadata (Year, Country, State, County, Place, Provider) |
+| 35 | ✅ | Fix `RECORD_FAMILY_KEYWORDS` matching so "Churchill" doesn't falsely categorize as "church" |
+| 36 | ✅ | Mark Birth and Race extracted from Census as `Proof: Proposed` instead of proven or missing |
 
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
