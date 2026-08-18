@@ -17,6 +17,19 @@
 (function () {
     'use strict';
 
+    // Shared location utility: determines Country from state/province text.
+    // Matches Gazetteer.CA_PROVINCE_NAMES (Gazetteer/Gazetteer.py) plus the historical
+    // fur-trade-era names. Defaults to "USA" when state is empty or unrecognized.
+    const CANADIAN_PROVINCES_AND_TERRITORIES = new Set([
+        'alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland',
+        'nova scotia', 'northwest territories', 'north-west territories', 'ontario',
+        'prince edward island', 'quebec', 'saskatchewan', 'yukon', 'nunavut',
+    ]);
+
+    function getCountryFromState(state) {
+        const normalized = (state || '').trim().toLowerCase();
+        return CANADIAN_PROVINCES_AND_TERRITORIES.has(normalized) ? 'Canada' : 'USA';
+    }
     // Shared by both runXGather() functions below. Resolves as soon as checkFn() returns a
     // truthy value, re-testing it on every DOM mutation (React re-rendering a panel, a
     // table's rows updating, a button's disabled attribute flipping) instead of on a fixed
@@ -521,7 +534,8 @@
         // iframe even when same-origin. The parent does the actual click instead, in the
         // same top-level context that already reliably downloads the JSON.
         const match = window.location.pathname.match(/\/dz\/v1\/([^/]+)\/\$dist/);
-        const itemId = match ? decodeURIComponent(match[1]) : "unknown_item";
+        let itemId = match ? decodeURIComponent(match[1]) : "unknown_item";
+        itemId = itemId.replace(/^(3:1:3|1:1:)/, '');
         const fileName = `${itemId.replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`;
 
         fetch(window.location.href)
@@ -1027,7 +1041,7 @@
                 state = pathArr[0] || "";
                 county = pathArr[1] || "";
                 city = pathArr[2] || "";
-                country = ancestryCountryFromState(state);
+                country = getCountryFromState(state);
                 const ed = getEnumerationDistrict(pathArr, info?.structureType);
                 enumerationDistrict = ed.value;
                 placeDetails = pathArr.slice(3).filter((_, i) => (i + 3) !== ed.index).join(" - ") || "";
@@ -1745,12 +1759,34 @@
             return wait.result;
         }
 
+        function parseFsLocationFromBrowsePath(browsePathArray) {
+            let state = "", county = "", city = "", ed = "";
+            let segments = browsePathArray.filter(s => !/^image\s+\d+\s+of\s+\d+$/i.test(s));
+            let edIndex = segments.findIndex(s => /\bED\b|enumeration district/i.test(s));
+            if (edIndex !== -1) {
+                ed = segments[edIndex];
+                segments.splice(edIndex, 1);
+            }
+            if (segments.length > 0) state = segments[0];
+            if (segments.length > 1) county = segments[1];
+            if (segments.length > 2) city = segments[2];
+            return { state, county, city, enumeration_district: ed };
+        }
+
+        function parseFsLocationFromCitation(citationText) {
+            const match = citationText.match(/FamilySearch\s*\([^)]*\),\s*(.*?)(?:;\s*citing|\.$)/i);
+            if (!match) return { state: "", county: "", city: "", enumeration_district: "" };
+            let pathString = match[1];
+            return parseFsLocationFromBrowsePath(pathString.split(' > ').map(s => s.trim()));
+        }
+
         async function buildFsItemData(itemId) {
             const pageType = await detectFsPageType();
             let rows = [];
             let citationText = '';
             let catalogItems = [];
             let incomplete = false;
+            let locationInfo = { state: "", county: "", city: "", enumeration_district: "" };
 
             if (pageType === 'image-index') {
                 const apiWait = await waitForFsImageIndexResponse(itemId);
@@ -1761,13 +1797,18 @@
                         imageNumber: imageMatch ? imageMatch[1] : undefined,
                         imageTotal: imageMatch ? imageMatch[2] : undefined,
                     });
+                    
+                    const record = ((apiWait.result && apiWait.result.records) || [])[0];
+                    const headPerson = record ? (record.persons || [])[0] : null;
+                    const censusFact = headPerson ? fsImageIndexFindByType(headPerson.facts || [], 'http://gedcomx.org/Census') : null;
+                    const browsePath = fsImageIndexBrowsePathSegments(censusFact);
+                    locationInfo = parseFsLocationFromBrowsePath(browsePath);
                 } else {
                     incomplete = true;
                     debugLog(`No Image-Index response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
                     if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
-                const catalog = await scrapeCitationAndCatalog();
-                catalogItems = catalog.catalogItems;
+                // No DOM scraping needed for image-index pages (fixes missing-panel errors).
             } else if (pageType === 'names') {
                 const apiWait = await waitForFsApiResponse(itemId);
                 if (apiWait.result) {
@@ -1780,13 +1821,25 @@
                 const citation = await scrapeCitationAndCatalog();
                 citationText = citation.citationText;
                 catalogItems = citation.catalogItems;
+                locationInfo = parseFsLocationFromCitation(citationText);
             } else {
                 incomplete = true;
                 debugLog(`Neither Names nor Image Index tab found for item ${itemId} - unrecognized page shape.`);
                 if (window.fsShowToast) window.fsShowToast('Unrecognized page.', 'error', 4000);
             }
 
-            return {item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows, incomplete};
+            return {
+                item_id: itemId, 
+                citation_text: citationText, 
+                catalog_items: catalogItems, 
+                rows, 
+                incomplete,
+                country: getCountryFromState(locationInfo.state),
+                state: locationInfo.state,
+                county: locationInfo.county,
+                city: locationInfo.city,
+                enumeration_district: locationInfo.enumeration_district
+            };
         }
 
         async function scrapeCurrentImage() {
@@ -2157,27 +2210,7 @@
     // there - the guard is load-bearing, not defensive boilerplate.
 // extractCurrentPageData() used to hardcode country = "USA" unconditionally - confirmed
 // live (2026-08-15 Canadian gather, dbId 1578, Ontario) this mislabeled every Canadian
-// Ancestry record as American, all the way through to the generated GEDCOM's citation
-// text. Matches Gazetteer.CA_PROVINCE_NAMES (Gazetteer/Gazetteer.py) plus the historical
-// fur-trade-era names already added to Archivist/Census.py's
-// CANADIAN_PROVINCES_AND_TERRITORIES this session - kept in sync by hand across the two
-// languages rather than sharing one file, same as this project's other small
-// cross-language constant duplications (e.g. get_census_era's US-history thresholds).
-const CANADIAN_PROVINCES_AND_TERRITORIES = new Set([
-    'alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland',
-    'nova scotia', 'northwest territories', 'north-west territories', 'ontario',
-    'prince edward island', 'quebec', 'saskatchewan', 'yukon', 'nunavut',
-]);
 
-// browsePath's own province/state text (e.g. "Ontario", "Dakota Territory") is the only
-// signal available at gather time - Ancestry's index-panel-data API has no dedicated
-// country field of its own. Defaults to "USA" (the collection this project has gathered
-// most, and every pre-Canada-support gather's own established behavior) when state is
-// empty or unrecognized, rather than leaving it blank.
-function ancestryCountryFromState(state) {
-    const normalized = (state || '').trim().toLowerCase();
-    return CANADIAN_PROVINCES_AND_TERRITORIES.has(normalized) ? 'Canada' : 'USA';
-}
 
 // Ancestry's imageviewer/api/record/index-panel-data endpoint uses a stable, self-
 // describing fieldName vocabulary that does NOT change across census years (only which
@@ -2341,16 +2374,14 @@ function buildRetryNavigationUrl(url, runIdValue) {
     return `${url}${separator}mgs_auto=1&mgs_run=${runIdValue}`;
 }
 
-function ancestryIncompletePagesSummary(pages) {
-    return (pages || [])
-        .filter((p) => p.incomplete)
-        .map((p) => ({page_number: p.page_number, image_id: p.image_id}));
-}
-
-function fsIncompleteItemsSummary(items) {
+function incompleteItemsSummary(items) {
     return (items || [])
         .filter((i) => i.incomplete)
-        .map((i) => ({item_id: i.item_id}));
+        .map((i) => ({
+            page_number: i.page_number,
+            image_id: i.image_id,
+            item_id: i.item_id
+        }));
 }
 
     if (typeof module !== 'undefined' && module.exports) {
@@ -2363,8 +2394,8 @@ function fsIncompleteItemsSummary(items) {
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
-            ancestryCountryFromState, buildRetryNavigationUrl, ancestryIncompletePagesSummary,
-            fsIncompleteItemsSummary,
+            getCountryFromState, buildRetryNavigationUrl, incompleteItemsSummary,
+            fsIncompleteItemsSummary: incompleteItemsSummary // Alias for backward compatibility if tests use it
         };
     }
 
