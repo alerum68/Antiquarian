@@ -16,7 +16,7 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Optional
 
 from dotenv import set_key
 from watchdog.events import FileSystemEventHandler
@@ -114,30 +114,30 @@ def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
 def build_detailed_census_filename(year: str, normalized_data: dict, provider: str) -> Optional[str]:
     """Builds a '(Year) Census - (Country) - (State) - (County) - (City, township, ED) - (Provider).json'
     filename matching the specific request."""
+    prov_abbr = "ANC" if provider.lower() == "ancestry" else (
+        "FS" if provider.lower() in ("familysearch", "fs") else provider)
+
     for sheet in normalized_data.get("sheets", []):
         for record in sheet.get("records", []):
             fields = record.get("type_specific_fields", {}) or {}
-            parts = [f"Census - {year}" if year else "Census"]
+            parts = [f"Census-{year}" if year else "Census"]
             if fields.get("country"):
                 parts.append(fields["country"])
             if fields.get("state"):
                 parts.append(fields["state"])
             if fields.get("county"):
                 parts.append(fields["county"])
-            
-            city_ed = []
+
             if fields.get("city"):
-                city_ed.append(fields["city"])
+                parts.append(fields["city"])
             if fields.get("enumeration_district"):
-                city_ed.append(fields["enumeration_district"])
-            if city_ed:
-                parts.append(", ".join(city_ed))
-            
-            if provider:
-                parts.append(provider)
-            
+                parts.append(fields["enumeration_district"])
+
+            if prov_abbr:
+                parts.append(prov_abbr)
+
             if len(parts) > 1:
-                safe = " - ".join(parts)
+                safe = "-".join(parts)
                 safe = re.sub(r'[/\\?%*:|"<>]', "-", safe).strip()
                 return f"{safe}.json"
     return None
@@ -312,7 +312,16 @@ def census_collection_folder_name(census_year: str, country: str, collection_nam
 
 
 def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
-                             location_folder: str) -> Path:
+                             year: str, country: str, location_folder: str) -> Path:
+    """Resolves the image target directory for a census gather.
+
+    Path structure: <base_img_dir>/<census_folder>/<country>/<year>/<location_parts...>
+    census_folder is the sanitised collection-level folder name (from
+    census_collection_folder_name()) and forms the first sub-level so all images from one
+    collection stay together regardless of state/county. country and year are appended
+    next (each skipped when blank), then location_folder is split on ' - ' to form the
+    remaining leaf segments.
+    """
     if os.path.isabs(base_img_setting):
         base_img_dir = Path(base_img_setting)
     else:
@@ -320,14 +329,19 @@ def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_f
         base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
             Path(genealogy_dir) / media_setting if genealogy_dir else Path(media_setting))
         base_img_dir = base_media_dir / base_img_setting
-    # location_folder arrives as a single " - "-joined string (e.g. "Ontario - Frontenac
-    # - Rockwood Lunatic Asylum", state - county - city) - nest each real segment as its
-    # own subfolder (State\County\City) rather than one folder literally named with
-    # embedded " - " text, e.g. "1880 USA Census\Michigan\Kent County" not
-    # "1880 USA Census\Kent County, Michigan".
+
+    parts = []
+    if census_folder:
+        parts.append(census_folder)
+    if country:
+        parts.append(country)
+    if year:
+        parts.append(year)
+
     location_parts = [p.strip() for p in location_folder.split(' - ') if p.strip()]
-    img_target_dir = base_img_dir.joinpath(census_folder, *location_parts) if location_parts \
-        else base_img_dir / census_folder
+    parts.extend(location_parts)
+
+    img_target_dir = base_img_dir.joinpath(*parts) if parts else base_img_dir
     img_target_dir.mkdir(parents=True, exist_ok=True)
     return img_target_dir
 

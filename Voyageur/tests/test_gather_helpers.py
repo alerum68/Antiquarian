@@ -298,37 +298,24 @@ def test_atomic_write_bytes_leaves_no_truncated_file_at_dest_on_failure(tmp_path
 
 
 def test_resolve_census_image_dir_absolute_base(tmp_path):
-    """Regression: a " - "-joined location_folder (state - county - city, the exact
-    shape A.py's/FS.py's own filename-derived location text arrives in) must nest as
-    real subfolders (State\\County\\City), not one folder literally named with embedded
-    " - " text."""
-    abs_base = tmp_path / "AbsCensus"
-
-    result = gh.resolve_census_image_dir(str(abs_base), "", "1900 US Federal Census", "USA - Ohio")
-
-    assert result == abs_base / "1900 US Federal Census" / "USA" / "Ohio"
+    abs_base = tmp_path / "AbsMedia"
+    abs_base.mkdir()
+    result = gh.resolve_census_image_dir(str(abs_base), "", "", "1900", "USA", "Ohio")
+    assert result == abs_base / "USA" / "1900" / "Ohio"
     assert result.exists()
 
 
 def test_resolve_census_image_dir_relative_to_media_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("MEDIA_DIR", "Media")
-    program_dir = tmp_path / "program"
-
-    result = gh.resolve_census_image_dir("Census", str(program_dir), "1900 US Federal Census", "Ohio")
-
-    assert result == program_dir / "Media" / "Census" / "1900 US Federal Census" / "Ohio"
-    assert result.exists()
+    program_dir = tmp_path / "Program"
+    monkeypatch.setenv("MEDIA_DIR", "TestMedia")
+    result = gh.resolve_census_image_dir("Census", str(program_dir), "", "1900", "USA", "Ohio")
+    assert result == program_dir / "TestMedia" / "Census" / "USA" / "1900" / "Ohio"
 
 
 def test_resolve_census_image_dir_nests_state_county_city(tmp_path):
-    """Confirms the full 3-level nesting a real gather's location text produces (e.g.
-    Voyageur.js's own "Michigan - Kent County" browsePath-derived location string)."""
-    abs_base = tmp_path / "AbsCensus"
-
-    result = gh.resolve_census_image_dir(str(abs_base), "", "1880 USA Census", "Michigan - Kent County")
-
-    assert result == abs_base / "1880 USA Census" / "Michigan" / "Kent County"
-    assert result.exists()
+    abs_base = tmp_path / "AbsMedia"
+    result = gh.resolve_census_image_dir(str(abs_base), "", "", "1880", "USA", "Michigan - Kent County")
+    assert result == abs_base / "USA" / "1880" / "Michigan" / "Kent County"
 
 
 def test_census_collection_folder_name_generic_country_no_collection_name():
@@ -385,3 +372,70 @@ def test_print_incomplete_pages_warning_prints_item_id_when_no_page_number(capsy
 def test_print_incomplete_pages_warning_no_output_when_empty(capsys):
     gh.print_incomplete_pages_warning([], "page(s)")
     assert capsys.readouterr().out == ""
+
+
+def test_build_detailed_census_filename_with_all_fields():
+    normalized_data = {
+        "sheets": [{
+            "records": [{
+                "type_specific_fields": {
+                    "country": "USA",
+                    "state": "North Dakota",
+                    "county": "Pembina",
+                    "city": "Walhalla",
+                    "enumeration_district": "34-36"
+                }
+            }]
+        }]
+    }
+    result = gh.build_detailed_census_filename("1950", normalized_data, "FamilySearch")
+    assert result == "Census-1950-USA-North Dakota-Pembina-Walhalla-34-36-FS.json"
+
+
+def test_build_detailed_census_filename_with_missing_fields():
+    normalized_data = {
+        "sheets": [{
+            "records": [{
+                "type_specific_fields": {
+                    "country": "USA",
+                    "state": "",
+                    "county": "",
+                    "city": ""
+                }
+            }]
+        }]
+    }
+    result = gh.build_detailed_census_filename("1950", normalized_data, "Ancestry")
+    assert result == "Census-1950-USA-ANC.json"
+
+
+from unittest.mock import patch
+from pathlib import Path
+
+
+def test_resolve_census_image_dir_builds_structured_path(tmp_path):
+    """census_folder is a distinct level between base and country/year."""
+    with patch("_gather_helpers.os.getenv", return_value=""):
+        result = gh.resolve_census_image_dir(
+            str(tmp_path), "", "United States Census 1880",
+            "1880", "USA", "North Dakota - Pembina"
+        )
+    assert result == tmp_path / "United States Census 1880" / "USA" / "1880" / "North Dakota" / "Pembina"
+
+
+def test_resolve_census_image_dir_no_location_parts(tmp_path):
+    """Empty location_folder still produces a valid path."""
+    with patch("_gather_helpers.os.getenv", return_value=""):
+        result = gh.resolve_census_image_dir(
+            str(tmp_path), "", "1880 USA Census", "1880", "USA", ""
+        )
+    assert result == tmp_path / "1880 USA Census" / "USA" / "1880"
+
+
+def test_resolve_census_image_dir_omits_empty_segments(tmp_path):
+    """Absent country or year are skipped, not added as empty path segments."""
+    with patch("_gather_helpers.os.getenv", return_value=""):
+        result = gh.resolve_census_image_dir(
+            str(tmp_path), "", "Some Collection", "", "", "Pembina"
+        )
+    assert result == tmp_path / "Some Collection" / "Pembina"
