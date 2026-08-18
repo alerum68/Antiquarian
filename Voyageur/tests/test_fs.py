@@ -157,3 +157,42 @@ def test_convert_raw_gather_to_final_routes_non_census_collections_through_unive
 
     assert "sheets" in final_data
     assert clean_name is None
+
+
+import json
+
+MINIMAL_FINAL_DATA = {
+    "citation": {"collection_name": "United States Census, 1880"},
+    "sheets": [{
+        "records": [{
+            "type_specific_fields": {
+                "census_year": "1880",
+                "country": "USA",
+                "state": "North Dakota",
+                "county": "Pembina",
+                "city": "Walhalla",
+                "enumeration_district": "",
+            }
+        }]
+    }]
+}
+
+
+def test_fs_main_image_routing_uses_live_data_not_filename():
+    """census_year and location_folder come from final_data, never from stem.split."""
+    from _gather_helpers import extract_census_image_routing_fields
+    year, country, loc_folder, coll_name = extract_census_image_routing_fields(MINIMAL_FINAL_DATA)
+    assert year == "1880"
+    assert country == "USA"
+    assert loc_folder == "North Dakota - Pembina - Walhalla"
+    assert coll_name == "United States Census, 1880"
+
+
+def test_fs_location_folder_skips_empty_fields():
+    """Empty city is omitted from location_folder, no trailing ' - '."""
+    data = json.loads(json.dumps(MINIMAL_FINAL_DATA))
+    data["sheets"][0]["records"][0]["type_specific_fields"]["city"] = ""
+    from _gather_helpers import extract_census_image_routing_fields
+    _, _, loc_folder, _ = extract_census_image_routing_fields(data)
+    assert loc_folder == "North Dakota - Pembina"
+    assert not loc_folder.endswith(" - ")

@@ -40,6 +40,7 @@ import census_schema
 from _gather_helpers import (
     census_collection_folder_name,
     cleanup_checkpoint_files,
+    extract_census_image_routing_fields,
     find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
@@ -724,7 +725,6 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
-
 def normalize_familysearch_census_gather(raw_census: dict, collection_title: str) -> dict:
     """Translates a raw FamilySearch census gather (already grouped into Voyageur's own
     {census_year, pages: [...]} shape by build_census_json) into the shared record schema -
@@ -790,16 +790,12 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
             recovered_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
         _unlink_with_retry(group["final"])
 
-        stem = re.sub(r' - FS$', '', recovered_json.stem)
-        stem_parts = stem.split(' - ', 1)
-        census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
-        location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-        collection_name = final_data.get("citation", {}).get("collection_name", "")
-        country = next(
-            (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
-             for s in final_data.get("sheets", []) if s.get("records")), "")
+        # Extract routing fields from the normalised data directly - no filename parsing.
+        census_year, country, location_folder, collection_name = \
+            extract_census_image_routing_fields(final_data)
         census_folder = census_collection_folder_name(census_year, country, collection_name)
-        img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
+        img_target_dir = resolve_census_image_dir(
+            "Census", genealogy_dir, census_folder, census_year, country, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
             downloads_dir, f"TMP_FS_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
@@ -890,24 +886,16 @@ def main() -> None:
     # Mirrors A.py's own nested image-folder convention (see census_collection_folder_name()),
     # derived from this same run's own clean filename (when one was built) so both
     # sources' images land under a comparable structure.
-    stem = re.sub(r' - FS$', '', final_json.stem)
-    stem_parts = stem.split(' - ', 1)
-    census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
-    location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-    # country only ever appears in type_specific_fields for census-flavor gathers
-    # (build_census_json/census_schema) - .get()'s own defaults make this a safe no-op
-    # for a church/scrip gather's differently-shaped participants, no record_family
-    # check needed.
-    collection_name = final_data.get("citation", {}).get("collection_name", "")
-    country = next(
-        (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
-         for s in final_data.get("sheets", []) if s.get("records")), "")
+    # Extract routing fields from the normalised data directly - no filename parsing.
+    census_year, country, location_folder, collection_name = \
+        extract_census_image_routing_fields(final_data)
     census_folder = census_collection_folder_name(census_year, country, collection_name)
 
     # Matches Antiquarian.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
-    img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
+    img_target_dir = resolve_census_image_dir(
+        base_img_setting, genealogy_dir, census_folder, census_year, country, location_folder)
 
     img_moved, img_skipped, img_failed = move_downloaded_images(
         downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)
