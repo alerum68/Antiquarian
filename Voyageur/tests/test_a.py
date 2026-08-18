@@ -74,3 +74,30 @@ def test_normalize_ancestry_census_gather_derives_canadian_title_from_page_count
     normalized = A.normalize_ancestry_census_gather(raw_gather)
 
     assert normalized["collection_title"] == "1871 Canada Census - Ontario"
+
+
+MINIMAL_NORMALIZED = {
+    "citation": {"collection_name": "United States Federal Census, 1860"},
+    "sheets": [{
+        "records": [{
+            "type_specific_fields": {
+                "census_year": "1860",
+                "country": "USA",
+                "state": "Minnesota",
+                "county": "Ramsey",
+                "city": "St Paul",
+                "enumeration_district": "",
+            }
+        }]
+    }]
+}
+
+
+def test_a_main_image_routing_uses_live_data_not_filename():
+    """A.py image routing reads census_year/location from data, not the filename stem."""
+    from _gather_helpers import extract_census_image_routing_fields
+    year, country, loc_folder, coll_name = extract_census_image_routing_fields(MINIMAL_NORMALIZED)
+    assert year == "1860"
+    assert country == "USA"
+    assert loc_folder == "Minnesota - Ramsey - St Paul"
+    assert coll_name == "United States Federal Census, 1860"

@@ -311,6 +311,31 @@ def census_collection_folder_name(census_year: str, country: str, collection_nam
     return f"{census_year} {country or 'USA'} Census"
 
 
+def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str, str]:
+    """Extracts (census_year, country, location_folder, collection_name) from a normalised
+    gather dict (output of normalize_*_census_gather). Used by both FS.py and A.py to
+    route images without re-parsing the filename.
+
+    location_folder is built as 'state - county - city' (each segment omitted when blank)
+    matching the ' - ' split resolve_census_image_dir uses internally."""
+    fields: dict = {}
+    for sheet in final_data.get("sheets", []):
+        records = sheet.get("records", [])
+        if records:
+            fields = records[0].get("type_specific_fields", {}) or {}
+            break
+    census_year = fields.get("census_year", "") or ""
+    country = fields.get("country", "") or ""
+    location_parts = [
+        fields.get("state", ""),
+        fields.get("county", ""),
+        fields.get("city", ""),
+    ]
+    location_folder = " - ".join(p for p in location_parts if p)
+    collection_name = final_data.get("citation", {}).get("collection_name", "") or ""
+    return census_year, country, location_folder, collection_name
+
+
 def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
                              year: str, country: str, location_folder: str) -> Path:
     """Resolves the image target directory for a census gather.
