@@ -37,6 +37,12 @@
 | 34 | ✅ | Dynamic Census GEDCOM naming based on extracted metadata (Year, Country, State, County, Place, Provider) |
 | 35 | ✅ | Fix `RECORD_FAMILY_KEYWORDS` matching so "Churchill" doesn't falsely categorize as "church" |
 | 36 | ✅ | Mark Birth and Race extracted from Census as `Proof: Proposed` instead of proven or missing |
+| 37 | ✅ | Voyageur UI/Logic fixes: set GATHER_ON_COLLISION default to "skip"; format city/ED with hyphens in names; strip ARK prefix from image files; update Media/Census output folder structure to `Country/Year/Location`; fix FS CITATION_RE regex to support 1950 census without NARA. All tests pass. |
+| 38 | ✅ | Task 1: Extend `resolve_census_image_dir` to take `census_folder` |
+| 39 | ✅ | Task 2: Fix `FS.py` - replace stale `stem.split` blocks with live data |
+| 40 | ✅ | Task 3: Fix `A.py` - same stem.split removal, helper promoted to `_gather_helpers.py` |
+| 41 | ✅ | Task 4: Remove dead `scrapeCitationAndCatalog()` call from JS `image-index` branch |
+| 42 | ✅ | Task 5: Full regression suite + final lint |
 
 
 ## Reviewer-Debt Resolution (2026-08-11) — D1–D5 closed, all verified
