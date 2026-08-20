@@ -345,7 +345,7 @@ def resolve_gedcom_output_path(target_software: str) -> Path:
     out_dir = Path(str(GEDCOM_OUTPUT_PATH)) if GEDCOM_OUTPUT_PATH else (
         Path(str(RM_DIR)) if target_software == "RM" else Path(str(FTM_DIR)))
     out_dir.mkdir(parents=True, exist_ok=True)
-    suffix = f" - {target_software}" if len(resolve_gedcom_output_targets()) > 1 else ""
+    suffix = f"-{target_software}" if len(resolve_gedcom_output_targets()) > 1 else ""
     return out_dir / f"{base_name}{suffix}{ext}"
 
 

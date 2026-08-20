@@ -599,10 +599,6 @@ def _build_citation_block(rec: dict, part: dict, tag_name: str, vol: str, media_
         else:
             block.extend([f"3 REFN {refn}", "3 QUAY 3"])
 
-    apid_record_id = Utils.clean_val((part.get('type_specific_fields') or {}).get('apid'))
-    if apid_record_id and Utils.APID_DB:
-        block.append(f"3 _APID 1,{Utils.APID_DB}::{apid_record_id}")
-
     person_ark = Utils.clean_val((part.get('type_specific_fields') or {}).get('person_ark'))
     if person_ark:
         record_url = f"https://www.familysearch.org/ark:/61903/1:1:{person_ark}"
@@ -766,6 +762,10 @@ def build_individual(uid: str, rec: dict, part: dict, vol: str, media_uid: str, 
         indi.append(f"1 _FSFTID {fsftid}")
         indi.extend(Utils.weblink_lines(f"https://www.familysearch.org/tree/person/details/{fsftid}",
                                         "FamilySearch Family Tree", target_software))
+
+    apid_record_id = Utils.clean_val((part.get('type_specific_fields') or {}).get('apid'))
+    if apid_record_id and Utils.APID_DB:
+        indi.append(f"1 _APID 1,{Utils.APID_DB}::{apid_record_id}")
 
     task_block, needs_review, folder_name = None, False, None
 

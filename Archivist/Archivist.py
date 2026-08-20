@@ -78,9 +78,9 @@ if __name__ == "__main__":
     record_type = loaded_data.get("record_type_name") or loaded_data.get("record_family") or ""
     collection_title = loaded_data.get("collection_title", "").lower()
     is_census = (
-        record_type.startswith("Census_") or 
-        record_type == "census" or 
-        "pages" in loaded_data or 
+        record_type.startswith("Census_") or
+        record_type == "census" or
+        "pages" in loaded_data or
         "census" in collection_title
     )
     if is_census:

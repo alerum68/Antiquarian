@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.29
+// @version      0.3.33
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -132,6 +132,49 @@
     // 3-image gather run's downloaded JSON contained exactly 1 item, not 3.
     const FS_RELOAD_STATE_KEY = 'voyageur_fs_reload_state';
 
+    // Defense-in-depth alongside stopBatch()'s URL-stripping fix: a goToNextImage()
+    // navigation already committed (browser mid-navigating to a URL FamilySearch's own
+    // router built while mgs_auto=1 was still present) can land AFTER stopBatch() already
+    // ran on the old page - too late for that page's history.replaceState() to change a
+    // navigation already in flight to a different document. This sessionStorage flag
+    // (keyed by run_id, so a genuinely new run is never blocked) survives that landing and
+    // is checked by the auto-start trigger at the bottom of this function, alongside
+    // shouldAutoStart itself.
+    const FS_STOPPED_RUNS_KEY = 'voyageur_fs_stopped_runs';
+
+    function markFsRunStopped(runId) {
+        let stopped = [];
+        try {
+            stopped = JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]');
+        } catch (e) {
+            stopped = [];
+        }
+        if (!stopped.includes(runId)) stopped.push(runId);
+        sessionStorage.setItem(FS_STOPPED_RUNS_KEY, JSON.stringify(stopped));
+    }
+
+    function isFsRunStopped(runId) {
+        try {
+            return JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]').includes(runId);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Called by startBatch() on every start (manual click or auto-triggered) - a deliberate
+    // restart must not stay blocked by an earlier stop on the same run_id, since shouldAutoStart
+    // (computed once per script injection) would otherwise keep coming back false on every
+    // subsequent "Next Image" reload for the rest of this run.
+    function clearFsRunStopped(runId) {
+        let stopped = [];
+        try {
+            stopped = JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]');
+        } catch (e) {
+            stopped = [];
+        }
+        sessionStorage.setItem(FS_STOPPED_RUNS_KEY, JSON.stringify(stopped.filter((id) => id !== runId)));
+    }
+
     function saveFsReloadState(runId, state) {
         sessionStorage.setItem(FS_RELOAD_STATE_KEY, JSON.stringify({
             runId,
@@ -243,18 +286,54 @@
         };
     }
 
-    // PERSON -> EVENT(eventType=BIRTH) -> PLACE -> FIELD -> text. Confirmed live: the CENSUS
-    // event's PLACE is residence, not birthplace - only the BIRTH-type event's PLACE is
-    // birthplace, and it's absent entirely when FamilySearch's indexing didn't derive one.
-    function fsPersonBirthPlace(byId, person) {
+    // PERSON -> EVENT(eventType) -> PLACE -> FIELD -> text. Confirmed live both BIRTH and
+    // CENSUS event types exist with this shape (design spec's element-type table: "Residence
+    // (CENSUS) / birthplace (BIRTH)") - shared by fsPersonBirthPlace and
+    // fsPersonResidencePlace below. Returns '' when the event is absent entirely (FamilySearch's
+    // indexing didn't derive one for this person).
+    function fsPersonEventPlace(byId, person, eventType) {
         const events = (person && person.subElements || [])
             .map((ref) => byId[ref.id])
             .filter((el) => el && el.elementType === 'EVENT');
-        const birthEvent = events.find((e) => e.eventType === 'BIRTH');
-        if (!birthEvent) return '';
-        const placeEl = fsFindChild(byId, birthEvent.subElements, 'PLACE');
+        const event = events.find((e) => e.eventType === eventType);
+        if (!event) return '';
+        const placeEl = fsFindChild(byId, event.subElements, 'PLACE');
         if (!placeEl) return '';
         const field = fsFindChild(byId, placeEl.subElements, 'FIELD');
+        return field ? fsFieldText(field) : '';
+    }
+
+    function fsPersonBirthPlace(byId, person) {
+        return fsPersonEventPlace(byId, person, 'BIRTH');
+    }
+
+    // Confirmed live only via the design spec's single BIRTH-event example ("Maine, United
+    // States") - a multi-segment CENSUS-event residence text's own internal comma order
+    // (specific-to-general vs general-to-specific) has NOT been confirmed against a real
+    // captured PLACE text (the design spec's own "STATE/COUNTY/TOWN proper scoping" item is
+    // explicitly flagged unresolved). fsResidencePlaceToBrowsePath below assumes
+    // specific-to-general, matching the one confirmed example - needs live verification
+    // against a real CENSUS-event capture before being fully trusted.
+    function fsPersonResidencePlace(byId, person) {
+        return fsPersonEventPlace(byId, person, 'CENSUS');
+    }
+
+    // Converts a raw residence PLACE text into browsePath segments in the general-to-specific
+    // order parseFsLocationFromBrowsePath()/FS.py's parse_census_browse_path() both expect
+    // (matching fsImageIndexBrowsePathSegments' own segment order convention) - see the
+    // live-verification caveat on fsPersonResidencePlace above.
+    function fsResidencePlaceToBrowsePath(residenceText) {
+        if (!residenceText) return [];
+        return residenceText.split(',').map((s) => s.trim()).filter(Boolean).reverse();
+    }
+
+    // Image-level singleton FIELD lookup - unlike fsPersonFieldText (scoped to one PERSON's
+    // direct children), EXT_FILM_NBR/EXT_PUB_NBR/EXT_REPOSITORY_NAME are confirmed live to
+    // appear once per image, not per person (design spec's "Citation data" section) - safe to
+    // find anywhere in the flat elements array.
+    function fsImageLevelFieldText(apiResponse, fieldType) {
+        const field = (apiResponse.elements || [])
+            .find((e) => e.elementType === 'FIELD' && e.fieldType === fieldType);
         return field ? fsFieldText(field) : '';
     }
 
@@ -341,6 +420,36 @@
             }
         }
         return rows;
+    }
+
+    // Builds the same prose citation_text string FS.py's parse_citation()/
+    // parse_nara_citing_clause() already regex-parse, entirely from JSON fields, so the
+    // Names-panel extraction path no longer depends on scrapeCitationAndCatalog()'s UI read
+    // for citation/location data (rows already came from the JSON path - see
+    // fsBuildRowsFromApiResponse). collectionName/url/imageNumber/imageTotal come from the
+    // caller - DOM/window reads with no JSON source in this endpoint's response, same caveat
+    // fsBuildCitationTextFromImageIndexResponse already carries for imageNumber/imageTotal.
+    function fsBuildCitationTextFromApiResponse(apiResponse, byId, primaryPerson, {collectionName = '', url = '', imageNumber, imageTotal} = {}) {
+        const date = new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'});
+
+        const browsePath = fsResidencePlaceToBrowsePath(fsPersonResidencePlace(byId, primaryPerson));
+        if (imageNumber && imageTotal) browsePath.push(`image ${imageNumber} of ${imageTotal}`);
+
+        const publication = fsImageLevelFieldText(apiResponse, 'EXT_FILM_NBR');
+        const rawRepoName = fsImageLevelFieldText(apiResponse, 'EXT_REPOSITORY_NAME');
+        // Same trailing "(NARA)" stripping as fsBuildCitationTextFromImageIndexResponse -
+        // confirmed live EXT_REPOSITORY_NAME carries the identical suffix ("The U.S. National
+        // Archives and Records Administration (NARA)").
+        const repoName = rawRepoName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const repoLoc = 'Washington D.C.';
+
+        let text = `"${collectionName}," database with images, FamilySearch (${url} : ${date}), ${browsePath.join(' > ')}`;
+        if (publication && repoName) {
+            text += `; citing NARA microfilm publication ${publication} (${repoLoc}: ${repoName}, n.d.).`;
+        } else {
+            text += '.';
+        }
+        return text;
     }
 
     // filmdatainfo/image-data parsing (the "Image Index" page's own data source, reached via
@@ -1197,7 +1306,7 @@
             const {year, locationStr} = getYearAndLocation();
             const payload = {
                 census_year: year, location: locationStr, pages: accumulatedPages,
-                incomplete_pages: ancestryIncompletePagesSummary(accumulatedPages),
+                incomplete_pages: incompleteItemsSummary(accumulatedPages),
             };
             triggerJsonDownload(JSON.stringify(payload, null, 2), `${year} - ${locationStr} - ANC.json`);
             if (window.showToast) window.showToast("Success! Master JSON Downloaded.", "success", 5000);
@@ -1290,7 +1399,7 @@
                 await runAncestryRetryPass();
                 return;
             }
-            const incomplete = ancestryIncompletePagesSummary(accumulatedPages);
+            const incomplete = incompleteItemsSummary(accumulatedPages);
             if (incomplete.length > 0) {
                 const pageList = incomplete.map((p) => p.page_number).join(', ');
                 if (window.showToast) {
@@ -1396,8 +1505,12 @@
         let seenItemIds = new Set();
         let itemsAtLastCheckpoint = 0;
 
-        const shouldAutoStart = window.location.href.includes('mgs_auto=1');
         const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
+        // isFsRunStopped() check: see FS_STOPPED_RUNS_KEY's own note - covers the narrower
+        // race stopBatch()'s URL-strip alone can't (a navigation already in flight when Stop
+        // was clicked, landing on a page whose URL was already committed with mgs_auto=1
+        // still baked in).
+        const shouldAutoStart = window.location.href.includes('mgs_auto=1') && !isFsRunStopped(runId);
 
         // A genuine FamilySearch page navigation from clicking "Next Image" (see
         // goToNextImage/FS_RELOAD_STATE_KEY's own note) re-runs this whole script from
@@ -1683,18 +1796,6 @@
             return null;
         }
 
-        async function clickTab(tabText) {
-            // Event-driven (see waitForCondition) rather than polling every 100ms for up to
-            // 5s. No settle delay after the click either - every caller already waits on its
-            // own specific downstream condition (real citation text, an actually-populated
-            // table) rather than assuming a fixed delay is enough.
-            const tabWait = await waitForCondition(() => findByExactText('[role="tab"], button, a', tabText),
-                {timeoutMs: 5000});
-            if (!tabWait.result) return false;
-            tabWait.result.click();
-            return true;
-        }
-
         function getItemId() {
             const match = window.location.pathname.match(/ark:\/61903\/([^/?#]+)/);
             return match ? decodeURIComponent(match[1]) : "";
@@ -1703,53 +1804,11 @@
         // ==========================================
         // SCRAPING
         // ==========================================
-        async function scrapeCitationAndCatalog() {
-            const ok = await clickTab('Information');
-            if (!ok) return {citationText: "", catalogItems: []};
-
-            // FamilySearch renders the "Citation" heading immediately on tab switch but fills in
-            // the actual prose a beat later, showing a literal "No citation is available." placeholder
-            // in the meantime - waiting only for the heading to exist (rather than for real text to
-            // replace the placeholder) meant every image after the first got its citation scraped
-            // before it was ready. Event-driven (see waitForCondition) rather than polling every
-            // 200ms for up to 10s.
-            const citationWait = await waitForCondition(() => {
-                const citationHeading = findByExactText('h1, h2, h3, h4, h5, h6', 'Citation');
-                if (!citationHeading) return null;
-                // The citation prose sits alongside the heading inside the same panel; grab the
-                // panel's text and strip the heading/button lines around it rather than assuming
-                // a specific sibling structure, since that's the part most likely to shift.
-                const panelText = citationHeading.parentElement ? citationHeading.parentElement.innerText : "";
-                const match = panelText.match(/Citation\s*\n+([\s\S]*?)(?:\n+COPY CITATION|$)/i);
-                const candidateText = match ? match[1].trim() : "";
-                return (candidateText && candidateText.toLowerCase() !== 'no citation is available.') ? candidateText : null;
-            }, {timeoutMs: 10000});
-            const citationText = citationWait.result || "";
-
-            const catalogItems = [];
-            const table = document.querySelector('table');
-            if (table) {
-                const rows = [...table.querySelectorAll('tr')];
-                for (const row of rows.slice(1)) {
-                    const cells = [...row.querySelectorAll('th, td')];
-                    if (cells.length >= 3) {
-                        catalogItems.push({
-                            label: (cells[0].innerText || '').trim(),
-                            item_number: (cells[1].innerText || '').trim(),
-                            note: (cells[2].innerText || '').trim()
-                        });
-                    }
-                }
-            }
-
-            return {citationText, catalogItems};
-        }
-
         // Runs once per image, before either data source is awaited. Names/Image Index tab
         // presence is the ground truth of which page actually rendered - confirmed live this
         // is a navigation-method split (Search -> Names panel, Image Browser -> Image Index),
         // not something inferable from the URL. Event-driven via the existing
-        // waitForCondition convention, same as clickTab() above.
+        // waitForCondition convention.
         async function detectFsPageType({timeoutMs = 15000} = {}) {
             const wait = await waitForCondition(() => {
                 if (findByExactText('[role="tab"], button, a', 'Names')) return 'names';
@@ -1813,15 +1872,26 @@
                 const apiWait = await waitForFsApiResponse(itemId);
                 if (apiWait.result) {
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
+                    const byId = buildFsElementIndex(apiWait.result);
+                    const primaryPerson = (apiWait.result.elements || []).find((e) => e.elementType === 'PERSON' && e.primary);
+                    const imageMatch = document.body.innerText.match(/Image\s+(\d+)\s+of\s+(\d+)/i);
+                    citationText = fsBuildCitationTextFromApiResponse(apiWait.result, byId, primaryPerson, {
+                        collectionName: document.title,
+                        url: window.location.href,
+                        imageNumber: imageMatch ? imageMatch[1] : undefined,
+                        imageTotal: imageMatch ? imageMatch[2] : undefined,
+                    });
+                    locationInfo = parseFsLocationFromCitation(citationText);
                 } else {
                     incomplete = true;
                     debugLog(`No orchestration-API response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
                     if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
-                const citation = await scrapeCitationAndCatalog();
-                citationText = citation.citationText;
-                catalogItems = citation.catalogItems;
-                locationInfo = parseFsLocationFromCitation(citationText);
+                // No DOM scraping needed for the Names panel either now, matching the
+                // Image-Index path above. catalogItems stays [] - roll_number still resolves
+                // downstream via nara_info['publication'] parsed from citationText's own NARA
+                // clause (FS.py's build_census_json), same fallback the Image-Index path
+                // already relies on.
             } else {
                 incomplete = true;
                 debugLog(`Neither Names nor Image Index tab found for item ${itemId} - unrecognized page shape.`);
@@ -1842,9 +1912,20 @@
             };
         }
 
+        // Returns {progressed} rather than silently returning on an already-seen/missing
+        // itemId - a bounded browse set (e.g. one enumeration district's own image count)
+        // doesn't always give goToNextImage() a genuine dead end (a disabled/absent "Next"
+        // button): FamilySearch's own navigation can instead wrap back around to an image
+        // already gathered, or land somewhere with no parseable ark at all. Silently
+        // returning here (the prior behavior) gave runLoop() no way to distinguish that from
+        // real forward progress, so it kept calling goToNextImage() and cycling through the
+        // same already-seen images forever instead of ever reaching stopBatch() - confirmed
+        // live: a completed 14-image gather kept "flashing" between images indefinitely
+        // instead of downloading its final JSON.
         async function scrapeCurrentImage() {
             const itemId = getItemId();
-            if (!itemId || seenItemIds.has(itemId)) return;
+            if (!itemId) return {progressed: false, reason: 'no-item-id'};
+            if (seenItemIds.has(itemId)) return {progressed: false, reason: 'already-seen'};
 
             const itemData = await buildFsItemData(itemId);
             await downloadFsImage(itemId);
@@ -1856,6 +1937,7 @@
             }
 
             debugLog(`Scraped item ${itemId}: ${itemData.rows.length} index rows.`);
+            return {progressed: true};
         }
 
         // FamilySearch's account-level "explore" record view (reached, confirmed live, via
@@ -1955,7 +2037,7 @@
                 const prevUrl = window.location.href;
                 nextBtn.click();
                 // No post-nav settle delay needed - scrapeCurrentImage's own downstream
-                // waits (waitForFsApiResponse/scrapeCitationAndCatalog) already handle "has
+                // waits (waitForFsApiResponse/waitForFsImageIndexResponse) already handle "has
                 // the new page's content rendered yet" on their own terms.
                 const navWait = await waitForCondition(() => window.location.href !== prevUrl,
                     {timeoutMs: 10000});
@@ -1970,7 +2052,19 @@
         async function runLoop() {
             while (isRunning) {
                 if (window.fsShowToast) window.fsShowToast(`Gathering ${getItemId()}...`, 'success', 1200);
-                await scrapeCurrentImage();
+                const {progressed, reason} = await scrapeCurrentImage();
+                if (!progressed) {
+                    debugLog(`scrapeCurrentImage made no progress (${reason}) - treating as end of batch.`);
+                    if (window.fsShowToast) {
+                        window.fsShowToast(
+                            reason === 'already-seen'
+                                ? 'Reached an already-gathered image - stopping.'
+                                : 'Could not identify this page - stopping.',
+                            'success', 3000);
+                    }
+                    stopBatch();
+                    break;
+                }
 
                 if (accumulatedItems.length - itemsAtLastCheckpoint >= FS_CHECKPOINT_INTERVAL_ITEMS) {
                     downloadCheckpointJson();
@@ -1999,7 +2093,7 @@
                 await runFsRetryPass();
                 return;
             }
-            const incomplete = fsIncompleteItemsSummary(accumulatedItems);
+            const incomplete = incompleteItemsSummary(accumulatedItems);
             if (incomplete.length > 0) {
                 const idList = incomplete.map((i) => i.item_id).join(', ');
                 if (window.fsShowToast) {
@@ -2121,15 +2215,34 @@
         }
 
         function downloadFinalJson() {
-            if (accumulatedItems.length === 0) {
+            // A reload wiping in-memory accumulatedItems (see FS_RELOAD_STATE_KEY's own
+            // note - "Next Image" is a real page navigation, re-running this whole script
+            // from scratch on every image) can land right before this runs, leaving
+            // accumulatedItems empty in memory even after a real, multi-image gather -
+            // confirmed live: "Stop & Download" appearing to do nothing was this exact
+            // case, not a download-mechanism failure. saveFsReloadState() is called before
+            // every single navigation attempt in runLoop(), so sessionStorage almost always
+            // holds a snapshot at least as complete as whatever survived in memory - fall
+            // back to it rather than declaring "no data gathered" and giving up.
+            let items = accumulatedItems;
+            if (items.length === 0) {
+                const persisted = loadFsReloadState(runId);
+                if (persisted && persisted.accumulatedItems && persisted.accumulatedItems.length > 0) {
+                    items = persisted.accumulatedItems;
+                    debugLog(`downloadFinalJson: in-memory accumulatedItems was empty, recovered `
+                        + `${items.length} item(s) from reload state.`);
+                }
+            }
+
+            if (items.length === 0) {
                 if (window.fsShowToast) window.fsShowToast('No data gathered to download.', 'error');
                 return;
             }
 
             const collectionTitle = document.title || 'FamilySearch Gather';
             const payload = {
-                source: 'FS', collection_title: collectionTitle, items: accumulatedItems,
-                incomplete_pages: fsIncompleteItemsSummary(accumulatedItems),
+                source: 'FS', collection_title: collectionTitle, items: items,
+                incomplete_pages: incompleteItemsSummary(items),
             };
             const safeName = collectionTitle.replace(/[/\\?%*:|"<>]/g, '-').slice(0, 120);
             triggerFsJsonDownload(JSON.stringify(payload, null, 2), `FS - ${safeName}.json`);
@@ -2156,6 +2269,7 @@
 
         function startBatch() {
             isRunning = true;
+            clearFsRunStopped(runId);
             if (!isResumingFsState) {
                 accumulatedItems = [];
                 seenItemIds.clear();
@@ -2190,6 +2304,26 @@
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'block';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'none';
             if (window._fsStatusLight) window._fsStatusLight.classList.remove('running');
+            // Strip mgs_auto/mgs_run from the URL bar (no navigation - history.replaceState
+            // only, so this can't itself trigger a reload) the moment the batch stops.
+            // "Next Image" is a real page navigation on FamilySearch, so this whole script
+            // re-executes from scratch on every image (see FS_RELOAD_STATE_KEY's own note) -
+            // shouldAutoStart is re-read from the URL on every one of those re-executions.
+            // Without stripping it here, a goToNextImage() navigation already in flight when
+            // Stop was clicked (or any other later reload on this tab) lands after
+            // isRunning=false already took effect, re-injects the script, finds mgs_auto=1
+            // still present, and silently restarts the whole batch from empty state -
+            // confirmed live: this produced duplicate downloads of already-gathered images
+            // under the same run_id after a completed, downloaded run.
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('mgs_auto');
+            cleanUrl.searchParams.delete('mgs_run');
+            if (cleanUrl.href !== window.location.href) {
+                window.history.replaceState(null, '', cleanUrl.href);
+            }
+            // Belt-and-suspenders alongside the URL strip above - see FS_STOPPED_RUNS_KEY's
+            // own note for the narrower race this covers.
+            markFsRunStopped(runId);
             debugLog('Batch stopped.');
             finishBatch().catch((err) => console.error('[Voyageur FS] finishBatch crashed:', err));
         }
@@ -2208,9 +2342,6 @@
     // Test-only: exposes pure, DOM-free helpers for the Node test harness (see
     // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
     // there - the guard is load-bearing, not defensive boilerplate.
-// extractCurrentPageData() used to hardcode country = "USA" unconditionally - confirmed
-// live (2026-08-15 Canadian gather, dbId 1578, Ontario) this mislabeled every Canadian
-
 
 // Ancestry's imageviewer/api/record/index-panel-data endpoint uses a stable, self-
 // describing fieldName vocabulary that does NOT change across census years (only which
@@ -2387,15 +2518,17 @@ function incompleteItemsSummary(items) {
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             placesMatch, saveReloadState, loadReloadState, clearReloadState,
+            markFsRunStopped, isFsRunStopped, clearFsRunStopped,
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
-            fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
+            fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
+            fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
+            fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse,
             fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
             fsImageIndexFieldText, fsImageIndexFindByType,
             fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
             getCountryFromState, buildRetryNavigationUrl, incompleteItemsSummary,
-            fsIncompleteItemsSummary: incompleteItemsSummary // Alias for backward compatibility if tests use it
         };
     }
 

@@ -277,40 +277,6 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     return len(moved), skipped, final_failed_names
 
 
-def sanitize_for_path_segment(text: str) -> str:
-    """Strips only the characters Windows genuinely forbids in a path segment
-    (`< > : " / \\ | ? *`), preserving spaces/commas/etc. for readability - same
-    character class FS.py's own build_clean_census_filename() already uses for the
-    equivalent problem (a live site's free-text collection name becoming a folder/file
-    name), reused here for consistency rather than a second, differently-scoped
-    sanitizer."""
-    return re.sub(r'[/\\?%*:|"<>]', "-", text).strip()
-
-
-def census_collection_folder_name(census_year: str, country: str, collection_name: str = "") -> str:
-    """Builds the image-folder name shared by A.py's and FS.py's own
-    main()/_recover_orphaned_runs() image-saving paths, and read back by
-    Archivist/Census.py's own nested_dir lookup - the single source of truth for this
-    string so all call sites stay in sync.
-
-    Prefers the gather's own real collection_name (Ancestry: the citation text
-    scrapeSourceCitation() captures; FamilySearch: FS's own collection_title, e.g.
-    "United States, Census, 1860") when available - the actual source name beats a
-    generated label, and needs no country-detection logic of its own to be correct for
-    any country. Falls back to "{year} {country} Census" only when no real
-    collection_name was captured for this gather. country is whatever the gather itself
-    recorded (Ancestry: Voyageur.js's ancestryCountryFromState(); FamilySearch: FS.py's
-    own "canada" in collection_title.lower() check), plugged in directly - never a fixed
-    US-or-Canada choice, so any country this project ever gathers is handled the same
-    way with no country list to maintain; defaults to "USA" (this project's
-    long-standing default) only when country is absent/unrecognized. Confirmed live
-    (2026-08-15, dbId 1578, Ontario) that the old unconditional "US Federal Census"
-    folder name mislabeled every non-US gather."""
-    if collection_name:
-        return sanitize_for_path_segment(collection_name)
-    return f"{census_year} {country or 'USA'} Census"
-
-
 def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str, str]:
     """Extracts (census_year, country, location_folder, collection_name) from a normalised
     gather dict (output of normalize_*_census_gather). Used by both FS.py and A.py to
@@ -318,13 +284,17 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
 
     location_folder is built as 'state - county - city' (each segment omitted when blank)
     matching the ' - ' split resolve_census_image_dir uses internally."""
+    record: dict = {}
     fields: dict = {}
     for sheet in final_data.get("sheets", []):
         records = sheet.get("records", [])
         if records:
-            fields = records[0].get("type_specific_fields", {}) or {}
+            record = records[0] or {}
+            fields = record.get("type_specific_fields", {}) or {}
             break
-    census_year = fields.get("census_year", "") or ""
+    # normalize_census_pages() stores year on the record itself (a sibling of
+    # type_specific_fields), not inside type_specific_fields - see census_schema.py.
+    census_year = record.get("year", "") or ""
     country = fields.get("country", "") or ""
     location_parts = [
         fields.get("state", ""),
@@ -336,16 +306,15 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
     return census_year, country, location_folder, collection_name
 
 
-def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
+def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str,
                              year: str, country: str, location_folder: str) -> Path:
     """Resolves the image target directory for a census gather.
 
-    Path structure: <base_img_dir>/<census_folder>/<country>/<year>/<location_parts...>
-    census_folder is the sanitised collection-level folder name (from
-    census_collection_folder_name()) and forms the first sub-level so all images from one
-    collection stay together regardless of state/county. country and year are appended
-    next (each skipped when blank), then location_folder is split on ' - ' to form the
-    remaining leaf segments.
+    Path structure: <base_img_dir>/<country>/<year>/<location_parts...>, matching the
+    project's Media\\Census\\Country\\Year\\State\\County\\City\\ convention (see
+    docs/plans/2026-08-17-media-directory-structure.md) - no separate collection-name
+    wrapper folder; country and year are each skipped when blank, then location_folder is
+    split on ' - ' to form the remaining leaf segments.
     """
     if os.path.isabs(base_img_setting):
         base_img_dir = Path(base_img_setting)
@@ -356,8 +325,6 @@ def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_f
         base_img_dir = base_media_dir / base_img_setting
 
     parts = []
-    if census_folder:
-        parts.append(census_folder)
     if country:
         parts.append(country)
     if year:

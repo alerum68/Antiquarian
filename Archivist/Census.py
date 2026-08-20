@@ -771,10 +771,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
     fam_num = get_row_val(row, ['Family Number', 'Family', 'Household Number', 'Household'], '')
     dwell_num = get_row_val(row, ['Dwelling Number', 'Dwelling', 'House Number'], '')
 
-    fsftid = get_row_val(row, ['FSFTID'], '')
     fs_url = get_row_val(row, ['FamilySearch_URL'], '')
-    # Prefer existing FSFTID; otherwise, use record ark for FS-sourced records
-    citation_fsftid = fsftid or (strip_ark_type_prefix(rec_id) if fs_url else '')
 
     ancestry_url = get_row_val(row, ['Extracted_URL'], '') or (
         f"https://www.ancestry.com/search/collections/{APID_DB}/records/{rec_id}"
@@ -812,11 +809,9 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
         cit.append("3 DATA")
         if APID_DB and rec_id:
-            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
+            cit.extend(["3 _WEBTAG",
                         f"4 NAME Anc- {collection_title}",
                         f"4 URL {ancestry_url}"])
-        if citation_fsftid:
-            cit.append(f"1 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME FS- {collection_title}",
@@ -830,9 +825,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             f"{row_county}; {row_state}; Roll {row_roll}; Film {row_film}")
         cit.append("3 QUAY 3")
         if APID_DB and rec_id:
-            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
-        if citation_fsftid:
-            cit.append(f"1 _FSFTID {citation_fsftid}")
+            cit.extend([f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
         if fs_url:
             cit.extend([f"3 _LINK {fs_url}", f"3 NOTE {fs_url}"])
         cit.append(f"3 OBJE {m_id}")
@@ -1330,12 +1323,23 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         alt_names = parse_alternate_entries(row, 'AlternateNames')
         row_fsftid = get_row_val(row, ['FSFTID'], '')
+        row_person_ark = get_row_val(row, ['PersonArk'], '')
+        # Prefer an explicit FSFTID column; otherwise fall back to this row's own PersonArk
+        # (FS.py's person_ark - this specific individual's FamilySearch persona id) so the
+        # individual still gets a _FSFTID tag. Never rec_id/PID: PID is only person_ark
+        # when FS.py actually captured one for this row - it falls back to a synthesized
+        # "{item_id}-{row_index}" compound id (not an ark at all) when it didn't, and that
+        # compound would produce a bogus _FSFTID if mistaken for one. The FamilySearch
+        # Family Tree link below uses only the real FSFTID column value - an ark identifies
+        # a record/individual persona, not a tree profile, so it isn't a valid link target.
+        indi_fsftid = row_fsftid or (strip_ark_type_prefix(row_person_ark) if row_person_ark else '')
         fs_tree_link = (Utils.weblink_lines(f"https://www.familysearch.org/tree/person/details/{row_fsftid}",
                                             "FamilySearch Family Tree", target_software)
                         if row_fsftid else [])
         ged.extend(
             [f"0 @I{rec_id}@ INDI", f"1 REFN {strip_ark_type_prefix(rec_id)}"]
-            + ([f"1 _FSFTID {row_fsftid}"] if row_fsftid else [])
+            + ([f"1 _FSFTID {indi_fsftid}"] if indi_fsftid else [])
+            + ([f"1 _APID 1,{APID_DB}::{rec_id}"] if (APID_DB and rec_id) else [])
             + fs_tree_link
             + [f"1 NAME {giv} /{sur}/"] + cit +
             build_alternate_name_lines(alt_names, cit) +
@@ -1482,6 +1486,7 @@ def load_census_dataframe(data: dict) -> pd.DataFrame:
             row = dict(person.get('columns', {}))
             row.update(page_meta)
             row['PID'] = person.get('pid', '')
+            row['PersonArk'] = person.get('person_ark', '')
             row['Extracted_URL'] = person.get('extracted_url', '')
             row['FSFTID'] = person.get('fsftid', '')
             row['FamilySearch_URL'] = person.get('familysearch_url', '')
@@ -1564,6 +1569,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     col = FACT_TYPE_TO_COLUMN.get(fact.get('fact_type', ''), fact.get('fact_type', ''))
                     row[col] = fact.get('value') or fact.get('date') or fact.get('place') or ''
                 row['PID'] = pts.get('pid', '')
+                row['PersonArk'] = pts.get('person_ark', '')
                 row['Extracted_URL'] = pts.get('extracted_url', '')
                 row['FSFTID'] = pts.get('fsftid', '')
                 row['FamilySearch_URL'] = pts.get('familysearch_url', '')
@@ -1588,9 +1594,8 @@ def run_census_flavor(data: dict) -> None:
     if "pages" in data:
         census_df = load_census_dataframe(data)
         payload_year = Utils.clean_val(data.get('census_year'))
-        payload_location = Utils.clean_val(data.get('location'))
     else:
-        census_df, payload_year, payload_location = build_census_dataframe_from_unified(data)
+        census_df, payload_year, _ = build_census_dataframe_from_unified(data)
 
     STATE = get_json_fallback(census_df, ['State', 'State/Province'], STATE)
     COUNTY = get_json_fallback(census_df, ['County', 'Parish'], COUNTY)
@@ -1653,24 +1658,12 @@ def run_census_flavor(data: dict) -> None:
     CALL_NUMBER = CALL_NUMBER or (f"{FILM_NUMBER}, roll {ROLL_NUMBER}".strip(", ")
                                   if (FILM_NUMBER or ROLL_NUMBER) else CALL_NUMBER)
 
-    location_str = payload_location
-    if IMAGE_DIR and CENSUS_YEAR and location_str:
-        location_folder = re.sub(r'^USA\s*-\s*', '', location_str)
-        # Try the current folder-naming scheme first - the real collection name
-        # (sanitized the same way Voyageur's own census_collection_folder_name() does)
-        # when one was captured, else the generic "{year} {country} Census" template;
-        # fall back to the legacy unconditional "{year} US Federal Census" name every
-        # gather - any country - used before this fix, so already-gathered images stay
-        # linkable without requiring a re-gather.
-        current_folder_name = (
-            re.sub(r'[/\\?%*:|"<>]', "-", COLLECTION_NAME).strip() if COLLECTION_NAME
-            else f'{CENSUS_YEAR} {COUNTRY or "USA"} Census'
-        )
-        nested_dir = Path(IMAGE_DIR) / current_folder_name / location_folder
-        if not nested_dir.is_dir():
-            legacy_dir = Path(IMAGE_DIR) / f"{CENSUS_YEAR} US Federal Census" / location_folder
-            if legacy_dir.is_dir():
-                nested_dir = legacy_dir
+    # Matches Voyageur's own resolve_census_image_dir() convention: <base>/<country>/
+    # <year>/<state>/<county>/<city>, no collection-name wrapper folder - see
+    # docs/plans/2026-08-17-media-directory-structure.md.
+    if IMAGE_DIR and CENSUS_YEAR:
+        location_parts = [p for p in (STATE, COUNTY, TOWNSHIP) if p]
+        nested_dir = Path(IMAGE_DIR).joinpath(COUNTRY or "USA", str(CENSUS_YEAR), *location_parts)
         if nested_dir.is_dir():
             IMAGE_DIR = str(nested_dir)
 

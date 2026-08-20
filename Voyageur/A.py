@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 
 import census_schema
 from _gather_helpers import (
-    census_collection_folder_name,
     cleanup_checkpoint_files,
     extract_census_image_routing_fields,
     find_orphaned_gather_runs,
@@ -117,19 +116,20 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
         # Best-effort only, matching this function's own header-normalization-skipped
         # philosophy (see docstring) - opportunistically read routing fields back from
         # whatever JSON shape actually landed, falling back to empty/generic defaults
-        # rather than guessing when the file isn't in the expected shape.
-        recovered_data = {}
+        # rather than guessing when the file isn't in the expected shape. The routing-field
+        # extraction stays inside this same try: a recovered file can parse as valid JSON
+        # yet have an unexpected shape (e.g. a non-dict sheet/record), which must fall back
+        # the same as a read/parse failure, not crash main() before the gather even starts.
+        census_year, country, location_folder = "", "", ""
         try:
             with open(recovered_json, "r", encoding="utf-8") as f:
                 recovered_data = json.load(f)
-        except (OSError, json.JSONDecodeError):
+            census_year, country, location_folder, _ = \
+                extract_census_image_routing_fields(recovered_data)
+        except (OSError, json.JSONDecodeError, AttributeError, IndexError, TypeError):
             pass
-
-        census_year, country, location_folder, collection_name = \
-            extract_census_image_routing_fields(recovered_data)
-        census_folder = census_collection_folder_name(census_year, country, collection_name)
         img_target_dir = resolve_census_image_dir(
-            "Census", genealogy_dir, census_folder, census_year, country, location_folder)
+            "Census", genealogy_dir, census_year, country, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
             downloads_dir, f"TMP_A_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
@@ -213,12 +213,11 @@ def main() -> Path:
     # json_status == "skipped": that means an existing final_json was kept as-is (collision
     # policy), and it was already normalized whenever it was first produced - leaving it
     # untouched is what "skip" is supposed to mean.
-    # Real collection_name/country for the image-folder name below (see
-    # census_collection_folder_name()) - read from the gather itself, never hardcoded.
-    # Only available when this run actually normalized the data (json_status ==
-    # "moved"); a "skipped" run kept an existing file as-is and never re-read it, so the
-    # folder-name helper's own generic fallback (blank collection_name/country) applies
-    # instead - a rare edge case, since a fresh gather almost always produces "moved".
+    # Real country for the image-folder path below (see resolve_census_image_dir()) - read
+    # from the gather itself, never hardcoded. Only available when this run actually
+    # normalized the data (json_status == "moved"); a "skipped" run kept an existing file
+    # as-is and never re-read it, so country comes back blank instead - a rare edge case,
+    # since a fresh gather almost always produces "moved".
     if json_status == "moved":
         with open(final_json, "r", encoding="utf-8") as f:
             raw_gather = json.load(f)
@@ -253,9 +252,8 @@ def main() -> Path:
     # never reads at all.
     write_archivist_json_file(final_json.name)
 
-    census_year, country, location_folder, collection_name = \
+    census_year, country, location_folder, _ = \
         extract_census_image_routing_fields(normalized)
-    census_folder = census_collection_folder_name(census_year, country, collection_name)
 
     # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
     # PROGRAM_DIR directly. Resolved here independently (rather than relying on
@@ -264,7 +262,7 @@ def main() -> Path:
     # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
     # directly by the user) is used as-is, never re-nested.
     img_target_dir = resolve_census_image_dir(
-        base_img_setting, genealogy_dir, census_folder, census_year, country, location_folder)
+        base_img_setting, genealogy_dir, census_year, country, location_folder)
 
     img_moved, img_skipped, img_failed = move_downloaded_images(
         downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)

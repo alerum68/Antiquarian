@@ -29,7 +29,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from urllib.parse import urlparse, urlencode, urlunparse
 
 import pandas as pd
 import yaml
@@ -38,7 +38,6 @@ from thefuzz import fuzz
 
 import census_schema
 from _gather_helpers import (
-    census_collection_folder_name,
     cleanup_checkpoint_files,
     extract_census_image_routing_fields,
     find_orphaned_gather_runs,
@@ -618,6 +617,17 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
     pages = []
     for page_number, it in enumerate(items_raw, start=1):
         item_id = it.get("item_id", "")
+        # Voyageur.js's buildFsItemData() computes this item's own state/county/city/
+        # country/enumeration_district directly (from the Image-Index API response or the
+        # scraped citation, depending on page type) - prefer that over the single
+        # first-citation-text-derived location_info/country below, which only covers the
+        # (common but not universal) case where every item in the gather shares one
+        # location; falling back to it only when this item's own fields came back empty.
+        item_state = it.get("state") or location_info["state"]
+        item_county = it.get("county") or location_info["county"]
+        item_city = it.get("city") or location_info["city"]
+        item_country = it.get("country") or country
+        item_ed = it.get("enumeration_district") or location_info["enumeration_district"]
         people = []
         for row_index, row in enumerate(it.get("rows", [])):
             # FamilySearch's census index never exposes an actual Line Number on any year
@@ -678,12 +688,12 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
         pages.append({
             "page_number": page_number,
             "image_id": item_id,
-            "country": country,
-            "state": location_info["state"],
-            "county": location_info["county"],
-            "city": location_info["city"],
+            "country": item_country,
+            "state": item_state,
+            "county": item_county,
+            "city": item_city,
             "place_details": "",
-            "enumeration_district": location_info["enumeration_district"],
+            "enumeration_district": item_ed,
             "film_number": "",
             "roll_number": roll_number,
             "apid_db": "",
@@ -791,16 +801,27 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
         _unlink_with_retry(group["final"])
 
         # Extract routing fields from the normalised data directly - no filename parsing.
-        census_year, country, location_folder, collection_name = \
+        census_year, country, location_folder, _ = \
             extract_census_image_routing_fields(final_data)
-        census_folder = census_collection_folder_name(census_year, country, collection_name)
         img_target_dir = resolve_census_image_dir(
-            "Census", genealogy_dir, census_folder, census_year, country, location_folder)
+            "Census", genealogy_dir, census_year, country, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
             downloads_dir, f"TMP_FS_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
         print(f"[System] Recovered stale run {run_id}: wrote {out_name} and moved {img_moved} image(s) "
               f"to Project folders.")
+
+
+def normalize_familysearch_gather_url(url: str) -> str:
+    """Normalizes to FamilySearch's canonical ark-image URL: <scheme>://<host>/ark:/61903/
+    <image-id>?view=index&lang=en - forcing the "index" view (Voyageur.js's extraction
+    relies on the index panel being open) instead of the "explore" view. URLs copied from
+    search results/tree links carry extra tracking/session query params (wc, cc, i,
+    groupId, grid, ...) that aren't part of the ark's own identity and can send the viewer
+    to the wrong page - discard the entire original query string rather than patching
+    around it, keeping only the ark path itself (collection id + image ark)."""
+    parsed_url = urlparse(url)
+    return urlunparse(parsed_url._replace(query=urlencode({"view": "index", "lang": "en"})))
 
 
 def main() -> None:
@@ -821,14 +842,7 @@ def main() -> None:
         print("[ERROR] Please enter a FamilySearch record URL in the Toolbox settings first.")
         sys.exit(1)
 
-    # Normalize FamilySearch URL to force the "index" view instead of the "explore" view
-    # (Voyageur.js extraction relies on the index panel being open)
-    parsed_url = urlparse(url)
-    query_params = dict(parse_qsl(parsed_url.query))
-    query_params["view"] = "index"
-    for key in ["groupId", "grid"]:
-        query_params.pop(key, None)
-    url = urlunparse(parsed_url._replace(query=urlencode(query_params)))
+    url = normalize_familysearch_gather_url(url)
 
     # Voyageur.js used GM_download to land these in their own Downloads subfolder, but
     # confirmed live this was unreliable - GM_download's own "downloads" permission grant
@@ -883,19 +897,17 @@ def main() -> None:
     _unlink_with_retry(raw_json_file)
     cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
 
-    # Mirrors A.py's own nested image-folder convention (see census_collection_folder_name()),
-    # derived from this same run's own clean filename (when one was built) so both
-    # sources' images land under a comparable structure.
+    # Mirrors A.py's own nested image-folder convention - both sources' images land under
+    # the same Media\Census\Country\Year\State\County\City structure.
     # Extract routing fields from the normalised data directly - no filename parsing.
-    census_year, country, location_folder, collection_name = \
+    census_year, country, location_folder, _ = \
         extract_census_image_routing_fields(final_data)
-    census_folder = census_collection_folder_name(census_year, country, collection_name)
 
     # Matches Antiquarian.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
     img_target_dir = resolve_census_image_dir(
-        base_img_setting, genealogy_dir, census_folder, census_year, country, location_folder)
+        base_img_setting, genealogy_dir, census_year, country, location_folder)
 
     img_moved, img_skipped, img_failed = move_downloaded_images(
         downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)

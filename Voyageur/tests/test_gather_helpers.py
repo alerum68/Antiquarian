@@ -1,5 +1,6 @@
 import os
 import time as time_module
+from unittest.mock import patch
 
 import pytest
 
@@ -300,7 +301,7 @@ def test_atomic_write_bytes_leaves_no_truncated_file_at_dest_on_failure(tmp_path
 def test_resolve_census_image_dir_absolute_base(tmp_path):
     abs_base = tmp_path / "AbsMedia"
     abs_base.mkdir()
-    result = gh.resolve_census_image_dir(str(abs_base), "", "", "1900", "USA", "Ohio")
+    result = gh.resolve_census_image_dir(str(abs_base), "", "1900", "USA", "Ohio")
     assert result == abs_base / "USA" / "1900" / "Ohio"
     assert result.exists()
 
@@ -308,36 +309,14 @@ def test_resolve_census_image_dir_absolute_base(tmp_path):
 def test_resolve_census_image_dir_relative_to_media_dir(tmp_path, monkeypatch):
     program_dir = tmp_path / "Program"
     monkeypatch.setenv("MEDIA_DIR", "TestMedia")
-    result = gh.resolve_census_image_dir("Census", str(program_dir), "", "1900", "USA", "Ohio")
+    result = gh.resolve_census_image_dir("Census", str(program_dir), "1900", "USA", "Ohio")
     assert result == program_dir / "TestMedia" / "Census" / "USA" / "1900" / "Ohio"
 
 
 def test_resolve_census_image_dir_nests_state_county_city(tmp_path):
     abs_base = tmp_path / "AbsMedia"
-    result = gh.resolve_census_image_dir(str(abs_base), "", "", "1880", "USA", "Michigan - Kent County")
+    result = gh.resolve_census_image_dir(str(abs_base), "", "1880", "USA", "Michigan - Kent County")
     assert result == abs_base / "USA" / "1880" / "Michigan" / "Kent County"
-
-
-def test_census_collection_folder_name_generic_country_no_collection_name():
-    """Not a fixed US-or-Canada choice - any country plugs into the same "{year}
-    {country} Census" template, uniform format, no country list to maintain."""
-    assert gh.census_collection_folder_name("1880", "USA") == "1880 USA Census"
-    assert gh.census_collection_folder_name("1871", "Canada") == "1871 Canada Census"
-    assert gh.census_collection_folder_name("1901", "England") == "1901 England Census"
-    # Absent/unrecognized country defaults to USA, this project's long-standing default.
-    assert gh.census_collection_folder_name("1880", "") == "1880 USA Census"
-
-
-def test_census_collection_folder_name_prefers_real_collection_name():
-    """The gather's own real collection_name (Ancestry's scraped citation text, or FS's
-    own collection_title) beats the generated template when one was actually captured -
-    needs no country-detection logic of its own to be correct for any country."""
-    assert (gh.census_collection_folder_name("1871", "Canada", "1871 Census of Canada")
-           == "1871 Census of Canada")
-    # Forbidden Windows path characters get stripped, same as FS.py's own
-    # build_clean_census_filename() convention.
-    assert (gh.census_collection_folder_name("1860", "USA", 'United States, Census: 1860')
-           == "United States, Census- 1860")
 
 
 def test_write_archivist_json_file_writes_expected_key(monkeypatch):
@@ -409,33 +388,19 @@ def test_build_detailed_census_filename_with_missing_fields():
     assert result == "Census-1950-USA-ANC.json"
 
 
-from unittest.mock import patch
-from pathlib import Path
-
-
-def test_resolve_census_image_dir_builds_structured_path(tmp_path):
-    """census_folder is a distinct level between base and country/year."""
-    with patch("_gather_helpers.os.getenv", return_value=""):
-        result = gh.resolve_census_image_dir(
-            str(tmp_path), "", "United States Census 1880",
-            "1880", "USA", "North Dakota - Pembina"
-        )
-    assert result == tmp_path / "United States Census 1880" / "USA" / "1880" / "North Dakota" / "Pembina"
-
-
 def test_resolve_census_image_dir_no_location_parts(tmp_path):
     """Empty location_folder still produces a valid path."""
     with patch("_gather_helpers.os.getenv", return_value=""):
         result = gh.resolve_census_image_dir(
-            str(tmp_path), "", "1880 USA Census", "1880", "USA", ""
+            str(tmp_path), "", "1880", "USA", ""
         )
-    assert result == tmp_path / "1880 USA Census" / "USA" / "1880"
+    assert result == tmp_path / "USA" / "1880"
 
 
 def test_resolve_census_image_dir_omits_empty_segments(tmp_path):
     """Absent country or year are skipped, not added as empty path segments."""
     with patch("_gather_helpers.os.getenv", return_value=""):
         result = gh.resolve_census_image_dir(
-            str(tmp_path), "", "Some Collection", "", "", "Pembina"
+            str(tmp_path), "", "", "", "Pembina"
         )
-    assert result == tmp_path / "Some Collection" / "Pembina"
+    assert result == tmp_path / "Pembina"

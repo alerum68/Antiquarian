@@ -6,21 +6,23 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
     ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
-    ancestryCountryFromState,
+    getCountryFromState,
 } = require('./harness.js');
 
-test('ancestryCountryFromState: Canadian provinces/territories resolve to Canada, everything else to USA', () => {
-    assert.equal(ancestryCountryFromState('Ontario'), 'Canada');
-    assert.equal(ancestryCountryFromState('Nova Scotia'), 'Canada');
-    assert.equal(ancestryCountryFromState('Manitoba'), 'Canada');
+test('getCountryFromState: Canadian provinces/territories resolve to Canada, everything else to USA', () => {
+    assert.equal(getCountryFromState('Ontario'), 'Canada');
+    assert.equal(getCountryFromState('Nova Scotia'), 'Canada');
+    assert.equal(getCountryFromState('Manitoba'), 'Canada');
+    assert.equal(getCountryFromState('Northwest Territories'), 'Canada');
     // Case-insensitive - browsePath text casing isn't guaranteed.
-    assert.equal(ancestryCountryFromState('QUEBEC'), 'Canada');
-    assert.equal(ancestryCountryFromState('Dakota Territory'), 'USA');
-    assert.equal(ancestryCountryFromState('Minnesota'), 'USA');
+    assert.equal(getCountryFromState('QUEBEC'), 'Canada');
+    assert.equal(getCountryFromState('Dakota Territory'), 'USA');
+    assert.equal(getCountryFromState('Minnesota'), 'USA');
     // Absent/unrecognized state defaults to USA, matching every pre-Canada-support
     // gather's own established behavior.
-    assert.equal(ancestryCountryFromState(''), 'USA');
-    assert.equal(ancestryCountryFromState(undefined), 'USA');
+    assert.equal(getCountryFromState(''), 'USA');
+    assert.equal(getCountryFromState(null), 'USA');
+    assert.equal(getCountryFromState(undefined), 'USA');
 });
 
 // Real captured 1850 fieldLabels (dbId 8054, Pembina, Minnesota Territory) - 17 fields,

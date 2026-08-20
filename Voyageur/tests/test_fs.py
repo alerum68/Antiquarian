@@ -1,5 +1,6 @@
 """Tests for FS.py's build_universal_json() document_metadata fix and Commissioner
 validation wiring - see the Voyageur-Parish-Scrip-scaffold design spec."""
+import json
 import FS
 
 
@@ -9,6 +10,23 @@ def test_sanitize_item_id_filename_replaces_unsafe_characters():
 
 def test_sanitize_item_id_filename_preserves_safe_characters():
     assert FS.sanitize_item_id_filename("abc-123_DEF") == "abc-123_DEF.jpg"
+
+
+def test_normalize_familysearch_gather_url_strips_tracking_params():
+    """User-reported: a URL copied from a FamilySearch search result carries wc/cc/i
+    tracking params that aren't part of the ark's own identity and can send the viewer to
+    the wrong page - only the ark path (collection id + image ark) and a clean
+    view=index&lang=en query belong in the launch URL."""
+    messy = ("https://www.familysearch.org/ark:/61903/3:1:33SQ-GRCN-QMV"
+             "?wc=QZF7-X1H%3A648803501%2C649973301%2C649993301%2C1589282428%26cc%3D1810731"
+             "&cc=1810731&lang=en&i=0")
+    assert (FS.normalize_familysearch_gather_url(messy)
+            == "https://www.familysearch.org/ark:/61903/3:1:33SQ-GRCN-QMV?view=index&lang=en")
+
+
+def test_normalize_familysearch_gather_url_already_canonical_is_unchanged():
+    canonical = "https://www.familysearch.org/ark:/61903/3:1:3QHN-PQHW-1YYN?view=index&lang=en"
+    assert FS.normalize_familysearch_gather_url(canonical) == canonical
 
 
 def test_build_universal_json_sets_real_document_metadata_from_item_id():
@@ -124,6 +142,56 @@ def test_build_census_json_accepts_household_view_row_shape():
     assert "Relationship to Head" not in people[4]["columns"]
 
 
+def test_build_census_json_pages_use_each_items_own_location_not_the_first_ones():
+    """Regression: Voyageur.js's buildFsItemData() computes each item's own state/county/
+    city/country/enumeration_district directly (from the Image-Index API response or the
+    scraped citation - see fsBuildItemData image-index/names branches), but
+    build_census_json() previously derived location_info once from only the FIRST item's
+    citation_text and applied it to every page, silently discarding the second (and every
+    later) item's own, potentially different, location fields."""
+    items_raw = [
+        {
+            "item_id": "item-1", "citation_text": "",
+            "state": "Minnesota", "county": "Ramsey", "city": "St Paul",
+            "country": "USA", "enumeration_district": "45",
+            "rows": [],
+        },
+        {
+            "item_id": "item-2", "citation_text": "",
+            "state": "North Dakota", "county": "Pembina", "city": "Walhalla",
+            "country": "USA", "enumeration_district": "12",
+            "rows": [],
+        },
+    ]
+    result = FS.build_census_json({"collection_title": "1900 Census"}, items_raw, {})
+
+    assert result["pages"][0]["state"] == "Minnesota"
+    assert result["pages"][0]["county"] == "Ramsey"
+    assert result["pages"][0]["enumeration_district"] == "45"
+    assert result["pages"][1]["state"] == "North Dakota"
+    assert result["pages"][1]["county"] == "Pembina"
+    assert result["pages"][1]["enumeration_district"] == "12"
+
+
+def test_build_census_json_page_falls_back_to_citation_location_when_items_own_is_blank():
+    """When an item's own state/county/city/country/enumeration_district came back empty
+    (e.g. buildFsItemData()'s citation-text regex didn't match), the page still falls back
+    to the shared first-citation-derived location_info, rather than losing the location
+    entirely."""
+    items_raw = [{
+        "item_id": "item-1",
+        "citation_text": '"1900 Census," database with images, FamilySearch '
+        '(https://familysearch.org : 3 August 2026), Minnesota > Ramsey > St Paul; '
+        "some publisher, some place.",
+        "rows": [],
+    }]
+    result = FS.build_census_json({"collection_title": "1900 Census"}, items_raw, {})
+
+    assert result["pages"][0]["state"] == "Minnesota"
+    assert result["pages"][0]["county"] == "Ramsey"
+    assert result["pages"][0]["city"] == "St Paul"
+
+
 def test_convert_raw_gather_to_final_routes_census_collections_through_census_path():
     raw = {
         "collection_title": "United States, Census, 1880",
@@ -159,14 +227,12 @@ def test_convert_raw_gather_to_final_routes_non_census_collections_through_unive
     assert clean_name is None
 
 
-import json
-
 MINIMAL_FINAL_DATA = {
     "citation": {"collection_name": "United States Census, 1880"},
     "sheets": [{
         "records": [{
+            "year": "1880",
             "type_specific_fields": {
-                "census_year": "1880",
                 "country": "USA",
                 "state": "North Dakota",
                 "county": "Pembina",
@@ -196,3 +262,30 @@ def test_fs_location_folder_skips_empty_fields():
     _, _, loc_folder, _ = extract_census_image_routing_fields(data)
     assert loc_folder == "North Dakota - Pembina"
     assert not loc_folder.endswith(" - ")
+
+
+def test_fs_normalize_then_extract_routing_fields_round_trips():
+    """Integration regression: extract_census_image_routing_fields() must read whatever
+    shape normalize_familysearch_census_gather() actually produces, not a hand-built
+    fixture - census_year previously lived only in test fixtures' type_specific_fields, a
+    shape the real normalizer never produces (it stores year as the record's own top-level
+    "year" key - see census_schema.py), which let census_year come back "" for every real
+    FamilySearch gather while the hand-built-fixture tests kept passing."""
+    from _gather_helpers import extract_census_image_routing_fields
+    raw_census = {
+        "census_year": "1900",
+        "pages": [{
+            "page_number": 3, "state": "Ohio", "county": "Lucas", "city": "", "country": "USA",
+            "repository": "FamilySearch",
+            "people": [
+                {"columns": {"Given Name": "Marie", "Surname": "Boucher", "Gender": "F",
+                             "Age": "35", "Relationship to Head": "Head", "Family Number": "2"},
+                 "pid": "p2"},
+            ],
+        }],
+    }
+    normalized = FS.normalize_familysearch_census_gather(raw_census, "1900 US Census - Ohio")
+    year, country, loc_folder, _ = extract_census_image_routing_fields(normalized)
+    assert year == "1900"
+    assert country == "USA"
+    assert loc_folder == "Ohio - Lucas"

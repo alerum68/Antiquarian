@@ -376,6 +376,69 @@ def test_census_gedcom_refn_is_bare_ark_not_the_gedcomx_type_prefixed_form(tmp_p
     assert "1 REFN 1:1:MF36-Z6D" not in lines
 
 
+def test_census_gedcom_fsftid_falls_back_to_persons_own_ark_not_the_record_id(tmp_path, monkeypatch):
+    """User-requested fix: the _FSFTID fallback (when no genuine tree-attached FSFTID exists)
+    must pull this specific individual's own FamilySearch persona ark (FS.py's person_ark,
+    carried through as this row's PersonArk column) - never rec_id/PID, which is only ever
+    equal to person_ark when FS.py actually captured one; otherwise PID holds a synthesized
+    "{item_id}-{row_index}" record-level compound that isn't an ark at all and would produce
+    a bogus _FSFTID if used. This row's PID is deliberately a different value than its
+    PersonArk to prove the two are read independently."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["pid"] = "9999-fake-record-id"
+    head["type_specific_fields"]["person_ark"] = "1:1:MF36-Z6D"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert "0 @I9999-fake-record-id@ INDI" in lines
+    assert "1 _FSFTID MF36-Z6D" in lines
+    assert not any(ln.startswith("1 _FSFTID ") and "MF36-Z6D" not in ln for ln in lines), \
+        f"_FSFTID must come from PersonArk, not the record's own PID: {lines}"
+
+
+def test_census_gedcom_apid_is_individual_level_not_nested_in_citation(tmp_path, monkeypatch):
+    """_APID is an individual-level GEDCOM tag (FTM/RM both expect it directly on the INDI
+    record), never nested inside a per-fact SOUR citation - confirms build_gedcom_from_census
+    emits exactly one '1 _APID ...' per person and that no '3 _APID' (the old, incorrect
+    citation-nested placement) survives anywhere in the output."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["pid"] = "105307051"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "APID_DB", "2442")
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    apid_lines = [ln for ln in lines if "_APID" in ln]
+    assert apid_lines == ["1 _APID 1,2442::105307051"], apid_lines
+
+
 def _citation_row(**overrides):
     row = {"Given Name": "Jean", "Surname": "Gagnon", "FSFTID": "", "FamilySearch_URL": "",
            "Extracted_URL": "", "Family Number": "5", "Dwelling Number": "5"}
@@ -412,13 +475,11 @@ def test_census_citation_never_emits_apid_for_an_ark_shaped_rec_id(monkeypatch):
         assert not any("_FSFTID" in ln for ln in cit), f"{target}: bogus _FSFTID from an ark: {cit}"
 
 
-def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_rows(monkeypatch):
-    """User-requested follow-up: the citation-level _FSFTID field should carry this record's
-    own FamilySearch person ark - as an identifier, not a URL - when there's no genuine
-    tree-attached FSFTID, but ONLY for rows we already know are FamilySearch-sourced
-    (FamilySearch_URL present); never fabricated for Ancestry-only rows. And it must be
-    BARE (no '1:1:' GEDCOM X type prefix) - that prefix stays only in the actual clickable
-    weblink, which is unaffected here."""
+def test_census_citation_never_emits_fsftid_for_familysearch_sourced_rows(monkeypatch):
+    """_FSFTID is an individual-level GEDCOM tag (see build_gedcom_from_census's indi_fsftid,
+    which sources it from the row's own PersonArk column, not from build_census_citation) -
+    it must never appear inside the per-fact citation itself, whether or not the row is
+    FamilySearch-sourced."""
     monkeypatch.setattr(arc, "APID_DB", "")
     monkeypatch.setattr(arc, "CENSUS_YEAR", 1860)
     monkeypatch.setattr(arc, "CENSUS_SOURCE_ID", "1473181")
@@ -429,7 +490,7 @@ def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_
         cit = arc.build_census_citation(fs_row, "1:1:MF36-Z6D", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert any(ln == "1 _FSFTID MF36-Z6D" for ln in cit), f"{target}: missing bare _FSFTID: {cit}"
+        assert not any("_FSFTID" in ln for ln in cit), f"{target}: _FSFTID leaked into citation: {cit}"
 
     monkeypatch.setattr(arc, "APID_DB", "2442")
     anc_row = _citation_row(FSFTID="")
@@ -437,7 +498,7 @@ def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_
         cit = arc.build_census_citation(anc_row, "105307051", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert not any("_FSFTID" in ln for ln in cit), f"{target}: fabricated _FSFTID for Ancestry-only row: {cit}"
+        assert not any("_FSFTID" in ln for ln in cit), f"{target}: _FSFTID leaked into citation: {cit}"
 
 
 def test_strip_ark_type_prefix():
@@ -476,9 +537,11 @@ def test_census_citation_household_id_field_is_bare_number_when_only_one_number_
     assert any(ln == "4 VALUE dwelling 5, family 1" for ln in both), both
 
 
-def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
-    """Companion to the regression above - a genuine Ancestry-sourced record (real APID_DB,
-    numeric rec_id, no FSFTID) must still get its _APID tag exactly as before."""
+def test_census_citation_never_emits_apid_for_real_ancestry_data(monkeypatch):
+    """Companion to the regression above - _APID is an individual-level GEDCOM tag (see
+    build_gedcom_from_census's indi-level '1 _APID ...' line), not a citation-level one, so
+    even a genuine Ancestry-sourced record (real APID_DB, numeric rec_id) must never carry
+    it inside build_census_citation()'s own output."""
     monkeypatch.setattr(arc, "APID_DB", "2442")
     monkeypatch.setattr(arc, "CENSUS_YEAR", 1860)
     monkeypatch.setattr(arc, "CENSUS_SOURCE_ID", "1001")
@@ -490,7 +553,7 @@ def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
         cit = arc.build_census_citation(row, "105307051", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert any(ln == "3 _APID 1,2442::105307051" for ln in cit), f"{target}: missing real _APID: {cit}"
+        assert not any("_APID" in ln for ln in cit), f"{target}: _APID leaked into citation: {cit}"
 
 
 def test_dynamic_occupation_template_normalizes_raw_case():

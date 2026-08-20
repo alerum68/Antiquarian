@@ -20,7 +20,7 @@ def test_voyageur_schema_matches_expected_shape():
     result = Antiquarian._load_tool_schema(BASE_DIR / "Voyageur")
 
     assert result == {
-        "Gather Settings": {"VOYAGEUR_SOURCE": "", "GATHER_URL": "", "GATHER_ON_COLLISION": "overwrite"},
+        "Gather Settings": {"VOYAGEUR_SOURCE": "", "GATHER_URL": "", "GATHER_ON_COLLISION": "skip"},
         "HBCA Settings": {
             "HBCA_LETTER_FILTER": "",
             "HBCA_RESOLVE_KEYSTONE": "false",

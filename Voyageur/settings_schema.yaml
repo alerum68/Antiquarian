@@ -7,7 +7,7 @@ sections:
       default: ""
       tooltip: "The web address (URL) of the specific record or collection you want to gather."
     GATHER_ON_COLLISION:
-      default: "overwrite"
+      default: "skip"
       tooltip: "When a gathered JSON or image file's destination already exists: overwrite it, or skip and keep the existing file."
       widget: segmented
       options: [["overwrite", "Overwrite"], ["skip", "Skip"]]
