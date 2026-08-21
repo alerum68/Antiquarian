@@ -1230,3 +1230,36 @@ def test_general_profile_citation_detail_fields_wraps_in_tmplt():
     assert any(ln == "5 NAME SourceDetailPerson" for ln in lines)
     assert any(ln == "5 VALUE Marie Gagnon" for ln in lines)
     assert not any(ln.startswith("4 TID") for ln in lines)
+
+
+def test_all_template_names_start_with_bang():
+    for tid, tpl in Scrip._SIMPLIFIED_CITATION_TEMPLATES.items():
+        assert tpl['name'].startswith('!'), f"TID {tid} name {tpl['name']!r} missing ! prefix"
+
+
+def test_findagrave_entry_removed():
+    assert 10001 not in Scrip._SIMPLIFIED_CITATION_TEMPLATES
+
+
+def test_non_traditional_master_fields_match_rmst():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10009]
+    assert 'Publisher' not in tpl['master_fields']
+    assert 'PublishLocation' not in tpl['master_fields']
+    assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_census_detail_fields_include_personal_id():
+    assert 'PersonalID' in Scrip._SIMPLIFIED_CITATION_TEMPLATES[10008]['detail_fields']
+
+
+def test_traditional_master_fields_include_title():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10010]
+    assert 'Title' in tpl['master_fields']
+    assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_master_template_fields_match_rmst():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10006]
+    for f in ('Author', 'Role', 'BookTitle', 'Subtitle', 'Title'):
+        assert f in tpl['master_fields'], f"missing {f}"
+    assert 'PersonalID' in tpl['detail_fields']
