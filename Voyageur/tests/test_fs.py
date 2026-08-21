@@ -294,3 +294,30 @@ def test_fs_normalize_then_extract_routing_fields_round_trips():
     assert year == "1900"
     assert country == "USA"
     assert loc_folder == "Ohio - Lucas"
+
+
+def test_recover_orphaned_runs_quarantines_corrupt_raw_json_instead_of_crashing(tmp_path):
+    """Real-world regression (2026-08-21): a stale TMP_FS_ raw JSON left behind by an
+    interrupted prior gather can have a corrupt byte spliced into it (confirmed live - not
+    a bug in this pipeline's own JSON.stringify-based serialization). Before this fix,
+    _recover_orphaned_runs's bare json.loads() crashed the ENTIRE current gather on
+    startup - and since find_orphaned_gather_runs re-scans by filename pattern with no
+    memory of a prior failure, the exact same file would crash every subsequent run too.
+    User-directed design: the corrupt file is moved into a "Failed" subfolder of the JSON
+    output directory (out of Downloads entirely) so recovery can report it and move on,
+    not loop forever."""
+    downloads_dir = tmp_path / "Downloads"
+    downloads_dir.mkdir()
+    json_target_dir = tmp_path / "Project"
+    json_target_dir.mkdir()
+
+    stale = downloads_dir / "TMP_FS_deadbeef_FS - Some Census.json"
+    stale.write_text('{"items": [{"foo": "",f\n"bar": "baz"}]}', encoding="utf-8")
+
+    FS._recover_orphaned_runs(downloads_dir, "current_run_id", json_target_dir, str(tmp_path), "skip")
+
+    assert not stale.exists()
+    quarantined = json_target_dir / "Failed" / "TMP_FS_deadbeef_FS - Some Census.json"
+    assert quarantined.exists()
+    assert quarantined.read_text(encoding="utf-8") == '{"items": [{"foo": "",f\n"bar": "baz"}]}'
+    assert list(json_target_dir.iterdir()) == [json_target_dir / "Failed"]

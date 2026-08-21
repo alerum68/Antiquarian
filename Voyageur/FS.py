@@ -794,8 +794,34 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
                   f"left in place for manual review: {names}")
             continue
 
-        raw_data = json.loads(_read_text_with_retry(group["final"]))
-        final_data, clean_name = convert_raw_gather_to_final(raw_data)
+        try:
+            raw_data = json.loads(_read_text_with_retry(group["final"]))
+            final_data, clean_name = convert_raw_gather_to_final(raw_data)
+        except Exception as exc:  # noqa: BLE001 - opportunistic recovery of a PAST run must
+            # never crash the CURRENT gather, and a corrupt/unparseable raw JSON (confirmed
+            # live 2026-08-21: a stray byte spliced into an otherwise-valid download,
+            # unrelated to any of this pipeline's own JSON.stringify-based serialization)
+            # could come from json.loads, or just as easily from convert_raw_gather_to_final/
+            # validate_against_commissioner further down - both are equally "this run's data
+            # is unusable", so both are handled the same way here. Left in Downloads
+            # unquarantined, this exact file would be picked up and crash again on every
+            # future run (find_orphaned_gather_runs re-scans by filename pattern every time,
+            # with no memory of a prior failed attempt) - user-directed design: move it into
+            # a "Failed" subfolder of the JSON output directory instead, so the raw data is
+            # preserved for manual inspection without blocking future runs or lingering in
+            # Downloads.
+            failed_dir = json_target_dir / "Failed"
+            failed_dir.mkdir(parents=True, exist_ok=True)
+            corrupt_path = failed_dir / group["final"].name
+            try:
+                group["final"].replace(corrupt_path)
+            except OSError:
+                corrupt_path = group["final"]
+            print(f"[WARN] Stale gather (run {run_id}) had unreadable raw JSON ({exc}) - "
+                  f"moved to {corrupt_path} for manual review; will not be retried "
+                  f"automatically.")
+            continue
+
         out_name = clean_name or group["final"].name[len(f"TMP_FS_{run_id}_"):]
         recovered_json = json_target_dir / out_name
 
