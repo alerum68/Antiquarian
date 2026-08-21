@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.43
+// @version      0.3.44
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -2069,11 +2069,25 @@
             } else if (pageType === 'names') {
                 const apiWait = await waitForFsApiResponse(itemId);
                 if (apiWait.result) {
-                    // Confirmed live 2026-08-21: the attachments response for THIS image
-                    // routinely arrives after the (usually faster) orchestration API response
-                    // above - building rows immediately would read person_ark before it had
-                    // been stored. Wait for it here so fsBuildRowsFromApiResponse's own
-                    // fsPersonArkFromAttachments() calls see it in time.
+                    // Confirmed live 2026-08-21: "Next Image" turned out to be a client-side
+                    // route change, NOT a full page reload as this file's own comments assumed
+                    // elsewhere (confirmed by injecting a probe script that survived the
+                    // navigation) - unsafeWindow, and everything on it, persists across every
+                    // image in one gather, not just within one. Without this reset,
+                    // __voyageurFsAttachmentsArrived - and __voyageurFsAttachmentsRequested -
+                    // go true on the FIRST image's attachments response and stay true forever,
+                    // so waitForFsAttachments() on every later image short-circuits on a STALE
+                    // flag instead of waiting for THIS image's own batch - confirmed live as
+                    // the real cause of Jess G Crowston's real KLBM-H9P mapping (present and
+                    // correctly keyed in the raw response, per a direct capture) never reaching
+                    // his row. __voyageurFsAttachments itself (the map of already-seen
+                    // mappings) is deliberately NOT cleared here - those entries stay correct
+                    // and harmless to keep across images, only the per-image "have we heard
+                    // back yet" flags need to start fresh.
+                    if (typeof unsafeWindow !== 'undefined') {
+                        unsafeWindow.__voyageurFsAttachmentsArrived = false;
+                        unsafeWindow.__voyageurFsAttachmentsRequested = false;
+                    }
                     await waitForFsAttachments();
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
                     // The attachments endpoint can fire again after this point with a LATER
