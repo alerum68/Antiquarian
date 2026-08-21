@@ -138,6 +138,21 @@ def evaluate_task_priority(task_note: str) -> tuple:
     return 3, "3", "General Review"
 
 
+def _gedcom_text_lines(level: int, tag: str, text: str) -> List[str]:
+    """Splits a multi-line template text value into a leading 'LEVEL TAG line1' followed by
+    'LEVEL+1 CONT lineN' continuation lines for every subsequent line. User-directed design
+    (2026-08-21), confirmed live as the real cause of RootsMagic falling back every source
+    to Freeform instead of the imported template: GEDCOM 5.5.1 requires every physical line
+    to start with its own level+tag - this template source's own multi-paragraph
+    Description/Hint text contains raw embedded newlines, which previously got written
+    out as bare continuation lines with no tag prefix at all (invalid GEDCOM), not proper
+    CONT lines."""
+    parts = text.split("\n")
+    result = [f"{level} {tag} {parts[0]}"]
+    result.extend(f"{level + 1} CONT {cont}" for cont in parts[1:])
+    return result
+
+
 # noinspection DuplicatedCode
 def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
@@ -151,15 +166,15 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
 
     lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
     if desc:
-        lines.append(f"1 DESC {desc}")
+        lines.extend(_gedcom_text_lines(1, "DESC", desc))
     if cat:
         lines.append(f"1 CAT {cat}")
     if foot:
-        lines.append(f"1 FOOT {foot}")
+        lines.extend(_gedcom_text_lines(1, "FOOT", foot))
     if short:
-        lines.append(f"1 SHORT {short}")
+        lines.extend(_gedcom_text_lines(1, "SHORT", short))
     if bibl:
-        lines.append(f"1 BIBL {bibl}")
+        lines.extend(_gedcom_text_lines(1, "BIBL", bibl))
 
     for fld in elem.findall("Field"):
         f_type = (fld.findtext("Type") or "Text").strip()
@@ -175,10 +190,10 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
         if f_disp:
             lines.append(f"2 DISP {f_disp}")
         if f_hint:
-            lines.append(f"2 HINT {f_hint}")
+            lines.extend(_gedcom_text_lines(2, "HINT", f_hint))
         lines.append(f"2 DETL {f_detl}")
         if f_lhnt:
-            lines.append(f"2 LHNT {f_lhnt}")
+            lines.extend(_gedcom_text_lines(2, "LHNT", f_lhnt))
     return lines
 
 
