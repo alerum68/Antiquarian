@@ -884,8 +884,9 @@ def test_get_scrip_citation_fields_skips_empty_values():
     part = make_participant("primary", given="Roger", surname="Letendre")
     lines = Scrip.get_scrip_citation_fields(20001, rec, part, "1320")
     joined = "\n".join(lines)
-    assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
-    assert "4 NAME ClaimantName" in joined and "4 VALUE Roger Letendre" in joined
+    assert "3 _TMPLT" in joined
+    assert "5 NAME AffidavitNumber" in joined and "5 VALUE 5473" in joined
+    assert "5 NAME ClaimantName" in joined and "5 VALUE Roger Letendre" in joined
     # Microfilm/Parish/URL were never set on this record - must not appear at all.
     assert "Microfilm" not in joined
     assert "URL" not in joined
@@ -901,7 +902,8 @@ def test_build_general_citation_scrip_cites_the_matching_template_source_with_fi
         blocks = General.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
         joined = blocks[0]
         assert "2 SOUR @S20001@" in joined
-        assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
+        assert "3 _TMPLT" in joined
+        assert "5 NAME AffidavitNumber" in joined and "5 VALUE 5473" in joined
         assert "LAC Digital Record" in joined
         assert (
             "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber=1506170"

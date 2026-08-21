@@ -247,13 +247,18 @@ def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str
 
 
 def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str) -> List[str]:
-    """Builds the citation detail FIELD/VALUE lines for a RootsMagic citation."""
+    """Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+    that's on the master SOUR record only."""
     lines = []
     for field_name in _SCRIP_TEMPLATES[template_id]['detail_fields']:
         value = _scrip_template_field_value(field_name, rec, part, vol)
         if value:
-            lines.extend(["3 FIELD", f"4 NAME {field_name}", f"4 VALUE {value}"])
-    return lines
+            lines.extend(["4 FIELD", f"5 NAME {field_name}", f"5 VALUE {value}"])
+    if not lines:
+        return []
+    return ["3 _TMPLT"] + lines
+
+
 
 
 def get_scrip_template_sources(template_ids_used: set, target_software: str) -> list:
