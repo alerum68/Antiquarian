@@ -190,11 +190,15 @@ class GeneralProfile:
             ("URL", Utils.clean_val(COLLECTION_URL)),
             ("RefNumber", ref_num_str),
         ]
-        lines = []
+        # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+        # that's on the master SOUR record only.
+        field_lines = []
         for f_name, f_val in parish_detail_fields:
             if f_val:
-                lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
-        return lines
+                field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
+        if not field_lines:
+            return []
+        return ["3 _TMPLT"] + field_lines
 
     # noinspection DuplicatedCode
     @staticmethod

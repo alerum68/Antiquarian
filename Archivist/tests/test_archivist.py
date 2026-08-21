@@ -1217,3 +1217,14 @@ def test_rmst_element_to_gedcom_uses_stmplt_tag_vocabulary():
     assert "DISP " not in joined
     assert "DETL " not in joined
     assert "LHNT " not in joined
+
+def test_general_profile_citation_detail_fields_wraps_in_tmplt():
+    rec = {"record_id": "REC-1", "type_specific_fields": {}}
+    part = {"std_given": "Marie", "std_surname": "Gagnon"}
+    General.GENERAL_CONFIG["parish_location"] = "St. Boniface, Manitoba"
+    lines = General.GeneralProfile.citation_detail_fields(rec, part, "12", "3", "RM")
+    assert lines[0] == "3 _TMPLT"
+    assert "4 FIELD" in lines
+    assert any(ln == "5 NAME SourceDetailPerson" for ln in lines)
+    assert any(ln == "5 VALUE Marie Gagnon" for ln in lines)
+    assert not any(ln.startswith("4 TID") for ln in lines)
