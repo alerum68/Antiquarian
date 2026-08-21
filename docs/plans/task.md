@@ -11,4 +11,4 @@
 | 9. Regenerate golden files, verify suite | Done |
 | 10. Hand-trace Footnote verification | Done |
 | 11. Regenerate and inspect real output | Done |
-| 12. Final whole-branch review | In Progress |
+| 12. Final whole-branch review | Done |
