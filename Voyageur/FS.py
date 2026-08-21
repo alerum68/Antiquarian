@@ -586,13 +586,16 @@ def split_full_name(raw_name: str) -> Tuple[str, str]:
     return " ".join(parts[:-1]), parts[-1]
 
 
-def pid_from_record_id(record_id: str) -> str:
-    """Deterministic, numbers-only, 10-digit PID derived from a record's own identifier -
-    user-directed design (2026-08-21): GEDCOM software expects a clean numeric xref/REFN,
+def pid_from_identifier(identifier: str) -> str:
+    """Deterministic, numbers-only, 10-digit PID derived from an ark identifier - either
+    person_ark (preferred, when a true Family Tree attachment is on file) or record_ark.
+    User-directed design (2026-08-21): GEDCOM software expects a clean numeric xref/REFN,
     not an ark-shaped string with colons and hyphens, and it must stay stable across
-    repeated gathers of the same record - Python's own hash() is randomized per-process
-    (unless PYTHONHASHSEED is pinned) and so is unsuitable; hashlib is not."""
-    digest = hashlib.sha256(record_id.encode('utf-8')).hexdigest()
+    repeated gathers of the same record/person - Python's own hash() is randomized
+    per-process (unless PYTHONHASHSEED is pinned) and so is unsuitable; hashlib is not.
+    Hashing person_ark when present means the SAME real person attached across multiple
+    records/census years collapses to the same pid, usable later to merge them."""
+    digest = hashlib.sha256(identifier.encode('utf-8')).hexdigest()
     return f"{int(digest, 16) % 10 ** 10:010d}"
 
 
@@ -666,23 +669,25 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             # Archivist's census-flavor loop uses 'pid' directly as this person's REFN/@I@ id
             # - it needs to be one clean identifier, not an ark-shaped string with colons and
             # hyphens. User-directed design (2026-08-21): 'pid' is a deterministic, numbers-
-            # only, 10-digit hash of record_ark (this row's own real, already-distinct
+            # only, 10-digit hash, preferring person_ark (the true Family Tree profile id)
+            # when a genuine attachment is on file - the same real person attached across
+            # multiple records/census years then collapses to the same pid, usable later to
+            # merge them - falling back to record_ark (this row's own real, already-distinct
             # per-person FamilySearch record/persona identifier - always present, already
-            # carries its own "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D"), falling back
+            # carries its own "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D"), and finally
             # to the old compound "{item_id}-{row_index}" form only on the rare row where
-            # record_ark itself is missing, before hashing. It is NOT an Ancestry APID and
-            # must never feed Archivist's _APID GEDCOM tag (that's Ancestry-specific
+            # record_ark itself is missing too, before hashing. It is NOT an Ancestry APID
+            # and must never feed Archivist's _APID GEDCOM tag (that's Ancestry-specific
             # citation-linking syntax) - Census.py guards that tag on real Ancestry data now.
             #
-            # person_ark is a SEPARATE, independent field - the true Family Tree profile id
-            # (a real, enduring identity, when one is on file for this persona), never folded
-            # into 'pid' or fabricated from record_ark. Blank when no attachment was found,
-            # matching the "don't fabricate" convention everywhere else in this file.
+            # person_ark is ALSO still preserved as its own separate field below - the raw
+            # value, not the hash - blank when no attachment was found, matching the "don't
+            # fabricate" convention everywhere else in this file.
             record_ark = row.get("record_ark", "")
             person_ark = row.get("person_ark", "")
             people.append({
                 "columns": columns,
-                "pid": pid_from_record_id(record_ark or f"{item_id}-{row_index + 1}"),
+                "pid": pid_from_identifier(person_ark or record_ark or f"{item_id}-{row_index + 1}"),
                 "record_ark": record_ark,
                 "person_ark": person_ark,
                 # load_census_dataframe reads this directly (same construction
