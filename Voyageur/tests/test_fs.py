@@ -4,6 +4,37 @@ import json
 import FS
 
 
+def test_parse_citation_matches_without_the_optional_nara_clause():
+    """Real-world regression (2026-08-21): Voyageur.js's own
+    fsBuildCitationTextFromApiResponse() only appends the trailing "; citing NARA microfilm
+    publication ... (repo_loc: repo_name, n.d.)." clause when the image-level
+    EXT_FILM_NBR/EXT_REPOSITORY_NAME fields are both present - a real gather missing those
+    two fields produced a citation_text ending in a bare period right after browse_path.
+    The old CITATION_RE required that clause unconditionally, so the whole match failed and
+    collection_name/repository/browse_path all came back blank even though citation_text
+    itself was non-empty - confirmed live this is why every citation field except
+    collection_url was blank for a real 1950 Pembina, ND gather."""
+    text = ('"United States Census, 1950: Pembina. Census 1950," database with images, '
+            'FamilySearch (https://x : 21 August 2026), North Dakota > Pembina > image 3 of 14.')
+    result = FS.parse_citation(text)
+    assert result["collection_name"] == "United States Census, 1950: Pembina. Census 1950"
+    assert result["repository"] == "FamilySearch"
+    assert result["browse_path"] == "North Dakota > Pembina > image 3 of 14"
+    assert result["publisher"] == ""
+    assert result["pub_loc"] == ""
+
+
+def test_parse_citation_still_matches_with_the_optional_nara_clause():
+    text = ('"United States Census, 1950: Pembina. Census 1950," database with images, '
+            'FamilySearch (https://x : 21 August 2026), North Dakota > Pembina > image 3 of 14; '
+            'citing NARA microfilm publication T627 (Washington D.C.: The U.S. National Archives '
+            'and Records Administration (NARA), n.d.).')
+    result = FS.parse_citation(text)
+    assert result["collection_name"] == "United States Census, 1950: Pembina. Census 1950"
+    assert result["repository"] == "FamilySearch"
+    assert result["browse_path"] == "North Dakota > Pembina > image 3 of 14"
+
+
 def test_sanitize_item_id_filename_replaces_unsafe_characters():
     assert FS.sanitize_item_id_filename("abc 123/def") == "abc_123_def.jpg"
 

@@ -139,8 +139,17 @@ PARENT_MATCH_THRESHOLD = 80
 
 CITATION_RE = re.compile(
     r'^"(?P<collection_name>.+?),"\s+database with images,\s+(?P<repository>.+?)\s*\(.*?\),\s*'
-    r'(?P<browse_path>.+?);\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?)\.\s*$'
+    r'(?P<browse_path>.+?)'
+    r'(?:;\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?))?\.\s*$'
 )
+# User-directed design (2026-08-21): the trailing "; citing NARA microfilm publication ...
+# (repo_loc: repo_name, n.d.)." clause is OPTIONAL in Voyageur.js's own
+# fsBuildCitationTextFromApiResponse() - it only appends that clause when the image-level
+# EXT_FILM_NBR/EXT_REPOSITORY_NAME fields are both present, otherwise the citation text ends
+# with a bare period right after browse_path. The old pattern required that clause
+# unconditionally, so a real gather missing those two fields failed to match AT ALL -
+# collection_name/repository/browse_path/publisher/pub_loc all came back blank even though
+# citation_text itself was non-empty (only collection_url, extracted separately, survived).
 
 
 # ==========================================
@@ -399,8 +408,10 @@ def parse_citation(text: str) -> Dict[str, str]:
     if m:
         result["collection_name"] = m.group("collection_name").strip()
         result["repository"] = m.group("repository").strip()
-        result["publisher"] = m.group("publisher").strip()
-        result["pub_loc"] = m.group("pub_loc").strip()
+        # publisher/pub_loc are the optional trailing NARA clause - None (not "") when
+        # that clause is absent from this citation, per the pattern's own comment.
+        result["publisher"] = (m.group("publisher") or "").strip()
+        result["pub_loc"] = (m.group("pub_loc") or "").strip()
         result["browse_path"] = m.group("browse_path").strip()
     return result
 
