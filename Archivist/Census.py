@@ -844,7 +844,6 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         page_parts.append(person_str)
 
         collection_title = COLLECTION_NAME or DEFAULT_COLLECTION_NAME
-        cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
 
         detail_fields = [
             ("Page", f"p. {real_page}" if real_page else ""),
@@ -857,11 +856,16 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             ("URL", ancestry_url),
             ("RefNumber", f"APID 1,{APID_DB}::{rec_id}" if (APID_DB and rec_id) else ""),
         ]
+        cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
+        # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+        # that's on the master SOUR record only.
+        cit.append("3 _TMPLT")
         for f_name, f_val in detail_fields:
             if f_val:
-                cit.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
+                cit.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
 
         cit.append("3 DATA")
+
         if APID_DB and rec_id:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME Anc- {collection_title}",

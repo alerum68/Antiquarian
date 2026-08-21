@@ -669,19 +669,22 @@ def test_census_citation_household_id_field_is_bare_number_when_only_one_number_
     family_only = arc.build_census_citation(
         _citation_row(**{"Family Number": "1", "Dwelling Number": ""}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE 1" for ln in family_only), family_only
+    assert any(ln == "3 _TMPLT" for ln in family_only), family_only
+    assert any(ln == "5 VALUE 1" for ln in family_only), family_only
     assert not any("family" in ln.lower() for ln in family_only), family_only
 
     dwelling_only = arc.build_census_citation(
         _citation_row(**{"Family Number": "", "Dwelling Number": "5"}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE 5" for ln in dwelling_only), dwelling_only
+    assert any(ln == "3 _TMPLT" for ln in dwelling_only), dwelling_only
+    assert any(ln == "5 VALUE 5" for ln in dwelling_only), dwelling_only
     assert not any("dwelling" in ln.lower() for ln in dwelling_only), dwelling_only
 
     both = arc.build_census_citation(
         _citation_row(**{"Family Number": "1", "Dwelling Number": "5"}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE dwelling 5, family 1" for ln in both), both
+    assert any(ln == "3 _TMPLT" for ln in both), both
+    assert any(ln == "5 VALUE dwelling 5, family 1" for ln in both), both
 
 
 def test_census_citation_never_emits_apid_for_real_ancestry_data(monkeypatch):
