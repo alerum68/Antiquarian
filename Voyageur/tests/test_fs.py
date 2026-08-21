@@ -317,6 +317,17 @@ def test_fs_location_folder_skips_empty_fields():
     assert not loc_folder.endswith(" - ")
 
 
+def test_fs_location_folder_nests_past_city_down_to_enumeration_district():
+    """User-directed design (2026-08-21): nests one level past city, down to the
+    enumeration district - a single city/township can span several EDs, so ED is the level
+    that actually disambiguates one image set from another within it."""
+    data = json.loads(json.dumps(MINIMAL_FINAL_DATA))
+    data["sheets"][0]["records"][0]["type_specific_fields"]["enumeration_district"] = "12"
+    from _gather_helpers import extract_census_image_routing_fields
+    _, _, loc_folder, _ = extract_census_image_routing_fields(data)
+    assert loc_folder == "North Dakota - Pembina - Walhalla - 12"
+
+
 def test_fs_image_routing_uses_majority_state_not_just_first_record():
     """Real-world regression (2026-08-21): a real 1950 Pembina, ND gather had its very
     first record's own 'state' field read "Advance" (a citation-parsing artifact for that

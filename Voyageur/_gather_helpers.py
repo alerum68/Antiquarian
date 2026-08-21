@@ -301,13 +301,17 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
     producing a FILE reference to a folder the images were never actually saved in. Same
     fix as that function's own reasoning, applied consistently here too.
 
-    location_folder is built as 'state - county - city' (each segment omitted when blank)
-    matching the ' - ' split resolve_census_image_dir uses internally."""
+    location_folder is built as 'state - county - city - ED' (each segment omitted when
+    blank) matching the ' - ' split resolve_census_image_dir uses internally. User-directed
+    design (2026-08-21): nests one level past city, down to the enumeration district - a
+    single city/township can span several EDs, so ED is the level that actually
+    disambiguates one image set from another within it."""
     census_year = ""
     countries: list = []
     states: list = []
     counties: list = []
     cities: list = []
+    eds: list = []
     for sheet in final_data.get("sheets", []):
         for record in sheet.get("records", []) or []:
             record = record or {}
@@ -320,9 +324,11 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
             states.append(fields.get("state", ""))
             counties.append(fields.get("county", ""))
             cities.append(fields.get("city", ""))
+            eds.append(fields.get("enumeration_district", ""))
 
     country = _mode_or_first(countries)
-    location_parts = [_mode_or_first(states), _mode_or_first(counties), _mode_or_first(cities)]
+    location_parts = [_mode_or_first(states), _mode_or_first(counties), _mode_or_first(cities),
+                      _mode_or_first(eds)]
     location_folder = " - ".join(p for p in location_parts if p)
     collection_name = final_data.get("citation", {}).get("collection_name", "") or ""
     return census_year, country, location_folder, collection_name
