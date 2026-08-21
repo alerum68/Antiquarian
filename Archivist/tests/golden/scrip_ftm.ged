@@ -31,7 +31,7 @@
 2 DATE 1880
 2 PLAC Winnipeg
 2 _PROOF proven
-2 SOUR @S001@
+2 SOUR @S20004@
 3 _TITL Letendre, Roger: Claim: 3126; Affidavit: 5473; Scrip: 12761 [Personal ("Roger", Letendre)]
 3 PAGE Claim 3126; Affdt 5473
 3 DATA
@@ -70,4 +70,9 @@
 1 AUTH 
 1 PUBL : 
 1 REFN 001
+0 @S20004@ SOUR
+1 TITL Métis Scrip Certificates and Payments
+1 AUTH Library and Archives Canada, Ottawa, Ontario
+1 PUBL Library and Archives Canada, Ottawa, Ontario. Department of the Interior fonds, RG 15, Series D-II-8-e/f/j. Scrip Commission.
+1 REFN 20004
 0 TRLR

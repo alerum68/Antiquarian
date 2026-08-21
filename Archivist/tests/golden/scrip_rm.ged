@@ -32,9 +32,22 @@
 2 DATE 1880
 2 PLAC Winnipeg
 2 _PROOF proven
-2 SOUR @S001@
+2 SOUR @S20004@
 3 _TITL Letendre, Roger: Claim: 3126; Affidavit: 5473; Scrip: 12761 [Personal ("Roger", Letendre)]
 3 PAGE Claim 3126; Affdt 5473
+3 _TMPLT
+4 FIELD
+5 NAME ClaimantName
+5 VALUE Roger Letendre
+4 FIELD
+5 NAME ScripType
+5 VALUE Half-breed Head
+4 FIELD
+5 NAME CertificateNumber
+5 VALUE 12761
+4 FIELD
+5 NAME Amount
+5 VALUE $160
 3 DATA
 3 REFN SCRIP-5473
 3 QUAY 3
@@ -80,4 +93,127 @@
 1 TITL , ,  ; , , .
 1 _SUBQ  - .
 1 _BIBL . . , .
+0 @S20004@ SOUR
+1 ABBR Métis Scrip Certificates and Payments
+1 REFN 20004
+1 TITL Métis Scrip Certificates and Payments
+1 _BIBL Library and Archives Canada, Ottawa, Ontario. Department of the Interior fonds, RG 15, Series D-II-8-e/f/j. Scrip Commission.
+1 _TMPLT
+2 TID 20004
+2 FIELD
+3 NAME PrimaryCreator
+3 VALUE Department of the Interior
+2 FIELD
+3 NAME Department
+3 VALUE Scrip Commission
+2 FIELD
+3 NAME Date
+3 VALUE 1870–1906
+2 FIELD
+3 NAME SourceDescription
+3 VALUE Métis Scrip Certificates and Payments
+2 FIELD
+3 NAME Collection
+3 VALUE Department of the Interior fonds, RG 15, Series D-II-8-e/f/j
+2 FIELD
+3 NAME Repository
+3 VALUE Library and Archives Canada, Ottawa, Ontario
+0 _STMPLT
+1 TID 20004
+1 NAME !Simple Citations: Métis Scrip (Certificates & Payments)
+1 DESC Designed for citing the physical scrip certificates or receipts issued to the claimant, organized under LAC RG 15 Series D-II-8-e, D-II-8-f, or D-II-8-j. Uses the Simplified Citations architecture.
+1 CAT Simplified Citations for Genealogical Sources
+1 FOOTNOTE <[PrimaryCreator]<,  [Department]>>< ([Date])>. <?[SourceDescription]|[SourceDescription].|><?[Collection]| [Collection].> ||< [ClaimantName]><, [ScripType] scrip certificate no. [CertificateNumber]><
+2 CONC  for [Amount]><, issued [IssueDate]><; vol. [Volume]><, microfilm [Microfilm]><. [Repository:Caps]><?[Repository]|< ([URL]><? [URL]|<: accessed [Accessed]>><?[URL]|)>.>>< [RefNumber:Caps].>
+1 SHORT <[PrimaryCreator]<,  [Department]>>< ([Date])>. <?[SourceDescription]|[SourceDescription]<: [ClaimantName]<, cert. no. [CertificateNumber]>>.|<: [ClaimantName].>>
+1 BIBLIO <[PrimaryCreator]<,  [Department]>>< ([Date])>. <?[SourceDescription]|[SourceDescription].|><?[Collection]| [Collection].>< [Repository].>
+1 FIELD
+2 NAME PrimaryCreator
+2 DISPLAY Primary Creator
+2 HINT e.g., Department of the Interior
+2 TYPE NAME
+2 ISDETAIL N
+1 FIELD
+2 NAME Department
+2 DISPLAY Dept. / Commission
+2 HINT e.g., Scrip Commission
+2 TYPE TEXT
+2 ISDETAIL N
+1 FIELD
+2 NAME Date
+2 DISPLAY Date Range
+2 HINT e.g., 1870–1906
+2 TYPE DATE
+2 ISDETAIL N
+1 FIELD
+2 NAME SourceDescription
+2 DISPLAY Source Description
+2 HINT e.g., Métis Scrip Certificates and Payments
+2 TYPE TEXT
+2 ISDETAIL N
+1 FIELD
+2 NAME Collection
+2 DISPLAY Collection / Series
+2 HINT e.g., Department of the Interior fonds, RG 15, Series D-II-8-e
+2 TYPE TEXT
+2 ISDETAIL N
+1 FIELD
+2 NAME Repository
+2 DISPLAY Repository
+2 HINT e.g., Library and Archives Canada, Ottawa, Ontario
+2 TYPE TEXT
+2 ISDETAIL N
+1 FIELD
+2 NAME ClaimantName
+2 DISPLAY Claimant Name
+2 HINT Name on the certificate
+2 TYPE NAME
+2 ISDETAIL Y
+1 FIELD
+2 NAME ScripType
+2 DISPLAY Scrip Type
+2 HINT e.g., Land, Money
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME CertificateNumber
+2 DISPLAY Certificate Number
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME Amount
+2 DISPLAY Amount
+2 HINT e.g., 160 acres, $240
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME IssueDate
+2 DISPLAY Issue Date
+2 TYPE DATE
+2 ISDETAIL Y
+1 FIELD
+2 NAME Volume
+2 DISPLAY Volume
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME Microfilm
+2 DISPLAY Microfilm
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME URL
+2 DISPLAY URL
+2 TYPE TEXT
+2 ISDETAIL Y
+1 FIELD
+2 NAME Accessed
+2 DISPLAY Date Accessed
+2 TYPE DATE
+2 ISDETAIL Y
+1 FIELD
+2 NAME RefNumber
+2 DISPLAY Reference / Item ID
+2 TYPE TEXT
+2 ISDETAIL Y
 0 TRLR
