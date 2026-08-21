@@ -660,6 +660,28 @@ def test_dynamic_occupation_template_normalizes_raw_case():
     assert occ == "Farmer at Smith Farm, working in Agriculture"
 
 
+def test_dynamic_notes_exclude_citation_plumbing_columns():
+    """User-directed design (2026-08-21): the CENS fact's visible note must not duplicate
+    citation/URL data already carried by the SOUR citation block and weblinks - Collection
+    Name/Collection URL/RecordArk/PersonArk are plumbing columns, not genealogical facts
+    about the person, and previously fell through build_dynamic_events_and_notes()'s
+    catch-all into a plain, visible note since they weren't in CORE_COLUMNS."""
+    row = pd.Series({
+        "Collection Name": "United States Census, 1950: Pembina. Census 1950",
+        "Collection URL": "https://www.familysearch.org/ark:/61903/3:1:3QHN-PQHW-1YYJ",
+        "RecordArk": "1:1:6F7Z-QJKR", "PersonArk": "KLBM-H9P",
+        "Lived on Farm": "yes",
+    })
+    columns = list(row.index)
+    _, notes = arc.build_dynamic_events_and_notes(row, [], "Jess", columns, "North Dakota, USA", "")
+    joined = " | ".join(notes)
+    assert "Collection Name" not in joined
+    assert "Collection URL" not in joined
+    assert "RecordArk" not in joined
+    assert "PersonArk" not in joined
+    assert "Lived on Farm: yes" in joined
+
+
 def test_dynamic_occupation_template():
     from Census import get_occupation_value
 

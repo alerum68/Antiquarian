@@ -896,7 +896,8 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'institution 1', 'institution 1 type', 'institution 1 from line', 'institution 1 to line',
                 'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line',
                 'father birth place', 'mother birth place', 'weeks out of work',
-                'residence place fallback'}
+                'residence place fallback', 'collection name', 'collection url',
+                'recordark', 'personark'}
 
 INSTITUTION_COLUMNS = ('Institution 1', 'Institution 1 Type', 'Institution 1 From Line', 'Institution 1 To Line',
                        'Institution 2', 'Institution 2 Type', 'Institution 2 From Line', 'Institution 2 To Line')
