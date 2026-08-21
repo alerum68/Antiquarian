@@ -188,3 +188,15 @@ def test_citation_detail_fields_degrade_gracefully_without_keystone_records():
     part = {"std_given": "Charles", "std_surname": "Adams"}
     lines = profile.citation_detail_fields(rec, part, page="adams_charles.pdf", vol="", target_software="RM")
     assert any("B.239/k/3" in line for line in lines)
+
+
+def test_hbca_citation_detail_fields_wraps_in_tmplt():
+    rec = {"event_place": "Red River", "type_specific_fields": {
+        "employee_name": "John Smith", "hbca_references": ["A.32/1"],
+    }}
+    part = {"std_given": "John", "std_surname": "Smith"}
+    lines = HBCA.HBCAProfile.citation_detail_fields(rec, part, "1", "1", "RM")
+    assert lines[0] == "3 _TMPLT"
+    assert "4 FIELD" in lines
+    assert any(ln == "5 NAME SourceDetailPerson" for ln in lines)
+    assert not any(ln.startswith("4 TID") for ln in lines)
