@@ -318,6 +318,27 @@ def find_parent(units: List[HouseholdUnit], member: pd.Series) -> Optional[Tuple
     return best
 
 
+def sort_group_by_line_number(group: pd.DataFrame) -> pd.DataFrame:
+    """Both parse_household() and parse_household_relational() assume rows arrive in the
+    census sheet's own physical line order (head first, then the rest of the household) -
+    confirmed live this isn't guaranteed by the raw gather's own participant ordering: a
+    real household had a daughter (Line Number 6) listed before the head (Line Number 4) in
+    the DataFrame, so parse_household_relational's "first person must be Head" check wrongly
+    flagged her as unrelated and detached her from her own family. Sorting by Line Number
+    here, right before parsing, fixes the input at the one place both functions actually
+    need it - regardless of what order upstream extraction produced - rather than requiring
+    every extraction path to itself guarantee ordering. A stable sort keeps rows with no
+    parseable Line Number (or when none exist at all) in their original relative order."""
+    line_col = next((c for c in ['Line Number', 'Line'] if c in group.columns), None)
+    if not line_col:
+        return group
+    line_nums = pd.to_numeric(group[line_col], errors='coerce')
+    if line_nums.isna().all():
+        return group
+    return group.assign(_line_sort_key=line_nums).sort_values(
+        '_line_sort_key', kind='stable', na_position='last').drop(columns='_line_sort_key')
+
+
 def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.Series], List[FlagRecord]]:
     members = [row for _, row in group.iterrows()]
     n = len(members)
@@ -1291,6 +1312,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
     child_famc: Dict[Any, str] = {}
 
     for _, group in df.groupby('Household_ID'):
+        group = sort_group_by_line_number(group)
         units: List[HouseholdUnit]
         unrelated: List[pd.Series]
         flags: List[FlagRecord]

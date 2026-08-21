@@ -191,6 +191,40 @@ def test_relational_era_household_parsing_works_on_adapted_dataframe():
     assert not unrelated
 
 
+def test_sort_group_by_line_number_fixes_out_of_order_household_and_reattaches_child():
+    """Real-world regression (2026-08-21): a real gather's participant array for one
+    household was NOT in sheet/line order (Line Numbers 6, 4, 8, 10, 9, 5, 7 - a daughter,
+    line 6, listed before the head, line 4). parse_household_relational's "first person
+    must be Head" check wrongly detached her as unrelated. Sorting by Line Number right
+    before parsing fixes this regardless of what order the raw gather produced."""
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([
+            _participant("Marlys", "Crowston", "F", role_name="Daughter", age="16", line="6"),
+            _participant("Jess", "Crowston", "M", role_name="Head", age="51", line="4"),
+            _participant("Glenda", "Crowston", "F", role_name="Daughter", age="12", line="8"),
+            _participant("James", "Crowston", "M", role_name="Son", age="8", line="10"),
+            _participant("Faye", "Crowston", "F", role_name="Daughter", age="9", line="9"),
+            _participant("May", "Crowston", "F", role_name="Wife", age="43", line="5"),
+            _participant("Gerald", "Crowston", "M", role_name="Son", age="14", line="7"),
+        ], family_number="10"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+    arc.CENSUS_YEAR = int(year)
+    arc.CENSUS_ERA = arc.get_census_era(arc.CENSUS_YEAR)
+
+    sorted_df = arc.sort_group_by_line_number(df)
+    assert list(sorted_df["Given Name"]) == ["Jess", "May", "Marlys", "Gerald", "Glenda", "Faye", "James"]
+
+    units, unrelated, flags = arc.parse_household_relational(sorted_df)
+    assert len(units) == 1
+    unrelated_names = [u.get('Given Name') for u in unrelated]
+    assert len(unrelated) == 0, f"everyone should be attached to the household: {unrelated_names}"
+    assert units[0]["husband"]["Given Name"] == "Jess"
+    assert units[0]["wife"]["Given Name"] == "May"
+    children = {c["Given Name"] for c in units[0]["children"]}
+    assert children == {"Marlys", "Gerald", "Glenda", "Faye", "James"}
+
+
 def test_heuristic_era_household_parsing_works_on_adapted_dataframe():
     """1860 (heuristic era) - no role_name at all (matches what census_schema.py produces
     when the source has no relationship column) - confirms parse_household (unchanged)
