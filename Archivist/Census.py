@@ -1850,6 +1850,12 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
                     row['Race'] = p['race']
+                # User-directed design (2026-08-21): occupation belongs in the participant's
+                # own named 'occupation' field, not a duplicate facts-array entry (see
+                # field_maps/familysearch_census.yaml's own comment on this) - get_occupation_value()
+                # reads this same 'Occupation' column already.
+                if p.get('occupation'):
+                    row['Occupation'] = p['occupation']
                 for fact in p.get('facts', []) or []:
                     col = FACT_TYPE_TO_COLUMN.get(fact.get('fact_type', ''), fact.get('fact_type', ''))
                     row[col] = fact.get('value') or fact.get('date') or fact.get('place') or ''

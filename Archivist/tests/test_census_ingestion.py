@@ -153,6 +153,21 @@ def test_adapter_maps_facts_to_expected_old_column_names():
     assert row["Immigration Year"] == "1889"
 
 
+def test_adapter_promotes_named_occupation_field_not_just_facts():
+    """User-directed design (2026-08-21): occupation belongs in the participant's own named
+    'occupation' field (Commissioner's own Participant.facts docstring: "do not duplicate a
+    fact already covered by a named field ... here") - FamilySearch's YAML mapping now
+    targets this directly rather than a duplicate facts-array entry, so
+    build_census_dataframe_from_unified() must promote p.get('occupation') on its own,
+    independent of the general facts-based FACT_TYPE_TO_COLUMN path (still exercised by
+    test_adapter_maps_facts_to_expected_old_column_names for sources that genuinely use it)."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["occupation"] = "Farmer"
+    doc = _unified_doc("Census_1900", [_sheet([_record([head], family_number="5")])])
+    df, _, _ = arc.build_census_dataframe_from_unified(doc)
+    assert df.iloc[0]["Occupation"] == "Farmer"
+
+
 def test_relational_era_household_parsing_works_on_adapted_dataframe():
     """1900 (relationship era) - Head + Wife, explicit role_name - confirms
     parse_household_relational (unchanged) correctly resolves the household from the

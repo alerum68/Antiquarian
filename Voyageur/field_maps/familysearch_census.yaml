@@ -19,6 +19,13 @@ participant_fields:
   "Birth Place": birth_place
   "Birthplace": birth_place
   "Race": race
+  # User-directed design (2026-08-21): Occupation belongs in the participant's own named
+  # 'occupation' field, not a duplicate participant_facts/facts-array entry - Commissioner's
+  # own Participant.facts docstring says as much: "do not duplicate a fact already covered
+  # by a named field (occupation, birth_date, etc.) here." Archivist/Census.py promotes
+  # p.get('occupation') straight to the 'Occupation' DataFrame column.
+  "Occupation": occupation
+  "OCCUPATION": occupation
   "Relationship to Head": role_name
   "Relationship to Head of Household": role_name
   "Relationship": role_name
@@ -161,7 +168,9 @@ participant_fields:
   "EVENT_RESIDENCE_PLACE": type_specific_fields.residence_place_fallback
 
 participant_facts:
-  "Occupation": Occupation
+  # NOTE: Occupation deliberately NOT mapped here (2026-08-21) - see participant_fields'
+  # "Occupation"/"OCCUPATION" entries above; it belongs in the participant's own named
+  # 'occupation' field, not a duplicate facts-array entry.
   "Immigration Year": Immigration
   "Naturalization": Naturalization
   "Military Service": Military
@@ -184,10 +193,10 @@ participant_facts:
   "VesselVisitedNumber": Residence
   "ShantyVisitedNumber": Residence
 
-  # --- FamilySearch raw field names - only "Occupation" and "Education" are valid
-  # Commissioner FactDefinition names; everything else that used to live here moved to
-  # participant_fields above (see that section's comment for why).
-  "OCCUPATION": Occupation
+  # --- FamilySearch raw field names - only "Education" is a valid Commissioner
+  # FactDefinition name here; everything else that used to live here (including
+  # "OCCUPATION", now mapped as a named field above) moved to participant_fields (see that
+  # section's comment for why).
   "MISC_GRADE_COMPLETED": Education
 
 

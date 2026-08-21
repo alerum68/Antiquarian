@@ -457,6 +457,25 @@ def test_familysearch_census_field_map_loads_and_normalizes():
     assert participant["type_specific_fields"]["fsftid"] == "ABCD-123"
 
 
+def test_familysearch_occupation_maps_to_named_field_not_a_duplicate_fact():
+    """User-directed design (2026-08-21): Commissioner's own Participant.facts docstring
+    says "do not duplicate a fact already covered by a named field (occupation, birth_date,
+    etc.) here" - FamilySearch's raw OCCUPATION/Occupation fields must land in the
+    participant's own named 'occupation' field, not also produce a facts-array entry."""
+    raw = {
+        "census_year": "1950", "location": "North Dakota",
+        "pages": [_page([
+            {"columns": {"Given Name": "Jess", "Surname": "Crowston", "Gender": "M",
+                         "Relationship to Head": "Head", "Family Number": "5",
+                         "OCCUPATION": "Farmer"}, "pid": "p1"},
+        ])],
+    }
+    doc = census_schema.normalize_census_pages(raw, "familysearch_census", "1950 US Census", "Census_1950")
+    participant = doc["sheets"][0]["records"][0]["participants"][0]
+    assert participant["occupation"] == "Farmer"
+    assert not any(f.get("fact_type") == "Occupation" for f in participant["facts"])
+
+
 def test_normalize_and_validate_census_returns_normalized_doc():
     raw = {
         "census_year": "1900", "location": "Minnesota",
