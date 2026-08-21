@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const {
-    getCountryFromState, incompleteItemsSummary
+    getCountryFromState, incompleteItemsSummary, findByAriaLabel
 } = require('./harness.js');
 
 test('getCountryFromState correctly maps states and provinces', () => {
@@ -25,4 +25,23 @@ test('incompleteItemsSummary maps missing ids correctly', () => {
     assert.equal(summary[0].page_number, 1);
     assert.equal(summary[0].image_id, 'A');
     assert.equal(summary[0].item_id, '1');
+});
+
+// findByAriaLabel: the test harness's `document` is a plain {} stub (no jsdom - see
+// harness.js), so DOM query behavior is exercised via a minimal hand-built
+// querySelectorAll stub rather than a real DOM, matching the project's "no new
+// dependencies" convention.
+function fakeElement(ariaLabel) {
+    return { getAttribute: (name) => (name === 'aria-label' ? ariaLabel : null) };
+}
+
+test('findByAriaLabel: matches exact aria-label regardless of visible text content', () => {
+    globalThis.document.querySelectorAll = () => [fakeElement('Names'), fakeElement('Save Record')];
+    const el = findByAriaLabel('button', 'Names');
+    assert.equal(el.getAttribute('aria-label'), 'Names');
+});
+
+test('findByAriaLabel: returns null when no match', () => {
+    globalThis.document.querySelectorAll = () => [fakeElement('Save Record')];
+    assert.equal(findByAriaLabel('button', 'Names'), null);
 });

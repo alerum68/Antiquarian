@@ -30,6 +30,7 @@ extra_fields:
     - {name: pid, type: string}
     - {name: extracted_url, type: string}
     - {name: fsftid, type: string}
+    - {name: record_ark, type: string}
     - {name: person_ark, type: string}
     - {name: familysearch_url, type: string}
     - {name: unmapped, type: dict}
@@ -38,6 +39,60 @@ extra_fields:
     - {name: birth_month, type: string}
     - {name: marital_status, type: string}
     - {name: alternate_birth_places, type: list}
+    # FamilySearch occupation-detail fields (2026-08-20, real 1950 census capture) - see
+    # Voyageur/field_maps/familysearch_census.yaml for the raw-field-name mapping and
+    # Archivist/Census.py's build_census_dataframe_from_unified() for how these promote to
+    # the DataFrame column names get_occupation_value() actually reads.
+    - {name: industry, type: string}
+    - {name: occupation_category, type: string}
+    - {name: class_of_worker, type: string}
+    - {name: hours_worked, type: string}
+    - {name: weeks_worked, type: string}
+    - {name: seeking_work, type: string}
+    - {name: attended_school, type: string}
+    # FamilySearch remaining-field mappings (2026-08-21, real 1950 census capture) - column
+    # names chosen so Archivist/Census.py's DYNAMIC_EVENT_RULES/CORE_COLUMNS machinery
+    # either builds a specific GEDCOM event (veteran/military fields) or surfaces the value
+    # as a plain, visible fact note - never silently dropped. See
+    # docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 3 for what's still
+    # unresolved (institution/group-quarters fields, MISC_CODE_A/B/C/C1/C2's meaning).
+    - {name: veteran, type: string}
+    - {name: wwi_veteran, type: string}
+    - {name: wwii_veteran, type: string}
+    - {name: citizen_status, type: string}
+    - {name: children_born, type: string}
+    - {name: three_plus_acres, type: string}
+    - {name: lived_on_farm, type: string}
+    - {name: lived_on_farm_last_year, type: string}
+    - {name: same_house_last_year, type: string}
+    - {name: same_county_last_year, type: string}
+    - {name: household_continued, type: string}
+    - {name: multiple_marriages, type: string}
+    - {name: years_since_marital_status_change, type: string}
+    - {name: had_other_income, type: string}
+    - {name: income, type: string}
+    - {name: other_income, type: string}
+    - {name: other_income_supplement, type: string}
+    - {name: relatives_income, type: string}
+    - {name: relatives_other_income_supplement, type: string}
+    - {name: last_occupation, type: string}
+    - {name: last_occupation_industry, type: string}
+    - {name: last_worker_class, type: string}
+    - {name: completed_grade_flag, type: string}
+    - {name: worked_last_week, type: string}
+    # Institution/group-quarters fields (2026-08-21) - user-directed design: a person with
+    # any of these present was enumerated in an institution (hospital, prison, boarding
+    # house, etc.), not a regular household - no family/spouse/parent-child links should be
+    # built for them, and Archivist/Census.py composes these into one note sentence
+    # attached to the CENS fact instead of separate raw notes.
+    - {name: institution_1, type: string}
+    - {name: institution_1_type, type: string}
+    - {name: institution_1_from_line, type: string}
+    - {name: institution_1_to_line, type: string}
+    - {name: institution_2, type: string}
+    - {name: institution_2_type, type: string}
+    - {name: institution_2_from_line, type: string}
+    - {name: institution_2_to_line, type: string}
 settings_sections:
   - "Citation Overrides"
 ---

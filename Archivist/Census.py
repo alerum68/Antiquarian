@@ -565,6 +565,14 @@ def append_unit_if_not_empty(units: List[HouseholdUnit], unit: Optional[Househol
 
 def parse_household_relational(
         group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.Series], List[FlagRecord]]:
+    # User-directed design (2026-08-21): anyone enumerated at an institution (group
+    # quarters - hospital, prison, boarding house, etc.) gets no family/spouse/parent-child
+    # links at all, just their own individual record - if any member of this group is an
+    # institution resident, treat the whole group as unrelated individuals rather than
+    # attempting relational family-unit parsing on them.
+    if any(is_institution_resident(m) for _, m in group.iterrows()):
+        return [], [m for _, m in group.iterrows()], []
+
     rel_col = find_relationship_column(group.columns)
     if rel_col is None:
         return parse_household(group)
@@ -836,6 +844,8 @@ def get_census_notes(row: pd.Series) -> List[str]:
     note_cols = ['Quality', 'Real Estate Value', 'Personal Estate Value', 'Cannot Read, Write', 'Disability Condition',
                  'Deaf Dumb Blind Insane', 'Idiotic Pauper Convict']
     notes = [f"{c}: {Utils.clean_val(row[c])}" for c in note_cols if c in row and Utils.clean_val(row[c])]
+    if institution_note := build_institution_note(row):
+        notes.append(institution_note)
     if CENSUS_YEAR == 1870:
         flags = {'Father Foreign Born': "Father of foreign birth.", 'Mother Foreign Born': "Mother of foreign birth.",
                  'Male Citizen Over 21': "Male citizen of the United States of 21 years of age and upwards.",
@@ -859,7 +869,45 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'place_details', 'roll', 'film', 'enumeration_district', 'apid_db', 'extracted_url', 'pid', 'street',
                 'street address', 'address', 'house number', 'publisher', 'publisher location',
                 'repository', 'repository location', 'fsftid', 'familysearch_url', 'alternatenames',
-                'alternatebirthplaces', '_mergereviewreason'}
+                'alternatebirthplaces', '_mergereviewreason',
+                'institution 1', 'institution 1 type', 'institution 1 from line', 'institution 1 to line',
+                'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line'}
+
+INSTITUTION_COLUMNS = ('Institution 1', 'Institution 1 Type', 'Institution 1 From Line', 'Institution 1 To Line',
+                       'Institution 2', 'Institution 2 Type', 'Institution 2 From Line', 'Institution 2 To Line')
+
+
+def is_institution_resident(row: pd.Series) -> bool:
+    """True when any institution/group-quarters field is present for this person - user-
+    directed design (2026-08-21): such a person should get no family/spouse/parent-child
+    links (they were enumerated at an institution, not with their own household), just a
+    note on their CENS fact stating where they were located."""
+    return any(Utils.clean_val(row.get(c)) for c in INSTITUTION_COLUMNS)
+
+
+def build_institution_note(row: pd.Series) -> str:
+    """One composed sentence for the CENS fact's note, built from whichever institution
+    fields are present - labeled by their own raw concept (not assuming exactly what
+    FamilySearch's bare "Institution N" field holds beyond "some institution-identifying
+    value") since that hasn't been confirmed against a real non-empty sample."""
+    parts = []
+    for num in ('1', '2'):
+        name = Utils.clean_val(row.get(f'Institution {num}'))
+        itype = Utils.clean_val(row.get(f'Institution {num} Type'))
+        from_line = Utils.clean_val(row.get(f'Institution {num} From Line'))
+        to_line = Utils.clean_val(row.get(f'Institution {num} To Line'))
+        if not (name or itype or from_line or to_line):
+            continue
+        piece = "Enumerated at institution"
+        if name:
+            piece += f" {name}"
+        if itype:
+            piece += f" (type: {itype})"
+        if from_line or to_line:
+            piece += f", lines {from_line or '?'}-{to_line or '?'}"
+        parts.append(piece)
+    return "; ".join(parts)
+
 
 DYNAMIC_EVENT_RULES = [(re.compile(r'immigrat', re.I), 'IMMI'),
                        (re.compile(r'year of naturali[sz]', re.I), 'NATU_DATE'),
@@ -1324,15 +1372,18 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
         alt_names = parse_alternate_entries(row, 'AlternateNames')
         row_fsftid = get_row_val(row, ['FSFTID'], '')
         row_person_ark = get_row_val(row, ['PersonArk'], '')
-        # Prefer an explicit FSFTID column; otherwise fall back to this row's own PersonArk
-        # (FS.py's person_ark - this specific individual's FamilySearch persona id) so the
-        # individual still gets a _FSFTID tag. Never rec_id/PID: PID is only person_ark
-        # when FS.py actually captured one for this row - it falls back to a synthesized
-        # "{item_id}-{row_index}" compound id (not an ark at all) when it didn't, and that
-        # compound would produce a bogus _FSFTID if mistaken for one. The FamilySearch
-        # Family Tree link below uses only the real FSFTID column value - an ark identifies
-        # a record/individual persona, not a tree profile, so it isn't a valid link target.
-        indi_fsftid = row_fsftid or (strip_ark_type_prefix(row_person_ark) if row_person_ark else '')
+        # PersonArk is now (2026-08-20) the TRUE enduring Family Tree identifier, not a
+        # record-scoped persona id - RecordArk carries that instead (see
+        # docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4). Confirmed live the
+        # same day: FamilySearch's own UI shows a real Tree-attachment id ("Attached in Tree
+        # to Jesse Guy Crowston ... KLBM-H9P") that does not appear anywhere in the
+        # orchestration API's JSON response - only in the rendered page - so there is
+        # currently no reliable source to populate PersonArk from at gather time, and no
+        # record-scoped fallback is used here (a persona id is not a valid FamilySearch
+        # Tree person id, and falling back to one would produce a fabricated-looking
+        # _FSFTID). _FSFTID is simply omitted when PersonArk is empty, matching every other
+        # "don't fabricate data" convention in this file.
+        indi_fsftid = row_fsftid or row_person_ark
         fs_tree_link = (Utils.weblink_lines(f"https://www.familysearch.org/tree/person/details/{row_fsftid}",
                                             "FamilySearch Family Tree", target_software)
                         if row_fsftid else [])
@@ -1486,6 +1537,7 @@ def load_census_dataframe(data: dict) -> pd.DataFrame:
             row = dict(person.get('columns', {}))
             row.update(page_meta)
             row['PID'] = person.get('pid', '')
+            row['RecordArk'] = person.get('record_ark', '')
             row['PersonArk'] = person.get('person_ark', '')
             row['Extracted_URL'] = person.get('extracted_url', '')
             row['FSFTID'] = person.get('fsftid', '')
@@ -1561,6 +1613,97 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Married within Year'] = pts['married_within_year']
                 if pts.get('street'):
                     row['Street'] = pts['street']
+                # FamilySearch occupation-detail fields (2026-08-20) - land in
+                # type_specific_fields (see field_maps/familysearch_census.yaml, not valid
+                # Commissioner FactDefinition names) but must reach these exact column
+                # names for get_occupation_value() to read them.
+                if pts.get('industry'):
+                    row['Industry'] = pts['industry']
+                if pts.get('occupation_category'):
+                    row['Occupation Category'] = pts['occupation_category']
+                if pts.get('class_of_worker'):
+                    row['Class of Worker'] = pts['class_of_worker']
+                if pts.get('hours_worked'):
+                    row['Hours Worked'] = pts['hours_worked']
+                if pts.get('weeks_worked'):
+                    row['Weeks Worked'] = pts['weeks_worked']
+                # FamilySearch remaining fields (2026-08-21) - no dedicated GEDCOM tag for
+                # most of these, so build_dynamic_events_and_notes() (these column names are
+                # not in CORE_COLUMNS) surfaces each as a plain, visible fact note; the three
+                # veteran columns are a deliberate exception - "veteran" in the column name
+                # matches the existing DYNAMIC_EVENT_RULES MILITARY pattern, so those three
+                # become a real "1 EVEN / 2 TYPE Military Service" event instead of a note.
+                if pts.get('veteran'):
+                    row['Veteran'] = pts['veteran']
+                if pts.get('wwi_veteran'):
+                    row['WWI Veteran'] = pts['wwi_veteran']
+                if pts.get('wwii_veteran'):
+                    row['WWII Veteran'] = pts['wwii_veteran']
+                if pts.get('citizen_status'):
+                    row['Citizen Status'] = pts['citizen_status']
+                if pts.get('children_born'):
+                    row['Children Born'] = pts['children_born']
+                if pts.get('three_plus_acres'):
+                    row['3+ Acres'] = pts['three_plus_acres']
+                if pts.get('lived_on_farm'):
+                    row['Lived on Farm'] = pts['lived_on_farm']
+                if pts.get('lived_on_farm_last_year'):
+                    row['Lived on Farm Last Year'] = pts['lived_on_farm_last_year']
+                if pts.get('same_house_last_year'):
+                    row['Same House as Last Year'] = pts['same_house_last_year']
+                if pts.get('same_county_last_year'):
+                    row['Same County as Last Year'] = pts['same_county_last_year']
+                if pts.get('household_continued'):
+                    row['Household Continued on Next Sheet'] = pts['household_continued']
+                if pts.get('multiple_marriages'):
+                    row['Multiple Marriages'] = pts['multiple_marriages']
+                if pts.get('years_since_marital_status_change'):
+                    row['Years Since Marital Status Change'] = pts['years_since_marital_status_change']
+                if pts.get('had_other_income'):
+                    row['Had Other Income'] = pts['had_other_income']
+                if pts.get('income'):
+                    row['Income'] = pts['income']
+                if pts.get('other_income'):
+                    row['Other Income'] = pts['other_income']
+                if pts.get('other_income_supplement'):
+                    row['Other Income Supplement'] = pts['other_income_supplement']
+                if pts.get('relatives_income'):
+                    row["Relatives' Income"] = pts['relatives_income']
+                if pts.get('relatives_other_income_supplement'):
+                    row["Relatives' Other Income Supplement"] = pts['relatives_other_income_supplement']
+                if pts.get('last_occupation'):
+                    row['Last Occupation'] = pts['last_occupation']
+                if pts.get('last_occupation_industry'):
+                    row['Last Occupation Industry'] = pts['last_occupation_industry']
+                if pts.get('last_worker_class'):
+                    row['Last Worker Class'] = pts['last_worker_class']
+                if pts.get('completed_grade_flag'):
+                    row['Completed Grade Flag'] = pts['completed_grade_flag']
+                if pts.get('worked_last_week'):
+                    row['Worked Last Week'] = pts['worked_last_week']
+                # Institution/group-quarters fields - composed into one note by
+                # get_census_notes() (see build_institution_note()) rather than surfacing as
+                # separate raw notes, so these column names are also added to CORE_COLUMNS.
+                if pts.get('institution_1'):
+                    row['Institution 1'] = pts['institution_1']
+                if pts.get('institution_1_type'):
+                    row['Institution 1 Type'] = pts['institution_1_type']
+                if pts.get('institution_1_from_line'):
+                    row['Institution 1 From Line'] = pts['institution_1_from_line']
+                if pts.get('institution_1_to_line'):
+                    row['Institution 1 To Line'] = pts['institution_1_to_line']
+                if pts.get('institution_2'):
+                    row['Institution 2'] = pts['institution_2']
+                if pts.get('institution_2_type'):
+                    row['Institution 2 Type'] = pts['institution_2_type']
+                if pts.get('institution_2_from_line'):
+                    row['Institution 2 From Line'] = pts['institution_2_from_line']
+                if pts.get('institution_2_to_line'):
+                    row['Institution 2 To Line'] = pts['institution_2_to_line']
+                if pts.get('seeking_work'):
+                    row['Seeking Work'] = pts['seeking_work']
+                if pts.get('attended_school'):
+                    row['Attended School'] = pts['attended_school']
                 if p.get('birth_place'):
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
@@ -1569,6 +1712,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     col = FACT_TYPE_TO_COLUMN.get(fact.get('fact_type', ''), fact.get('fact_type', ''))
                     row[col] = fact.get('value') or fact.get('date') or fact.get('place') or ''
                 row['PID'] = pts.get('pid', '')
+                row['RecordArk'] = pts.get('record_ark', '')
                 row['PersonArk'] = pts.get('person_ark', '')
                 row['Extracted_URL'] = pts.get('extracted_url', '')
                 row['FSFTID'] = pts.get('fsftid', '')

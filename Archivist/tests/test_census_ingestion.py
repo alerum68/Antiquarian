@@ -197,6 +197,51 @@ def test_heuristic_era_household_parsing_works_on_adapted_dataframe():
     assert {units[0]["husband"]["Given Name"], units[0]["wife"]["Given Name"]} == {"Jean", "Marie"}
 
 
+def test_is_institution_resident_true_when_any_institution_field_present():
+    row = pd.Series({"Institution 1 Type": "Hospital"})
+    assert arc.is_institution_resident(row) is True
+    assert arc.is_institution_resident(pd.Series({"Given Name": "Jean"})) is False
+
+
+def test_build_institution_note_composes_one_sentence_from_present_fields():
+    row = pd.Series({
+        "Institution 1": "County Poor Farm", "Institution 1 Type": "Almshouse",
+        "Institution 1 From Line": "1", "Institution 1 To Line": "40",
+    })
+    note = arc.build_institution_note(row)
+    assert "County Poor Farm" in note
+    assert "Almshouse" in note
+    assert "1-40" in note
+
+
+def test_build_institution_note_empty_when_no_institution_fields_present():
+    assert arc.build_institution_note(pd.Series({"Given Name": "Jean"})) == ""
+
+
+def test_institution_resident_gets_no_family_links_even_with_head_wife_roles():
+    """User-directed design (2026-08-21): a person enumerated at an institution gets no
+    family/spouse/parent-child links at all, just their own individual record - confirmed
+    here by giving the pair explicit Head/Wife roles (which would normally link them) but
+    marking one an institution resident, and asserting parse_household_relational treats
+    the whole group as unrelated individuals rather than a family unit."""
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([
+            _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1"),
+            _participant("Marie", "Gagnon", "F", role_name="Wife", age="38", line="2"),
+        ], family_number="5"),
+    ])])
+    doc["sheets"][0]["records"][0]["participants"][1]["type_specific_fields"]["institution_1_type"] = "Hospital"
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    arc.CENSUS_YEAR = int(year)
+    arc.CENSUS_ERA = arc.get_census_era(arc.CENSUS_YEAR)
+    assert arc.CENSUS_ERA == "relationship"
+
+    units, unrelated, flags = arc.parse_household_relational(df)
+    assert units == []
+    assert len(unrelated) == 2
+
+
 def test_two_households_get_separate_family_number_groups():
     doc = _unified_doc("Census_1900", [_sheet([
         _record([_participant("Jean", "Gagnon", "M", role_name="Head", line="1")], family_number="5"),
@@ -376,17 +421,15 @@ def test_census_gedcom_refn_is_bare_ark_not_the_gedcomx_type_prefixed_form(tmp_p
     assert "1 REFN 1:1:MF36-Z6D" not in lines
 
 
-def test_census_gedcom_fsftid_falls_back_to_persons_own_ark_not_the_record_id(tmp_path, monkeypatch):
-    """User-requested fix: the _FSFTID fallback (when no genuine tree-attached FSFTID exists)
-    must pull this specific individual's own FamilySearch persona ark (FS.py's person_ark,
-    carried through as this row's PersonArk column) - never rec_id/PID, which is only ever
-    equal to person_ark when FS.py actually captured one; otherwise PID holds a synthesized
-    "{item_id}-{row_index}" record-level compound that isn't an ark at all and would produce
-    a bogus _FSFTID if used. This row's PID is deliberately a different value than its
-    PersonArk to prove the two are read independently."""
+def test_census_gedcom_fsftid_uses_persons_own_person_ark_when_present(tmp_path, monkeypatch):
+    """2026-08-20 semantic split: PersonArk now carries a TRUE enduring FamilySearch Family
+    Tree identifier (FSFTID-shaped, e.g. "KLBM-H9P" - no ark-type prefix, so no
+    strip_ark_type_prefix() is applied), distinct from RecordArk (this persona's
+    record-scoped id). This row's PID is deliberately a different value than its PersonArk
+    to prove the two are read independently."""
     head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
     head["type_specific_fields"]["pid"] = "9999-fake-record-id"
-    head["type_specific_fields"]["person_ark"] = "1:1:MF36-Z6D"
+    head["type_specific_fields"]["person_ark"] = "KLBM-H9P"
     doc = _unified_doc("Census_1900", [{
         "page_id": "3",
         "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
@@ -405,9 +448,39 @@ def test_census_gedcom_fsftid_falls_back_to_persons_own_ark_not_the_record_id(tm
     lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
 
     assert "0 @I9999-fake-record-id@ INDI" in lines
-    assert "1 _FSFTID MF36-Z6D" in lines
-    assert not any(ln.startswith("1 _FSFTID ") and "MF36-Z6D" not in ln for ln in lines), \
+    assert "1 _FSFTID KLBM-H9P" in lines
+    assert not any(ln.startswith("1 _FSFTID ") and "KLBM-H9P" not in ln for ln in lines), \
         f"_FSFTID must come from PersonArk, not the record's own PID: {lines}"
+
+
+def test_census_gedcom_fsftid_omitted_when_no_true_person_ark_found(tmp_path, monkeypatch):
+    """Real-world case confirmed live 2026-08-20 (Jess Guy Crowston, FamilySearch's own UI
+    shows 'Attached in Tree to ... KLBM-H9P' but that id appears nowhere in the
+    orchestration API's JSON response FS.py actually gathers from): when only a RecordArk
+    exists and no true PersonArk was captured, _FSFTID must be omitted entirely, not
+    fall back to the record-scoped persona id (a persona id is not a valid FamilySearch
+    Tree person id, and using one would produce a fabricated-looking _FSFTID)."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["record_ark"] = "1:1:MF36-Z6D"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert not any("_FSFTID" in ln for ln in lines), \
+        f"_FSFTID must not fall back to RecordArk: {lines}"
 
 
 def test_census_gedcom_apid_is_individual_level_not_nested_in_citation(tmp_path, monkeypatch):

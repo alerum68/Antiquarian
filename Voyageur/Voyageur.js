@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.33
+// @version      0.3.35
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -211,6 +211,32 @@
         sessionStorage.removeItem(FS_RELOAD_STATE_KEY);
     }
 
+    // DOM HELPERS - module-level (not nested in runFamilySearchGather) so they're reachable
+    // from module.exports for testing, same as the pure API-parsing helpers below.
+    function findByExactText(selector, text) {
+        // FamilySearch's own CSS class names aren't a stable target (same reasoning as
+        // Ancestry's findLeafByExactText) - match by visible text instead.
+        const candidates = document.querySelectorAll(selector);
+        for (const el of candidates) {
+            if (el.textContent.trim() === text) return el;
+        }
+        return null;
+    }
+
+    // FamilySearch's "explore" viewer (confirmed live 2026-08-20) renders control labels
+    // ("Names", "Save Record", "Information", "Go to image N") via aria-label on
+    // otherwise-textless icon buttons - exhaustive textContent search (exact,
+    // case-insensitive, substring, whole-DOM) found zero matches for any of them, while
+    // [aria-label] search found them immediately. findByExactText can never find these; use
+    // this instead for any control whose visible label isn't real DOM text.
+    function findByAriaLabel(selector, label) {
+        const candidates = document.querySelectorAll(selector);
+        for (const el of candidates) {
+            if ((el.getAttribute('aria-label') || '').trim() === label) return el;
+        }
+        return null;
+    }
+
     // FamilySearch orchestration-API graph traversal - confirmed live (see
     // docs/superpowers/specs/2026-08-14-fs-orchestration-api-extraction-design.md) that
     // FamilySearch's own client fires GET .../orchestration/sls/image/{ark} automatically on
@@ -351,72 +377,81 @@
             }));
     }
 
-    // Reduces one orchestration-API PERSON down to the canonical field map shared with the
-    // Image-Index parser (fsCanonicalFieldsFromImageIndexPerson) - fsColumnsFromCanonicalFields
-    // below builds the final `columns` object from either source's canonical map the same way.
-    function fsCanonicalFieldsFromApiPerson(byId, person) {
-        const {given, surname} = fsPersonName(byId, person);
-        const sex = fsPersonFieldText(byId, person, 'SEX_CODE');
-        return {
-            givenName: given,
-            surname: surname,
-            sex: sex ? sex.toUpperCase() : '',
-            age: fsWrappedFieldText(byId, person, 'AGE'),
-            birthplace: fsPersonBirthPlace(byId, person),
-            householdIdSource: fsPersonFieldText(byId, person, 'SOURCE_HOUSEHOLD_ID'),
-            householdIdFs: fsPersonFieldText(byId, person, 'FS_HOUSEHOLD_ID'),
-            relationshipToHead: fsPersonFieldText(byId, person, 'RELATIONSHIP_TO_HEAD'),
-            maritalStatus: fsPersonFieldText(byId, person, 'MARITAL_STATUS'),
-            occupation: fsPersonFieldText(byId, person, 'OCCUPATION'),
-            race: fsPersonFieldText(byId, person, 'RACE_OR_COLOR'),
-            fatherBirthplace: fsPersonFieldText(byId, person, 'FTHR_BIR_PLACE'),
-            motherBirthplace: fsPersonFieldText(byId, person, 'MTHR_BIR_PLACE'),
-        };
+    // Generic, non-curating field collector - walks every subElement reachable from PERSON
+    // (2026-08-20, explicit user direction: capture the raw JSON in full, do NOT hand-pick
+    // which fields matter or rename them at extraction time - renaming/mapping to GEDCOM
+    // fields happens only downstream, in Archivist, via a declarative field map). Keys are
+    // FamilySearch's own vocabulary verbatim (fieldType for direct FIELD children;
+    // NAME_GIVEN/NAME_SURNAME for the name-wrapper shape; EVENT_<eventType>_PLACE for
+    // event/place wrappers; the wrapper's own elementType, e.g. "AGE", for any other single
+    // FIELD-holding wrapper) - nothing is dropped because we don't yet have a mapping for
+    // it, and nothing is translated to a human-friendly label here. Grounded in the graph
+    // shape confirmed live across two real captures (see fsPersonFieldText/fsWrappedFieldText/
+    // fsPersonName/fsPersonEventPlace above and the 2026-08-14 design spec) - not yet
+    // verified this covers every element type FamilySearch's API can return; extend the
+    // three `if` branches below if a real capture surfaces a differently-shaped wrapper.
+    function fsRawFieldsFromApiPerson(byId, person) {
+        const raw = {};
+        if (!person || !person.subElements) return raw;
+
+        for (const ref of person.subElements) {
+            const el = byId[ref.id];
+            if (!el) continue;
+
+            if (el.elementType === 'FIELD') {
+                raw[el.fieldType || el.id] = fsFieldText(el);
+                continue;
+            }
+
+            if (el.elementType === 'NAME') {
+                const givenEl = fsFindChild(byId, el.subElements, 'NAME_GIVEN');
+                const surnameEl = fsFindChild(byId, el.subElements, 'NAME_SURNAME');
+                const givenField = givenEl ? fsFindChild(byId, givenEl.subElements, 'FIELD') : null;
+                const surnameField = surnameEl ? fsFindChild(byId, surnameEl.subElements, 'FIELD') : null;
+                if (givenField) raw.NAME_GIVEN = fsFieldText(givenField);
+                if (surnameField) raw.NAME_SURNAME = fsFieldText(surnameField);
+                continue;
+            }
+
+            if (el.elementType === 'EVENT') {
+                const placeEl = fsFindChild(byId, el.subElements, 'PLACE');
+                const placeField = placeEl ? fsFindChild(byId, placeEl.subElements, 'FIELD') : null;
+                if (placeField) raw[`EVENT_${el.eventType || 'UNKNOWN'}_PLACE`] = fsFieldText(placeField);
+                continue;
+            }
+
+            // Any other single-FIELD wrapper (e.g. AGE) - keyed by the wrapper's own
+            // elementType, since the inner FIELD itself carries no distinguishing fieldType.
+            const field = fsFindChild(byId, el.subElements, 'FIELD');
+            if (field) raw[el.elementType] = fsFieldText(field);
+        }
+
+        return raw;
     }
 
-    // Shared by both fsBuildRowsFromApiResponse (orchestration API) and
-    // fsBuildRowsFromImageIndexResponse (filmdatainfo/image-data) - both sources reduce a
-    // person down to the same canonical field shape above this function, so the household-ID
-    // precedence and era-appropriate omission logic exists exactly once. householdIdSource
-    // (SOURCE_HOUSEHOLD_ID) is the sheet-printed family number, preferred over
-    // householdIdFs (FS_HOUSEHOLD_ID, FamilySearch's own system-generated id) - confirmed
-    // live on the orchestration API these two are exact complements on a real image (35 + 7 =
-    // 42 of 42 persons), and the same two-key relationship was independently confirmed live
-    // again on the Image-Index endpoint (1860 sample used FS_HOUSEHOLD_ID, 1880 used
-    // SOURCE_HOUSEHOLD_ID). Falls back to a sequential per-household counter only if neither
-    // exists at all.
-    function fsColumnsFromCanonicalFields(canonicalFields, sequenceFallback) {
-        const columns = {
-            'Given Name': canonicalFields.givenName || '',
-            'Surname': canonicalFields.surname || '',
-            'Gender': canonicalFields.sex || '',
-            'Age': canonicalFields.age || '',
-            'Family Number': canonicalFields.householdIdSource
-                || canonicalFields.householdIdFs
-                || String(sequenceFallback),
-        };
-        // Omitted entirely (not set to '') when absent - matches the old UI-scraper's own
-        // "don't fabricate data" convention, and is how the pre-1880 era boundary is handled:
-        // no special-case branching, just field-absence. maritalStatus/occupation/race/
-        // fatherBirthplace/motherBirthplace/birthplace are captured in canonicalFields but
-        // deliberately not added here - see this plan's Global Constraints.
-        if (canonicalFields.relationshipToHead) columns['Relationship to Head'] = canonicalFields.relationshipToHead;
-        return columns;
+    // True Family Tree person id (entityId) for a given record_ark, if
+    // /service/tree/links/sources/attachments (intercepted in runFamilySearchGather, see
+    // its own comment) has one on file - most personas were never attached by anyone, so
+    // '' (never fabricated) is the common, expected result, not an error.
+    function fsPersonArkFromAttachments(recordArk) {
+        if (typeof unsafeWindow === 'undefined' || !recordArk) return '';
+        return (unsafeWindow.__voyageurFsAttachments || {})[recordArk] || '';
     }
 
     function fsBuildRowsFromApiResponse(apiResponse) {
         const byId = buildFsElementIndex(apiResponse);
         const rows = [];
-        let householdIndex = 0;
         for (const household of fsHouseholds(apiResponse, byId)) {
-            householdIndex++;
             for (const personId of household.personIds) {
                 const person = byId[personId];
                 if (!person) continue;
 
-                const canonicalFields = fsCanonicalFieldsFromApiPerson(byId, person);
-                const columns = fsColumnsFromCanonicalFields(canonicalFields, householdIndex);
-                rows.push({columns, person_ark: person.id, attached_fsftid: ''});
+                const columns = fsRawFieldsFromApiPerson(byId, person);
+                // record_ark: this persona's own record-scoped identifier (person.id) -
+                // always present. person_ark: a true, enduring Family Tree identifier, only
+                // when one is actually found (never fabricated) - see
+                // docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4.
+                rows.push({columns, record_ark: person.id, person_ark: fsPersonArkFromAttachments(person.id)});
             }
         }
         return rows;
@@ -479,63 +514,60 @@
         return (list || []).find((item) => item.type === type) || null;
     }
 
-    function fsCanonicalFieldsFromImageIndexPerson(person) {
-        const facts = (person && person.facts) || [];
-        const fields = (person && person.fields) || [];
+    // GedcomX type URIs are the closest thing this API has to a "raw field name" - keyed by
+    // their trailing path segment (e.g. "http://gedcomx.org/MaritalStatus" -> "MaritalStatus")
+    // rather than translated to a human-friendly label, same "capture everything, rename
+    // nothing at extraction time" direction as fsRawFieldsFromApiPerson above.
+    function fsLastUriSegment(uri) {
+        if (!uri) return '';
+        const parts = String(uri).split('/');
+        return parts[parts.length - 1] || String(uri);
+    }
 
-        const nameForm = person && person.names && person.names[0] && person.names[0].nameForms && person.names[0].nameForms[0];
-        const parts = (nameForm && nameForm.parts) || [];
-        const surnamePart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Surname');
-        const givenPart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Given');
-
-        const genderType = person && person.gender && person.gender.type;
-        const sex = genderType === 'http://gedcomx.org/Male' ? 'M'
-            : genderType === 'http://gedcomx.org/Female' ? 'F' : '';
-
-        const birthFact = fsImageIndexFindByType(facts, 'http://gedcomx.org/Birth');
-        const birthPlaceField = birthFact && birthFact.place
-            ? fsImageIndexFindByType(birthFact.place.fields, 'http://gedcomx.org/Place') : null;
-
-        return {
-            givenName: givenPart ? (givenPart.value || '') : '',
-            surname: surnamePart ? (surnamePart.value || '') : '',
-            sex,
-            age: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/Age')),
-            birthplace: fsImageIndexFieldText(birthPlaceField),
-            // SourceHouseholdId and HouseholdId are confirmed distinct type URIs backing
-            // SOURCE_HOUSEHOLD_ID and FS_HOUSEHOLD_ID respectively - same precedence
-            // relationship as the orchestration API (see fsColumnsFromCanonicalFields).
-            householdIdSource: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/SourceHouseholdId')),
-            householdIdFs: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/HouseholdId')),
-            relationshipToHead: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/RelationshipToHead')),
-            maritalStatus: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/MaritalStatus')),
-            occupation: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Occupation')),
-            race: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Race')),
-            fatherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/FatherBirthPlace')),
-            motherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/MotherBirthPlace')),
-        };
+    function fsRawFieldsFromImageIndexPerson(person) {
+        const raw = {};
+        const nameForm = person && person.names && person.names[0]
+            && person.names[0].nameForms && person.names[0].nameForms[0];
+        for (const part of (nameForm && nameForm.parts) || []) {
+            if (part.type) raw[fsLastUriSegment(part.type)] = part.value || '';
+        }
+        if (person && person.gender && person.gender.type) {
+            raw.Gender = fsLastUriSegment(person.gender.type);
+        }
+        for (const field of (person && person.fields) || []) {
+            if (field.type) raw[fsLastUriSegment(field.type)] = fsImageIndexFieldText(field);
+        }
+        for (const fact of (person && person.facts) || []) {
+            if (!fact.type) continue;
+            const key = fsLastUriSegment(fact.type);
+            raw[key] = fsImageIndexFieldText(fact);
+            // A fact's place can be a single "Place" field (Birth) or several sub-fields
+            // (Census: State/County/Township/District) - walk all of them rather than
+            // looking for one specific type, so nothing under place.fields is missed.
+            for (const placeField of (fact.place && fact.place.fields) || []) {
+                if (placeField.type) raw[`${key}_${fsLastUriSegment(placeField.type)}`] = fsImageIndexFieldText(placeField);
+            }
+        }
+        return raw;
     }
 
     function fsBuildRowsFromImageIndexResponse(apiResponse) {
         const rows = [];
         const records = (apiResponse && apiResponse.records) || [];
-        records.forEach((record, recordIndex) => {
+        records.forEach((record) => {
             (record.persons || []).forEach((person) => {
-                const canonicalFields = fsCanonicalFieldsFromImageIndexPerson(person);
-                const columns = fsColumnsFromCanonicalFields(canonicalFields, recordIndex + 1);
+                const columns = fsRawFieldsFromImageIndexPerson(person);
 
                 // identifiers[...][0] is a full URL (.../ark:/61903/1:1:XXXX-XXX) - extract
                 // just the "1:1:XXXX-XXX" segment to match the orchestration-API path's own
-                // person_ark convention (a bare ark, not a full URL).
+                // record_ark convention (a bare ark, not a full URL).
                 const identifierUrl = (person.identifiers
                     && person.identifiers['http://gedcomx.org/Persistent']
                     && person.identifiers['http://gedcomx.org/Persistent'][0]) || '';
                 const arkMatch = identifierUrl.match(/(1:1:[A-Z0-9-]+)/);
+                const recordArk = arkMatch ? arkMatch[1] : '';
 
-                // Tree-attachment link shape not yet confirmed against a real tree-attached
-                // person (see this plan's Task 2 notes) - left empty rather than guessed,
-                // same "don't fabricate" convention as everywhere else in this file.
-                rows.push({columns, person_ark: arkMatch ? arkMatch[1] : '', attached_fsftid: ''});
+                rows.push({columns, record_ark: recordArk, person_ark: fsPersonArkFromAttachments(recordArk)});
             });
         });
         return rows;
@@ -1555,8 +1587,23 @@
             // MutationObserver would never see it, so waiters are notified directly here
             // instead of relying on that helper's DOM-mutation-driven re-checks.
             unsafeWindow.__voyageurFsApiWaiters = {};
+            // True Family Tree person id (entityId) per record-scoped ark, keyed exactly
+            // like record_ark ("1:1:XXXX-XXX") - populated from
+            // /service/tree/links/sources/attachments below. Confirmed live 2026-08-21: this
+            // endpoint fires automatically once the Names panel loads (a batch covering
+            // every person on the page/household, not scoped to one persona and not
+            // requiring any click) with response shape
+            // {attachedSourcesMap: {"<full ark URL>": [{persons: [{entityId: "<tree id, e.g.
+            // KLBM-H9P>", ...}], sourceId: "..."}]}} - entityId is the id shown in the UI's
+            // "Attached in Tree to ... <id>" text, absent from the orchestration API
+            // response itself (see docs/plans/2026-08-20-familysearch-viewer-rebuild.md
+            // Task 4). Not every persona has an entry here - most historical personas were
+            // never attached to a Tree profile by anyone; absence is the common case, not
+            // an error.
+            unsafeWindow.__voyageurFsAttachments = {};
 
             const FS_API_TARGET = '/service/records/volunteer/orchestration/sls/image/';
+            const FS_ATTACHMENTS_TARGET = '/service/tree/links/sources/attachments';
 
             function fsApiArkFromUrl(url) {
                 const match = url.match(/\/image\/([^/?#]+)/);
@@ -1577,12 +1624,38 @@
                 }
             }
 
+            function fsAttachmentArkFromUri(arkUri) {
+                const match = arkUri.match(/\/ark:\/61903\/(.+)$/);
+                return match ? decodeURIComponent(match[1]) : null;
+            }
+
+            function storeFsAttachmentsResponse(bodyText) {
+                try {
+                    const parsed = JSON.parse(bodyText);
+                    const map = parsed.attachedSourcesMap || {};
+                    for (const arkUri of Object.keys(map)) {
+                        const ark = fsAttachmentArkFromUri(arkUri);
+                        if (!ark) continue;
+                        const entry = map[arkUri][0];
+                        const person = entry && entry.persons && entry.persons[0];
+                        if (person && person.entityId) {
+                            unsafeWindow.__voyageurFsAttachments[ark] = person.entityId;
+                        }
+                    }
+                } catch (e) {
+                    // Leave unset - a true person_ark simply won't be found for any ark in
+                    // this batch, matching the "don't fabricate" convention everywhere else.
+                }
+            }
+
             const origFsXhrOpen = unsafeWindow.XMLHttpRequest.prototype.open;
             unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
                 this.__voyageurFsApiUrl = url;
                 this.addEventListener('load', function () {
                     if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_API_TARGET)) {
                         storeFsApiResponse(this.__voyageurFsApiUrl, this.responseText);
+                    } else if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_ATTACHMENTS_TARGET)) {
+                        storeFsAttachmentsResponse(this.responseText);
                     }
                 });
                 return origFsXhrOpen.apply(this, arguments);
@@ -1594,6 +1667,8 @@
                 const resp = await origFsFetch.apply(this, args);
                 if (url.includes(FS_API_TARGET)) {
                     resp.clone().text().then((t) => storeFsApiResponse(url, t));
+                } else if (url.includes(FS_ATTACHMENTS_TARGET)) {
+                    resp.clone().text().then((t) => storeFsAttachmentsResponse(t));
                 }
                 return resp;
             };
@@ -1786,16 +1861,6 @@
         // ==========================================
         // DOM HELPERS
         // ==========================================
-        function findByExactText(selector, text) {
-            // FamilySearch's own CSS class names aren't a stable target (same reasoning as
-            // Ancestry's findLeafByExactText) - match by visible text instead.
-            const candidates = document.querySelectorAll(selector);
-            for (const el of candidates) {
-                if (el.textContent.trim() === text) return el;
-            }
-            return null;
-        }
-
         function getItemId() {
             const match = window.location.pathname.match(/ark:\/61903\/([^/?#]+)/);
             return match ? decodeURIComponent(match[1]) : "";
@@ -1811,8 +1876,10 @@
         // waitForCondition convention.
         async function detectFsPageType({timeoutMs = 15000} = {}) {
             const wait = await waitForCondition(() => {
-                if (findByExactText('[role="tab"], button, a', 'Names')) return 'names';
-                if (findByExactText('[role="tab"], button, a', 'Image Index')) return 'image-index';
+                if (findByAriaLabel('[role="tab"], button, a', 'Names')
+                    || findByExactText('[role="tab"], button, a', 'Names')) return 'names';
+                if (findByAriaLabel('[role="tab"], button, a', 'Image Index')
+                    || findByExactText('[role="tab"], button, a', 'Image Index')) return 'image-index';
                 return null;
             }, {timeoutMs});
             return wait.result;
@@ -2522,13 +2589,14 @@ function incompleteItemsSummary(items) {
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
             fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
             fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
-            fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse,
-            fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
-            fsImageIndexFieldText, fsImageIndexFindByType,
-            fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
+            fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse, fsPersonArkFromAttachments,
+            fsRawFieldsFromApiPerson,
+            fsImageIndexFieldText, fsImageIndexFindByType, fsLastUriSegment,
+            fsRawFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
             getCountryFromState, buildRetryNavigationUrl, incompleteItemsSummary,
+            findByAriaLabel,
         };
     }
 

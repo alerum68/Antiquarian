@@ -9,7 +9,7 @@ const {
     fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
     fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
     fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse,
-    fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
+    fsRawFieldsFromApiPerson, fsPersonArkFromAttachments,
 } = require('./harness.js');
 
 // Fixture shape matches the confirmed live structure exactly: a flat `elements`
@@ -226,148 +226,111 @@ test('fsHouseholds: groups PERSON arks by RECORD.subElements directly, no extra 
     assert.deepEqual(households[1].personIds, ['1:1:PERSON-B']);
 });
 
-test('fsBuildRowsFromApiResponse: 1880-style person gets full columns including Relationship to Head', () => {
+// 2026-08-20: explicit user direction - stop hand-picking which fields matter at
+// extraction time. fsBuildRowsFromApiResponse now surfaces every field
+// fsRawFieldsFromApiPerson finds, keyed by FamilySearch's own vocabulary
+// (fieldType/elementType/eventType-derived), with zero renaming to human-friendly
+// labels - renaming/GEDCOM-mapping happens downstream in Archivist via a
+// declarative field map, never here.
+test('fsBuildRowsFromApiResponse: 1880-style person gets every raw field, keyed by FamilySearch fieldType', () => {
     const rows = fsBuildRowsFromApiResponse(makeApiResponse());
-    const rowA = rows.find(r => r.person_ark === '1:1:PERSON-A');
+    const rowA = rows.find(r => r.record_ark === '1:1:PERSON-A');
     assert.deepEqual(rowA.columns, {
-        'Given Name': 'ELIZA M.', 'Surname': 'FISK', 'Gender': 'F', 'Age': '38',
-        'Family Number': '90', 'Relationship to Head': 'Head',
+        NAME_GIVEN: 'ELIZA M.', NAME_SURNAME: 'FISK', AGE: '38',
+        EVENT_BIRTH_PLACE: 'Maine, United States', EVENT_CENSUS_PLACE: 'St Paul, Ramsey, Minnesota',
+        RELATIONSHIP_TO_HEAD: 'Head', MARITAL_STATUS: 'Married', OCCUPATION: 'Farmer',
+        RACE_OR_COLOR: 'White', FTHR_BIR_PLACE: 'Germany', MTHR_BIR_PLACE: 'Vermont, United States',
+        SEX_CODE: 'F', SOURCE_HOUSEHOLD_ID: '90',
     });
-    assert.equal(rowA.attached_fsftid, '');
+    // record_ark is the record/persona identifier (always present); person_ark is a true
+    // enduring identifier and is never fabricated - empty until a real one is found (see
+    // docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4).
+    assert.equal(rowA.person_ark, '');
 });
 
-test('fsBuildRowsFromApiResponse: 1850-style person omits Relationship to Head entirely, not blank', () => {
+test('fsBuildRowsFromApiResponse: 1850-style person only has the fields actually present, nothing fabricated', () => {
     const rows = fsBuildRowsFromApiResponse(makeApiResponse());
-    const rowB = rows.find(r => r.person_ark === '1:1:PERSON-B');
+    const rowB = rows.find(r => r.record_ark === '1:1:PERSON-B');
     assert.deepEqual(rowB.columns, {
-        'Given Name': 'Bozil', 'Surname': 'Delmer', 'Gender': 'M', 'Age': '47',
-        'Family Number': '2',
+        NAME_GIVEN: 'Bozil', NAME_SURNAME: 'Delmer', AGE: '47',
+        SEX_CODE: 'M', SOURCE_HOUSE_NBR: '12',
     });
-    assert.ok(!('Relationship to Head' in rowB.columns));
+    assert.ok(!('RELATIONSHIP_TO_HEAD' in rowB.columns));
+    assert.ok(!('MARITAL_STATUS' in rowB.columns));
 });
 
-test('fsBuildRowsFromApiResponse: Family Number falls back to FS_HOUSEHOLD_ID when SOURCE_HOUSE_NBR exists', () => {
-    const data = makeApiResponse();
-    // Give PERSON-B both FS_HOUSEHOLD_ID and the pre-existing SOURCE_HOUSE_NBR to prove
-    // FS_HOUSEHOLD_ID is used and is not overridden/blocked by SOURCE_HOUSE_NBR.
-    data.elements.push(
-        {elementType: 'FIELD', id: 'field-fshouseholdid-b', fieldType: 'FS_HOUSEHOLD_ID', fieldValues: [{normalizedValues: [{text: '999'}]}]},
-    );
-    data.elements.find(e => e.id === '1:1:PERSON-B').subElements.push({id: 'field-fshouseholdid-b'});
-    const rows = fsBuildRowsFromApiResponse(data);
-    const rowB = rows.find(r => r.person_ark === '1:1:PERSON-B');
-    // SOURCE_HOUSE_NBR ("12") is a dwelling number, not a family number - it is never
-    // consulted by fsFamilyNumber. FS_HOUSEHOLD_ID ("999") is used as the family number.
-    assert.equal(rowB.columns['Family Number'], '999');
+// fsPersonArkFromAttachments: true Family Tree person id (entityId), confirmed live
+// 2026-08-21 via /service/tree/links/sources/attachments (fires automatically once the
+// Names panel loads - not per-click). globalThis.unsafeWindow is `undefined` by default in
+// this harness (see harness.js); tests give it a real object temporarily to exercise the
+// lookup.
+test('fsPersonArkFromAttachments: returns the entityId when this record_ark has an attachment on file', () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {'1:1:6F7Z-QJKR': 'KLBM-H9P'}};
+    assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), 'KLBM-H9P');
+    globalThis.unsafeWindow = undefined;
 });
 
-test('fsBuildRowsFromApiResponse: Family Number prefers SOURCE_HOUSEHOLD_ID over FS_HOUSEHOLD_ID when both exist', () => {
-    const data = makeApiResponse();
-    // Give PERSON-A (who already has SOURCE_HOUSEHOLD_ID '90') an additional FS_HOUSEHOLD_ID field of '999'.
-    data.elements.push(
-        {elementType: 'FIELD', id: 'field-fshouseholdid-a', fieldType: 'FS_HOUSEHOLD_ID', fieldValues: [{normalizedValues: [{text: '999'}]}]},
-    );
-    data.elements.find(e => e.id === '1:1:PERSON-A').subElements.push({id: 'field-fshouseholdid-a'});
-    const rows = fsBuildRowsFromApiResponse(data);
-    const rowA = rows.find(r => r.person_ark === '1:1:PERSON-A');
-    // SOURCE_HOUSEHOLD_ID ("90") should win over FS_HOUSEHOLD_ID ("999").
-    assert.equal(rowA.columns['Family Number'], '90');
+test('fsPersonArkFromAttachments: returns empty string (not undefined) when no attachment exists - the common case', () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {'1:1:6F7Z-QJKR': 'KLBM-H9P'}};
+    assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKT'), '');
+    globalThis.unsafeWindow = undefined;
 });
 
-test('fsBuildRowsFromApiResponse: Family Number falls back to a sequential per-household counter when no household-id field exists at all', () => {
-    const data = {
-        numberOfPersonsOnImage: 1, numberOfRecordsOnImage: 1,
-        elements: [
-            {elementType: 'RECORD', id: 'rec-1', subElements: [{id: '1:1:PERSON-C'}]},
-            {elementType: 'PERSON', id: '1:1:PERSON-C', primary: true, subElements: [{id: 'name-c'}]},
-            {elementType: 'NAME', id: 'name-c', primary: true, subElements: [{id: 'given-c'}, {id: 'surname-c'}]},
-            {elementType: 'NAME_GIVEN', id: 'given-c', subElements: [{id: 'field-given-c'}]},
-            {elementType: 'FIELD', id: 'field-given-c', fieldType: 'NAME_GN', fieldValues: [{normalizedValues: [{text: 'Test'}]}]},
-            {elementType: 'NAME_SURNAME', id: 'surname-c', subElements: [{id: 'field-surname-c'}]},
-            {elementType: 'FIELD', id: 'field-surname-c', fieldType: 'NAME_SURN', fieldValues: [{normalizedValues: [{text: 'Person'}]}]},
-        ],
-    };
-    const rows = fsBuildRowsFromApiResponse(data);
-    assert.equal(rows[0].columns['Family Number'], '1');
+test('fsPersonArkFromAttachments: safe when unsafeWindow or the attachments map is entirely absent', () => {
+    globalThis.unsafeWindow = undefined;
+    assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), '');
 });
 
-test('fsCanonicalFieldsFromApiPerson: extracts every canonical field for an 1880-style person', () => {
+test('fsBuildRowsFromApiResponse: populates person_ark from a real captured attachments-map entry', () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {'1:1:PERSON-A': 'KLBM-H9P'}};
+    const rows = fsBuildRowsFromApiResponse(makeApiResponse());
+    const rowA = rows.find(r => r.record_ark === '1:1:PERSON-A');
+    const rowB = rows.find(r => r.record_ark === '1:1:PERSON-B');
+    assert.equal(rowA.person_ark, 'KLBM-H9P');
+    assert.equal(rowB.person_ark, '', 'PERSON-B has no attachment on file - must stay empty, not fabricated');
+    globalThis.unsafeWindow = undefined;
+});
+
+test('fsRawFieldsFromApiPerson: direct FIELD children captured verbatim, keyed by fieldType', () => {
     const data = makeApiResponse();
     const byId = buildFsElementIndex(data);
-    const person = byId['1:1:PERSON-A'];
-    const fields = fsCanonicalFieldsFromApiPerson(byId, person);
-    assert.deepEqual(fields, {
-        givenName: 'ELIZA M.', surname: 'FISK', sex: 'F', age: '38',
-        birthplace: 'Maine, United States',
-        householdIdSource: '90', householdIdFs: '',
-        relationshipToHead: 'Head', maritalStatus: 'Married', occupation: 'Farmer',
-        race: 'White', fatherBirthplace: 'Germany', motherBirthplace: 'Vermont, United States',
-    });
+    const raw = fsRawFieldsFromApiPerson(byId, byId['1:1:PERSON-A']);
+    assert.equal(raw.MARITAL_STATUS, 'Married');
+    assert.equal(raw.OCCUPATION, 'Farmer');
+    assert.equal(raw.RACE_OR_COLOR, 'White');
+    assert.equal(raw.FTHR_BIR_PLACE, 'Germany');
+    assert.equal(raw.MTHR_BIR_PLACE, 'Vermont, United States');
+    assert.equal(raw.SOURCE_HOUSEHOLD_ID, '90');
 });
 
-test('fsCanonicalFieldsFromApiPerson: era-absent fields come back as empty strings, not thrown errors', () => {
+test('fsRawFieldsFromApiPerson: NAME wrapper produces NAME_GIVEN/NAME_SURNAME keys', () => {
     const data = makeApiResponse();
     const byId = buildFsElementIndex(data);
-    const person = byId['1:1:PERSON-B'];
-    const fields = fsCanonicalFieldsFromApiPerson(byId, person);
-    assert.equal(fields.relationshipToHead, '');
-    assert.equal(fields.maritalStatus, '');
-    assert.equal(fields.occupation, '');
-    assert.equal(fields.race, '');
-    assert.equal(fields.fatherBirthplace, '');
-    assert.equal(fields.motherBirthplace, '');
-    assert.equal(fields.givenName, 'Bozil');
-    assert.equal(fields.householdIdFs, '');
+    const raw = fsRawFieldsFromApiPerson(byId, byId['1:1:PERSON-A']);
+    assert.equal(raw.NAME_GIVEN, 'ELIZA M.');
+    assert.equal(raw.NAME_SURNAME, 'FISK');
 });
 
-test('fsColumnsFromCanonicalFields: builds the exact existing columns shape, relationship present', () => {
-    const columns = fsColumnsFromCanonicalFields({
-        givenName: 'ELIZA M.', surname: 'FISK', sex: 'F', age: '38',
-        householdIdSource: '90', householdIdFs: '', relationshipToHead: 'Head',
-        maritalStatus: 'Married', occupation: 'Farmer', race: 'White',
-        fatherBirthplace: 'Germany', motherBirthplace: 'Vermont, United States', birthplace: 'Maine',
-    }, 1);
-    assert.deepEqual(columns, {
-        'Given Name': 'ELIZA M.', 'Surname': 'FISK', 'Gender': 'F', 'Age': '38',
-        'Family Number': '90', 'Relationship to Head': 'Head',
-    });
+test('fsRawFieldsFromApiPerson: EVENT wrapper produces EVENT_<eventType>_PLACE keys for both BIRTH and CENSUS', () => {
+    const data = makeApiResponse();
+    const byId = buildFsElementIndex(data);
+    const raw = fsRawFieldsFromApiPerson(byId, byId['1:1:PERSON-A']);
+    assert.equal(raw.EVENT_BIRTH_PLACE, 'Maine, United States');
+    assert.equal(raw.EVENT_CENSUS_PLACE, 'St Paul, Ramsey, Minnesota');
 });
 
-test('fsColumnsFromCanonicalFields: omits Relationship to Head entirely when absent, not blank', () => {
-    const columns = fsColumnsFromCanonicalFields({
-        givenName: 'Bozil', surname: 'Delmer', sex: 'M', age: '47',
-        householdIdSource: '', householdIdFs: '', relationshipToHead: '',
-        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
-    }, 2);
-    assert.deepEqual(columns, {
-        'Given Name': 'Bozil', 'Surname': 'Delmer', 'Gender': 'M', 'Age': '47', 'Family Number': '2',
-    });
-    assert.ok(!('Relationship to Head' in columns));
+test('fsRawFieldsFromApiPerson: AGE wrapper is keyed by its own elementType', () => {
+    const data = makeApiResponse();
+    const byId = buildFsElementIndex(data);
+    assert.equal(fsRawFieldsFromApiPerson(byId, byId['1:1:PERSON-A']).AGE, '38');
 });
 
-test('fsColumnsFromCanonicalFields: Family Number precedence, householdIdSource wins over householdIdFs', () => {
-    const columns = fsColumnsFromCanonicalFields({
-        givenName: 'X', surname: 'Y', sex: '', age: '',
-        householdIdSource: '90', householdIdFs: '999', relationshipToHead: '',
-        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
-    }, 5);
-    assert.equal(columns['Family Number'], '90');
-});
-
-test('fsColumnsFromCanonicalFields: Family Number falls back to householdIdFs when householdIdSource absent', () => {
-    const columns = fsColumnsFromCanonicalFields({
-        givenName: 'X', surname: 'Y', sex: '', age: '',
-        householdIdSource: '', householdIdFs: '999', relationshipToHead: '',
-        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
-    }, 5);
-    assert.equal(columns['Family Number'], '999');
-});
-
-test('fsColumnsFromCanonicalFields: Family Number falls back to sequenceFallback when neither household id exists', () => {
-    const columns = fsColumnsFromCanonicalFields({
-        givenName: 'X', surname: 'Y', sex: '', age: '',
-        householdIdSource: '', householdIdFs: '', relationshipToHead: '',
-        maritalStatus: '', occupation: '', race: '', fatherBirthplace: '', motherBirthplace: '', birthplace: '',
-    }, 3);
-    assert.equal(columns['Family Number'], '3');
+test('fsRawFieldsFromApiPerson: era-absent fields are simply absent from the raw map, not blank-valued', () => {
+    const data = makeApiResponse();
+    const byId = buildFsElementIndex(data);
+    const raw = fsRawFieldsFromApiPerson(byId, byId['1:1:PERSON-B']);
+    assert.ok(!('RELATIONSHIP_TO_HEAD' in raw));
+    assert.ok(!('MARITAL_STATUS' in raw));
+    assert.equal(raw.NAME_GIVEN, 'Bozil');
+    assert.equal(raw.SOURCE_HOUSE_NBR, '12');
 });

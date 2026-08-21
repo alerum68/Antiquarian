@@ -656,33 +656,37 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             # - it needs to be one clean identifier, not a compound one. This used to be
             # "{item_id}-{row_index}" (item_id is itself a full page-level ARK, e.g.
             # "3:1:33S7-9YBJ-9PD7"), which read as two identifiers glued together once
-            # rendered ("3:1:33S7-9YBJ-9PD7-1"). person_ark is this row's own real,
-            # already-distinct per-person FamilySearch identifier (already carries its own
-            # "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D" - both JS extraction paths
-            # produce it in this same shape, confirmed live) - use that instead, falling
-            # back to the old compound form only on the rare row where person_ark itself is
-            # missing. It is NOT an Ancestry APID and must never feed Archivist's _APID
-            # GEDCOM tag (that's Ancestry-specific citation-linking syntax) - Census.py
-            # guards that tag on real Ancestry data now. It must ALSO never feed 'fsftid':
-            # that field drives a "familysearch.org/tree/person/details/<id>" weblink,
-            # which is specifically a Family Tree PROFILE id (a different, unrelated ID
-            # namespace with no "1:1:" prefix, only obtained via genuine tree-attachment) -
-            # person_ark is this historical record's own persona id, not a tree profile id,
+            # rendered ("3:1:33S7-9YBJ-9PD7-1"). record_ark is this row's own real,
+            # already-distinct per-person FamilySearch record/persona identifier (already
+            # carries its own "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D" - both JS
+            # extraction paths produce it in this same shape, confirmed live) - use that
+            # instead, falling back to the old compound form only on the rare row where
+            # record_ark itself is missing. It is NOT an Ancestry APID and must never feed
+            # Archivist's _APID GEDCOM tag (that's Ancestry-specific citation-linking
+            # syntax) - Census.py guards that tag on real Ancestry data now. It must ALSO
+            # never feed 'fsftid'/'person_ark': those drive a
+            # "familysearch.org/tree/person/details/<id>" weblink and the _FSFTID GEDCOM
+            # tag, which are specifically a Family Tree PROFILE id (a different, unrelated
+            # ID namespace with no "1:1:" prefix, only obtained via genuine tree-attachment,
+            # not yet extractable from the orchestration API response - see
+            # docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4) -
+            # record_ark is this historical record's own persona id, not a tree profile id,
             # and belongs only in familysearch_url's ark-based citation link below.
+            record_ark = row.get("record_ark", "")
             person_ark = row.get("person_ark", "")
             people.append({
                 "columns": columns,
-                "pid": person_ark or f"{item_id}-{row_index + 1}",
-                "fsftid": row.get("attached_fsftid", ""),
+                "pid": record_ark or f"{item_id}-{row_index + 1}",
+                "record_ark": record_ark,
                 "person_ark": person_ark,
                 # load_census_dataframe reads this directly (same construction
                 # MergedCensus.py uses for a merged person) - without it, an FS-only
                 # (non-merged) census run had no FamilySearch web link on its citation
-                # at all, even though person_ark was already right here to build one.
-                # person_ark already carries its own "1:1:" prefix (see above) - do not
+                # at all, even though record_ark was already right here to build one.
+                # record_ark already carries its own "1:1:" prefix (see above) - do not
                 # prepend a second one here (confirmed live: doing so produced a broken
                 # ".../ark:/61903/1:1:1:1:MF36-Z6D" URL).
-                "familysearch_url": f"https://www.familysearch.org/ark:/61903/{person_ark}" if person_ark else "",
+                "familysearch_url": f"https://www.familysearch.org/ark:/61903/{record_ark}" if record_ark else "",
             })
 
         pages.append({
