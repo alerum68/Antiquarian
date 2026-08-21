@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.42
+// @version      0.3.43
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -433,14 +433,26 @@
     // /service/tree/links/sources/attachments (intercepted in runFamilySearchGather, see
     // its own comment) has one on file - most personas were never attached by anyone, so
     // '' (never fabricated) is the common, expected result, not an error.
+    // User-directed design (2026-08-21): matches by checking whether record_ark appears
+    // WITHIN each stored source URI, not by exact dictionary-key equality - an exact-match
+    // lookup kept failing live even when the same person was genuinely referenced, because
+    // the stored URI can carry more around the persona ark than a clean extraction assumes
+    // (trailing path segments, encoding). A substring match is strictly more permissive, so
+    // it can only find a real match an exact lookup missed, never a false one (ark ids are
+    // long, specific alphanumeric strings - two different real arks colliding as substrings
+    // of each other is not a realistic risk).
     function fsPersonArkFromAttachments(recordArk) {
         if (typeof unsafeWindow === 'undefined' || !recordArk) return '';
         const map = unsafeWindow.__voyageurFsAttachments || {};
-        const found = map[recordArk] || '';
-        // TEMPORARY diagnostic (2026-08-21) - see storeFsAttachmentsResponse's own note.
-        console.log(`[Voyageur FS ARK] lookup ${recordArk} -> ${found || '(none)'}`
-            + (found ? '' : ` | known keys: ${JSON.stringify(Object.keys(map))}`));
-        return found;
+        for (const uri of Object.keys(map)) {
+            if (uri.includes(recordArk)) {
+                const found = map[uri];
+                console.log(`[Voyageur FS ARK] lookup ${recordArk} -> ${found} (matched via ${uri})`);
+                return found;
+            }
+        }
+        console.log(`[Voyageur FS ARK] lookup ${recordArk} -> (none) | known uris: ${JSON.stringify(Object.keys(map))}`);
+        return '';
     }
 
     function fsBuildRowsFromApiResponse(apiResponse) {
@@ -1669,35 +1681,30 @@
                 }
             }
 
-            function fsAttachmentArkFromUri(arkUri) {
-                const match = arkUri.match(/\/ark:\/61903\/(.+)$/);
-                return match ? decodeURIComponent(match[1]) : null;
-            }
-
             function storeFsAttachmentsResponse(bodyText) {
                 try {
                     const parsed = JSON.parse(bodyText);
                     const map = parsed.attachedSourcesMap || {};
                     const rawKeys = Object.keys(map);
-                    // TEMPORARY diagnostic (2026-08-21): person_ark keeps coming back empty for
-                    // a person confirmed live to have a real Tree attachment (Jess G Crowston /
-                    // KLBM-H9P) - logging the raw response shape here so a real capture can
-                    // show whether fsAttachmentArkFromUri's extracted key actually matches the
-                    // record_ark (person.id) it's later looked up by in fsPersonArkFromAttachments.
+                    // TEMPORARY diagnostic (2026-08-21): person_ark keeps coming back empty/
+                    // wrong for a person confirmed live to have a real Tree attachment
+                    // (Jess G Crowston / KLBM-H9P) - logging the raw response shape here.
                     console.log(`[Voyageur FS ARK] attachments response: ${rawKeys.length} source(s)`, rawKeys);
                     for (const arkUri of rawKeys) {
-                        const ark = fsAttachmentArkFromUri(arkUri);
-                        if (!ark) {
-                            console.log(`[Voyageur FS ARK] could not extract ark from URI: ${arkUri}`);
-                            continue;
-                        }
                         const entry = map[arkUri][0];
                         const person = entry && entry.persons && entry.persons[0];
                         if (person && person.entityId) {
-                            unsafeWindow.__voyageurFsAttachments[ark] = person.entityId;
-                            console.log(`[Voyageur FS ARK] stored ${ark} -> ${person.entityId}`);
+                            // User-directed design (2026-08-21): store the full DECODED uri as
+                            // the key, not a regex-extracted ark - fsPersonArkFromAttachments()
+                            // now matches by substring against this, so it no longer matters
+                            // whether the uri carries anything beyond the bare persona ark
+                            // (trailing path segments, etc.) that an exact-key lookup would
+                            // have missed.
+                            const decodedUri = decodeURIComponent(arkUri);
+                            unsafeWindow.__voyageurFsAttachments[decodedUri] = person.entityId;
+                            console.log(`[Voyageur FS ARK] stored ${decodedUri} -> ${person.entityId}`);
                         } else {
-                            console.log(`[Voyageur FS ARK] no entityId for ark ${ark}`, entry);
+                            console.log(`[Voyageur FS ARK] no entityId for uri ${arkUri}`, entry);
                         }
                     }
                 } catch (e) {

@@ -281,6 +281,18 @@ test('fsPersonArkFromAttachments: safe when unsafeWindow or the attachments map 
     assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), '');
 });
 
+// User-directed design (2026-08-21): matches by substring, not exact key equality - an
+// exact-match lookup kept failing live even for a person confirmed to have a real
+// attachment, because the stored key can carry more around the persona ark than a clean
+// extraction assumes (trailing path segments, a leading host/scheme, etc.).
+test('fsPersonArkFromAttachments: matches when the stored key carries extra text around record_ark', () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {
+        'https://www.familysearch.org/ark:/61903/1:1:6F7Z-QJKR/some-trailing-segment': 'KLBM-H9P',
+    }};
+    assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), 'KLBM-H9P');
+    globalThis.unsafeWindow = undefined;
+});
+
 // backfillFsPersonArks: real-run regression (2026-08-21) - the attachments endpoint fires
 // MULTIPLE separate times for one page (one real capture showed a 3-source batch, then a
 // LATER, separate 12-source batch with Jess G Crowston's real KLBM-H9P entry). Waiting for
