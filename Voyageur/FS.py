@@ -142,7 +142,7 @@ CITATION_RE = re.compile(
     r'(?P<browse_path>.+?)'
     r'(?:;\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?))?\.\s*$'
 )
-# User-directed design (2026-08-21): the trailing "; citing NARA microfilm publication ...
+# The trailing "; citing NARA microfilm publication ...
 # (repo_loc: repo_name, n.d.)." clause is OPTIONAL in Voyageur.js's own
 # fsBuildCitationTextFromApiResponse() - it only appends that clause when the image-level
 # EXT_FILM_NBR/EXT_REPOSITORY_NAME fields are both present, otherwise the citation text ends
@@ -600,7 +600,7 @@ def split_full_name(raw_name: str) -> Tuple[str, str]:
 def pid_from_identifier(identifier: str) -> str:
     """Deterministic, numbers-only, 10-digit PID derived from an ark identifier - either
     person_ark (preferred, when a true Family Tree attachment is on file) or record_ark.
-    User-directed design (2026-08-21): GEDCOM software expects a clean numeric xref/REFN,
+    GEDCOM software expects a clean numeric xref/REFN,
     not an ark-shaped string with colons and hyphens, and it must stay stable across
     repeated gathers of the same record/person - Python's own hash() is randomized
     per-process (unless PYTHONHASHSEED is pinned) and so is unsuitable; hashlib is not.
@@ -653,6 +653,13 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
         item_city = it.get("city") or location_info["city"]
         item_country = it.get("country") or country
         item_ed = it.get("enumeration_district") or location_info["enumeration_district"]
+        # Voyageur.js's scrapeFsCollectionInfo() reads the real FamilySearch numeric
+        # collection id from the "Information" tab's "Historical Record Collection" link -
+        # citation_text's own cc= parse (below) never finds one under this architecture
+        # (see parse_citation's own note), so prefer this per-item value, same convention
+        # as the location fields above.
+        item_collection_id = it.get("collection_id") or citation.get("collection_id", "")
+        item_collection_name = it.get("collection_name") or citation.get("collection_name", "")
         people = []
         for row_index, row in enumerate(it.get("rows", [])):
             # FamilySearch's census index never exposes an actual Line Number on any year
@@ -679,7 +686,7 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
 
             # Archivist's census-flavor loop uses 'pid' directly as this person's REFN/@I@ id
             # - it needs to be one clean identifier, not an ark-shaped string with colons and
-            # hyphens. User-directed design (2026-08-21): 'pid' is a deterministic, numbers-
+            # hyphens. 'pid' is a deterministic, numbers-
             # only, 10-digit hash, preferring person_ark (the true Family Tree profile id)
             # when a genuine attachment is on file - the same real person attached across
             # multiple records/census years then collapses to the same pid, usable later to
@@ -723,8 +730,8 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             "film_number": "",
             "roll_number": roll_number,
             "apid_db": "",
-            "collection_id": citation.get("collection_id", ""),
-            "collection_name": citation.get("collection_name", ""),
+            "collection_id": item_collection_id,
+            "collection_name": item_collection_name,
             "collection_url": citation.get("collection_url", ""),
             "repository": citation.get("repository", ""),
             "repository_loc": citation.get("repository_loc", ""),

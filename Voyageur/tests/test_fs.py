@@ -44,7 +44,7 @@ def test_sanitize_item_id_filename_preserves_safe_characters():
 
 
 def test_pid_from_identifier_is_deterministic_numeric_and_ten_digits():
-    """User-directed design (2026-08-21): 'pid' must be a clean, GEDCOM-friendly numeric
+    """'pid' must be a clean, GEDCOM-friendly numeric
     xref/REFN, not an ark-shaped string with colons and hyphens, and must stay stable across
     repeated gathers of the same record/person - hashlib (not Python's own randomized hash())."""
     pid = FS.pid_from_identifier("1:1:MF36-Z6D")
@@ -245,6 +245,40 @@ def test_build_census_json_page_falls_back_to_citation_location_when_items_own_i
     assert result["pages"][0]["city"] == "St Paul"
 
 
+def test_build_census_json_prefers_scraped_collection_id_over_citation_cc_param():
+    """Regression: Voyageur.js's scrapeFsCollectionInfo() reads the real FamilySearch
+    numeric collection id from the "Information" tab's "Historical Record Collection" link
+    (there is no `cc=`-style query param in FamilySearch's own generated citation text under
+    this architecture - see parse_citation()'s own note) - this per-item value must win over
+    whatever parse_citation() derived from citation_text, same convention as the location
+    fields above."""
+    items_raw = [{
+        "item_id": "item-1", "citation_text": "",
+        "collection_id": "4464515", "collection_name": "United States, Census, 1950",
+        "rows": [],
+    }]
+    result = FS.build_census_json({"collection_title": "1950 Census"}, items_raw, {})
+
+    assert result["pages"][0]["collection_id"] == "4464515"
+    assert result["pages"][0]["collection_name"] == "United States, Census, 1950"
+
+
+def test_build_census_json_page_falls_back_to_citation_collection_id_when_items_own_is_blank():
+    """When Voyageur.js couldn't find/scrape the Information-tab collection link (e.g. it
+    never appeared in time), the page still falls back to whatever parse_citation() found
+    in citation_text, rather than losing collection_id entirely."""
+    items_raw = [{
+        "item_id": "item-1",
+        "citation_text": '"1900 Census," database with images, FamilySearch '
+        '(https://familysearch.org?cc=1803986 : 3 August 2026), Minnesota > Ramsey > St Paul; '
+        "some publisher, some place.",
+        "rows": [],
+    }]
+    result = FS.build_census_json({"collection_title": "1900 Census"}, items_raw, {})
+
+    assert result["pages"][0]["collection_id"] == "1803986"
+
+
 def test_convert_raw_gather_to_final_routes_census_collections_through_census_path():
     raw = {
         "collection_title": "United States, Census, 1880",
@@ -318,7 +352,7 @@ def test_fs_location_folder_skips_empty_fields():
 
 
 def test_fs_location_folder_nests_past_city_down_to_enumeration_district():
-    """User-directed design (2026-08-21): nests one level past city, down to the
+    """Nests one level past city, down to the
     enumeration district - a single city/township can span several EDs, so ED is the level
     that actually disambiguates one image set from another within it."""
     data = json.loads(json.dumps(MINIMAL_FINAL_DATA))
@@ -380,7 +414,7 @@ def test_recover_orphaned_runs_quarantines_corrupt_raw_json_instead_of_crashing(
     _recover_orphaned_runs's bare json.loads() crashed the ENTIRE current gather on
     startup - and since find_orphaned_gather_runs re-scans by filename pattern with no
     memory of a prior failure, the exact same file would crash every subsequent run too.
-    User-directed design: the corrupt file is moved into a "Failed" subfolder of the JSON
+    The corrupt file is moved into a "Failed" subfolder of the JSON
     output directory (out of Downloads entirely) so recovery can report it and move on,
     not loop forever."""
     downloads_dir = tmp_path / "Downloads"

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.45
+// @version      0.3.46
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -184,6 +184,8 @@
             pagesNeedingRetry: state.pagesNeedingRetry,
             retryPhase: state.retryPhase,
             currentRetryTarget: state.currentRetryTarget,
+            collectionId: state.collectionId,
+            collectionName: state.collectionName,
         }));
     }
 
@@ -204,6 +206,8 @@
             pagesNeedingRetry: parsed.pagesNeedingRetry || [],
             retryPhase: parsed.retryPhase || false,
             currentRetryTarget: parsed.currentRetryTarget || null,
+            collectionId: parsed.collectionId || '',
+            collectionName: parsed.collectionName || '',
         };
     }
 
@@ -363,7 +367,7 @@
         return field ? fsFieldText(field) : '';
     }
 
-    // User-directed design (2026-08-21), confirmed live via a full raw orchestration-API
+    // Confirmed live via a full raw orchestration-API
     // capture: STATE/COUNTY/CITY/DISTRICT_ENUMERATION are directly available as image-level
     // FIELD elements (attached to a shared PLACE element covering every person on the
     // page), far more reliable than parsing them back out of the citation prose text -
@@ -452,7 +456,7 @@
     // /service/tree/links/sources/attachments (intercepted in runFamilySearchGather, see
     // its own comment) has one on file - most personas were never attached by anyone, so
     // '' (never fabricated) is the common, expected result, not an error.
-    // User-directed design (2026-08-21): matches by checking whether record_ark appears
+    // Matches by checking whether record_ark appears
     // WITHIN each stored source URI, not by exact dictionary-key equality - an exact-match
     // lookup kept failing live even when the same person was genuinely referenced, because
     // the stored URI can carry more around the persona ark than a clean extraction assumes
@@ -1594,6 +1598,13 @@
         let accumulatedItems = [];
         let seenItemIds = new Set();
         let itemsAtLastCheckpoint = 0;
+        // Collection-level (not per-image) - FamilySearch's own "Information" tab is the
+        // only place that exposes the real numeric collection id (see
+        // scrapeFsCollectionInfo() below); scraped once per run and persisted through every
+        // "Next Image" reload the same way accumulatedItems/seenItemIds already are, since
+        // every image in one gather belongs to the same one collection.
+        let fsCollectionId = '';
+        let fsCollectionName = '';
 
         const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
         // isFsRunStopped() check: see FS_STOPPED_RUNS_KEY's own note - covers the narrower
@@ -1622,6 +1633,8 @@
             pagesNeedingRetry = resumedFsState.pagesNeedingRetry;
             inRetryPhase = resumedFsState.retryPhase;
             currentRetryTarget = resumedFsState.currentRetryTarget;
+            fsCollectionId = resumedFsState.collectionId;
+            fsCollectionName = resumedFsState.collectionName;
             isResumingFsState = true;
             clearFsReloadState();
         }
@@ -1713,7 +1726,7 @@
                         const entry = map[arkUri][0];
                         const person = entry && entry.persons && entry.persons[0];
                         if (person && person.entityId) {
-                            // User-directed design (2026-08-21): store the full DECODED uri as
+                            // Store the full DECODED uri as
                             // the key, not a regex-extracted ark - fsPersonArkFromAttachments()
                             // now matches by substring against this, so it no longer matters
                             // whether the uri carries anything beyond the bare persona ark
@@ -2035,6 +2048,54 @@
             return wait.result;
         }
 
+        // FamilySearch's own "Information" tab (confirmed live 2026-08-21) is the only place
+        // that exposes the real numeric FamilySearch collection id - citation_text never
+        // carries a `cc=`-style query param under this architecture (Voyageur.js's own
+        // navigate URL, not FamilySearch's catalog browse URL, is what ends up in the
+        // citation), and the records/images/orchestration GraphQL API's `artifact`/
+        // `getArtifactParent`/`group` queries all require an internal id format that
+        // couldn't be reverse-engineered from the image ark. The Information panel's
+        // "Historical Record Collection" link (as opposed to the "Catalog Collection" link
+        // right above it) reliably points to /en/search/collection/<id> - unambiguous to
+        // select via the href pattern alone, no text-matching needed. Called once per run
+        // (gated by fsCollectionId being falsy) since every image in one gather belongs to
+        // the same collection - switches to Information, scrapes, then switches back to
+        // whichever tab (Names/Image Index) this page actually started on so the rest of
+        // buildFsItemData's existing per-image flow is unaffected.
+        async function scrapeFsCollectionInfo(pageType) {
+            const infoTab = findByAriaLabel('[role="tab"], button, a', 'Information')
+                || findByExactText('[role="tab"], button, a', 'Information');
+            if (!infoTab) {
+                debugLog('Information tab not found - collection_id will stay blank.');
+                return {collectionId: '', collectionName: ''};
+            }
+            infoTab.click();
+
+            const linkWait = await waitForCondition(
+                () => document.querySelector('a[href*="/search/collection/"]'),
+                {timeoutMs: 10000}
+            );
+            let collectionId = '', collectionName = '';
+            if (linkWait.result) {
+                const href = linkWait.result.getAttribute('href') || '';
+                const idMatch = href.match(/\/search\/collection\/(\d+)/);
+                if (idMatch) collectionId = idMatch[1];
+                collectionName = linkWait.result.textContent.trim();
+            } else {
+                debugLog(`Information panel collection link never appeared (${linkWait.elapsedMs}ms) - collection_id will stay blank.`);
+            }
+
+            const backLabel = pageType === 'image-index' ? 'Image Index' : 'Names';
+            const backTab = findByAriaLabel('[role="tab"], button, a', backLabel)
+                || findByExactText('[role="tab"], button, a', backLabel);
+            if (backTab) {
+                backTab.click();
+                await waitForCondition(() => !document.querySelector('a[href*="/search/collection/"]'), {timeoutMs: 5000});
+            }
+
+            return {collectionId, collectionName};
+        }
+
         function parseFsLocationFromBrowsePath(browsePathArray) {
             let state = "", county = "", city = "", ed = "";
             let segments = browsePathArray.filter(s => !/^image\s+\d+\s+of\s+\d+$/i.test(s));
@@ -2133,16 +2194,18 @@
             }
 
             return {
-                item_id: itemId, 
-                citation_text: citationText, 
-                catalog_items: catalogItems, 
-                rows, 
+                item_id: itemId,
+                citation_text: citationText,
+                catalog_items: catalogItems,
+                rows,
                 incomplete,
                 country: getCountryFromState(locationInfo.state),
                 state: locationInfo.state,
                 county: locationInfo.county,
                 city: locationInfo.city,
-                enumeration_district: locationInfo.enumeration_district
+                enumeration_district: locationInfo.enumeration_district,
+                collection_id: fsCollectionId,
+                collection_name: fsCollectionName
             };
         }
 
@@ -2284,6 +2347,17 @@
         // BATCH LOOP
         // ==========================================
         async function runLoop() {
+            if (!fsCollectionId) {
+                const pageType = await detectFsPageType();
+                const info = await scrapeFsCollectionInfo(pageType);
+                fsCollectionId = info.collectionId;
+                fsCollectionName = info.collectionName;
+                saveFsReloadState(runId, {
+                    accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
+                    pagesNeedingRetry, retryPhase: inRetryPhase, currentRetryTarget,
+                    collectionId: fsCollectionId, collectionName: fsCollectionName,
+                });
+            }
             while (isRunning) {
                 if (window.fsShowToast) window.fsShowToast(`Gathering ${getItemId()}...`, 'success', 1200);
                 const {progressed, reason} = await scrapeCurrentImage();
@@ -2311,7 +2385,10 @@
                 // goToNextImage() itself ever called location.reload(). Without this,
                 // accumulatedItems reset to empty on the next injection and only the LAST
                 // scraped item ever reached the final JSON - confirmed live.
-                saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint});
+                saveFsReloadState(runId, {
+                    accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
+                    collectionId: fsCollectionId, collectionName: fsCollectionName,
+                });
 
                 const {advanced, timedOut} = await goToNextImage();
                 if (!advanced) {
@@ -2343,6 +2420,7 @@
             saveFsReloadState(runId, {
                 accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
                 pagesNeedingRetry, retryPhase: true, currentRetryTarget: target,
+                collectionId: fsCollectionId, collectionName: fsCollectionName,
             });
             window.location.href = buildRetryNavigationUrl(target.url, runId);
         }
