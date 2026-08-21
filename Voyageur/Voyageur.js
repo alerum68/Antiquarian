@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.39
+// @version      0.3.40
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1737,21 +1737,43 @@
         // observed but never got a response (network failure, backgrounded tab) - the same
         // accepted pattern waitForFsApiResponse already uses for its own network wait.
         async function waitForFsAttachments({timeoutMs = 3000, requestGraceMs = 300} = {}) {
-            if (unsafeWindow.__voyageurFsAttachmentsArrived) return;
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) {
+                console.log('[Voyageur FS ARK] waitForFsAttachments: already arrived, not waiting.');
+                return;
+            }
 
             if (!unsafeWindow.__voyageurFsAttachmentsRequested) {
                 await new Promise((resolve) => setTimeout(resolve, requestGraceMs));
-                if (!unsafeWindow.__voyageurFsAttachmentsRequested) return;
+                if (!unsafeWindow.__voyageurFsAttachmentsRequested) {
+                    console.log(`[Voyageur FS ARK] waitForFsAttachments: no request observed after `
+                        + `${requestGraceMs}ms grace - not waiting further.`);
+                    return;
+                }
             }
 
-            if (unsafeWindow.__voyageurFsAttachmentsArrived) return;
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) {
+                console.log('[Voyageur FS ARK] waitForFsAttachments: response arrived during grace window.');
+                return;
+            }
+
+            console.log('[Voyageur FS ARK] waitForFsAttachments: request observed, waiting for response...');
+            const startedAt = performance.now();
+            let timedOut = true;
             await new Promise((resolve) => {
                 const timer = setTimeout(resolve, timeoutMs);
                 unsafeWindow.__voyageurFsAttachmentsWaiters.push(() => {
                     clearTimeout(timer);
+                    timedOut = false;
                     resolve();
                 });
             });
+            const elapsedMs = Math.round(performance.now() - startedAt);
+            if (timedOut) {
+                console.log(`[Voyageur FS ARK] waitForFsAttachments: TIMED OUT after ${elapsedMs}ms - `
+                    + `proceeding without it.`);
+            } else {
+                console.log(`[Voyageur FS ARK] waitForFsAttachments: response arrived after ${elapsedMs}ms.`);
+            }
         }
 
         // Instant resolution if the response already arrived before this was called (the API
