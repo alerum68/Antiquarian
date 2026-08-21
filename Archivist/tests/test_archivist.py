@@ -1065,13 +1065,14 @@ def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
 def test_load_source_template_lines_from_rmst():
     lines = General.load_source_template_lines(20001)
     joined = "\n".join(lines)
-    assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
+    assert "0 _STMPLT" in joined
     assert "1 TID 20001" in joined
+    assert "1 NAME !Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
     assert "1 CAT Simplified Citations for Genealogical Sources" in joined
-    assert "1 FOOT" in joined
+    assert "1 FOOTNOTE" in joined
     assert "1 SHORT" in joined
-    assert "1 BIBL" in joined
-    assert "1 FIELD\n2 TYPE Name\n2 NAME ClaimantName" in joined
+    assert "1 BIBLIO" in joined
+    assert "1 FIELD\n2 NAME ClaimantName" in joined
 
 
 def test_get_scrip_template_sources_simplified_citations_fields():
@@ -1136,7 +1137,8 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
             ]
         }
         ged_text = General.build_gedcom_from_general(json_data, target_software="RM")
-        assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
+        assert "0 _STMPLT" in ged_text
+        assert "1 NAME !Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
         assert "0 @S20001@ SOUR" in ged_text
         assert "0 @I1506170@ INDI" in ged_text
     finally:

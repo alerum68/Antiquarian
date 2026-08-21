@@ -136,7 +136,7 @@ def test_hbca_resolve_source_templates():
     assert "0 @S10009@ SOUR" in sources_str
     assert "Hudson's Bay Company" in sources_str
     assert "Biographical Sheets" in sources_str
-    assert "0 _SRCTEMPLATE" in sources_str
+    assert "0 _STMPLT" in sources_str
     assert "1 TID 10009" in sources_str
 
 
