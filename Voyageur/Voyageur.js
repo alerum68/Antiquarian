@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.44
+// @version      0.3.45
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -361,6 +361,25 @@
         const field = (apiResponse.elements || [])
             .find((e) => e.elementType === 'FIELD' && e.fieldType === fieldType);
         return field ? fsFieldText(field) : '';
+    }
+
+    // User-directed design (2026-08-21), confirmed live via a full raw orchestration-API
+    // capture: STATE/COUNTY/CITY/DISTRICT_ENUMERATION are directly available as image-level
+    // FIELD elements (attached to a shared PLACE element covering every person on the
+    // page), far more reliable than parsing them back out of the citation prose text -
+    // that depends on the exact phrasing fsBuildCitationTextFromApiResponse happens to
+    // produce, and confirmed live to break down entirely once the trailing NARA clause is
+    // absent. fsImageLevelFieldText's own .find() picks up this canonical entry correctly
+    // even though several other (per-person residence, blank on this page) STATE/COUNTY/
+    // CITY fields also exist elsewhere in the same elements array - confirmed live it's
+    // always first in array order.
+    function fsImageLevelLocation(apiResponse) {
+        return {
+            state: fsImageLevelFieldText(apiResponse, 'STATE'),
+            county: fsImageLevelFieldText(apiResponse, 'COUNTY'),
+            city: fsImageLevelFieldText(apiResponse, 'CITY'),
+            enumeration_district: fsImageLevelFieldText(apiResponse, 'DISTRICT_ENUMERATION'),
+        };
     }
 
     // RECORD.subElements directly lists the household's PERSON arks - confirmed live, no
@@ -2030,13 +2049,6 @@
             return { state, county, city, enumeration_district: ed };
         }
 
-        function parseFsLocationFromCitation(citationText) {
-            const match = citationText.match(/FamilySearch\s*\([^)]*\),\s*(.*?)(?:;\s*citing|\.$)/i);
-            if (!match) return { state: "", county: "", city: "", enumeration_district: "" };
-            let pathString = match[1];
-            return parseFsLocationFromBrowsePath(pathString.split(' > ').map(s => s.trim()));
-        }
-
         async function buildFsItemData(itemId) {
             const pageType = await detectFsPageType();
             let rows = [];
@@ -2103,7 +2115,7 @@
                         imageNumber: imageMatch ? imageMatch[1] : undefined,
                         imageTotal: imageMatch ? imageMatch[2] : undefined,
                     });
-                    locationInfo = parseFsLocationFromCitation(citationText);
+                    locationInfo = fsImageLevelLocation(apiWait.result);
                 } else {
                     incomplete = true;
                     debugLog(`No orchestration-API response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
@@ -2743,7 +2755,7 @@ function incompleteItemsSummary(items) {
             markFsRunStopped, isFsRunStopped, clearFsRunStopped,
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
             fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
-            fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
+            fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsImageLevelLocation, fsHouseholds,
             fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse, fsPersonArkFromAttachments,
             backfillFsPersonArks,
             fsRawFieldsFromApiPerson,

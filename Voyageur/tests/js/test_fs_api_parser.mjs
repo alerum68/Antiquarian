@@ -7,7 +7,7 @@ const require = createRequire(import.meta.url);
 const {
     buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
     fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
-    fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
+    fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsImageLevelLocation, fsHouseholds,
     fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse,
     fsRawFieldsFromApiPerson, fsPersonArkFromAttachments, backfillFsPersonArks,
 } = require('./harness.js');
@@ -190,6 +190,37 @@ test('fsImageLevelFieldText: finds a FIELD anywhere in the flat elements array b
 test('fsImageLevelFieldText: returns empty string when the field does not exist', () => {
     const data = makeApiResponse();
     assert.equal(fsImageLevelFieldText(data, 'NOT_A_REAL_FIELD_TYPE'), '');
+});
+
+// fsImageLevelLocation: user-directed design (2026-08-21), confirmed live via a full raw
+// orchestration-API capture (a real 1950 Pembina, ND census image) - STATE/COUNTY/CITY/
+// DISTRICT_ENUMERATION are directly available as image-level FIELD elements, far more
+// reliable than parsing them back out of citation prose text. Fixture shape matches that
+// real capture: a canonical PLACE-level entry (real text) appears BEFORE several blank
+// per-person-residence STATE/COUNTY/CITY fields elsewhere in the same flat array - .find()
+// must land on the first (real) one, not one of the later blanks.
+test('fsImageLevelLocation: reads state/county/city/enumeration_district from image-level FIELDs', () => {
+    const data = {
+        elements: [
+            {elementType: 'FIELD', fieldType: 'STATE', fieldValues: [{origValue: {text: 'North Dakota'}}]},
+            {elementType: 'FIELD', fieldType: 'COUNTY', fieldValues: [{origValue: {text: 'Pembina'}}]},
+            {elementType: 'FIELD', fieldType: 'CITY', fieldValues: [{origValue: {text: 'Advance'}}]},
+            {elementType: 'FIELD', fieldType: 'DISTRICT_ENUMERATION', fieldValues: [{origValue: {text: '34-1'}}]},
+            // Later, blank per-person-residence entries - must not win over the real ones above.
+            {elementType: 'FIELD', fieldType: 'STATE', fieldValues: [{origValue: {text: ''}}]},
+            {elementType: 'FIELD', fieldType: 'COUNTY', fieldValues: [{origValue: {text: ''}}]},
+            {elementType: 'FIELD', fieldType: 'CITY', fieldValues: [{origValue: {text: ''}}]},
+        ],
+    };
+    assert.deepEqual(fsImageLevelLocation(data), {
+        state: 'North Dakota', county: 'Pembina', city: 'Advance', enumeration_district: '34-1',
+    });
+});
+
+test('fsImageLevelLocation: blank fields when none exist at all', () => {
+    assert.deepEqual(fsImageLevelLocation({elements: []}), {
+        state: '', county: '', city: '', enumeration_district: '',
+    });
 });
 
 test('fsBuildCitationTextFromApiResponse: builds the full prose citation with browse path and NARA clause', () => {
