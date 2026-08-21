@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.40
+// @version      0.3.42
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -460,6 +460,28 @@
             }
         }
         return rows;
+    }
+
+    // Confirmed live 2026-08-21: /service/tree/links/sources/attachments fires MULTIPLE
+    // separate times for one page's Names panel (one real capture showed 3 sources, then a
+    // later, separate response with 12 more - not one single batch covering everyone at
+    // once). waitForFsAttachments() only waits for the FIRST response to arrive, so
+    // fsBuildRowsFromApiResponse() can still miss a person whose real entityId only shows up
+    // in a LATER batch - confirmed live: Jess G Crowston's real KLBM-H9P mapping was stored
+    // correctly, but only after his row had already been built with an empty person_ark, and
+    // nothing ever went back to fill it in. This re-checks every row still missing a
+    // person_ark across a few more short rounds, so a later batch still gets picked up
+    // instead of being silently missed.
+    async function backfillFsPersonArks(rows, {maxRounds = 6, roundDelayMs = 500} = {}) {
+        for (let round = 0; round < maxRounds; round++) {
+            const stillMissing = rows.filter((r) => !r.person_ark && r.record_ark);
+            if (stillMissing.length === 0) return;
+            await new Promise((resolve) => setTimeout(resolve, roundDelayMs));
+            for (const row of stillMissing) {
+                const resolved = fsPersonArkFromAttachments(row.record_ark);
+                if (resolved) row.person_ark = resolved;
+            }
+        }
     }
 
     // Builds the same prose citation_text string FS.py's parse_citation()/
@@ -2047,6 +2069,10 @@
                     // fsPersonArkFromAttachments() calls see it in time.
                     await waitForFsAttachments();
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
+                    // The attachments endpoint can fire again after this point with a LATER
+                    // batch covering people the first response didn't - see
+                    // backfillFsPersonArks's own note.
+                    await backfillFsPersonArks(rows);
                     const byId = buildFsElementIndex(apiWait.result);
                     const primaryPerson = (apiWait.result.elements || []).find((e) => e.elementType === 'PERSON' && e.primary);
                     const imageMatch = document.body.innerText.match(/Image\s+(\d+)\s+of\s+(\d+)/i);
@@ -2698,6 +2724,7 @@ function incompleteItemsSummary(items) {
             fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
             fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
             fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse, fsPersonArkFromAttachments,
+            backfillFsPersonArks,
             fsRawFieldsFromApiPerson,
             fsImageIndexFieldText, fsImageIndexFindByType, fsLastUriSegment,
             fsRawFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,

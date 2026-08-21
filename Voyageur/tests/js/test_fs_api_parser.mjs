@@ -9,7 +9,7 @@ const {
     fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
     fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsHouseholds,
     fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse,
-    fsRawFieldsFromApiPerson, fsPersonArkFromAttachments,
+    fsRawFieldsFromApiPerson, fsPersonArkFromAttachments, backfillFsPersonArks,
 } = require('./harness.js');
 
 // Fixture shape matches the confirmed live structure exactly: a flat `elements`
@@ -279,6 +279,44 @@ test('fsPersonArkFromAttachments: returns empty string (not undefined) when no a
 test('fsPersonArkFromAttachments: safe when unsafeWindow or the attachments map is entirely absent', () => {
     globalThis.unsafeWindow = undefined;
     assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), '');
+});
+
+// backfillFsPersonArks: real-run regression (2026-08-21) - the attachments endpoint fires
+// MULTIPLE separate times for one page (one real capture showed a 3-source batch, then a
+// LATER, separate 12-source batch with Jess G Crowston's real KLBM-H9P entry). Waiting for
+// only the first response isn't enough - a row built before the later batch arrives must
+// still get filled in once it does.
+test('backfillFsPersonArks: picks up a later-arriving batch across rounds', async () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {}};
+    const rows = [
+        {columns: {}, record_ark: '1:1:6F7Z-QJKR', person_ark: ''},
+        {columns: {}, record_ark: '1:1:OTHER', person_ark: 'ALREADY-SET'},
+    ];
+    setTimeout(() => {
+        globalThis.unsafeWindow.__voyageurFsAttachments['1:1:6F7Z-QJKR'] = 'KLBM-H9P';
+    }, 5);
+    await backfillFsPersonArks(rows, {maxRounds: 5, roundDelayMs: 10});
+    assert.equal(rows[0].person_ark, 'KLBM-H9P');
+    assert.equal(rows[1].person_ark, 'ALREADY-SET');
+    globalThis.unsafeWindow = undefined;
+});
+
+test('backfillFsPersonArks: gives up after maxRounds when nothing ever arrives - never fabricated', () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {}};
+    const rows = [{columns: {}, record_ark: '1:1:NEVER-ATTACHED', person_ark: ''}];
+    return backfillFsPersonArks(rows, {maxRounds: 2, roundDelayMs: 5}).then(() => {
+        assert.equal(rows[0].person_ark, '');
+        globalThis.unsafeWindow = undefined;
+    });
+});
+
+test('backfillFsPersonArks: returns immediately with no delay when nothing is missing', async () => {
+    globalThis.unsafeWindow = {__voyageurFsAttachments: {}};
+    const rows = [{columns: {}, record_ark: '1:1:X', person_ark: 'ALREADY'}];
+    const startedAt = Date.now();
+    await backfillFsPersonArks(rows, {maxRounds: 10, roundDelayMs: 1000});
+    assert.ok(Date.now() - startedAt < 200, 'must not wait a full round when nothing is missing');
+    globalThis.unsafeWindow = undefined;
 });
 
 test('fsBuildRowsFromApiResponse: populates person_ark from a real captured attachments-map entry', () => {
