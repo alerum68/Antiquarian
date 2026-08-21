@@ -93,6 +93,11 @@ extra_fields:
     - {name: institution_2_type, type: string}
     - {name: institution_2_from_line, type: string}
     - {name: institution_2_to_line, type: string}
+    # Father/mother birthplace - describes a relative, not this participant's own facts;
+    # Archivist/Census.py uses these to append a second BIRT fact to an already-extracted
+    # parent, or to synthesize a stub parent record when none was extracted.
+    - {name: father_birth_place, type: string}
+    - {name: mother_birth_place, type: string}
 settings_sections:
   - "Citation Overrides"
 ---

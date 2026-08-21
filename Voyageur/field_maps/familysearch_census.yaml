@@ -135,6 +135,16 @@ participant_fields:
   "INSTITUTION_2_FROM_LINE_1950_CENSUS": type_specific_fields.institution_2_from_line
   "INSTITUTION_2_TO_LINE_1950_CENSUS": type_specific_fields.institution_2_to_line
 
+  # Parent birthplace fields - user-directed design (2026-08-21): these describe a
+  # RELATIVE (the child's father/mother), not the row's own facts, so they can't go
+  # through the normal single-person column promotion. Archivist/Census.py's
+  # build_gedcom_from_census() reads these to either append a second, proposed-proof BIRT
+  # fact to the father's/mother's own INDI record (when that parent was already extracted
+  # from the household), or to synthesize a stub parent record (surname only, no given
+  # name - not recorded) carrying just that BIRT fact when no such parent exists yet.
+  "FTHR_BIR_PLACE": type_specific_fields.father_birth_place
+  "MTHR_BIR_PLACE": type_specific_fields.mother_birth_place
+
 participant_facts:
   "Occupation": Occupation
   "Immigration Year": Immigration

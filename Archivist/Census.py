@@ -840,6 +840,29 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
     return cit
 
 
+def build_row_citation(idx: Any, row: pd.Series, target_software: str) -> Tuple[str, List[str]]:
+    """Computes (rec_id, citation_lines) for a row on its own. Every input build_census_citation()
+    needs is a pure function of the row/idx (no dependency on iteration order or media_dict
+    state), so - unlike the main per-row loop in build_gedcom_from_census() - this is safe to
+    call ahead of time, e.g. to cite a child's own census entry as the source for a fact placed
+    on a DIFFERENT person's (a parent's) record."""
+    row_pid = Utils.clean_val(row.get('PID', row.get('pid', '')))
+    rec_id = row_pid if row_pid else str(ANCESTRY_START_RECORD_ID + cast(int, idx))
+    row_state = get_row_val(row, ['State', 'State/Province'], '') or STATE
+    row_county = get_row_val(row, ['County', 'Parish'], '') or COUNTY
+    row_town = get_row_val(row, ['City', 'Township', 'Town', 'Civil Division', 'Ward'], '') or TOWNSHIP
+    row_roll = get_row_val(row, ['Roll', 'Roll Number', 'NARA Roll'], '') or ROLL_NUMBER
+    row_film = get_row_val(row, ['Film', 'FHL Film Number', 'Microfilm'], '') or FILM_NUMBER
+    row_ed = get_row_val(row, ['Enumeration District', 'Enumeration_District', 'ED'], '') or ENUMERATION_DISTRICT
+    page = get_row_val(row, ['Page', 'Page_Number', 'Page Number'], '')
+    real_page = get_row_val(row, ['Real Page', 'Real_Page', 'Page', 'Page_Number'], '')
+    image_id_val = Utils.clean_val(row.get('Image_ID', '')) or f"{BASE_ID}_{page.zfill(5)}"
+    m_id = f"@M{Path(image_id_val).stem}@"
+    cit = build_census_citation(row, rec_id, m_id, real_page, target_software, row_town, row_county, row_state,
+                                row_roll, row_film, row_ed)
+    return rec_id, cit
+
+
 def get_census_notes(row: pd.Series) -> List[str]:
     note_cols = ['Quality', 'Real Estate Value', 'Personal Estate Value', 'Cannot Read, Write', 'Disability Condition',
                  'Deaf Dumb Blind Insane', 'Idiotic Pauper Convict']
@@ -871,7 +894,8 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'repository', 'repository location', 'fsftid', 'familysearch_url', 'alternatenames',
                 'alternatebirthplaces', '_mergereviewreason',
                 'institution 1', 'institution 1 type', 'institution 1 from line', 'institution 1 to line',
-                'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line'}
+                'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line',
+                'father birth place', 'mother birth place'}
 
 INSTITUTION_COLUMNS = ('Institution 1', 'Institution 1 Type', 'Institution 1 From Line', 'Institution 1 To Line',
                        'Institution 2', 'Institution 2 Type', 'Institution 2 From Line', 'Institution 2 To Line')
@@ -1241,12 +1265,18 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             ged.append(f"2 CONC {Utils.GEDCOM_CONC}")
 
     fam_links: Dict[Any, List[str]] = {i: [] for i in df.index}
-    fam_blocks: List[str] = []
+    fam_block_lines: Dict[str, List[str]] = {}
     used_fam_ids = set()
     media_dict: Dict[str, Dict[str, Union[str, Path]]] = {}
     task_blocks: List[str] = []
     folder_tasks: Dict[str, List[str]] = {}
     review_flags: Dict[Any, List[Tuple[str, float]]] = {}
+    # Populated below as each household unit is built - lets the parent-birthplace pass
+    # (further down) tell whether a child's father/mother was already extracted as a real
+    # person (append a second BIRT fact to them) versus needing a synthesized stub parent,
+    # and which FAM block a synthesized parent should be attached to.
+    child_parent_idx: Dict[Any, Tuple[Optional[Any], Optional[Any]]] = {}
+    child_famc: Dict[Any, str] = {}
 
     for _, group in df.groupby('Household_ID'):
         units: List[HouseholdUnit]
@@ -1295,27 +1325,110 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
             used_fam_ids.add(f_id)
 
-            fam_blocks.append(f"0 {f_id} FAM")
+            fam_block_lines[f_id] = [f"0 {f_id} FAM"]
 
             if isinstance(h, pd.Series):
                 h_idx = Utils.clean_val(h.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, h.name))
-                fam_blocks.append(f"1 HUSB @I{h_idx}@")
+                fam_block_lines[f_id].append(f"1 HUSB @I{h_idx}@")
                 fam_links[h.name].append(f"1 FAMS {f_id}")
             if isinstance(w, pd.Series):
                 w_idx = Utils.clean_val(w.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, w.name))
-                fam_blocks.append(f"1 WIFE @I{w_idx}@")
+                fam_block_lines[f_id].append(f"1 WIFE @I{w_idx}@")
                 fam_links[w.name].append(f"1 FAMS {f_id}")
             if isinstance(children_list, list):
                 for child in children_list:
                     if isinstance(child, pd.Series):
                         c_idx = Utils.clean_val(child.get('PID')) or str(
                             ANCESTRY_START_RECORD_ID + cast(int, child.name))
-                        fam_blocks.append(f"1 CHIL @I{c_idx}@")
+                        fam_block_lines[f_id].append(f"1 CHIL @I{c_idx}@")
                         fam_links[child.name].append(f"1 FAMC {f_id}")
+                        child_parent_idx[child.name] = (h.name if isinstance(h, pd.Series) else None,
+                                                        w.name if isinstance(w, pd.Series) else None)
+                        child_famc[child.name] = f_id
 
             if (isinstance(h, pd.Series) and pd.notna(h.get('Married within Year'))) or (
                     isinstance(w, pd.Series) and pd.notna(w.get('Married within Year'))):
-                fam_blocks.extend(["1 MARR", f"2 DATE EST {CENSUS_YEAR}", "2 _PROOF proven"])
+                fam_block_lines[f_id].extend(["1 MARR", f"2 DATE EST {CENSUS_YEAR}", "2 _PROOF proven"])
+
+    # User-directed design (2026-08-21): FTHR_BIR_PLACE/MTHR_BIR_PLACE describe a relative,
+    # not the row's own facts. When that parent was already extracted as a real person in
+    # this household (child_parent_idx), append a second, proposed-proof BIRT fact to their
+    # existing INDI record rather than overriding the birthplace already extracted from
+    # their own gather. Otherwise synthesize a stub parent (surname only - given name isn't
+    # recorded) carrying just that BIRT fact, attached into the child's existing FAMC family
+    # if one exists (reusing it rather than creating a redundant second family), or a new
+    # one otherwise - but ONLY when that birthplace is foreign (reusing is_foreign_birthplace,
+    # which already excludes "USA"/"United States"/"US" and every US state/territory): the
+    # 1950 census overwhelmingly records "United States" for domestic-born parents, and
+    # creating a stub person for that ubiquitous, unremarkable answer would flood the tree
+    # with low-value records - a real, already-known parent still gets the fact appended
+    # regardless, since that costs nothing extra on an already-real person. If both parents
+    # need synthesizing for the same child, they share one new family instead of two.
+    extra_birth_facts: Dict[Any, List[str]] = {}
+    synth_parent_blocks: List[str] = []
+    # Guards against synthesizing a second father/mother into the same family when more
+    # than one sibling in a parentless unit separately reports the same absent parent's
+    # birthplace - only the first such child's data gets a synthetic person; a duplicate
+    # HUSB/WIFE line in one FAM block would otherwise be invalid GEDCOM.
+    family_synth_father: Dict[str, str] = {}
+    family_synth_mother: Dict[str, str] = {}
+    for idx, row in df.iterrows():
+        father_place = Utils.clean_val(row.get('Father Birth Place'))
+        mother_place = Utils.clean_val(row.get('Mother Birth Place'))
+        if not (father_place or mother_place):
+            continue
+
+        child_sur = Utils.clean_val(row.get('Surname'))
+        rec_id, cit = build_row_citation(idx, row, target_software)
+        existing_father_idx, existing_mother_idx = child_parent_idx.get(idx, (None, None))
+
+        father_place_for_synth: Optional[str] = None
+        if father_place:
+            if existing_father_idx is not None:
+                extra_birth_facts.setdefault(existing_father_idx, []).extend(
+                    ["1 BIRT", f"2 PLAC {father_place}", "2 _PROOF proposed"] + cit)
+            elif is_foreign_birthplace(father_place):
+                father_place_for_synth = father_place
+
+        mother_place_for_synth: Optional[str] = None
+        if mother_place:
+            if existing_mother_idx is not None:
+                extra_birth_facts.setdefault(existing_mother_idx, []).extend(
+                    ["1 BIRT", f"2 PLAC {mother_place}", "2 _PROOF proposed"] + cit)
+            elif is_foreign_birthplace(mother_place):
+                mother_place_for_synth = mother_place
+
+        if not (father_place_for_synth or mother_place_for_synth):
+            continue
+
+        target_fam_id = child_famc.get(idx)
+        if target_fam_id is None:
+            target_fam_id = f"@F{rec_id}_PARENTS@"
+            fam_block_lines[target_fam_id] = [f"0 {target_fam_id} FAM", f"1 CHIL @I{rec_id}@"]
+            fam_links.setdefault(idx, []).append(f"1 FAMC {target_fam_id}")
+            child_famc[idx] = target_fam_id
+
+        child_name = f"{Utils.clean_val(row.get('Given Name'))} {child_sur}".strip()
+        if father_place_for_synth and target_fam_id not in family_synth_father:
+            synth_id = f"@I{rec_id}_FTHR@"
+            synth_parent_blocks.extend(
+                [f"0 {synth_id} INDI", f"1 NAME /{child_sur}/", "1 SEX M", "1 BIRT",
+                 f"2 PLAC {father_place_for_synth}", "2 _PROOF proposed"] + cit +
+                [f"1 NOTE Synthesized father record (given name not recorded); birthplace inferred from "
+                 f"{child_name}'s census entry.", f"1 FAMS {target_fam_id}"])
+            fam_block_lines[target_fam_id].insert(1, f"1 HUSB {synth_id}")
+            family_synth_father[target_fam_id] = synth_id
+        if mother_place_for_synth and target_fam_id not in family_synth_mother:
+            synth_id = f"@I{rec_id}_MTHR@"
+            synth_parent_blocks.extend(
+                [f"0 {synth_id} INDI", f"1 NAME /{child_sur}/", "1 SEX F", "1 BIRT",
+                 f"2 PLAC {mother_place_for_synth}", "2 _PROOF proposed"] + cit +
+                [f"1 NOTE Synthesized mother record (given name not recorded); birthplace inferred from "
+                 f"{child_name}'s census entry.", f"1 FAMS {target_fam_id}"])
+            lines = fam_block_lines[target_fam_id]
+            insert_idx = next((i + 1 for i, ln in enumerate(lines) if ln.startswith("1 HUSB")), 1)
+            lines.insert(insert_idx, f"1 WIFE {synth_id}")
+            family_synth_mother[target_fam_id] = synth_id
 
     current_line_page_key = None
     synthesized_line_num = 0
@@ -1470,9 +1583,12 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         if notes := (get_census_notes(row) + dyn_notes):
             ged.append(f"2 NOTE {' | '.join(notes)}")
+        ged.extend(extra_birth_facts.get(idx, []))
         ged.extend(fam_links.get(idx, []))
 
-    ged.extend(fam_blocks)
+    ged.extend(synth_parent_blocks)
+    for lines in fam_block_lines.values():
+        ged.extend(lines)
     ged.extend(task_blocks)
 
     for folder, tasks in folder_tasks.items():
@@ -1704,6 +1820,13 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Seeking Work'] = pts['seeking_work']
                 if pts.get('attended_school'):
                     row['Attended School'] = pts['attended_school']
+                # Describe a relative (the child's father/mother), not this participant's
+                # own facts - build_gedcom_from_census() reads these separately to append a
+                # second BIRT fact to an already-extracted parent or synthesize a stub one.
+                if pts.get('father_birth_place'):
+                    row['Father Birth Place'] = pts['father_birth_place']
+                if pts.get('mother_birth_place'):
+                    row['Mother Birth Place'] = pts['mother_birth_place']
                 if p.get('birth_place'):
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):

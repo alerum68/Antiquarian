@@ -742,3 +742,109 @@ def test_canadian_and_historical_hbc_birthplaces_are_not_foreign():
     assert is_foreign_birthplace("Red River Settlement") is False
     assert is_foreign_birthplace("Pembina, Dakota Territory") is False
     assert is_foreign_birthplace("Ireland") is True
+
+
+def test_parent_birthplace_appends_second_birt_fact_to_existing_father(tmp_path, monkeypatch):
+    """User-directed design (2026-08-21): FTHR_BIR_PLACE/MTHR_BIR_PLACE describe the
+    child's own father/mother, not the child's own facts. When that parent was already
+    extracted as a real person in the household, the birthplace must land as a SECOND,
+    proposed-proof BIRT fact on the parent's own INDI record - not overriding the
+    birthplace already extracted from the parent's own gathered row - and no new person
+    is created for them."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["birth_place"] = "Minnesota, USA"
+    wife = _participant("Marie", "Gagnon", "F", role_name="Wife", age="38", line="2")
+    child = _participant("Louis", "Gagnon", "M", role_name="Child", age="10", line="3")
+    child["type_specific_fields"]["father_birth_place"] = "Ireland"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, wife, child], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    head_start = lines.index("1 NAME Jean /Gagnon/")
+    next_indi = next(i for i in range(head_start + 1, len(lines)) if lines[i].startswith("0 @I"))
+    head_block = lines[head_start:next_indi]
+
+    birt_indices = [i for i, ln in enumerate(head_block) if ln == "1 BIRT"]
+    assert len(birt_indices) == 2, f"expected original + appended BIRT facts: {head_block}"
+    assert "2 PLAC Minnesota, USA" in head_block
+    assert "2 PLAC Ireland" in head_block
+    assert head_block[birt_indices[1]:birt_indices[1] + 3] == \
+        ["1 BIRT", "2 PLAC Ireland", "2 _PROOF proposed"]
+    # no synthetic father person was created since a real one already exists
+    assert lines.count("1 NAME /Gagnon/") == 0
+
+
+def test_parent_birthplace_synthesizes_stub_parents_when_foreign_and_none_extracted(tmp_path, monkeypatch):
+    """When the child has no extracted father/mother (unrelated in the household) and the
+    birthplace is foreign, FTHR_BIR_PLACE/MTHR_BIR_PLACE synthesize stub parent records -
+    surname only (no given name recorded) - carrying just a proposed-proof birthplace-only
+    BIRT fact, linked as the child's parents in a new FAM block."""
+    head = _participant("Marie", "Smith", "F", role_name="Head", age="70", line="1")
+    lodger = _participant("Louis", "Gagnon", "M", role_name="Lodger", age="10", line="2")
+    lodger["type_specific_fields"]["father_birth_place"] = "Ireland"
+    lodger["type_specific_fields"]["mother_birth_place"] = "Norway"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, lodger], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert lines.count("1 NAME /Gagnon/") == 2, f"expected one synthetic father + mother: {lines}"
+    assert "1 SEX M" in lines
+    assert "1 SEX F" in lines
+    assert "2 PLAC Ireland" in lines
+    assert "2 PLAC Norway" in lines
+
+    fam_starts = [i for i, ln in enumerate(lines) if ln.startswith("0 @F") and ln.endswith(" FAM")]
+    fam_blocks = []
+    for start in fam_starts:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("0 ")), len(lines))
+        fam_blocks.append(lines[start:end])
+    child_fam = next(fb for fb in fam_blocks if any(ln.startswith("1 CHIL") for ln in fb))
+    assert any(ln.startswith("1 HUSB") for ln in child_fam)
+    assert any(ln.startswith("1 WIFE") for ln in child_fam)
+
+
+def test_parent_birthplace_does_not_synthesize_a_person_for_domestic_birthplace(tmp_path, monkeypatch):
+    """User-directed refinement (2026-08-21): the 1950 census overwhelmingly records
+    "United States" for domestic-born parents - creating a stub person for that ubiquitous,
+    unremarkable answer would flood the tree with low-value records, so a synthetic parent
+    is only created when the birthplace is foreign. A domestic birthplace with no already-
+    extracted parent produces no new person and no fact at all."""
+    head = _participant("Marie", "Smith", "F", role_name="Head", age="70", line="1")
+    lodger = _participant("Louis", "Gagnon", "M", role_name="Lodger", age="10", line="2")
+    lodger["type_specific_fields"]["father_birth_place"] = "United States"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, lodger], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert "1 NAME /Gagnon/" not in lines
+    assert "2 PLAC United States" not in lines
