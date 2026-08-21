@@ -12,6 +12,17 @@ def test_sanitize_item_id_filename_preserves_safe_characters():
     assert FS.sanitize_item_id_filename("abc-123_DEF") == "abc-123_DEF.jpg"
 
 
+def test_pid_from_record_id_is_deterministic_numeric_and_ten_digits():
+    """User-directed design (2026-08-21): 'pid' must be a clean, GEDCOM-friendly numeric
+    xref/REFN, not an ark-shaped string with colons and hyphens, and must stay stable across
+    repeated gathers of the same record - hashlib (not Python's own randomized hash())."""
+    pid = FS.pid_from_record_id("1:1:MF36-Z6D")
+    assert pid.isdigit()
+    assert len(pid) == 10
+    assert FS.pid_from_record_id("1:1:MF36-Z6D") == pid
+    assert FS.pid_from_record_id("1:1:MF36-Z6E") != pid
+
+
 def test_normalize_familysearch_gather_url_strips_tracking_params():
     """User-reported: a URL copied from a FamilySearch search result carries wc/cc/i
     tracking params that aren't part of the ark's own identity and can send the viewer to
@@ -132,16 +143,20 @@ def test_build_census_json_accepts_household_view_row_shape():
 
     people = result["pages"][0]["people"]
     assert len(people) == 5
-    # 'pid' prefers person_ark (the true, enduring Family Tree profile id) over record_ark
-    # when one is on file (2026-08-21 user-directed design) - familysearch_url still
-    # points at record_ark, since that's this specific historical record's own citation link.
-    assert people[0]["pid"] == "9CJG-851"
+    # 'pid' is a deterministic, numbers-only, 10-digit hash of record_ark (2026-08-21
+    # user-directed design) - never person_ark, which is a fully separate field (the true,
+    # enduring Family Tree profile id, blank when no attachment was found) never folded into
+    # 'pid' or fabricated. familysearch_url still points at record_ark, since that's this
+    # specific historical record's own citation link.
+    assert people[0]["pid"] == FS.pid_from_record_id("1:1:MZ2Z-WM4")
+    assert people[0]["pid"].isdigit() and len(people[0]["pid"]) == 10
     assert people[0]["record_ark"] == "1:1:MZ2Z-WM4"
     assert people[0]["person_ark"] == "9CJG-851"
     assert people[0]["familysearch_url"] == "https://www.familysearch.org/ark:/61903/1:1:MZ2Z-WM4"
     assert people[0]["columns"]["Relationship to Head"] == "Head"
-    # Everyone else has no person_ark on file, so pid falls back to record_ark unchanged.
-    assert people[1]["pid"] == "1:1:MZ2Z-WM5"
+    # Everyone else has no person_ark on file - pid is still derived from record_ark only.
+    assert people[1]["pid"] == FS.pid_from_record_id("1:1:MZ2Z-WM5")
+    assert people[1]["person_ark"] == ""
     # J Baptiste Cardinal's household has no relationship data at all (the bare-"Primary"
     # case confirmed live) - the column must simply be absent, not fabricated as empty string.
     assert "Relationship to Head" not in people[4]["columns"]
