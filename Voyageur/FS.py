@@ -663,20 +663,22 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
             # instead, falling back to the old compound form only on the rare row where
             # record_ark itself is missing. It is NOT an Ancestry APID and must never feed
             # Archivist's _APID GEDCOM tag (that's Ancestry-specific citation-linking
-            # syntax) - Census.py guards that tag on real Ancestry data now. It must ALSO
-            # never feed 'fsftid'/'person_ark': those drive a
-            # "familysearch.org/tree/person/details/<id>" weblink and the _FSFTID GEDCOM
-            # tag, which are specifically a Family Tree PROFILE id (a different, unrelated
-            # ID namespace with no "1:1:" prefix, only obtained via genuine tree-attachment,
-            # not yet extractable from the orchestration API response - see
-            # docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4) -
-            # record_ark is this historical record's own persona id, not a tree profile id,
-            # and belongs only in familysearch_url's ark-based citation link below.
+            # syntax) - Census.py guards that tag on real Ancestry data now.
+            #
+            # User-directed design (2026-08-21): when a true Family Tree profile id (a real,
+            # enduring identity - see person_ark below) is on file for this persona, 'pid'
+            # prefers it over record_ark rather than a separate field being introduced for
+            # it - same underlying ark-shaped identifier family, just a more durable scope.
+            # This means the same real person attached across multiple pages/census years in
+            # one gather naturally collapses to the same @I@/REFN in the output GEDCOM
+            # instead of one duplicate INDI per record. Still never feeds Archivist's
+            # _APID GEDCOM tag (that guard is keyed off _APID's own Ancestry-specific source,
+            # unaffected by what 'pid' holds).
             record_ark = row.get("record_ark", "")
             person_ark = row.get("person_ark", "")
             people.append({
                 "columns": columns,
-                "pid": record_ark or f"{item_id}-{row_index + 1}",
+                "pid": person_ark or record_ark or f"{item_id}-{row_index + 1}",
                 "record_ark": record_ark,
                 "person_ark": person_ark,
                 # load_census_dataframe reads this directly (same construction

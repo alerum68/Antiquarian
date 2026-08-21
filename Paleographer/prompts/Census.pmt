@@ -98,6 +98,11 @@ extra_fields:
     # parent, or to synthesize a stub parent record when none was extracted.
     - {name: father_birth_place, type: string}
     - {name: mother_birth_place, type: string}
+    # Weeks out of work - folded into the Occupation fact's "Unemployed" note, not its own
+    # fact. Residence place fallback - only used when the State/County/City breakdown is
+    # blank; never its own fact.
+    - {name: weeks_out_of_work, type: string}
+    - {name: residence_place_fallback, type: string}
 settings_sections:
   - "Citation Overrides"
 ---

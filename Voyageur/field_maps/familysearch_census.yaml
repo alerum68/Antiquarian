@@ -69,6 +69,14 @@ participant_fields:
   "MISC_WEEKS_WORKED": type_specific_fields.weeks_worked
   "MISC_FLAG_SEEKING_WORK": type_specific_fields.seeking_work
   "MISC_FLAG_ATTENDED_SCHOOL": type_specific_fields.attended_school
+  # User-directed design (2026-08-21): recorded as a note on the Occupation fact's
+  # "Unemployed" state (get_occupation_value()'s notes_parts/is_unemployed), not its own
+  # separate fact - a weeks-out-of-work count is inherently about this same occupation
+  # question, not a distinct historical event.
+  "MISC_WEEKS_OUT_OF_WORK": type_specific_fields.weeks_out_of_work
+  # MISC_FLAG_EMPLOYED deliberately NOT mapped - user confirmed (2026-08-21) it's redundant
+  # with the Occupation fact's existing Out Of Work/Seeking Work-driven "Unemployed" state;
+  # mapping it would just be a second, conflicting way to say the same thing.
 
   # marital_status already has a declared home in Paleographer/prompts/Census.pmt's
   # participant extra_fields (it predates this task) - mapped now that its raw
@@ -144,6 +152,13 @@ participant_fields:
   # name - not recorded) carrying just that BIRT fact when no such parent exists yet.
   "FTHR_BIR_PLACE": type_specific_fields.father_birth_place
   "MTHR_BIR_PLACE": type_specific_fields.mother_birth_place
+
+  # User-directed design (2026-08-21): EVENT_RESIDENCE_PLACE is a backup for the census
+  # place only - used by Archivist/Census.py's get_location_string() solely when the
+  # State/County/City breakdown that normally composes that place string is entirely
+  # blank, never as its own separate RESI fact. EVENT_CENSUS_PLACE itself is deliberately
+  # NOT mapped here - it duplicates the record's own State field.
+  "EVENT_RESIDENCE_PLACE": type_specific_fields.residence_place_fallback
 
 participant_facts:
   "Occupation": Occupation

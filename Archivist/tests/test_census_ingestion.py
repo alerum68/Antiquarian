@@ -848,3 +848,30 @@ def test_parent_birthplace_does_not_synthesize_a_person_for_domestic_birthplace(
 
     assert "1 NAME /Gagnon/" not in lines
     assert "2 PLAC United States" not in lines
+
+
+def test_weeks_out_of_work_marks_unemployed_and_notes_the_weeks():
+    """User-directed design (2026-08-21): MISC_WEEKS_OUT_OF_WORK is folded into the
+    Occupation fact's "Unemployed" state rather than getting its own fact - a weeks-out-of-
+    work count is inherently about this same occupation question, not a distinct historical
+    event, and MISC_FLAG_EMPLOYED is deliberately not mapped at all since it would just be
+    a second, conflicting way to say the same thing."""
+    from Census import get_occupation_value
+
+    row = pd.Series({"Occupation": "Clerk", "Weeks Out of Work": "12"})
+    occ, notes = get_occupation_value(row)
+    assert occ == "Unemployed from Clerk"
+    assert "Weeks Out of Work: 12" in notes
+
+
+def test_location_string_falls_back_to_residence_place_only_when_census_place_blank():
+    """User-directed design (2026-08-21): EVENT_RESIDENCE_PLACE is a backup for the census
+    place only, used when the State/County/City breakdown that normally composes it is
+    entirely blank - never its own separate fact, and never preferred over a real value."""
+    from Census import get_location_string
+
+    blank_row = pd.Series({"Residence Place Fallback": "Some Town, Some State"})
+    assert get_location_string(blank_row) == "Some Town, Some State"
+
+    populated_row = pd.Series({"State": "Minnesota", "Residence Place Fallback": "Should Not Win"})
+    assert get_location_string(populated_row) == "Minnesota, USA"

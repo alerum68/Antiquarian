@@ -132,11 +132,16 @@ def test_build_census_json_accepts_household_view_row_shape():
 
     people = result["pages"][0]["people"]
     assert len(people) == 5
-    assert people[0]["pid"] == "1:1:MZ2Z-WM4"
+    # 'pid' prefers person_ark (the true, enduring Family Tree profile id) over record_ark
+    # when one is on file (2026-08-21 user-directed design) - familysearch_url still
+    # points at record_ark, since that's this specific historical record's own citation link.
+    assert people[0]["pid"] == "9CJG-851"
     assert people[0]["record_ark"] == "1:1:MZ2Z-WM4"
     assert people[0]["person_ark"] == "9CJG-851"
     assert people[0]["familysearch_url"] == "https://www.familysearch.org/ark:/61903/1:1:MZ2Z-WM4"
     assert people[0]["columns"]["Relationship to Head"] == "Head"
+    # Everyone else has no person_ark on file, so pid falls back to record_ark unchanged.
+    assert people[1]["pid"] == "1:1:MZ2Z-WM5"
     # J Baptiste Cardinal's household has no relationship data at all (the bare-"Primary"
     # case confirmed live) - the column must simply be absent, not fabricated as empty string.
     assert "Relationship to Head" not in people[4]["columns"]

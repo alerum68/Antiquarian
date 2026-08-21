@@ -895,7 +895,8 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'alternatebirthplaces', '_mergereviewreason',
                 'institution 1', 'institution 1 type', 'institution 1 from line', 'institution 1 to line',
                 'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line',
-                'father birth place', 'mother birth place'}
+                'father birth place', 'mother birth place', 'weeks out of work',
+                'residence place fallback'}
 
 INSTITUTION_COLUMNS = ('Institution 1', 'Institution 1 Type', 'Institution 1 From Line', 'Institution 1 To Line',
                        'Institution 2', 'Institution 2 Type', 'Institution 2 From Line', 'Institution 2 To Line')
@@ -1022,7 +1023,8 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
-                     Utils.clean_val(row.get('Seeking Work')) == 'Yes')
+                     Utils.clean_val(row.get('Seeking Work')) == 'Yes' or
+                     bool(Utils.clean_val(row.get('Weeks Out of Work'))))
 
     # 3. Concatenation
     occ_str = ""
@@ -1040,7 +1042,8 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
     # 4. Notes
     notes_parts = []
-    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Months Unemployed Past Year']:
+    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Weeks Out of Work',
+                  'Months Unemployed Past Year']:
         val = Utils.clean_val(row.get(field))
         if val:
             notes_parts.append(f"{field}: {val}")
@@ -1198,6 +1201,14 @@ def get_location_string(row: pd.Series) -> str:
     row_county = get_row_val(row, ['County', 'Parish'], '') or COUNTY
     row_town = get_row_val(row, ['City', 'Township', 'Town', 'Civil Division', 'Ward'], '') or TOWNSHIP
     row_country = get_row_val(row, ['Country'], '') or 'USA'
+
+    # User-directed design (2026-08-21): 'Residence Place Fallback' (FamilySearch's
+    # EVENT_RESIDENCE_PLACE) only fills in when the structured State/County/City breakdown
+    # is entirely blank - never its own fact, just a backup for this same place string.
+    if not (row_town or row_county or row_state):
+        fallback = Utils.clean_val(row.get('Residence Place Fallback'))
+        if fallback:
+            return fallback
 
     return ", ".join(filter(None, [row_town, row_county, row_state, row_country]))
 
@@ -1827,6 +1838,14 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Father Birth Place'] = pts['father_birth_place']
                 if pts.get('mother_birth_place'):
                     row['Mother Birth Place'] = pts['mother_birth_place']
+                # Folded into the Occupation fact's "Unemployed" note (get_occupation_value),
+                # not its own fact.
+                if pts.get('weeks_out_of_work'):
+                    row['Weeks Out of Work'] = pts['weeks_out_of_work']
+                # Only used by get_location_string() as a backup when the State/County/City
+                # breakdown is blank - never surfaced as its own fact.
+                if pts.get('residence_place_fallback'):
+                    row['Residence Place Fallback'] = pts['residence_place_fallback']
                 if p.get('birth_place'):
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
