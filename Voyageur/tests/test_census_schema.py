@@ -458,7 +458,7 @@ def test_familysearch_census_field_map_loads_and_normalizes():
 
 
 def test_familysearch_occupation_maps_to_named_field_not_a_duplicate_fact():
-    """User-directed design (2026-08-21): Commissioner's own Participant.facts docstring
+    """Commissioner's own Participant.facts docstring
     says "do not duplicate a fact already covered by a named field (occupation, birth_date,
     etc.) here" - FamilySearch's raw OCCUPATION/Occupation fields must land in the
     participant's own named 'occupation' field, not also produce a facts-array entry."""

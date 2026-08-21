@@ -291,7 +291,7 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
     gather dict (output of normalize_*_census_gather). Used by both FS.py and A.py to
     route images without re-parsing the filename.
 
-    User-directed design (2026-08-21): state/county/city are each the most common non-blank
+    State/county/city are each the most common non-blank
     value across ALL records, not just the first one - confirmed live this was a real bug,
     not a hypothetical: a real 1950 Pembina, ND gather had its very first record's own
     'state' field read "Advance" (a citation-parsing artifact for that one record) while the
@@ -302,8 +302,8 @@ def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str
     fix as that function's own reasoning, applied consistently here too.
 
     location_folder is built as 'state - county - city - ED' (each segment omitted when
-    blank) matching the ' - ' split resolve_census_image_dir uses internally. User-directed
-    design (2026-08-21): nests one level past city, down to the enumeration district - a
+    blank) matching the ' - ' split resolve_census_image_dir uses internally. Nests
+    one level past city, down to the enumeration district - a
     single city/township can span several EDs, so ED is the level that actually
     disambiguates one image set from another within it."""
     census_year = ""

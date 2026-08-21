@@ -140,8 +140,8 @@ def evaluate_task_priority(task_note: str) -> tuple:
 
 def _gedcom_text_lines(level: int, tag: str, text: str) -> List[str]:
     """Splits a multi-line template text value into a leading 'LEVEL TAG line1' followed by
-    'LEVEL+1 CONT lineN' continuation lines for every subsequent line. User-directed design
-    (2026-08-21), confirmed live as the real cause of RootsMagic falling back every source
+    'LEVEL+1 CONT lineN' continuation lines for every subsequent line. Confirmed
+    live as the real cause of RootsMagic falling back every source
     to Freeform instead of the imported template: GEDCOM 5.5.1 requires every physical line
     to start with its own level+tag - this template source's own multi-paragraph
     Description/Hint text contains raw embedded newlines, which previously got written
@@ -601,7 +601,7 @@ def append_unit_if_not_empty(units: List[HouseholdUnit], unit: Optional[Househol
 
 def parse_household_relational(
         group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.Series], List[FlagRecord]]:
-    # User-directed design (2026-08-21): anyone enumerated at an institution (group
+    # Anyone enumerated at an institution (group
     # quarters - hospital, prison, boarding house, etc.) gets no family/spouse/parent-child
     # links at all, just their own individual record - if any member of this group is an
     # institution resident, treat the whole group as unrelated individuals rather than
@@ -1239,7 +1239,7 @@ def get_location_string(row: pd.Series) -> str:
     row_town = get_row_val(row, ['City', 'Township', 'Town', 'Civil Division', 'Ward'], '') or TOWNSHIP
     row_country = get_row_val(row, ['Country'], '') or 'USA'
 
-    # User-directed design (2026-08-21): 'Residence Place Fallback' (FamilySearch's
+    # 'Residence Place Fallback' (FamilySearch's
     # EVENT_RESIDENCE_PLACE) only fills in when the structured State/County/City breakdown
     # is entirely blank - never its own fact, just a backup for this same place string.
     if not (row_town or row_county or row_state):
@@ -1399,7 +1399,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
                     isinstance(w, pd.Series) and pd.notna(w.get('Married within Year'))):
                 fam_block_lines[f_id].extend(["1 MARR", f"2 DATE EST {CENSUS_YEAR}", "2 _PROOF proven"])
 
-    # User-directed design (2026-08-21): FTHR_BIR_PLACE/MTHR_BIR_PLACE describe a relative,
+    # FTHR_BIR_PLACE/MTHR_BIR_PLACE describe a relative,
     # not the row's own facts. When that parent was already extracted as a real person in
     # this household (child_parent_idx), append a second, proposed-proof BIRT fact to their
     # existing INDI record rather than overriding the birthplace already extracted from
@@ -1888,7 +1888,7 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
                     row['Race'] = p['race']
-                # User-directed design (2026-08-21): occupation belongs in the participant's
+                # Occupation belongs in the participant's
                 # own named 'occupation' field, not a duplicate facts-array entry (see
                 # field_maps/familysearch_census.yaml's own comment on this) - get_occupation_value()
                 # reads this same 'Occupation' column already.
@@ -1990,8 +1990,8 @@ def run_census_flavor(data: dict) -> None:
 
     # Matches Voyageur's own resolve_census_image_dir() convention: <base>/<country>/
     # <year>/<state>/<county>/<city>/<ED>, no collection-name wrapper folder - see
-    # docs/plans/2026-08-17-media-directory-structure.md. User-directed design (2026-08-21):
-    # nests one level past city, down to the enumeration district - a single city/township
+    # docs/plans/2026-08-17-media-directory-structure.md. Nests
+    # one level past city, down to the enumeration district - a single city/township
     # can span several EDs, so ED is the level that actually disambiguates one image set
     # from another within it. Always uses this computed path, never gated on nested_dir
     # already existing on disk - that gate meant a GEDCOM FILE reference silently fell back

@@ -19,7 +19,7 @@ participant_fields:
   "Birth Place": birth_place
   "Birthplace": birth_place
   "Race": race
-  # User-directed design (2026-08-21): Occupation belongs in the participant's own named
+  # Occupation belongs in the participant's own named
   # 'occupation' field, not a duplicate participant_facts/facts-array entry - Commissioner's
   # own Participant.facts docstring says as much: "do not duplicate a fact already covered
   # by a named field (occupation, birth_date, etc.) here." Archivist/Census.py promotes
@@ -76,12 +76,12 @@ participant_fields:
   "MISC_WEEKS_WORKED": type_specific_fields.weeks_worked
   "MISC_FLAG_SEEKING_WORK": type_specific_fields.seeking_work
   "MISC_FLAG_ATTENDED_SCHOOL": type_specific_fields.attended_school
-  # User-directed design (2026-08-21): recorded as a note on the Occupation fact's
+  # Recorded as a note on the Occupation fact's
   # "Unemployed" state (get_occupation_value()'s notes_parts/is_unemployed), not its own
   # separate fact - a weeks-out-of-work count is inherently about this same occupation
   # question, not a distinct historical event.
   "MISC_WEEKS_OUT_OF_WORK": type_specific_fields.weeks_out_of_work
-  # MISC_FLAG_EMPLOYED deliberately NOT mapped - user confirmed (2026-08-21) it's redundant
+  # MISC_FLAG_EMPLOYED deliberately NOT mapped - it's redundant
   # with the Occupation fact's existing Out Of Work/Seeking Work-driven "Unemployed" state;
   # mapping it would just be a second, conflicting way to say the same thing.
 
@@ -130,12 +130,12 @@ participant_fields:
   "MISC_FLAG_COMPLETED_GRADE": type_specific_fields.completed_grade_flag
   "MISC_FLAG_WORKED_LAST_WEEK": type_specific_fields.worked_last_week
 
-  # Institution/group-quarters fields - user-directed design (2026-08-21): presence of any
+  # Institution/group-quarters fields - presence of any
   # of these means this person was enumerated in an institution, not a regular household -
   # Archivist/Census.py composes them into one note sentence on the CENS fact and bypasses
   # family-relationship parsing for them (see build_institution_note()/
   # is_institution_resident()). MISC_CODE_A/B/C/C1/C2_1950_CENSUS deliberately NOT mapped -
-  # user confirmed these are Census Bureau "office use only" tabulation codes (relationship/
+  # these are Census Bureau "office use only" tabulation codes (relationship/
   # birthplace-citizenship/occupation-industry-worker-class, respectively) derived from the
   # same handwritten answers we already capture as readable text (RELATIONSHIP_TO_HEAD,
   # EVENT_BIRTH_PLACE, OCCUPATION/OCCUPATION_INDUSTRY/MISC_WORKER_CLASS) - a Rosetta-Stone
@@ -150,7 +150,7 @@ participant_fields:
   "INSTITUTION_2_FROM_LINE_1950_CENSUS": type_specific_fields.institution_2_from_line
   "INSTITUTION_2_TO_LINE_1950_CENSUS": type_specific_fields.institution_2_to_line
 
-  # Parent birthplace fields - user-directed design (2026-08-21): these describe a
+  # Parent birthplace fields - these describe a
   # RELATIVE (the child's father/mother), not the row's own facts, so they can't go
   # through the normal single-person column promotion. Archivist/Census.py's
   # build_gedcom_from_census() reads these to either append a second, proposed-proof BIRT
@@ -160,7 +160,7 @@ participant_fields:
   "FTHR_BIR_PLACE": type_specific_fields.father_birth_place
   "MTHR_BIR_PLACE": type_specific_fields.mother_birth_place
 
-  # User-directed design (2026-08-21): EVENT_RESIDENCE_PLACE is a backup for the census
+  # EVENT_RESIDENCE_PLACE is a backup for the census
   # place only - used by Archivist/Census.py's get_location_string() solely when the
   # State/County/City breakdown that normally composes that place string is entirely
   # blank, never as its own separate RESI fact. EVENT_CENSUS_PLACE itself is deliberately

@@ -154,7 +154,7 @@ def test_adapter_maps_facts_to_expected_old_column_names():
 
 
 def test_adapter_promotes_named_occupation_field_not_just_facts():
-    """User-directed design (2026-08-21): occupation belongs in the participant's own named
+    """Occupation belongs in the participant's own named
     'occupation' field (Commissioner's own Participant.facts docstring: "do not duplicate a
     fact already covered by a named field ... here") - FamilySearch's YAML mapping now
     targets this directly rather than a duplicate facts-array entry, so
@@ -293,7 +293,7 @@ def test_build_institution_note_empty_when_no_institution_fields_present():
 
 
 def test_institution_resident_gets_no_family_links_even_with_head_wife_roles():
-    """User-directed design (2026-08-21): a person enumerated at an institution gets no
+    """A person enumerated at an institution gets no
     family/spouse/parent-child links at all, just their own individual record - confirmed
     here by giving the pair explicit Head/Wife roles (which would normally link them) but
     marking one an institution resident, and asserting parse_household_relational treats
@@ -720,7 +720,7 @@ def test_dynamic_occupation_template_normalizes_raw_case():
 
 
 def test_dynamic_notes_exclude_citation_plumbing_columns():
-    """User-directed design (2026-08-21): the CENS fact's visible note must not duplicate
+    """The CENS fact's visible note must not duplicate
     citation/URL data already carried by the SOUR citation block and weblinks - Collection
     Name/Collection URL/RecordArk/PersonArk are plumbing columns, not genealogical facts
     about the person, and previously fell through build_dynamic_events_and_notes()'s
@@ -841,7 +841,7 @@ def test_canadian_and_historical_hbc_birthplaces_are_not_foreign():
 
 
 def test_parent_birthplace_appends_second_birt_fact_to_existing_father(tmp_path, monkeypatch):
-    """User-directed design (2026-08-21): FTHR_BIR_PLACE/MTHR_BIR_PLACE describe the
+    """FTHR_BIR_PLACE/MTHR_BIR_PLACE describe the
     child's own father/mother, not the child's own facts. When that parent was already
     extracted as a real person in the household, the birthplace must land as a SECOND,
     proposed-proof BIRT fact on the parent's own INDI record - not overriding the
@@ -920,7 +920,7 @@ def test_parent_birthplace_synthesizes_stub_parents_when_foreign_and_none_extrac
 
 
 def test_parent_birthplace_does_not_synthesize_a_person_for_domestic_birthplace(tmp_path, monkeypatch):
-    """User-directed refinement (2026-08-21): the 1950 census overwhelmingly records
+    """The 1950 census overwhelmingly records
     "United States" for domestic-born parents - creating a stub person for that ubiquitous,
     unremarkable answer would flood the tree with low-value records, so a synthetic parent
     is only created when the birthplace is foreign. A domestic birthplace with no already-
@@ -947,7 +947,7 @@ def test_parent_birthplace_does_not_synthesize_a_person_for_domestic_birthplace(
 
 
 def test_weeks_out_of_work_marks_unemployed_and_notes_the_weeks():
-    """User-directed design (2026-08-21): MISC_WEEKS_OUT_OF_WORK is folded into the
+    """MISC_WEEKS_OUT_OF_WORK is folded into the
     Occupation fact's "Unemployed" state rather than getting its own fact - a weeks-out-of-
     work count is inherently about this same occupation question, not a distinct historical
     event, and MISC_FLAG_EMPLOYED is deliberately not mapped at all since it would just be
@@ -961,7 +961,7 @@ def test_weeks_out_of_work_marks_unemployed_and_notes_the_weeks():
 
 
 def test_location_string_falls_back_to_residence_place_only_when_census_place_blank():
-    """User-directed design (2026-08-21): EVENT_RESIDENCE_PLACE is a backup for the census
+    """EVENT_RESIDENCE_PLACE is a backup for the census
     place only, used when the State/County/City breakdown that normally composes it is
     entirely blank - never its own separate fact, and never preferred over a real value."""
     from Census import get_location_string

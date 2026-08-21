@@ -312,7 +312,7 @@ test('fsPersonArkFromAttachments: safe when unsafeWindow or the attachments map 
     assert.equal(fsPersonArkFromAttachments('1:1:6F7Z-QJKR'), '');
 });
 
-// User-directed design (2026-08-21): matches by substring, not exact key equality - an
+// Matches by substring, not exact key equality - an
 // exact-match lookup kept failing live even for a person confirmed to have a real
 // attachment, because the stored key can carry more around the persona ark than a clean
 // extraction assumes (trailing path segments, a leading host/scheme, etc.).
