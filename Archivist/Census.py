@@ -205,8 +205,6 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     return lines
 
 
-
-
 _BUILTIN_SOURCE_TEMPLATES: Dict[int, List[str]] = {}
 
 
@@ -237,7 +235,7 @@ def load_source_template_lines(template_id: int) -> List[str]:
 
 
 def get_source_templates(template_ids_used: set) -> List[str]:
-    """Generates 0 _SRCTEMPLATE GEDCOM blocks for all referenced template IDs."""
+    """Generates 0 _STMPLT GEDCOM blocks for all referenced template IDs."""
     lines = []
     for tid in sorted(template_ids_used):
         t_lines = load_source_template_lines(tid)
@@ -859,10 +857,13 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
         # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
         # that's on the master SOUR record only.
-        cit.append("3 _TMPLT")
+        field_lines = []
         for f_name, f_val in detail_fields:
             if f_val:
-                cit.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
+                field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
+        if field_lines:
+            cit.append("3 _TMPLT")
+            cit.extend(field_lines)
 
         cit.append("3 DATA")
 

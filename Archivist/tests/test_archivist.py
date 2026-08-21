@@ -1222,6 +1222,7 @@ def test_rmst_element_to_gedcom_uses_stmplt_tag_vocabulary():
     assert "DETL " not in joined
     assert "LHNT " not in joined
 
+
 def test_general_profile_citation_detail_fields_wraps_in_tmplt():
     rec = {"record_id": "REC-1", "type_specific_fields": {}}
     part = {"std_given": "Marie", "std_surname": "Gagnon"}

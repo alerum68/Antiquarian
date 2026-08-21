@@ -555,7 +555,7 @@ def load_source_template_lines(template_id: int) -> List[str]:
 
 
 def get_source_templates(template_ids_used: set) -> List[str]:
-    """Generates 0 _SRCTEMPLATE GEDCOM blocks for all referenced template IDs."""
+    """Generates 0 _STMPLT GEDCOM blocks for all referenced template IDs."""
     lines = []
     for tid in sorted(template_ids_used):
         t_lines = load_source_template_lines(tid)

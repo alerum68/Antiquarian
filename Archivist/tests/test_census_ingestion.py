@@ -191,13 +191,13 @@ def test_relational_era_household_parsing_works_on_adapted_dataframe():
     assert not unrelated
 
 
-def test_gedcom_text_lines_splits_multiline_text_into_cont_lines():
+def test_gedcom_wrapped_lines_splits_multiline_text_into_cont_lines():
     """Real-world regression (2026-08-21): RootsMagic imported every source as Freeform
     instead of the intended template - traced to _rmst_element_to_gedcom() emitting
     multi-paragraph Description/Hint text (from the .rmst source) as a single GEDCOM line
     with raw embedded newlines. GEDCOM 5.5.1 requires every physical line to start with its
     own level+tag; a bare continuation line with no tag prefix is invalid and can make a
-    strict parser silently drop or abort the whole _SRCTEMPLATE record."""
+    strict parser silently drop or abort the whole _STMPLT record."""
     lines = arc._gedcom_wrapped_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
     assert lines == ["1 DESC First paragraph.", "2 CONT ", "2 CONT Second paragraph."]
     assert not any("\n" in ln for ln in lines)
