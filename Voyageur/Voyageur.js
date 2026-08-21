@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.38
+// @version      0.3.39
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1616,7 +1616,12 @@
             // then successfully stored a moment later, too late to help that row. These two
             // fields let buildFsItemData() await this response (see waitForFsAttachments
             // below) before building rows, not just fire in whatever order the two network
-            // calls happen to land in.
+            // calls happen to land in. __voyageurFsAttachmentsRequested is set the moment the
+            // outgoing request is observed (not when it resolves) - condition-based, not a
+            // fixed delay: a page where this endpoint is never called at all (most historical
+            // personas were never attached) skips waiting entirely instead of sitting through
+            // an arbitrary timeout for a response that was never coming.
+            unsafeWindow.__voyageurFsAttachmentsRequested = false;
             unsafeWindow.__voyageurFsAttachmentsArrived = false;
             unsafeWindow.__voyageurFsAttachmentsWaiters = [];
 
@@ -1690,6 +1695,9 @@
             const origFsXhrOpen = unsafeWindow.XMLHttpRequest.prototype.open;
             unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
                 this.__voyageurFsApiUrl = url;
+                if (url && url.includes(FS_ATTACHMENTS_TARGET)) {
+                    unsafeWindow.__voyageurFsAttachmentsRequested = true;
+                }
                 this.addEventListener('load', function () {
                     if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_API_TARGET)) {
                         storeFsApiResponse(this.__voyageurFsApiUrl, this.responseText);
@@ -1703,6 +1711,9 @@
             const origFsFetch = unsafeWindow.fetch;
             unsafeWindow.fetch = async function (...args) {
                 const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                if (url.includes(FS_ATTACHMENTS_TARGET)) {
+                    unsafeWindow.__voyageurFsAttachmentsRequested = true;
+                }
                 const resp = await origFsFetch.apply(this, args);
                 if (url.includes(FS_API_TARGET)) {
                     resp.clone().text().then((t) => storeFsApiResponse(url, t));
@@ -1714,12 +1725,25 @@
         }
 
         // Lets buildFsItemData() await this endpoint's response before building rows - see
-        // the note on __voyageurFsAttachmentsArrived above for why this matters. Resolves
-        // immediately if the response already arrived; otherwise waits up to timeoutMs (this
-        // endpoint fires automatically alongside the orchestration API call, so it should
-        // normally resolve almost as fast) before giving up, so a page where it genuinely
-        // never fires doesn't stall the gather.
-        async function waitForFsAttachments({timeoutMs = 4000} = {}) {
+        // the note on __voyageurFsAttachmentsArrived above for why this matters. Condition-
+        // based, not a fixed delay: gated on whether the request was actually observed at
+        // all (most historical personas were never attached, so most pages never call this
+        // endpoint), not on a blind timeout. requestGraceMs only covers the narrow window
+        // where the orchestration API response (which this function is awaited right after)
+        // and the attachments request can be dispatched within the same tick - real
+        // uncertainty about dispatch ORDER, not about whether the response has arrived yet
+        // (that part is resolved eagerly the instant it lands, via the waiters array, not
+        // polled). timeoutMs is a last-resort ceiling for a request that was genuinely
+        // observed but never got a response (network failure, backgrounded tab) - the same
+        // accepted pattern waitForFsApiResponse already uses for its own network wait.
+        async function waitForFsAttachments({timeoutMs = 3000, requestGraceMs = 300} = {}) {
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) return;
+
+            if (!unsafeWindow.__voyageurFsAttachmentsRequested) {
+                await new Promise((resolve) => setTimeout(resolve, requestGraceMs));
+                if (!unsafeWindow.__voyageurFsAttachmentsRequested) return;
+            }
+
             if (unsafeWindow.__voyageurFsAttachmentsArrived) return;
             await new Promise((resolve) => {
                 const timer = setTimeout(resolve, timeoutMs);
