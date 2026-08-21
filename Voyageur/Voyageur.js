@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.37
+// @version      0.3.38
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -1606,6 +1606,19 @@
             // never attached to a Tree profile by anyone; absence is the common case, not
             // an error.
             unsafeWindow.__voyageurFsAttachments = {};
+            // Confirmed live 2026-08-21 (console capture across a real multi-image gather):
+            // this endpoint's response routinely arrives AFTER the orchestration API's own
+            // response for the same image - fsBuildRowsFromApiResponse() runs as soon as the
+            // (usually faster) orchestration response lands and calls
+            // fsPersonArkFromAttachments() synchronously right then, so it was reading this
+            // map before the correct entityId had even been stored - a real, confirmed
+            // person_ark (e.g. Jess G Crowston's KLBM-H9P) was found empty at row-build time,
+            // then successfully stored a moment later, too late to help that row. These two
+            // fields let buildFsItemData() await this response (see waitForFsAttachments
+            // below) before building rows, not just fire in whatever order the two network
+            // calls happen to land in.
+            unsafeWindow.__voyageurFsAttachmentsArrived = false;
+            unsafeWindow.__voyageurFsAttachmentsWaiters = [];
 
             const FS_API_TARGET = '/service/records/volunteer/orchestration/sls/image/';
             const FS_ATTACHMENTS_TARGET = '/service/tree/links/sources/attachments';
@@ -1664,6 +1677,13 @@
                     // Leave unset - a true person_ark simply won't be found for any ark in
                     // this batch, matching the "don't fabricate" convention everywhere else.
                     console.log('[Voyageur FS ARK] failed to parse attachments response:', e);
+                } finally {
+                    // Resolve even on a parse failure - "a response arrived (however
+                    // unusable)" is still the correct signal to stop waitForFsAttachments()
+                    // from blocking on a reply that already came and went.
+                    unsafeWindow.__voyageurFsAttachmentsArrived = true;
+                    const waiters = unsafeWindow.__voyageurFsAttachmentsWaiters.splice(0);
+                    waiters.forEach((resolve) => resolve());
                 }
             }
 
@@ -1691,6 +1711,23 @@
                 }
                 return resp;
             };
+        }
+
+        // Lets buildFsItemData() await this endpoint's response before building rows - see
+        // the note on __voyageurFsAttachmentsArrived above for why this matters. Resolves
+        // immediately if the response already arrived; otherwise waits up to timeoutMs (this
+        // endpoint fires automatically alongside the orchestration API call, so it should
+        // normally resolve almost as fast) before giving up, so a page where it genuinely
+        // never fires doesn't stall the gather.
+        async function waitForFsAttachments({timeoutMs = 4000} = {}) {
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) return;
+            await new Promise((resolve) => {
+                const timer = setTimeout(resolve, timeoutMs);
+                unsafeWindow.__voyageurFsAttachmentsWaiters.push(() => {
+                    clearTimeout(timer);
+                    resolve();
+                });
+            });
         }
 
         // Instant resolution if the response already arrived before this was called (the API
@@ -1957,6 +1994,12 @@
             } else if (pageType === 'names') {
                 const apiWait = await waitForFsApiResponse(itemId);
                 if (apiWait.result) {
+                    // Confirmed live 2026-08-21: the attachments response for THIS image
+                    // routinely arrives after the (usually faster) orchestration API response
+                    // above - building rows immediately would read person_ark before it had
+                    // been stored. Wait for it here so fsBuildRowsFromApiResponse's own
+                    // fsPersonArkFromAttachments() calls see it in time.
+                    await waitForFsAttachments();
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
                     const byId = buildFsElementIndex(apiWait.result);
                     const primaryPerson = (apiWait.result.elements || []).find((e) => e.elementType === 'PERSON' && e.primary);
