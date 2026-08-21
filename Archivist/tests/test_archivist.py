@@ -1164,3 +1164,56 @@ def test_build_individual_skips_unknown_fact_type_gracefully():
     joined = "\n".join(lines)
 
     assert "irrelevant" not in joined
+
+
+def test_gedcom_wrapped_lines_cont_on_paragraph_break():
+    lines = Census._gedcom_wrapped_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
+    assert lines[0] == "1 DESC First paragraph."
+    assert lines[1] == "2 CONT "
+    assert lines[2] == "2 CONT Second paragraph."
+
+
+def test_gedcom_wrapped_lines_conc_on_long_line():
+    long_text = "A" * 250
+    lines = Census._gedcom_wrapped_lines(1, "FOOTNOTE", long_text, max_len=200)
+    assert lines[0] == f"1 FOOTNOTE {'A' * 200}"
+    assert lines[1] == f"2 CONC {'A' * 50}"
+
+
+def test_rmst_element_to_gedcom_uses_stmplt_tag_vocabulary():
+    import lxml.etree as etree
+    xml = etree.fromstring("""
+    <Template Id="99999">
+      <Name>!Test Template</Name>
+      <Description>A description.</Description>
+      <Category>Test Category</Category>
+      <Footnote>Footnote text.</Footnote>
+      <ShortFootnote>Short text.</ShortFootnote>
+      <Bibliography>Bibliography text.</Bibliography>
+      <Field>
+        <Type>Text</Type>
+        <Name>TestField</Name>
+        <Display>Test Field</Display>
+        <Hint>a hint</Hint>
+        <Detail>True</Detail>
+        <LongHint>a long hint</LongHint>
+      </Field>
+    </Template>
+    """)
+    lines = Census._rmst_element_to_gedcom(xml)
+    joined = "\n".join(lines)
+    assert "0 _STMPLT" in joined
+    assert "_SRCTEMPLATE" not in joined
+    assert "1 TID 99999" in joined
+    assert "1 NAME !Test Template" in joined
+    assert "1 FOOTNOTE Footnote text." in joined
+    assert "1 BIBLIO Bibliography text." in joined
+    assert "2 DISPLAY Test Field" in joined
+    assert "2 LONGHINT a long hint" in joined
+    assert "2 TYPE TEXT" in joined
+    assert "2 ISDETAIL Y" in joined
+    assert "FOOT " not in joined
+    assert "BIBL " not in joined
+    assert "DISP " not in joined
+    assert "DETL " not in joined
+    assert "LHNT " not in joined
