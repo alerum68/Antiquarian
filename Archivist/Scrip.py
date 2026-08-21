@@ -186,8 +186,14 @@ def select_scrip_template_id(commission_reference: str, document_type: str,
 def resolve_scrip_template_id(rec: dict) -> Optional[int]:
     """Resolves the template ID for a single Scrip record."""
     tf = rec.get('type_specific_fields') or {}
+    doc_type = tf.get('document_type')
+    if not doc_type:
+        for doc in rec.get('source_documents') or []:
+            doc_type = doc.get('document_type')
+            if doc_type:
+                break
     return select_scrip_template_id(
-        tf.get('commission_reference'), tf.get('document_type'), tf.get('rg_series_code'), _scrip_record_year(rec)
+        tf.get('commission_reference'), doc_type, tf.get('rg_series_code'), _scrip_record_year(rec)
     )
 
 

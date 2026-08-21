@@ -1263,3 +1263,11 @@ def test_master_template_fields_match_rmst():
     for f in ('Author', 'Role', 'BookTitle', 'Subtitle', 'Title'):
         assert f in tpl['master_fields'], f"missing {f}"
     assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_resolve_scrip_template_id_checks_source_documents_document_type():
+    rec = {
+        "type_specific_fields": {},
+        "source_documents": [{"document_type": "Scrip Certificate"}],
+    }
+    assert Scrip.resolve_scrip_template_id(rec) == 20004
