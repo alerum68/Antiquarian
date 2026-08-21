@@ -399,7 +399,12 @@ def test_two_unrelated_households_on_one_page_stay_separate():
     assert {r["type_specific_fields"]["family_number"] for r in records} == {"5", "6"}
 
 
-def test_unmapped_column_is_preserved_and_flags_for_review():
+def test_unmapped_column_is_preserved_but_no_longer_flags_for_review():
+    """2026-08-21: an unmapped column no longer triggers review - with raw-passthrough
+    extraction, most people legitimately have several unmapped fields (metadata, office-use
+    codes, etc.) as the normal, expected case, not an anomaly. The data must still be fully
+    preserved (never dropped), just without flagging every participant/record for review
+    over routine, expected gaps."""
     raw = {
         "census_year": "1900", "location": "Minnesota",
         "pages": [_page([
@@ -411,11 +416,11 @@ def test_unmapped_column_is_preserved_and_flags_for_review():
     doc = census_schema.normalize_census_pages(raw, "ancestry_census", "1900 US Census", "Census_1900")
     participant = doc["sheets"][0]["records"][0]["participants"][0]
 
-    assert participant["review"] is True
+    assert participant["review"] is False
     assert "Some Brand New Column Ancestry Just Added" in participant["type_specific_fields"]["unmapped"]
     unmapped = participant["type_specific_fields"]["unmapped"]
     assert unmapped["Some Brand New Column Ancestry Just Added"] == "mystery value"
-    assert doc["sheets"][0]["records"][0]["review"] is True
+    assert doc["sheets"][0]["records"][0]["review"] is False
 
 
 def test_recognized_extra_columns_become_typed_facts_not_flagged_for_review():

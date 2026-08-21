@@ -223,12 +223,17 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
         if person.get(passthrough_key):
             participant["type_specific_fields"][passthrough_key] = person[passthrough_key]
 
+    # 2026-08-21: an unmapped column is no longer treated as something needing human
+    # review - with raw-passthrough extraction (Voyageur.js fsRawFieldsFromApiPerson/
+    # fsRawFieldsFromImageIndexPerson), most people legitimately have several unmapped
+    # fields (metadata, office-use codes, etc. - see field_maps/familysearch_census.yaml's
+    # own comments on what's deliberately not mapped) as the normal, expected case, not an
+    # anomaly. The data is still fully preserved here, just without flagging every single
+    # participant (and, via record_review below, every record) for review over routine,
+    # expected gaps.
     unmapped = {k: v for k, v in columns.items() if k not in consumed and str(v).strip()}
     if unmapped:
         participant["type_specific_fields"]["unmapped"] = unmapped
-        participant["review"] = True
-        participant["review_reason"] = ("Unmapped column(s), preserved but not normalized: "
-                                        + ", ".join(sorted(unmapped)))
         unmapped_seen.update(unmapped.keys())
 
     if not participant["std_given"]:
