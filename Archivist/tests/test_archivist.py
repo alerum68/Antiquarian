@@ -563,6 +563,23 @@ def test_build_individual_fsftid_gets_companion_fs_tree_weblink():
     assert "1 _LINK https://www.familysearch.org/tree/person/details/LZXY-ABC" in joined_ftm
 
 
+def test_build_individual_apid_is_individual_level_not_nested_in_citation(monkeypatch):
+    """_APID is an individual-level GEDCOM tag (FTM/RM both expect it directly on the INDI
+    record, same as _FSFTID above), never nested inside a per-fact SOUR citation -
+    build_individual must emit exactly one '1 _APID ...' line, and build_general_citation
+    must never emit a '3 _APID' (the old, incorrect citation-nested placement)."""
+    monkeypatch.setattr(Utils, "APID_DB", "2442")
+    rec = {"event_type": "Burial", "page": "12", "record_id": "S-2", "participants": [
+        make_participant("primary", given="Baptiste", surname="Ledoux"),
+    ]}
+    primary = dict(rec["participants"][0], type_specific_fields={"apid": "105307051"})
+    rec["participants"][0] = primary  # type: ignore
+
+    lines, _, _, _ = General.build_individual("I1", rec, primary, "12", "M0000000001", "27 JUL 2026", False, "RM")
+    apid_lines = [ln for ln in lines if "_APID" in ln]
+    assert apid_lines == ["1 _APID 1,2442::105307051"], apid_lines
+
+
 # noinspection DuplicatedCode
 def test_build_family_baptism_shape_single_famc_no_suffix():
     rec = {"event_type": "Baptism", "page": "1", "record_id": "B-1", "participants": [

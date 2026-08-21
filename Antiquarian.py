@@ -222,7 +222,7 @@ PATH_PICKER_FIELDS = {
     "RM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "FTM_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "MEDIA_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
-    "JSON_DIR": {"kind": "directory", "base_dir_key": TOOLBOX_DIR_SENTINEL},
+    "JSON_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "GEDCOM_OUTPUT_PATH": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
     "PROMPTS_DIR": {"kind": "directory", "base_dir_key": GENEALOGY_DIR_SENTINEL},
 }
@@ -761,15 +761,6 @@ class Antiquarian(ctk.CTk):
         self._build_layout()
         self._load_env_to_vars()
 
-        # Ensure required internal data directories exist in the target working path
-        # before any downstream tools attempt to read or write to them.
-        prog_dir_var = self.string_vars.get("GENEALOGY_DIR")
-        if prog_dir_var:
-            prog_dir = prog_dir_var.get().strip()
-            if prog_dir:
-                for sub in ["Media", "JSON", "GEDCOM", "Prompts"]:
-                    os.makedirs(os.path.join(prog_dir, sub), exist_ok=True)
-
         # Force a geometry update before building the first tab.
         # This fixes a known CustomTkinter bug where CTkScrollableFrame
         # crashes with a math error if drawn before the window has a height.
@@ -1156,6 +1147,17 @@ class Antiquarian(ctk.CTk):
                 for key in fields.keys():
                     updates[key] = self.string_vars[key].get().replace('\\', '/')
             batch_set_env(env_path, updates)
+
+        # Now that the user has deliberately chosen their paths, materialise the Prompts
+        # folder so they know they can drop custom .pmt files there. All other data
+        # directories (Media, JSON, GEDCOM) are created on first use by the tools themselves.
+        gen_var = self.string_vars.get("GENEALOGY_DIR")
+        gen_dir = gen_var.get().strip() if gen_var else ""
+        prompts_var = self.string_vars.get("PROMPTS_DIR")
+        prompts_subdir = (prompts_var.get().strip() if prompts_var else "") or "Prompts"
+        if gen_dir:
+            os.makedirs(os.path.join(gen_dir, prompts_subdir), exist_ok=True)
+
         self.console.put("\n[System] Environment variables saved (global settings to the root .env, "
                          "each tool's settings to its own subfolder).\n")
 

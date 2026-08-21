@@ -180,6 +180,14 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
                 and isinstance(val, str)
             ):
                 val = capitalize_text_string(val)
+            # Commissioner's Participant.sex is Literal["M", "F", "U"] - FamilySearch's raw
+            # SEX_CODE value is the full word ("Male"/"Female", confirmed live 2026-08-20),
+            # which fails that validation unconverted. This is a value-format fix required
+            # for schema compliance, not the field-renaming/curation the raw-passthrough
+            # design forbids at extraction time - extraction still passes the raw word
+            # through untouched; this conversion happens only here, at GEDCOM-mapping time.
+            if target == "sex" and isinstance(val, str):
+                val = {"MALE": "M", "M": "M", "FEMALE": "F", "F": "F"}.get(val.strip().upper(), "U")
             if target.startswith("type_specific_fields."):
                 participant["type_specific_fields"][target.split(".", 1)[1]] = val
             else:
@@ -206,18 +214,26 @@ def _normalize_participant(person: dict, field_map: Dict[str, Dict[str, str]],
 
     # Whatever this person's own identifiers already carry (pid/fsftid/etc.) is preserved
     # as-is, not treated as an unmapped column - it never came from `columns` in the
-    # first place.
-    for passthrough_key in ("pid", "extracted_url", "fsftid", "person_ark", "familysearch_url",
-                            "alternate_birth_places"):
+    # first place. record_ark (this persona's record-scoped id, always present) and
+    # person_ark (a true enduring Family Tree identifier, only when one was actually
+    # found - see docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4) are
+    # genuinely distinct fields as of 2026-08-20 - both pass through independently.
+    for passthrough_key in ("pid", "extracted_url", "fsftid", "record_ark", "person_ark",
+                            "familysearch_url", "alternate_birth_places"):
         if person.get(passthrough_key):
             participant["type_specific_fields"][passthrough_key] = person[passthrough_key]
 
+    # 2026-08-21: an unmapped column is no longer treated as something needing human
+    # review - with raw-passthrough extraction (Voyageur.js fsRawFieldsFromApiPerson/
+    # fsRawFieldsFromImageIndexPerson), most people legitimately have several unmapped
+    # fields (metadata, office-use codes, etc. - see field_maps/familysearch_census.yaml's
+    # own comments on what's deliberately not mapped) as the normal, expected case, not an
+    # anomaly. The data is still fully preserved here, just without flagging every single
+    # participant (and, via record_review below, every record) for review over routine,
+    # expected gaps.
     unmapped = {k: v for k, v in columns.items() if k not in consumed and str(v).strip()}
     if unmapped:
         participant["type_specific_fields"]["unmapped"] = unmapped
-        participant["review"] = True
-        participant["review_reason"] = ("Unmapped column(s), preserved but not normalized: "
-                                        + ", ".join(sorted(unmapped)))
         unmapped_seen.update(unmapped.keys())
 
     if not participant["std_given"]:

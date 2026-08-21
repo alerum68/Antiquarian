@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { placesMatch, saveReloadState, loadReloadState, clearReloadState } = require('./harness.js');
+const {
+    placesMatch, saveReloadState, loadReloadState, clearReloadState,
+    markFsRunStopped, isFsRunStopped, clearFsRunStopped,
+} = require('./harness.js');
 
 test('placesMatch: identical place tuples match', () => {
     const a = {state: 'Dakota Territory', county: 'Pembina', city: 'Not Stated', enumeration_district: '076'};
@@ -71,4 +74,39 @@ test('reload state: clearReloadState removes saved state', () => {
 
     clearReloadState();
     assert.equal(loadReloadState(), null);
+});
+
+// Regression: a goToNextImage() navigation already in flight when Stop is clicked can land
+// after stopBatch() already ran on the old page - too late for that page's own
+// history.replaceState() URL-strip to affect a navigation already committed to a URL built
+// while mgs_auto=1 was still present. This sessionStorage-backed flag is the fallback that
+// still blocks shouldAutoStart on that later landing. See FS_STOPPED_RUNS_KEY's own note.
+test('FS stopped-run tracking: isFsRunStopped is false before any stop is marked', () => {
+    globalThis.sessionStorage._store = {};
+    assert.equal(isFsRunStopped('run-abc'), false);
+});
+
+test('FS stopped-run tracking: markFsRunStopped makes isFsRunStopped true for that run only', () => {
+    globalThis.sessionStorage._store = {};
+    markFsRunStopped('run-abc');
+    assert.equal(isFsRunStopped('run-abc'), true);
+    assert.equal(isFsRunStopped('run-xyz'), false);
+});
+
+test('FS stopped-run tracking: clearFsRunStopped un-blocks a deliberate restart of the same run', () => {
+    globalThis.sessionStorage._store = {};
+    markFsRunStopped('run-abc');
+    clearFsRunStopped('run-abc');
+    assert.equal(isFsRunStopped('run-abc'), false);
+});
+
+test('FS stopped-run tracking: multiple runs tracked independently', () => {
+    globalThis.sessionStorage._store = {};
+    markFsRunStopped('run-1');
+    markFsRunStopped('run-2');
+    assert.equal(isFsRunStopped('run-1'), true);
+    assert.equal(isFsRunStopped('run-2'), true);
+    clearFsRunStopped('run-1');
+    assert.equal(isFsRunStopped('run-1'), false);
+    assert.equal(isFsRunStopped('run-2'), true);
 });

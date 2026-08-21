@@ -10,8 +10,8 @@ from dotenv import load_dotenv
 
 import census_schema
 from _gather_helpers import (
-    census_collection_folder_name,
     cleanup_checkpoint_files,
+    extract_census_image_routing_fields,
     find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
@@ -113,28 +113,23 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
             print(f"[System] Recovered run {run_id}: {final_name} already exists in Project folder, "
                   f"discarding the stale copy (images below are still recovered).")
 
-        stem_parts = recovered_json.stem.split(' - ', 1)
-        census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
-        raw_location = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-        location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
         # Best-effort only, matching this function's own header-normalization-skipped
-        # philosophy (see docstring) - a recovered run's own dbid/country weren't
-        # reliably known even before this fix; opportunistically read them back from
-        # whatever JSON shape actually landed, falling back to the generic default
-        # (census_collection_folder_name()'s own blank-country handling) rather than
-        # guessing when the file isn't in the expected shape.
-        collection_name, country = "", ""
+        # philosophy (see docstring) - opportunistically read routing fields back from
+        # whatever JSON shape actually landed, falling back to empty/generic defaults
+        # rather than guessing when the file isn't in the expected shape. The routing-field
+        # extraction stays inside this same try: a recovered file can parse as valid JSON
+        # yet have an unexpected shape (e.g. a non-dict sheet/record), which must fall back
+        # the same as a read/parse failure, not crash main() before the gather even starts.
+        census_year, country, location_folder = "", "", ""
         try:
             with open(recovered_json, "r", encoding="utf-8") as f:
                 recovered_data = json.load(f)
-            collection_name = recovered_data.get("citation", {}).get("collection_name", "")
-            country = next(
-                (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
-                 for s in recovered_data.get("sheets", []) if s.get("records")), "")
-        except (OSError, json.JSONDecodeError, IndexError, AttributeError):
+            census_year, country, location_folder, _ = \
+                extract_census_image_routing_fields(recovered_data)
+        except (OSError, json.JSONDecodeError, AttributeError, IndexError, TypeError):
             pass
-        census_folder = census_collection_folder_name(census_year, country, collection_name)
-        img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
+        img_target_dir = resolve_census_image_dir(
+            "Census", genealogy_dir, census_year, country, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
             downloads_dir, f"TMP_A_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
@@ -218,22 +213,33 @@ def main() -> Path:
     # json_status == "skipped": that means an existing final_json was kept as-is (collision
     # policy), and it was already normalized whenever it was first produced - leaving it
     # untouched is what "skip" is supposed to mean.
-    # Real collection_name/country for the image-folder name below (see
-    # census_collection_folder_name()) - read from the gather itself, never hardcoded.
-    # Only available when this run actually normalized the data (json_status ==
-    # "moved"); a "skipped" run kept an existing file as-is and never re-read it, so the
-    # folder-name helper's own generic fallback (blank collection_name/country) applies
-    # instead - a rare edge case, since a fresh gather almost always produces "moved".
-    collection_name, country = "", ""
+    # Real country for the image-folder path below (see resolve_census_image_dir()) - read
+    # from the gather itself, never hardcoded. Only available when this run actually
+    # normalized the data (json_status == "moved"); a "skipped" run kept an existing file
+    # as-is and never re-read it, so country comes back blank instead - a rare edge case,
+    # since a fresh gather almost always produces "moved".
     if json_status == "moved":
         with open(final_json, "r", encoding="utf-8") as f:
             raw_gather = json.load(f)
         print_incomplete_pages_warning(raw_gather.get("incomplete_pages", []), "page(s)")
         normalized = normalize_ancestry_census_gather(raw_gather, dbid)
+
+        from _gather_helpers import build_detailed_census_filename
+        clean_name = build_detailed_census_filename(raw_gather.get("census_year", ""), normalized, "Ancestry")
+        if clean_name:
+            new_final_json = final_json.with_name(clean_name)
+            if new_final_json != final_json:
+                final_json.replace(new_final_json)
+                final_json = new_final_json
+
         with open(final_json, "w", encoding="utf-8") as f:
             json.dump(normalized, f, indent=2, ensure_ascii=False)
-        collection_name = normalized.get("citation", {}).get("collection_name", "")
-        country = next((p.get("country", "") for p in raw_gather.get("pages", [])), "")
+    else:
+        try:
+            with open(final_json, "r", encoding="utf-8") as f:
+                normalized = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            normalized = {}
 
     # Persist this as the JSON_FILE setting immediately, before anything below (the image
     # move) can fail - so even if that fails, Archivist's "Generate GEDCOM" (the manual/retry
@@ -246,12 +252,8 @@ def main() -> Path:
     # never reads at all.
     write_archivist_json_file(final_json.name)
 
-    stem_parts = final_json.stem.split(' - ', 1)
-    census_year = stem_parts[0].strip() if len(stem_parts) > 0 else "Unknown_Year"
-    raw_location = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-
-    location_folder = re.sub(r'^USA\s*-\s*', '', raw_location)
-    census_folder = census_collection_folder_name(census_year, country, collection_name)
+    census_year, country, location_folder, _ = \
+        extract_census_image_routing_fields(normalized)
 
     # CENSUS_IMAGE_DIR is a subfolder *of the Base Media Directory* (MEDIA_DIR), not of
     # PROGRAM_DIR directly. Resolved here independently (rather than relying on
@@ -259,7 +261,8 @@ def main() -> Path:
     # as a subprocess) so this script produces correct output standalone, with nothing
     # else open. An already-absolute CENSUS_IMAGE_DIR (whether GUI-resolved or set
     # directly by the user) is used as-is, never re-nested.
-    img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
+    img_target_dir = resolve_census_image_dir(
+        base_img_setting, genealogy_dir, census_year, country, location_folder)
 
     img_moved, img_skipped, img_failed = move_downloaded_images(
         downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)

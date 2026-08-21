@@ -15,7 +15,9 @@ import sys
 import threading
 import time
 import webbrowser
+from collections import Counter
 from pathlib import Path
+from typing import Optional
 
 from dotenv import set_key
 from watchdog.events import FileSystemEventHandler
@@ -108,6 +110,38 @@ def find_orphaned_gather_runs(downloads_dir: Path, source_prefix: str,
             else:
                 entry['final'] = p
     return runs
+
+
+def build_detailed_census_filename(year: str, normalized_data: dict, provider: str) -> Optional[str]:
+    """Builds a '(Year) Census - (Country) - (State) - (County) - (City, township, ED) - (Provider).json'
+    filename matching the specific request."""
+    prov_abbr = "ANC" if provider.lower() == "ancestry" else (
+        "FS" if provider.lower() in ("familysearch", "fs") else provider)
+
+    for sheet in normalized_data.get("sheets", []):
+        for record in sheet.get("records", []):
+            fields = record.get("type_specific_fields", {}) or {}
+            parts = [f"Census-{year}" if year else "Census"]
+            if fields.get("country"):
+                parts.append(fields["country"])
+            if fields.get("state"):
+                parts.append(fields["state"])
+            if fields.get("county"):
+                parts.append(fields["county"])
+
+            if fields.get("city"):
+                parts.append(fields["city"])
+            if fields.get("enumeration_district"):
+                parts.append(fields["enumeration_district"])
+
+            if prov_abbr:
+                parts.append(prov_abbr)
+
+            if len(parts) > 1:
+                safe = "-".join(parts)
+                safe = re.sub(r'[/\\?%*:|"<>]', "-", safe).strip()
+                return f"{safe}.json"
+    return None
 
 
 def build_gather_launch_url(url: str, run_id: str) -> str:
@@ -244,42 +278,72 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     return len(moved), skipped, final_failed_names
 
 
-def sanitize_for_path_segment(text: str) -> str:
-    """Strips only the characters Windows genuinely forbids in a path segment
-    (`< > : " / \\ | ? *`), preserving spaces/commas/etc. for readability - same
-    character class FS.py's own build_clean_census_filename() already uses for the
-    equivalent problem (a live site's free-text collection name becoming a folder/file
-    name), reused here for consistency rather than a second, differently-scoped
-    sanitizer."""
-    return re.sub(r'[/\\?%*:|"<>]', "-", text).strip()
+def _mode_or_first(values: list) -> str:
+    """Most common non-blank value, falling back to the first non-blank one on a tie
+    (Counter.most_common's own tie-break: insertion order) - never the empty string as long
+    as at least one real value exists."""
+    counts = Counter(v for v in values if v)
+    return counts.most_common(1)[0][0] if counts else ""
 
 
-def census_collection_folder_name(census_year: str, country: str, collection_name: str = "") -> str:
-    """Builds the image-folder name shared by A.py's and FS.py's own
-    main()/_recover_orphaned_runs() image-saving paths, and read back by
-    Archivist/Census.py's own nested_dir lookup - the single source of truth for this
-    string so all call sites stay in sync.
+def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str, str]:
+    """Extracts (census_year, country, location_folder, collection_name) from a normalised
+    gather dict (output of normalize_*_census_gather). Used by both FS.py and A.py to
+    route images without re-parsing the filename.
 
-    Prefers the gather's own real collection_name (Ancestry: the citation text
-    scrapeSourceCitation() captures; FamilySearch: FS's own collection_title, e.g.
-    "United States, Census, 1860") when available - the actual source name beats a
-    generated label, and needs no country-detection logic of its own to be correct for
-    any country. Falls back to "{year} {country} Census" only when no real
-    collection_name was captured for this gather. country is whatever the gather itself
-    recorded (Ancestry: Voyageur.js's ancestryCountryFromState(); FamilySearch: FS.py's
-    own "canada" in collection_title.lower() check), plugged in directly - never a fixed
-    US-or-Canada choice, so any country this project ever gathers is handled the same
-    way with no country list to maintain; defaults to "USA" (this project's
-    long-standing default) only when country is absent/unrecognized. Confirmed live
-    (2026-08-15, dbId 1578, Ontario) that the old unconditional "US Federal Census"
-    folder name mislabeled every non-US gather."""
-    if collection_name:
-        return sanitize_for_path_segment(collection_name)
-    return f"{census_year} {country or 'USA'} Census"
+    State/county/city are each the most common non-blank
+    value across ALL records, not just the first one - confirmed live this was a real bug,
+    not a hypothetical: a real 1950 Pembina, ND gather had its very first record's own
+    'state' field read "Advance" (a citation-parsing artifact for that one record) while the
+    true majority of records correctly said "North Dakota" - routing every image by the
+    first record alone sent them all into a one-off "Advance" folder that didn't match what
+    Archivist/Census.py's own get_json_fallback() (already mode-based) put in the GEDCOM,
+    producing a FILE reference to a folder the images were never actually saved in. Same
+    fix as that function's own reasoning, applied consistently here too.
+
+    location_folder is built as 'state - county - city - ED' (each segment omitted when
+    blank) matching the ' - ' split resolve_census_image_dir uses internally. Nests
+    one level past city, down to the enumeration district - a
+    single city/township can span several EDs, so ED is the level that actually
+    disambiguates one image set from another within it."""
+    census_year = ""
+    countries: list = []
+    states: list = []
+    counties: list = []
+    cities: list = []
+    eds: list = []
+    for sheet in final_data.get("sheets", []):
+        for record in sheet.get("records", []) or []:
+            record = record or {}
+            if not census_year:
+                # normalize_census_pages() stores year on the record itself (a sibling of
+                # type_specific_fields), not inside type_specific_fields - see census_schema.py.
+                census_year = record.get("year", "") or ""
+            fields = record.get("type_specific_fields", {}) or {}
+            countries.append(fields.get("country", ""))
+            states.append(fields.get("state", ""))
+            counties.append(fields.get("county", ""))
+            cities.append(fields.get("city", ""))
+            eds.append(fields.get("enumeration_district", ""))
+
+    country = _mode_or_first(countries)
+    location_parts = [_mode_or_first(states), _mode_or_first(counties), _mode_or_first(cities),
+                      _mode_or_first(eds)]
+    location_folder = " - ".join(p for p in location_parts if p)
+    collection_name = final_data.get("citation", {}).get("collection_name", "") or ""
+    return census_year, country, location_folder, collection_name
 
 
-def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_folder: str,
-                             location_folder: str) -> Path:
+def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str,
+                             year: str, country: str, location_folder: str) -> Path:
+    """Resolves the image target directory for a census gather.
+
+    Path structure: <base_img_dir>/<country>/<year>/<location_parts...>, matching the
+    project's Media\\Census\\Country\\Year\\State\\County\\City\\ convention (see
+    docs/plans/2026-08-17-media-directory-structure.md) - no separate collection-name
+    wrapper folder; country and year are each skipped when blank, then location_folder is
+    split on ' - ' to form the remaining leaf segments.
+    """
     if os.path.isabs(base_img_setting):
         base_img_dir = Path(base_img_setting)
     else:
@@ -287,14 +351,17 @@ def resolve_census_image_dir(base_img_setting: str, genealogy_dir: str, census_f
         base_media_dir = Path(media_setting) if os.path.isabs(media_setting) else (
             Path(genealogy_dir) / media_setting if genealogy_dir else Path(media_setting))
         base_img_dir = base_media_dir / base_img_setting
-    # location_folder arrives as a single " - "-joined string (e.g. "Ontario - Frontenac
-    # - Rockwood Lunatic Asylum", state - county - city) - nest each real segment as its
-    # own subfolder (State\County\City) rather than one folder literally named with
-    # embedded " - " text, e.g. "1880 USA Census\Michigan\Kent County" not
-    # "1880 USA Census\Kent County, Michigan".
+
+    parts = []
+    if country:
+        parts.append(country)
+    if year:
+        parts.append(year)
+
     location_parts = [p.strip() for p in location_folder.split(' - ') if p.strip()]
-    img_target_dir = base_img_dir.joinpath(census_folder, *location_parts) if location_parts \
-        else base_img_dir / census_folder
+    parts.extend(location_parts)
+
+    img_target_dir = base_img_dir.joinpath(*parts) if parts else base_img_dir
     img_target_dir.mkdir(parents=True, exist_ok=True)
     return img_target_dir
 

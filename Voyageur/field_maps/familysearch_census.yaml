@@ -19,6 +19,13 @@ participant_fields:
   "Birth Place": birth_place
   "Birthplace": birth_place
   "Race": race
+  # Occupation belongs in the participant's own named
+  # 'occupation' field, not a duplicate participant_facts/facts-array entry - Commissioner's
+  # own Participant.facts docstring says as much: "do not duplicate a fact already covered
+  # by a named field (occupation, birth_date, etc.) here." Archivist/Census.py promotes
+  # p.get('occupation') straight to the 'Occupation' DataFrame column.
+  "Occupation": occupation
+  "OCCUPATION": occupation
   "Relationship to Head": role_name
   "Relationship to Head of Household": role_name
   "Relationship": role_name
@@ -30,8 +37,140 @@ participant_fields:
   # overwrite, not a combine, so guessing it onto marital_status risks silently
   # clobbering a genuine "Marital Status" column's value.
 
+  # --- FamilySearch orchestration-API raw field names (2026-08-20 real 1950 census
+  # capture, run 2e93366f, 339 people, 71 distinct fields) - the JS extraction layer
+  # (Voyageur.js fsRawFieldsFromApiPerson) no longer curates/renames at extraction time,
+  # so raw FamilySearch vocabulary reaches this map directly. Verified against
+  # docs/plans/2026-08-20-familysearch-viewer-rebuild.md's "Task 3 remaining work" -
+  # only the entries confirmed to reach real GEDCOM output (grep of Census.py's own
+  # row.get(...) calls) are mapped here; see that plan doc's open-questions list for
+  # everything NOT yet mapped (marital status, citizenship, institution/group-quarters
+  # fields, the cryptic MISC_CODE_A/B/C/C1/C2_1950_CENSUS supplementary codes, etc.) -
+  # those are preserved safely under type_specific_fields.unmapped, not lost, just not
+  # yet wired to a GEDCOM tag pending user confirmation of their meaning.
+  "NAME_GIVEN": std_given
+  "NAME_SURNAME": std_surname
+  "SEX_CODE": sex   # raw value is "Male"/"Female" - census_schema.py normalizes to M/F/U
+  "AGE": age
+  "RACE_OR_COLOR": race
+  "RELATIONSHIP_TO_HEAD": role_name
+  "EVENT_BIRTH_PLACE": birth_place
+  "SOURCE_LINE_NBR": type_specific_fields.line_number
+
+  # get_occupation_value() (Archivist/Census.py) reads 'Industry'/'Occupation Category'/
+  # 'Class of Worker'/'Hours Worked'/'Weeks Worked'/'Seeking Work'/'Attended School' as
+  # DataFrame columns directly (confirmed live via grep of every row.get(...) call in that
+  # file) - these are NOT valid Commissioner FactDefinition names (only "Occupation" and
+  # "Education" are, used above/below), so they must go through participant_fields's
+  # type_specific_fields passthrough rather than participant_facts (which validates
+  # fact_type against Commissioner's fixed FACT_DEFINITIONS registry and rejects anything
+  # else - confirmed live: "Occupation Category"/"Industry"/"Class of Worker"/
+  # "Hours Worked"/"Seeking Work" all raised "Unknown fact_type ... not present in
+  # FACT_DEFINITIONS" when first tried as fact_type values). Census.py's
+  # build_census_dataframe_from_unified() promotes these specific type_specific_fields
+  # keys to their expected column names - see that function's own comment.
+  "OCCUPATION_INDUSTRY": type_specific_fields.industry
+  "MISC_OCCUPATION_CATEGORY": type_specific_fields.occupation_category
+  "MISC_WORKER_CLASS": type_specific_fields.class_of_worker
+  "MISC_HOURS_WORKED": type_specific_fields.hours_worked
+  "MISC_WEEKS_WORKED": type_specific_fields.weeks_worked
+  "MISC_FLAG_SEEKING_WORK": type_specific_fields.seeking_work
+  "MISC_FLAG_ATTENDED_SCHOOL": type_specific_fields.attended_school
+  # Recorded as a note on the Occupation fact's
+  # "Unemployed" state (get_occupation_value()'s notes_parts/is_unemployed), not its own
+  # separate fact - a weeks-out-of-work count is inherently about this same occupation
+  # question, not a distinct historical event.
+  "MISC_WEEKS_OUT_OF_WORK": type_specific_fields.weeks_out_of_work
+  # MISC_FLAG_EMPLOYED deliberately NOT mapped - it's redundant
+  # with the Occupation fact's existing Out Of Work/Seeking Work-driven "Unemployed" state;
+  # mapping it would just be a second, conflicting way to say the same thing.
+
+  # marital_status already has a declared home in Paleographer/prompts/Census.pmt's
+  # participant extra_fields (it predates this task) - mapped now that its raw
+  # FamilySearch source field is known. Not yet promoted to a GEDCOM-emitted column by
+  # Archivist/Census.py (no fact type or column exists for it - see this branch's plan doc
+  # open-questions list); captured and schema-valid, just not yet reaching output.
+  "MARITAL_STATUS": type_specific_fields.marital_status
+
+  # --- Remaining FamilySearch fields mapped 2026-08-21. Column names below are chosen so
+  # Archivist/Census.py's build_dynamic_events_and_notes() (DYNAMIC_EVENT_RULES/
+  # CORE_COLUMNS) either builds a real GEDCOM event automatically (the three veteran
+  # fields - "veteran" in the column name matches the existing MILITARY rule, confirmed
+  # already handles Ancestry data the same way) or surfaces the value as a plain, visible
+  # fact note - nothing here is fabricated or silently dropped, and nothing invents a
+  # GEDCOM tag that doesn't already exist. NOT included here (see this branch's plan doc
+  # for why - flagged as genuinely unclear rather than guessed at):
+  # INSTITUTION_1/2_* (group-quarters structure - needs a design decision, not a rename),
+  # MISC_CODE_A/B/C/C1/C2_1950_CENSUS (supplementary codes whose actual meaning is not
+  # known), MISC_CHECKED_BY(_DATE)/MISC_AG_QUESTIONAIRE_NBR_1950_CENSUS (about the
+  # enumeration process, not the person), OCC_FIELDS_POPULATED_1950_CENSUS (looks like
+  # FamilySearch's own internal indexing-completeness flag, not a historical fact).
+  "MISC_FLAG_VETERAN": type_specific_fields.veteran
+  "MISC_FLAG_WWI_VET": type_specific_fields.wwi_veteran
+  "MISC_FLAG_WWII_VET": type_specific_fields.wwii_veteran
+  "FLAG_CITZN_STATUS": type_specific_fields.citizen_status
+  "CNT_CHILDREN_BORN": type_specific_fields.children_born
+  "MISC_FLAG_3_PLUS_ACRES": type_specific_fields.three_plus_acres
+  "MISC_FLAG_LIVED_ON_FARM": type_specific_fields.lived_on_farm
+  "MISC_FLAG_LIVED_ON_FARM_LAST_YEAR": type_specific_fields.lived_on_farm_last_year
+  "MISC_SAME_HOUSE_1950_CENSUS": type_specific_fields.same_house_last_year
+  "MISC_SAME_COUNTY_1950_CENSUS": type_specific_fields.same_county_last_year
+  "MISC_FLAG_HOUSEHOLD_CONTINUED": type_specific_fields.household_continued
+  "MISC_FLAG_MULTIPLE_MARRIAGES": type_specific_fields.multiple_marriages
+  "MISC_YEARS_SINCE_MARITAL_STATUS_CHANGE": type_specific_fields.years_since_marital_status_change
+  "MISC_FLAG_INCOME_OTHER_SOURCES": type_specific_fields.had_other_income
+  "MISC_INCOME": type_specific_fields.income
+  "MISC_INCOME_OTHER_SOURCES": type_specific_fields.other_income
+  "MISC_OTHER_INCOME_SUPPLEMENT": type_specific_fields.other_income_supplement
+  "MISC_RELATIVE_INCOME": type_specific_fields.relatives_income
+  "MISC_RELATIVE_OTHER_INCOME_SUPPLEMENT": type_specific_fields.relatives_other_income_supplement
+  "MISC_LAST_OCCUPATION": type_specific_fields.last_occupation
+  "MISC_LAST_OCCUPATION_INDUSTRY": type_specific_fields.last_occupation_industry
+  "MISC_LAST_WORKER_CLASS": type_specific_fields.last_worker_class
+  "MISC_FLAG_COMPLETED_GRADE": type_specific_fields.completed_grade_flag
+  "MISC_FLAG_WORKED_LAST_WEEK": type_specific_fields.worked_last_week
+
+  # Institution/group-quarters fields - presence of any
+  # of these means this person was enumerated in an institution, not a regular household -
+  # Archivist/Census.py composes them into one note sentence on the CENS fact and bypasses
+  # family-relationship parsing for them (see build_institution_note()/
+  # is_institution_resident()). MISC_CODE_A/B/C/C1/C2_1950_CENSUS deliberately NOT mapped -
+  # these are Census Bureau "office use only" tabulation codes (relationship/
+  # birthplace-citizenship/occupation-industry-worker-class, respectively) derived from the
+  # same handwritten answers we already capture as readable text (RELATIONSHIP_TO_HEAD,
+  # EVENT_BIRTH_PLACE, OCCUPATION/OCCUPATION_INDUSTRY/MISC_WORKER_CLASS) - a Rosetta-Stone
+  # backup for illegible originals, not new historical facts, so mapping them would add
+  # noise rather than information.
+  "INSTITUTION_1_1950_CENSUS": type_specific_fields.institution_1
+  "INSTITUTION_1_TYPE_1950_CENSUS": type_specific_fields.institution_1_type
+  "INSTITUTION_1_FROM_LINE_1950_CENSUS": type_specific_fields.institution_1_from_line
+  "INSTITUTION_1_TO_LINE_1950_CENSUS": type_specific_fields.institution_1_to_line
+  "INSTITUTION_2_1950_CENSUS": type_specific_fields.institution_2
+  "INSTITUTION_2_TYPE_1950_CENSUS": type_specific_fields.institution_2_type
+  "INSTITUTION_2_FROM_LINE_1950_CENSUS": type_specific_fields.institution_2_from_line
+  "INSTITUTION_2_TO_LINE_1950_CENSUS": type_specific_fields.institution_2_to_line
+
+  # Parent birthplace fields - these describe a
+  # RELATIVE (the child's father/mother), not the row's own facts, so they can't go
+  # through the normal single-person column promotion. Archivist/Census.py's
+  # build_gedcom_from_census() reads these to either append a second, proposed-proof BIRT
+  # fact to the father's/mother's own INDI record (when that parent was already extracted
+  # from the household), or to synthesize a stub parent record (surname only, no given
+  # name - not recorded) carrying just that BIRT fact when no such parent exists yet.
+  "FTHR_BIR_PLACE": type_specific_fields.father_birth_place
+  "MTHR_BIR_PLACE": type_specific_fields.mother_birth_place
+
+  # EVENT_RESIDENCE_PLACE is a backup for the census
+  # place only - used by Archivist/Census.py's get_location_string() solely when the
+  # State/County/City breakdown that normally composes that place string is entirely
+  # blank, never as its own separate RESI fact. EVENT_CENSUS_PLACE itself is deliberately
+  # NOT mapped here - it duplicates the record's own State field.
+  "EVENT_RESIDENCE_PLACE": type_specific_fields.residence_place_fallback
+
 participant_facts:
-  "Occupation": Occupation
+  # NOTE: Occupation deliberately NOT mapped here (2026-08-21) - see participant_fields'
+  # "Occupation"/"OCCUPATION" entries above; it belongs in the participant's own named
+  # 'occupation' field, not a duplicate facts-array entry.
   "Immigration Year": Immigration
   "Naturalization": Naturalization
   "Military Service": Military
@@ -54,6 +193,12 @@ participant_facts:
   "VesselVisitedNumber": Residence
   "ShantyVisitedNumber": Residence
 
+  # --- FamilySearch raw field names - only "Education" is a valid Commissioner
+  # FactDefinition name here; everything else that used to live here (including
+  # "OCCUPATION", now mapped as a named field above) moved to participant_fields (see that
+  # section's comment for why).
+  "MISC_GRADE_COMPLETED": Education
+
 
 record_fields:
   "Family Number": family_number
@@ -67,3 +212,11 @@ record_fields:
   # can share a physical page - but it's a meaningfully better starting point for
   # Archivist's own age/sex/surname household heuristics than no grouping at all.
   "Page Number": page_number_fallback
+
+  # SOURCE_HOUSEHOLD_ID listed before FS_HOUSEHOLD_ID so _household_key()'s "first
+  # non-empty wins" iteration preserves the confirmed precedence (SOURCE_HOUSEHOLD_ID is
+  # the sheet-printed family number; FS_HOUSEHOLD_ID is FamilySearch's own system-generated
+  # fallback, used only when SOURCE_HOUSEHOLD_ID is absent - confirmed live, both on the
+  # orchestration API and independently on the Image-Index API).
+  "SOURCE_HOUSEHOLD_ID": family_number
+  "FS_HOUSEHOLD_ID": family_number

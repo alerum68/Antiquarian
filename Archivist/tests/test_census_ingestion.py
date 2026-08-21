@@ -153,6 +153,21 @@ def test_adapter_maps_facts_to_expected_old_column_names():
     assert row["Immigration Year"] == "1889"
 
 
+def test_adapter_promotes_named_occupation_field_not_just_facts():
+    """Occupation belongs in the participant's own named
+    'occupation' field (Commissioner's own Participant.facts docstring: "do not duplicate a
+    fact already covered by a named field ... here") - FamilySearch's YAML mapping now
+    targets this directly rather than a duplicate facts-array entry, so
+    build_census_dataframe_from_unified() must promote p.get('occupation') on its own,
+    independent of the general facts-based FACT_TYPE_TO_COLUMN path (still exercised by
+    test_adapter_maps_facts_to_expected_old_column_names for sources that genuinely use it)."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["occupation"] = "Farmer"
+    doc = _unified_doc("Census_1900", [_sheet([_record([head], family_number="5")])])
+    df, _, _ = arc.build_census_dataframe_from_unified(doc)
+    assert df.iloc[0]["Occupation"] == "Farmer"
+
+
 def test_relational_era_household_parsing_works_on_adapted_dataframe():
     """1900 (relationship era) - Head + Wife, explicit role_name - confirms
     parse_household_relational (unchanged) correctly resolves the household from the
@@ -176,6 +191,65 @@ def test_relational_era_household_parsing_works_on_adapted_dataframe():
     assert not unrelated
 
 
+def test_gedcom_text_lines_splits_multiline_text_into_cont_lines():
+    """Real-world regression (2026-08-21): RootsMagic imported every source as Freeform
+    instead of the intended template - traced to _rmst_element_to_gedcom() emitting
+    multi-paragraph Description/Hint text (from the .rmst source) as a single GEDCOM line
+    with raw embedded newlines. GEDCOM 5.5.1 requires every physical line to start with its
+    own level+tag; a bare continuation line with no tag prefix is invalid and can make a
+    strict parser silently drop or abort the whole _SRCTEMPLATE record."""
+    lines = arc._gedcom_text_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
+    assert lines == ["1 DESC First paragraph.", "2 CONT ", "2 CONT Second paragraph."]
+    assert not any("\n" in ln for ln in lines)
+
+
+def test_load_source_template_lines_has_no_embedded_raw_newlines():
+    """Integration regression: the real Census .rmst template's multi-paragraph
+    Description/Hint text must never produce a line containing an embedded '\\n' -
+    confirmed live this was the actual cause of RootsMagic's source-template import
+    silently failing (every source fell back to Freeform)."""
+    lines = arc.load_source_template_lines(10008)
+    assert lines, "expected the real Simplified Citations - Census.rmst template to be found"
+    assert not any("\n" in ln for ln in lines)
+    assert "1 DESC (NOTE: changes made to the content of this template should also be made " \
+           "to the master template. Alterations made for the sole purpose of allowing the " \
+           "content to print correctly do not need to be made.)" in lines
+
+
+def test_sort_group_by_line_number_fixes_out_of_order_household_and_reattaches_child():
+    """Real-world regression (2026-08-21): a real gather's participant array for one
+    household was NOT in sheet/line order (Line Numbers 6, 4, 8, 10, 9, 5, 7 - a daughter,
+    line 6, listed before the head, line 4). parse_household_relational's "first person
+    must be Head" check wrongly detached her as unrelated. Sorting by Line Number right
+    before parsing fixes this regardless of what order the raw gather produced."""
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([
+            _participant("Marlys", "Crowston", "F", role_name="Daughter", age="16", line="6"),
+            _participant("Jess", "Crowston", "M", role_name="Head", age="51", line="4"),
+            _participant("Glenda", "Crowston", "F", role_name="Daughter", age="12", line="8"),
+            _participant("James", "Crowston", "M", role_name="Son", age="8", line="10"),
+            _participant("Faye", "Crowston", "F", role_name="Daughter", age="9", line="9"),
+            _participant("May", "Crowston", "F", role_name="Wife", age="43", line="5"),
+            _participant("Gerald", "Crowston", "M", role_name="Son", age="14", line="7"),
+        ], family_number="10"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+    arc.CENSUS_YEAR = int(year)
+    arc.CENSUS_ERA = arc.get_census_era(arc.CENSUS_YEAR)
+
+    sorted_df = arc.sort_group_by_line_number(df)
+    assert list(sorted_df["Given Name"]) == ["Jess", "May", "Marlys", "Gerald", "Glenda", "Faye", "James"]
+
+    units, unrelated, flags = arc.parse_household_relational(sorted_df)
+    assert len(units) == 1
+    unrelated_names = [u.get('Given Name') for u in unrelated]
+    assert len(unrelated) == 0, f"everyone should be attached to the household: {unrelated_names}"
+    assert units[0]["husband"]["Given Name"] == "Jess"
+    assert units[0]["wife"]["Given Name"] == "May"
+    children = {c["Given Name"] for c in units[0]["children"]}
+    assert children == {"Marlys", "Gerald", "Glenda", "Faye", "James"}
+
+
 def test_heuristic_era_household_parsing_works_on_adapted_dataframe():
     """1860 (heuristic era) - no role_name at all (matches what census_schema.py produces
     when the source has no relationship column) - confirms parse_household (unchanged)
@@ -195,6 +269,51 @@ def test_heuristic_era_household_parsing_works_on_adapted_dataframe():
     units, unrelated, flags = arc.parse_household(df)
     assert len(units) == 1
     assert {units[0]["husband"]["Given Name"], units[0]["wife"]["Given Name"]} == {"Jean", "Marie"}
+
+
+def test_is_institution_resident_true_when_any_institution_field_present():
+    row = pd.Series({"Institution 1 Type": "Hospital"})
+    assert arc.is_institution_resident(row) is True
+    assert arc.is_institution_resident(pd.Series({"Given Name": "Jean"})) is False
+
+
+def test_build_institution_note_composes_one_sentence_from_present_fields():
+    row = pd.Series({
+        "Institution 1": "County Poor Farm", "Institution 1 Type": "Almshouse",
+        "Institution 1 From Line": "1", "Institution 1 To Line": "40",
+    })
+    note = arc.build_institution_note(row)
+    assert "County Poor Farm" in note
+    assert "Almshouse" in note
+    assert "1-40" in note
+
+
+def test_build_institution_note_empty_when_no_institution_fields_present():
+    assert arc.build_institution_note(pd.Series({"Given Name": "Jean"})) == ""
+
+
+def test_institution_resident_gets_no_family_links_even_with_head_wife_roles():
+    """A person enumerated at an institution gets no
+    family/spouse/parent-child links at all, just their own individual record - confirmed
+    here by giving the pair explicit Head/Wife roles (which would normally link them) but
+    marking one an institution resident, and asserting parse_household_relational treats
+    the whole group as unrelated individuals rather than a family unit."""
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([
+            _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1"),
+            _participant("Marie", "Gagnon", "F", role_name="Wife", age="38", line="2"),
+        ], family_number="5"),
+    ])])
+    doc["sheets"][0]["records"][0]["participants"][1]["type_specific_fields"]["institution_1_type"] = "Hospital"
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    arc.CENSUS_YEAR = int(year)
+    arc.CENSUS_ERA = arc.get_census_era(arc.CENSUS_YEAR)
+    assert arc.CENSUS_ERA == "relationship"
+
+    units, unrelated, flags = arc.parse_household_relational(df)
+    assert units == []
+    assert len(unrelated) == 2
 
 
 def test_two_households_get_separate_family_number_groups():
@@ -376,6 +495,97 @@ def test_census_gedcom_refn_is_bare_ark_not_the_gedcomx_type_prefixed_form(tmp_p
     assert "1 REFN 1:1:MF36-Z6D" not in lines
 
 
+def test_census_gedcom_fsftid_uses_persons_own_person_ark_when_present(tmp_path, monkeypatch):
+    """2026-08-20 semantic split: PersonArk now carries a TRUE enduring FamilySearch Family
+    Tree identifier (FSFTID-shaped, e.g. "KLBM-H9P" - no ark-type prefix, so no
+    strip_ark_type_prefix() is applied), distinct from RecordArk (this persona's
+    record-scoped id). This row's PID is deliberately a different value than its PersonArk
+    to prove the two are read independently."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["pid"] = "9999-fake-record-id"
+    head["type_specific_fields"]["person_ark"] = "KLBM-H9P"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert "0 @I9999-fake-record-id@ INDI" in lines
+    assert "1 _FSFTID KLBM-H9P" in lines
+    assert not any(ln.startswith("1 _FSFTID ") and "KLBM-H9P" not in ln for ln in lines), \
+        f"_FSFTID must come from PersonArk, not the record's own PID: {lines}"
+
+
+def test_census_gedcom_fsftid_omitted_when_no_true_person_ark_found(tmp_path, monkeypatch):
+    """Real-world case confirmed live 2026-08-20 (Jess Guy Crowston, FamilySearch's own UI
+    shows 'Attached in Tree to ... KLBM-H9P' but that id appears nowhere in the
+    orchestration API's JSON response FS.py actually gathers from): when only a RecordArk
+    exists and no true PersonArk was captured, _FSFTID must be omitted entirely, not
+    fall back to the record-scoped persona id (a persona id is not a valid FamilySearch
+    Tree person id, and using one would produce a fabricated-looking _FSFTID)."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["record_ark"] = "1:1:MF36-Z6D"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert not any("_FSFTID" in ln for ln in lines), \
+        f"_FSFTID must not fall back to RecordArk: {lines}"
+
+
+def test_census_gedcom_apid_is_individual_level_not_nested_in_citation(tmp_path, monkeypatch):
+    """_APID is an individual-level GEDCOM tag (FTM/RM both expect it directly on the INDI
+    record), never nested inside a per-fact SOUR citation - confirms build_gedcom_from_census
+    emits exactly one '1 _APID ...' per person and that no '3 _APID' (the old, incorrect
+    citation-nested placement) survives anywhere in the output."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["type_specific_fields"]["pid"] = "105307051"
+    doc = _unified_doc("Census_1900", [{
+        "page_id": "3",
+        "document_metadata": {"source_location": "Minnesota", "file_name": "4211353_00003.jpg"},
+        "records": [_record([head], family_number="5")],
+    }])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "APID_DB", "2442")
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    apid_lines = [ln for ln in lines if "_APID" in ln]
+    assert apid_lines == ["1 _APID 1,2442::105307051"], apid_lines
+
+
 def _citation_row(**overrides):
     row = {"Given Name": "Jean", "Surname": "Gagnon", "FSFTID": "", "FamilySearch_URL": "",
            "Extracted_URL": "", "Family Number": "5", "Dwelling Number": "5"}
@@ -412,13 +622,11 @@ def test_census_citation_never_emits_apid_for_an_ark_shaped_rec_id(monkeypatch):
         assert not any("_FSFTID" in ln for ln in cit), f"{target}: bogus _FSFTID from an ark: {cit}"
 
 
-def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_rows(monkeypatch):
-    """User-requested follow-up: the citation-level _FSFTID field should carry this record's
-    own FamilySearch person ark - as an identifier, not a URL - when there's no genuine
-    tree-attached FSFTID, but ONLY for rows we already know are FamilySearch-sourced
-    (FamilySearch_URL present); never fabricated for Ancestry-only rows. And it must be
-    BARE (no '1:1:' GEDCOM X type prefix) - that prefix stays only in the actual clickable
-    weblink, which is unaffected here."""
+def test_census_citation_never_emits_fsftid_for_familysearch_sourced_rows(monkeypatch):
+    """_FSFTID is an individual-level GEDCOM tag (see build_gedcom_from_census's indi_fsftid,
+    which sources it from the row's own PersonArk column, not from build_census_citation) -
+    it must never appear inside the per-fact citation itself, whether or not the row is
+    FamilySearch-sourced."""
     monkeypatch.setattr(arc, "APID_DB", "")
     monkeypatch.setattr(arc, "CENSUS_YEAR", 1860)
     monkeypatch.setattr(arc, "CENSUS_SOURCE_ID", "1473181")
@@ -429,7 +637,7 @@ def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_
         cit = arc.build_census_citation(fs_row, "1:1:MF36-Z6D", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert any(ln == "3 _FSFTID MF36-Z6D" for ln in cit), f"{target}: missing bare _FSFTID: {cit}"
+        assert not any("_FSFTID" in ln for ln in cit), f"{target}: _FSFTID leaked into citation: {cit}"
 
     monkeypatch.setattr(arc, "APID_DB", "2442")
     anc_row = _citation_row(FSFTID="")
@@ -437,7 +645,7 @@ def test_census_citation_fsftid_falls_back_to_bare_ark_for_familysearch_sourced_
         cit = arc.build_census_citation(anc_row, "105307051", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert not any("_FSFTID" in ln for ln in cit), f"{target}: fabricated _FSFTID for Ancestry-only row: {cit}"
+        assert not any("_FSFTID" in ln for ln in cit), f"{target}: _FSFTID leaked into citation: {cit}"
 
 
 def test_strip_ark_type_prefix():
@@ -476,9 +684,11 @@ def test_census_citation_household_id_field_is_bare_number_when_only_one_number_
     assert any(ln == "4 VALUE dwelling 5, family 1" for ln in both), both
 
 
-def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
-    """Companion to the regression above - a genuine Ancestry-sourced record (real APID_DB,
-    numeric rec_id, no FSFTID) must still get its _APID tag exactly as before."""
+def test_census_citation_never_emits_apid_for_real_ancestry_data(monkeypatch):
+    """Companion to the regression above - _APID is an individual-level GEDCOM tag (see
+    build_gedcom_from_census's indi-level '1 _APID ...' line), not a citation-level one, so
+    even a genuine Ancestry-sourced record (real APID_DB, numeric rec_id) must never carry
+    it inside build_census_citation()'s own output."""
     monkeypatch.setattr(arc, "APID_DB", "2442")
     monkeypatch.setattr(arc, "CENSUS_YEAR", 1860)
     monkeypatch.setattr(arc, "CENSUS_SOURCE_ID", "1001")
@@ -490,7 +700,7 @@ def test_census_citation_still_emits_apid_for_real_ancestry_data(monkeypatch):
         cit = arc.build_census_citation(row, "105307051", "@Mimg1@", "3", target,
                                         "Pembina", "Dakota Territory", "Dakota Territory",
                                         "T624_1", "")
-        assert any(ln == "3 _APID 1,2442::105307051" for ln in cit), f"{target}: missing real _APID: {cit}"
+        assert not any("_APID" in ln for ln in cit), f"{target}: _APID leaked into citation: {cit}"
 
 
 def test_dynamic_occupation_template_normalizes_raw_case():
@@ -507,6 +717,28 @@ def test_dynamic_occupation_template_normalizes_raw_case():
     })
     occ, _ = get_occupation_value(row)
     assert occ == "Farmer at Smith Farm, working in Agriculture"
+
+
+def test_dynamic_notes_exclude_citation_plumbing_columns():
+    """The CENS fact's visible note must not duplicate
+    citation/URL data already carried by the SOUR citation block and weblinks - Collection
+    Name/Collection URL/RecordArk/PersonArk are plumbing columns, not genealogical facts
+    about the person, and previously fell through build_dynamic_events_and_notes()'s
+    catch-all into a plain, visible note since they weren't in CORE_COLUMNS."""
+    row = pd.Series({
+        "Collection Name": "United States Census, 1950: Pembina. Census 1950",
+        "Collection URL": "https://www.familysearch.org/ark:/61903/3:1:3QHN-PQHW-1YYJ",
+        "RecordArk": "1:1:6F7Z-QJKR", "PersonArk": "KLBM-H9P",
+        "Lived on Farm": "yes",
+    })
+    columns = list(row.index)
+    _, notes = arc.build_dynamic_events_and_notes(row, [], "Jess", columns, "North Dakota, USA", "")
+    joined = " | ".join(notes)
+    assert "Collection Name" not in joined
+    assert "Collection URL" not in joined
+    assert "RecordArk" not in joined
+    assert "PersonArk" not in joined
+    assert "Lived on Farm: yes" in joined
 
 
 def test_dynamic_occupation_template():
@@ -606,3 +838,136 @@ def test_canadian_and_historical_hbc_birthplaces_are_not_foreign():
     assert is_foreign_birthplace("Red River Settlement") is False
     assert is_foreign_birthplace("Pembina, Dakota Territory") is False
     assert is_foreign_birthplace("Ireland") is True
+
+
+def test_parent_birthplace_appends_second_birt_fact_to_existing_father(tmp_path, monkeypatch):
+    """FTHR_BIR_PLACE/MTHR_BIR_PLACE describe the
+    child's own father/mother, not the child's own facts. When that parent was already
+    extracted as a real person in the household, the birthplace must land as a SECOND,
+    proposed-proof BIRT fact on the parent's own INDI record - not overriding the
+    birthplace already extracted from the parent's own gathered row - and no new person
+    is created for them."""
+    head = _participant("Jean", "Gagnon", "M", role_name="Head", age="40", line="1")
+    head["birth_place"] = "Minnesota, USA"
+    wife = _participant("Marie", "Gagnon", "F", role_name="Wife", age="38", line="2")
+    child = _participant("Louis", "Gagnon", "M", role_name="Child", age="10", line="3")
+    child["type_specific_fields"]["father_birth_place"] = "Ireland"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, wife, child], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    head_start = lines.index("1 NAME Jean /Gagnon/")
+    next_indi = next(i for i in range(head_start + 1, len(lines)) if lines[i].startswith("0 @I"))
+    head_block = lines[head_start:next_indi]
+
+    birt_indices = [i for i, ln in enumerate(head_block) if ln == "1 BIRT"]
+    assert len(birt_indices) == 2, f"expected original + appended BIRT facts: {head_block}"
+    assert "2 PLAC Minnesota, USA" in head_block
+    assert "2 PLAC Ireland" in head_block
+    assert head_block[birt_indices[1]:birt_indices[1] + 3] == \
+        ["1 BIRT", "2 PLAC Ireland", "2 _PROOF proposed"]
+    # no synthetic father person was created since a real one already exists
+    assert lines.count("1 NAME /Gagnon/") == 0
+
+
+def test_parent_birthplace_synthesizes_stub_parents_when_foreign_and_none_extracted(tmp_path, monkeypatch):
+    """When the child has no extracted father/mother (unrelated in the household) and the
+    birthplace is foreign, FTHR_BIR_PLACE/MTHR_BIR_PLACE synthesize stub parent records -
+    surname only (no given name recorded) - carrying just a proposed-proof birthplace-only
+    BIRT fact, linked as the child's parents in a new FAM block."""
+    head = _participant("Marie", "Smith", "F", role_name="Head", age="70", line="1")
+    lodger = _participant("Louis", "Gagnon", "M", role_name="Lodger", age="10", line="2")
+    lodger["type_specific_fields"]["father_birth_place"] = "Ireland"
+    lodger["type_specific_fields"]["mother_birth_place"] = "Norway"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, lodger], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert lines.count("1 NAME /Gagnon/") == 2, f"expected one synthetic father + mother: {lines}"
+    assert "1 SEX M" in lines
+    assert "1 SEX F" in lines
+    assert "2 PLAC Ireland" in lines
+    assert "2 PLAC Norway" in lines
+
+    fam_starts = [i for i, ln in enumerate(lines) if ln.startswith("0 @F") and ln.endswith(" FAM")]
+    fam_blocks = []
+    for start in fam_starts:
+        end = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("0 ")), len(lines))
+        fam_blocks.append(lines[start:end])
+    child_fam = next(fb for fb in fam_blocks if any(ln.startswith("1 CHIL") for ln in fb))
+    assert any(ln.startswith("1 HUSB") for ln in child_fam)
+    assert any(ln.startswith("1 WIFE") for ln in child_fam)
+
+
+def test_parent_birthplace_does_not_synthesize_a_person_for_domestic_birthplace(tmp_path, monkeypatch):
+    """The 1950 census overwhelmingly records
+    "United States" for domestic-born parents - creating a stub person for that ubiquitous,
+    unremarkable answer would flood the tree with low-value records, so a synthetic parent
+    is only created when the birthplace is foreign. A domestic birthplace with no already-
+    extracted parent produces no new person and no fact at all."""
+    head = _participant("Marie", "Smith", "F", role_name="Head", age="70", line="1")
+    lodger = _participant("Louis", "Gagnon", "M", role_name="Lodger", age="10", line="2")
+    lodger["type_specific_fields"]["father_birth_place"] = "United States"
+    doc = _unified_doc("Census_1950", [_sheet([
+        _record([head, lodger], family_number="5"),
+    ])])
+    df, year, _ = arc.build_census_dataframe_from_unified(doc)
+
+    monkeypatch.setattr(arc, "CENSUS_YEAR", int(year))
+    monkeypatch.setattr(arc, "CENSUS_ERA", arc.get_census_era(int(year)))
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_PATH", tmp_path)
+    monkeypatch.setattr(Utils, "GEDCOM_OUTPUT_NAME", "Test_Census.ged")
+    monkeypatch.setattr(arc, "IMAGE_DIR", tmp_path)
+
+    arc.build_gedcom_from_census(df, "RM")
+    lines = list(tmp_path.glob("*.ged"))[0].read_text(encoding="utf-8").splitlines()
+
+    assert "1 NAME /Gagnon/" not in lines
+    assert "2 PLAC United States" not in lines
+
+
+def test_weeks_out_of_work_marks_unemployed_and_notes_the_weeks():
+    """MISC_WEEKS_OUT_OF_WORK is folded into the
+    Occupation fact's "Unemployed" state rather than getting its own fact - a weeks-out-of-
+    work count is inherently about this same occupation question, not a distinct historical
+    event, and MISC_FLAG_EMPLOYED is deliberately not mapped at all since it would just be
+    a second, conflicting way to say the same thing."""
+    from Census import get_occupation_value
+
+    row = pd.Series({"Occupation": "Clerk", "Weeks Out of Work": "12"})
+    occ, notes = get_occupation_value(row)
+    assert occ == "Unemployed from Clerk"
+    assert "Weeks Out of Work: 12" in notes
+
+
+def test_location_string_falls_back_to_residence_place_only_when_census_place_blank():
+    """EVENT_RESIDENCE_PLACE is a backup for the census
+    place only, used when the State/County/City breakdown that normally composes it is
+    entirely blank - never its own separate fact, and never preferred over a real value."""
+    from Census import get_location_string
+
+    blank_row = pd.Series({"Residence Place Fallback": "Some Town, Some State"})
+    assert get_location_string(blank_row) == "Some Town, Some State"
+
+    populated_row = pd.Series({"State": "Minnesota", "Residence Place Fallback": "Should Not Win"})
+    assert get_location_string(populated_row) == "Minnesota, USA"

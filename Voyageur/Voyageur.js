@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Voyageur
 // @namespace    https://github.com/alerum68/Antiquarian
-// @version      0.3.29
+// @version      0.3.46
 // @description  Gathers pages from supported Repositories. Detects which repository you're on from the URL and runs that repository's own gather logic.
 // @author       alerum68
 // @match        *://*.ancestry.com/imageviewer*
@@ -17,6 +17,19 @@
 (function () {
     'use strict';
 
+    // Shared location utility: determines Country from state/province text.
+    // Matches Gazetteer.CA_PROVINCE_NAMES (Gazetteer/Gazetteer.py) plus the historical
+    // fur-trade-era names. Defaults to "USA" when state is empty or unrecognized.
+    const CANADIAN_PROVINCES_AND_TERRITORIES = new Set([
+        'alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland',
+        'nova scotia', 'northwest territories', 'north-west territories', 'ontario',
+        'prince edward island', 'quebec', 'saskatchewan', 'yukon', 'nunavut',
+    ]);
+
+    function getCountryFromState(state) {
+        const normalized = (state || '').trim().toLowerCase();
+        return CANADIAN_PROVINCES_AND_TERRITORIES.has(normalized) ? 'Canada' : 'USA';
+    }
     // Shared by both runXGather() functions below. Resolves as soon as checkFn() returns a
     // truthy value, re-testing it on every DOM mutation (React re-rendering a panel, a
     // table's rows updating, a button's disabled attribute flipping) instead of on a fixed
@@ -119,6 +132,49 @@
     // 3-image gather run's downloaded JSON contained exactly 1 item, not 3.
     const FS_RELOAD_STATE_KEY = 'voyageur_fs_reload_state';
 
+    // Defense-in-depth alongside stopBatch()'s URL-stripping fix: a goToNextImage()
+    // navigation already committed (browser mid-navigating to a URL FamilySearch's own
+    // router built while mgs_auto=1 was still present) can land AFTER stopBatch() already
+    // ran on the old page - too late for that page's history.replaceState() to change a
+    // navigation already in flight to a different document. This sessionStorage flag
+    // (keyed by run_id, so a genuinely new run is never blocked) survives that landing and
+    // is checked by the auto-start trigger at the bottom of this function, alongside
+    // shouldAutoStart itself.
+    const FS_STOPPED_RUNS_KEY = 'voyageur_fs_stopped_runs';
+
+    function markFsRunStopped(runId) {
+        let stopped = [];
+        try {
+            stopped = JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]');
+        } catch (e) {
+            stopped = [];
+        }
+        if (!stopped.includes(runId)) stopped.push(runId);
+        sessionStorage.setItem(FS_STOPPED_RUNS_KEY, JSON.stringify(stopped));
+    }
+
+    function isFsRunStopped(runId) {
+        try {
+            return JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]').includes(runId);
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // Called by startBatch() on every start (manual click or auto-triggered) - a deliberate
+    // restart must not stay blocked by an earlier stop on the same run_id, since shouldAutoStart
+    // (computed once per script injection) would otherwise keep coming back false on every
+    // subsequent "Next Image" reload for the rest of this run.
+    function clearFsRunStopped(runId) {
+        let stopped = [];
+        try {
+            stopped = JSON.parse(sessionStorage.getItem(FS_STOPPED_RUNS_KEY) || '[]');
+        } catch (e) {
+            stopped = [];
+        }
+        sessionStorage.setItem(FS_STOPPED_RUNS_KEY, JSON.stringify(stopped.filter((id) => id !== runId)));
+    }
+
     function saveFsReloadState(runId, state) {
         sessionStorage.setItem(FS_RELOAD_STATE_KEY, JSON.stringify({
             runId,
@@ -128,6 +184,8 @@
             pagesNeedingRetry: state.pagesNeedingRetry,
             retryPhase: state.retryPhase,
             currentRetryTarget: state.currentRetryTarget,
+            collectionId: state.collectionId,
+            collectionName: state.collectionName,
         }));
     }
 
@@ -148,11 +206,39 @@
             pagesNeedingRetry: parsed.pagesNeedingRetry || [],
             retryPhase: parsed.retryPhase || false,
             currentRetryTarget: parsed.currentRetryTarget || null,
+            collectionId: parsed.collectionId || '',
+            collectionName: parsed.collectionName || '',
         };
     }
 
     function clearFsReloadState() {
         sessionStorage.removeItem(FS_RELOAD_STATE_KEY);
+    }
+
+    // DOM HELPERS - module-level (not nested in runFamilySearchGather) so they're reachable
+    // from module.exports for testing, same as the pure API-parsing helpers below.
+    function findByExactText(selector, text) {
+        // FamilySearch's own CSS class names aren't a stable target (same reasoning as
+        // Ancestry's findLeafByExactText) - match by visible text instead.
+        const candidates = document.querySelectorAll(selector);
+        for (const el of candidates) {
+            if (el.textContent.trim() === text) return el;
+        }
+        return null;
+    }
+
+    // FamilySearch's "explore" viewer (confirmed live 2026-08-20) renders control labels
+    // ("Names", "Save Record", "Information", "Go to image N") via aria-label on
+    // otherwise-textless icon buttons - exhaustive textContent search (exact,
+    // case-insensitive, substring, whole-DOM) found zero matches for any of them, while
+    // [aria-label] search found them immediately. findByExactText can never find these; use
+    // this instead for any control whose visible label isn't real DOM text.
+    function findByAriaLabel(selector, label) {
+        const candidates = document.querySelectorAll(selector);
+        for (const el of candidates) {
+            if ((el.getAttribute('aria-label') || '').trim() === label) return el;
+        }
+        return null;
     }
 
     // FamilySearch orchestration-API graph traversal - confirmed live (see
@@ -230,19 +316,74 @@
         };
     }
 
-    // PERSON -> EVENT(eventType=BIRTH) -> PLACE -> FIELD -> text. Confirmed live: the CENSUS
-    // event's PLACE is residence, not birthplace - only the BIRTH-type event's PLACE is
-    // birthplace, and it's absent entirely when FamilySearch's indexing didn't derive one.
-    function fsPersonBirthPlace(byId, person) {
+    // PERSON -> EVENT(eventType) -> PLACE -> FIELD -> text. Confirmed live both BIRTH and
+    // CENSUS event types exist with this shape (design spec's element-type table: "Residence
+    // (CENSUS) / birthplace (BIRTH)") - shared by fsPersonBirthPlace and
+    // fsPersonResidencePlace below. Returns '' when the event is absent entirely (FamilySearch's
+    // indexing didn't derive one for this person).
+    function fsPersonEventPlace(byId, person, eventType) {
         const events = (person && person.subElements || [])
             .map((ref) => byId[ref.id])
             .filter((el) => el && el.elementType === 'EVENT');
-        const birthEvent = events.find((e) => e.eventType === 'BIRTH');
-        if (!birthEvent) return '';
-        const placeEl = fsFindChild(byId, birthEvent.subElements, 'PLACE');
+        const event = events.find((e) => e.eventType === eventType);
+        if (!event) return '';
+        const placeEl = fsFindChild(byId, event.subElements, 'PLACE');
         if (!placeEl) return '';
         const field = fsFindChild(byId, placeEl.subElements, 'FIELD');
         return field ? fsFieldText(field) : '';
+    }
+
+    function fsPersonBirthPlace(byId, person) {
+        return fsPersonEventPlace(byId, person, 'BIRTH');
+    }
+
+    // Confirmed live only via the design spec's single BIRTH-event example ("Maine, United
+    // States") - a multi-segment CENSUS-event residence text's own internal comma order
+    // (specific-to-general vs general-to-specific) has NOT been confirmed against a real
+    // captured PLACE text (the design spec's own "STATE/COUNTY/TOWN proper scoping" item is
+    // explicitly flagged unresolved). fsResidencePlaceToBrowsePath below assumes
+    // specific-to-general, matching the one confirmed example - needs live verification
+    // against a real CENSUS-event capture before being fully trusted.
+    function fsPersonResidencePlace(byId, person) {
+        return fsPersonEventPlace(byId, person, 'CENSUS');
+    }
+
+    // Converts a raw residence PLACE text into browsePath segments in the general-to-specific
+    // order parseFsLocationFromBrowsePath()/FS.py's parse_census_browse_path() both expect
+    // (matching fsImageIndexBrowsePathSegments' own segment order convention) - see the
+    // live-verification caveat on fsPersonResidencePlace above.
+    function fsResidencePlaceToBrowsePath(residenceText) {
+        if (!residenceText) return [];
+        return residenceText.split(',').map((s) => s.trim()).filter(Boolean).reverse();
+    }
+
+    // Image-level singleton FIELD lookup - unlike fsPersonFieldText (scoped to one PERSON's
+    // direct children), EXT_FILM_NBR/EXT_PUB_NBR/EXT_REPOSITORY_NAME are confirmed live to
+    // appear once per image, not per person (design spec's "Citation data" section) - safe to
+    // find anywhere in the flat elements array.
+    function fsImageLevelFieldText(apiResponse, fieldType) {
+        const field = (apiResponse.elements || [])
+            .find((e) => e.elementType === 'FIELD' && e.fieldType === fieldType);
+        return field ? fsFieldText(field) : '';
+    }
+
+    // Confirmed live via a full raw orchestration-API
+    // capture: STATE/COUNTY/CITY/DISTRICT_ENUMERATION are directly available as image-level
+    // FIELD elements (attached to a shared PLACE element covering every person on the
+    // page), far more reliable than parsing them back out of the citation prose text -
+    // that depends on the exact phrasing fsBuildCitationTextFromApiResponse happens to
+    // produce, and confirmed live to break down entirely once the trailing NARA clause is
+    // absent. fsImageLevelFieldText's own .find() picks up this canonical entry correctly
+    // even though several other (per-person residence, blank on this page) STATE/COUNTY/
+    // CITY fields also exist elsewhere in the same elements array - confirmed live it's
+    // always first in array order.
+    function fsImageLevelLocation(apiResponse) {
+        return {
+            state: fsImageLevelFieldText(apiResponse, 'STATE'),
+            county: fsImageLevelFieldText(apiResponse, 'COUNTY'),
+            city: fsImageLevelFieldText(apiResponse, 'CITY'),
+            enumeration_district: fsImageLevelFieldText(apiResponse, 'DISTRICT_ENUMERATION'),
+        };
     }
 
     // RECORD.subElements directly lists the household's PERSON arks - confirmed live, no
@@ -259,75 +400,153 @@
             }));
     }
 
-    // Reduces one orchestration-API PERSON down to the canonical field map shared with the
-    // Image-Index parser (fsCanonicalFieldsFromImageIndexPerson) - fsColumnsFromCanonicalFields
-    // below builds the final `columns` object from either source's canonical map the same way.
-    function fsCanonicalFieldsFromApiPerson(byId, person) {
-        const {given, surname} = fsPersonName(byId, person);
-        const sex = fsPersonFieldText(byId, person, 'SEX_CODE');
-        return {
-            givenName: given,
-            surname: surname,
-            sex: sex ? sex.toUpperCase() : '',
-            age: fsWrappedFieldText(byId, person, 'AGE'),
-            birthplace: fsPersonBirthPlace(byId, person),
-            householdIdSource: fsPersonFieldText(byId, person, 'SOURCE_HOUSEHOLD_ID'),
-            householdIdFs: fsPersonFieldText(byId, person, 'FS_HOUSEHOLD_ID'),
-            relationshipToHead: fsPersonFieldText(byId, person, 'RELATIONSHIP_TO_HEAD'),
-            maritalStatus: fsPersonFieldText(byId, person, 'MARITAL_STATUS'),
-            occupation: fsPersonFieldText(byId, person, 'OCCUPATION'),
-            race: fsPersonFieldText(byId, person, 'RACE_OR_COLOR'),
-            fatherBirthplace: fsPersonFieldText(byId, person, 'FTHR_BIR_PLACE'),
-            motherBirthplace: fsPersonFieldText(byId, person, 'MTHR_BIR_PLACE'),
-        };
+    // Generic, non-curating field collector - walks every subElement reachable from PERSON
+    // (2026-08-20, explicit user direction: capture the raw JSON in full, do NOT hand-pick
+    // which fields matter or rename them at extraction time - renaming/mapping to GEDCOM
+    // fields happens only downstream, in Archivist, via a declarative field map). Keys are
+    // FamilySearch's own vocabulary verbatim (fieldType for direct FIELD children;
+    // NAME_GIVEN/NAME_SURNAME for the name-wrapper shape; EVENT_<eventType>_PLACE for
+    // event/place wrappers; the wrapper's own elementType, e.g. "AGE", for any other single
+    // FIELD-holding wrapper) - nothing is dropped because we don't yet have a mapping for
+    // it, and nothing is translated to a human-friendly label here. Grounded in the graph
+    // shape confirmed live across two real captures (see fsPersonFieldText/fsWrappedFieldText/
+    // fsPersonName/fsPersonEventPlace above and the 2026-08-14 design spec) - not yet
+    // verified this covers every element type FamilySearch's API can return; extend the
+    // three `if` branches below if a real capture surfaces a differently-shaped wrapper.
+    function fsRawFieldsFromApiPerson(byId, person) {
+        const raw = {};
+        if (!person || !person.subElements) return raw;
+
+        for (const ref of person.subElements) {
+            const el = byId[ref.id];
+            if (!el) continue;
+
+            if (el.elementType === 'FIELD') {
+                raw[el.fieldType || el.id] = fsFieldText(el);
+                continue;
+            }
+
+            if (el.elementType === 'NAME') {
+                const givenEl = fsFindChild(byId, el.subElements, 'NAME_GIVEN');
+                const surnameEl = fsFindChild(byId, el.subElements, 'NAME_SURNAME');
+                const givenField = givenEl ? fsFindChild(byId, givenEl.subElements, 'FIELD') : null;
+                const surnameField = surnameEl ? fsFindChild(byId, surnameEl.subElements, 'FIELD') : null;
+                if (givenField) raw.NAME_GIVEN = fsFieldText(givenField);
+                if (surnameField) raw.NAME_SURNAME = fsFieldText(surnameField);
+                continue;
+            }
+
+            if (el.elementType === 'EVENT') {
+                const placeEl = fsFindChild(byId, el.subElements, 'PLACE');
+                const placeField = placeEl ? fsFindChild(byId, placeEl.subElements, 'FIELD') : null;
+                if (placeField) raw[`EVENT_${el.eventType || 'UNKNOWN'}_PLACE`] = fsFieldText(placeField);
+                continue;
+            }
+
+            // Any other single-FIELD wrapper (e.g. AGE) - keyed by the wrapper's own
+            // elementType, since the inner FIELD itself carries no distinguishing fieldType.
+            const field = fsFindChild(byId, el.subElements, 'FIELD');
+            if (field) raw[el.elementType] = fsFieldText(field);
+        }
+
+        return raw;
     }
 
-    // Shared by both fsBuildRowsFromApiResponse (orchestration API) and
-    // fsBuildRowsFromImageIndexResponse (filmdatainfo/image-data) - both sources reduce a
-    // person down to the same canonical field shape above this function, so the household-ID
-    // precedence and era-appropriate omission logic exists exactly once. householdIdSource
-    // (SOURCE_HOUSEHOLD_ID) is the sheet-printed family number, preferred over
-    // householdIdFs (FS_HOUSEHOLD_ID, FamilySearch's own system-generated id) - confirmed
-    // live on the orchestration API these two are exact complements on a real image (35 + 7 =
-    // 42 of 42 persons), and the same two-key relationship was independently confirmed live
-    // again on the Image-Index endpoint (1860 sample used FS_HOUSEHOLD_ID, 1880 used
-    // SOURCE_HOUSEHOLD_ID). Falls back to a sequential per-household counter only if neither
-    // exists at all.
-    function fsColumnsFromCanonicalFields(canonicalFields, sequenceFallback) {
-        const columns = {
-            'Given Name': canonicalFields.givenName || '',
-            'Surname': canonicalFields.surname || '',
-            'Gender': canonicalFields.sex || '',
-            'Age': canonicalFields.age || '',
-            'Family Number': canonicalFields.householdIdSource
-                || canonicalFields.householdIdFs
-                || String(sequenceFallback),
-        };
-        // Omitted entirely (not set to '') when absent - matches the old UI-scraper's own
-        // "don't fabricate data" convention, and is how the pre-1880 era boundary is handled:
-        // no special-case branching, just field-absence. maritalStatus/occupation/race/
-        // fatherBirthplace/motherBirthplace/birthplace are captured in canonicalFields but
-        // deliberately not added here - see this plan's Global Constraints.
-        if (canonicalFields.relationshipToHead) columns['Relationship to Head'] = canonicalFields.relationshipToHead;
-        return columns;
+    // True Family Tree person id (entityId) for a given record_ark, if
+    // /service/tree/links/sources/attachments (intercepted in runFamilySearchGather, see
+    // its own comment) has one on file - most personas were never attached by anyone, so
+    // '' (never fabricated) is the common, expected result, not an error.
+    // Matches by checking whether record_ark appears
+    // WITHIN each stored source URI, not by exact dictionary-key equality - an exact-match
+    // lookup kept failing live even when the same person was genuinely referenced, because
+    // the stored URI can carry more around the persona ark than a clean extraction assumes
+    // (trailing path segments, encoding). A substring match is strictly more permissive, so
+    // it can only find a real match an exact lookup missed, never a false one (ark ids are
+    // long, specific alphanumeric strings - two different real arks colliding as substrings
+    // of each other is not a realistic risk).
+    function fsPersonArkFromAttachments(recordArk) {
+        if (typeof unsafeWindow === 'undefined' || !recordArk) return '';
+        const map = unsafeWindow.__voyageurFsAttachments || {};
+        for (const uri of Object.keys(map)) {
+            if (uri.includes(recordArk)) {
+                const found = map[uri];
+                console.log(`[Voyageur FS ARK] lookup ${recordArk} -> ${found} (matched via ${uri})`);
+                return found;
+            }
+        }
+        console.log(`[Voyageur FS ARK] lookup ${recordArk} -> (none) | known uris: ${JSON.stringify(Object.keys(map))}`);
+        return '';
     }
 
     function fsBuildRowsFromApiResponse(apiResponse) {
         const byId = buildFsElementIndex(apiResponse);
         const rows = [];
-        let householdIndex = 0;
         for (const household of fsHouseholds(apiResponse, byId)) {
-            householdIndex++;
             for (const personId of household.personIds) {
                 const person = byId[personId];
                 if (!person) continue;
 
-                const canonicalFields = fsCanonicalFieldsFromApiPerson(byId, person);
-                const columns = fsColumnsFromCanonicalFields(canonicalFields, householdIndex);
-                rows.push({columns, person_ark: person.id, attached_fsftid: ''});
+                const columns = fsRawFieldsFromApiPerson(byId, person);
+                // record_ark: this persona's own record-scoped identifier (person.id) -
+                // always present. person_ark: a true, enduring Family Tree identifier, only
+                // when one is actually found (never fabricated) - see
+                // docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4.
+                rows.push({columns, record_ark: person.id, person_ark: fsPersonArkFromAttachments(person.id)});
             }
         }
         return rows;
+    }
+
+    // Confirmed live 2026-08-21: /service/tree/links/sources/attachments fires MULTIPLE
+    // separate times for one page's Names panel (one real capture showed 3 sources, then a
+    // later, separate response with 12 more - not one single batch covering everyone at
+    // once). waitForFsAttachments() only waits for the FIRST response to arrive, so
+    // fsBuildRowsFromApiResponse() can still miss a person whose real entityId only shows up
+    // in a LATER batch - confirmed live: Jess G Crowston's real KLBM-H9P mapping was stored
+    // correctly, but only after his row had already been built with an empty person_ark, and
+    // nothing ever went back to fill it in. This re-checks every row still missing a
+    // person_ark across a few more short rounds, so a later batch still gets picked up
+    // instead of being silently missed.
+    async function backfillFsPersonArks(rows, {maxRounds = 6, roundDelayMs = 500} = {}) {
+        for (let round = 0; round < maxRounds; round++) {
+            const stillMissing = rows.filter((r) => !r.person_ark && r.record_ark);
+            if (stillMissing.length === 0) return;
+            await new Promise((resolve) => setTimeout(resolve, roundDelayMs));
+            for (const row of stillMissing) {
+                const resolved = fsPersonArkFromAttachments(row.record_ark);
+                if (resolved) row.person_ark = resolved;
+            }
+        }
+    }
+
+    // Builds the same prose citation_text string FS.py's parse_citation()/
+    // parse_nara_citing_clause() already regex-parse, entirely from JSON fields, so the
+    // Names-panel extraction path no longer depends on scrapeCitationAndCatalog()'s UI read
+    // for citation/location data (rows already came from the JSON path - see
+    // fsBuildRowsFromApiResponse). collectionName/url/imageNumber/imageTotal come from the
+    // caller - DOM/window reads with no JSON source in this endpoint's response, same caveat
+    // fsBuildCitationTextFromImageIndexResponse already carries for imageNumber/imageTotal.
+    function fsBuildCitationTextFromApiResponse(apiResponse, byId, primaryPerson, {collectionName = '', url = '', imageNumber, imageTotal} = {}) {
+        const date = new Date().toLocaleDateString('en-US', {day: 'numeric', month: 'long', year: 'numeric'});
+
+        const browsePath = fsResidencePlaceToBrowsePath(fsPersonResidencePlace(byId, primaryPerson));
+        if (imageNumber && imageTotal) browsePath.push(`image ${imageNumber} of ${imageTotal}`);
+
+        const publication = fsImageLevelFieldText(apiResponse, 'EXT_FILM_NBR');
+        const rawRepoName = fsImageLevelFieldText(apiResponse, 'EXT_REPOSITORY_NAME');
+        // Same trailing "(NARA)" stripping as fsBuildCitationTextFromImageIndexResponse -
+        // confirmed live EXT_REPOSITORY_NAME carries the identical suffix ("The U.S. National
+        // Archives and Records Administration (NARA)").
+        const repoName = rawRepoName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        const repoLoc = 'Washington D.C.';
+
+        let text = `"${collectionName}," database with images, FamilySearch (${url} : ${date}), ${browsePath.join(' > ')}`;
+        if (publication && repoName) {
+            text += `; citing NARA microfilm publication ${publication} (${repoLoc}: ${repoName}, n.d.).`;
+        } else {
+            text += '.';
+        }
+        return text;
     }
 
     // filmdatainfo/image-data parsing (the "Image Index" page's own data source, reached via
@@ -357,63 +576,60 @@
         return (list || []).find((item) => item.type === type) || null;
     }
 
-    function fsCanonicalFieldsFromImageIndexPerson(person) {
-        const facts = (person && person.facts) || [];
-        const fields = (person && person.fields) || [];
+    // GedcomX type URIs are the closest thing this API has to a "raw field name" - keyed by
+    // their trailing path segment (e.g. "http://gedcomx.org/MaritalStatus" -> "MaritalStatus")
+    // rather than translated to a human-friendly label, same "capture everything, rename
+    // nothing at extraction time" direction as fsRawFieldsFromApiPerson above.
+    function fsLastUriSegment(uri) {
+        if (!uri) return '';
+        const parts = String(uri).split('/');
+        return parts[parts.length - 1] || String(uri);
+    }
 
-        const nameForm = person && person.names && person.names[0] && person.names[0].nameForms && person.names[0].nameForms[0];
-        const parts = (nameForm && nameForm.parts) || [];
-        const surnamePart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Surname');
-        const givenPart = fsImageIndexFindByType(parts, 'http://gedcomx.org/Given');
-
-        const genderType = person && person.gender && person.gender.type;
-        const sex = genderType === 'http://gedcomx.org/Male' ? 'M'
-            : genderType === 'http://gedcomx.org/Female' ? 'F' : '';
-
-        const birthFact = fsImageIndexFindByType(facts, 'http://gedcomx.org/Birth');
-        const birthPlaceField = birthFact && birthFact.place
-            ? fsImageIndexFindByType(birthFact.place.fields, 'http://gedcomx.org/Place') : null;
-
-        return {
-            givenName: givenPart ? (givenPart.value || '') : '',
-            surname: surnamePart ? (surnamePart.value || '') : '',
-            sex,
-            age: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/Age')),
-            birthplace: fsImageIndexFieldText(birthPlaceField),
-            // SourceHouseholdId and HouseholdId are confirmed distinct type URIs backing
-            // SOURCE_HOUSEHOLD_ID and FS_HOUSEHOLD_ID respectively - same precedence
-            // relationship as the orchestration API (see fsColumnsFromCanonicalFields).
-            householdIdSource: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/SourceHouseholdId')),
-            householdIdFs: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/HouseholdId')),
-            relationshipToHead: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://gedcomx.org/RelationshipToHead')),
-            maritalStatus: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/MaritalStatus')),
-            occupation: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Occupation')),
-            race: fsImageIndexFieldText(fsImageIndexFindByType(facts, 'http://gedcomx.org/Race')),
-            fatherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/FatherBirthPlace')),
-            motherBirthplace: fsImageIndexFieldText(fsImageIndexFindByType(fields, 'http://familysearch.org/types/fields/MotherBirthPlace')),
-        };
+    function fsRawFieldsFromImageIndexPerson(person) {
+        const raw = {};
+        const nameForm = person && person.names && person.names[0]
+            && person.names[0].nameForms && person.names[0].nameForms[0];
+        for (const part of (nameForm && nameForm.parts) || []) {
+            if (part.type) raw[fsLastUriSegment(part.type)] = part.value || '';
+        }
+        if (person && person.gender && person.gender.type) {
+            raw.Gender = fsLastUriSegment(person.gender.type);
+        }
+        for (const field of (person && person.fields) || []) {
+            if (field.type) raw[fsLastUriSegment(field.type)] = fsImageIndexFieldText(field);
+        }
+        for (const fact of (person && person.facts) || []) {
+            if (!fact.type) continue;
+            const key = fsLastUriSegment(fact.type);
+            raw[key] = fsImageIndexFieldText(fact);
+            // A fact's place can be a single "Place" field (Birth) or several sub-fields
+            // (Census: State/County/Township/District) - walk all of them rather than
+            // looking for one specific type, so nothing under place.fields is missed.
+            for (const placeField of (fact.place && fact.place.fields) || []) {
+                if (placeField.type) raw[`${key}_${fsLastUriSegment(placeField.type)}`] = fsImageIndexFieldText(placeField);
+            }
+        }
+        return raw;
     }
 
     function fsBuildRowsFromImageIndexResponse(apiResponse) {
         const rows = [];
         const records = (apiResponse && apiResponse.records) || [];
-        records.forEach((record, recordIndex) => {
+        records.forEach((record) => {
             (record.persons || []).forEach((person) => {
-                const canonicalFields = fsCanonicalFieldsFromImageIndexPerson(person);
-                const columns = fsColumnsFromCanonicalFields(canonicalFields, recordIndex + 1);
+                const columns = fsRawFieldsFromImageIndexPerson(person);
 
                 // identifiers[...][0] is a full URL (.../ark:/61903/1:1:XXXX-XXX) - extract
                 // just the "1:1:XXXX-XXX" segment to match the orchestration-API path's own
-                // person_ark convention (a bare ark, not a full URL).
+                // record_ark convention (a bare ark, not a full URL).
                 const identifierUrl = (person.identifiers
                     && person.identifiers['http://gedcomx.org/Persistent']
                     && person.identifiers['http://gedcomx.org/Persistent'][0]) || '';
                 const arkMatch = identifierUrl.match(/(1:1:[A-Z0-9-]+)/);
+                const recordArk = arkMatch ? arkMatch[1] : '';
 
-                // Tree-attachment link shape not yet confirmed against a real tree-attached
-                // person (see this plan's Task 2 notes) - left empty rather than guessed,
-                // same "don't fabricate" convention as everywhere else in this file.
-                rows.push({columns, person_ark: arkMatch ? arkMatch[1] : '', attached_fsftid: ''});
+                rows.push({columns, record_ark: recordArk, person_ark: fsPersonArkFromAttachments(recordArk)});
             });
         });
         return rows;
@@ -521,7 +737,8 @@
         // iframe even when same-origin. The parent does the actual click instead, in the
         // same top-level context that already reliably downloads the JSON.
         const match = window.location.pathname.match(/\/dz\/v1\/([^/]+)\/\$dist/);
-        const itemId = match ? decodeURIComponent(match[1]) : "unknown_item";
+        let itemId = match ? decodeURIComponent(match[1]) : "unknown_item";
+        itemId = itemId.replace(/^(3:1:3|1:1:)/, '');
         const fileName = `${itemId.replace(/[^a-zA-Z0-9_-]/g, '_')}.jpg`;
 
         fetch(window.location.href)
@@ -1027,7 +1244,7 @@
                 state = pathArr[0] || "";
                 county = pathArr[1] || "";
                 city = pathArr[2] || "";
-                country = ancestryCountryFromState(state);
+                country = getCountryFromState(state);
                 const ed = getEnumerationDistrict(pathArr, info?.structureType);
                 enumerationDistrict = ed.value;
                 placeDetails = pathArr.slice(3).filter((_, i) => (i + 3) !== ed.index).join(" - ") || "";
@@ -1183,7 +1400,7 @@
             const {year, locationStr} = getYearAndLocation();
             const payload = {
                 census_year: year, location: locationStr, pages: accumulatedPages,
-                incomplete_pages: ancestryIncompletePagesSummary(accumulatedPages),
+                incomplete_pages: incompleteItemsSummary(accumulatedPages),
             };
             triggerJsonDownload(JSON.stringify(payload, null, 2), `${year} - ${locationStr} - ANC.json`);
             if (window.showToast) window.showToast("Success! Master JSON Downloaded.", "success", 5000);
@@ -1276,7 +1493,7 @@
                 await runAncestryRetryPass();
                 return;
             }
-            const incomplete = ancestryIncompletePagesSummary(accumulatedPages);
+            const incomplete = incompleteItemsSummary(accumulatedPages);
             if (incomplete.length > 0) {
                 const pageList = incomplete.map((p) => p.page_number).join(', ');
                 if (window.showToast) {
@@ -1381,9 +1598,20 @@
         let accumulatedItems = [];
         let seenItemIds = new Set();
         let itemsAtLastCheckpoint = 0;
+        // Collection-level (not per-image) - FamilySearch's own "Information" tab is the
+        // only place that exposes the real numeric collection id (see
+        // scrapeFsCollectionInfo() below); scraped once per run and persisted through every
+        // "Next Image" reload the same way accumulatedItems/seenItemIds already are, since
+        // every image in one gather belongs to the same one collection.
+        let fsCollectionId = '';
+        let fsCollectionName = '';
 
-        const shouldAutoStart = window.location.href.includes('mgs_auto=1');
         const runId = new URLSearchParams(window.location.search).get('mgs_run') || 'norun';
+        // isFsRunStopped() check: see FS_STOPPED_RUNS_KEY's own note - covers the narrower
+        // race stopBatch()'s URL-strip alone can't (a navigation already in flight when Stop
+        // was clicked, landing on a page whose URL was already committed with mgs_auto=1
+        // still baked in).
+        const shouldAutoStart = window.location.href.includes('mgs_auto=1') && !isFsRunStopped(runId);
 
         // A genuine FamilySearch page navigation from clicking "Next Image" (see
         // goToNextImage/FS_RELOAD_STATE_KEY's own note) re-runs this whole script from
@@ -1405,6 +1633,8 @@
             pagesNeedingRetry = resumedFsState.pagesNeedingRetry;
             inRetryPhase = resumedFsState.retryPhase;
             currentRetryTarget = resumedFsState.currentRetryTarget;
+            fsCollectionId = resumedFsState.collectionId;
+            fsCollectionName = resumedFsState.collectionName;
             isResumingFsState = true;
             clearFsReloadState();
         }
@@ -1428,8 +1658,41 @@
             // MutationObserver would never see it, so waiters are notified directly here
             // instead of relying on that helper's DOM-mutation-driven re-checks.
             unsafeWindow.__voyageurFsApiWaiters = {};
+            // True Family Tree person id (entityId) per record-scoped ark, keyed exactly
+            // like record_ark ("1:1:XXXX-XXX") - populated from
+            // /service/tree/links/sources/attachments below. Confirmed live 2026-08-21: this
+            // endpoint fires automatically once the Names panel loads (a batch covering
+            // every person on the page/household, not scoped to one persona and not
+            // requiring any click) with response shape
+            // {attachedSourcesMap: {"<full ark URL>": [{persons: [{entityId: "<tree id, e.g.
+            // KLBM-H9P>", ...}], sourceId: "..."}]}} - entityId is the id shown in the UI's
+            // "Attached in Tree to ... <id>" text, absent from the orchestration API
+            // response itself (see docs/plans/2026-08-20-familysearch-viewer-rebuild.md
+            // Task 4). Not every persona has an entry here - most historical personas were
+            // never attached to a Tree profile by anyone; absence is the common case, not
+            // an error.
+            unsafeWindow.__voyageurFsAttachments = {};
+            // Confirmed live 2026-08-21 (console capture across a real multi-image gather):
+            // this endpoint's response routinely arrives AFTER the orchestration API's own
+            // response for the same image - fsBuildRowsFromApiResponse() runs as soon as the
+            // (usually faster) orchestration response lands and calls
+            // fsPersonArkFromAttachments() synchronously right then, so it was reading this
+            // map before the correct entityId had even been stored - a real, confirmed
+            // person_ark (e.g. Jess G Crowston's KLBM-H9P) was found empty at row-build time,
+            // then successfully stored a moment later, too late to help that row. These two
+            // fields let buildFsItemData() await this response (see waitForFsAttachments
+            // below) before building rows, not just fire in whatever order the two network
+            // calls happen to land in. __voyageurFsAttachmentsRequested is set the moment the
+            // outgoing request is observed (not when it resolves) - condition-based, not a
+            // fixed delay: a page where this endpoint is never called at all (most historical
+            // personas were never attached) skips waiting entirely instead of sitting through
+            // an arbitrary timeout for a response that was never coming.
+            unsafeWindow.__voyageurFsAttachmentsRequested = false;
+            unsafeWindow.__voyageurFsAttachmentsArrived = false;
+            unsafeWindow.__voyageurFsAttachmentsWaiters = [];
 
             const FS_API_TARGET = '/service/records/volunteer/orchestration/sls/image/';
+            const FS_ATTACHMENTS_TARGET = '/service/tree/links/sources/attachments';
 
             function fsApiArkFromUrl(url) {
                 const match = url.match(/\/image\/([^/?#]+)/);
@@ -1450,12 +1713,57 @@
                 }
             }
 
+            function storeFsAttachmentsResponse(bodyText) {
+                try {
+                    const parsed = JSON.parse(bodyText);
+                    const map = parsed.attachedSourcesMap || {};
+                    const rawKeys = Object.keys(map);
+                    // TEMPORARY diagnostic (2026-08-21): person_ark keeps coming back empty/
+                    // wrong for a person confirmed live to have a real Tree attachment
+                    // (Jess G Crowston / KLBM-H9P) - logging the raw response shape here.
+                    console.log(`[Voyageur FS ARK] attachments response: ${rawKeys.length} source(s)`, rawKeys);
+                    for (const arkUri of rawKeys) {
+                        const entry = map[arkUri][0];
+                        const person = entry && entry.persons && entry.persons[0];
+                        if (person && person.entityId) {
+                            // Store the full DECODED uri as
+                            // the key, not a regex-extracted ark - fsPersonArkFromAttachments()
+                            // now matches by substring against this, so it no longer matters
+                            // whether the uri carries anything beyond the bare persona ark
+                            // (trailing path segments, etc.) that an exact-key lookup would
+                            // have missed.
+                            const decodedUri = decodeURIComponent(arkUri);
+                            unsafeWindow.__voyageurFsAttachments[decodedUri] = person.entityId;
+                            console.log(`[Voyageur FS ARK] stored ${decodedUri} -> ${person.entityId}`);
+                        } else {
+                            console.log(`[Voyageur FS ARK] no entityId for uri ${arkUri}`, entry);
+                        }
+                    }
+                } catch (e) {
+                    // Leave unset - a true person_ark simply won't be found for any ark in
+                    // this batch, matching the "don't fabricate" convention everywhere else.
+                    console.log('[Voyageur FS ARK] failed to parse attachments response:', e);
+                } finally {
+                    // Resolve even on a parse failure - "a response arrived (however
+                    // unusable)" is still the correct signal to stop waitForFsAttachments()
+                    // from blocking on a reply that already came and went.
+                    unsafeWindow.__voyageurFsAttachmentsArrived = true;
+                    const waiters = unsafeWindow.__voyageurFsAttachmentsWaiters.splice(0);
+                    waiters.forEach((resolve) => resolve());
+                }
+            }
+
             const origFsXhrOpen = unsafeWindow.XMLHttpRequest.prototype.open;
             unsafeWindow.XMLHttpRequest.prototype.open = function (method, url) {
                 this.__voyageurFsApiUrl = url;
+                if (url && url.includes(FS_ATTACHMENTS_TARGET)) {
+                    unsafeWindow.__voyageurFsAttachmentsRequested = true;
+                }
                 this.addEventListener('load', function () {
                     if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_API_TARGET)) {
                         storeFsApiResponse(this.__voyageurFsApiUrl, this.responseText);
+                    } else if (this.__voyageurFsApiUrl && this.__voyageurFsApiUrl.includes(FS_ATTACHMENTS_TARGET)) {
+                        storeFsAttachmentsResponse(this.responseText);
                     }
                 });
                 return origFsXhrOpen.apply(this, arguments);
@@ -1464,12 +1772,69 @@
             const origFsFetch = unsafeWindow.fetch;
             unsafeWindow.fetch = async function (...args) {
                 const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+                if (url.includes(FS_ATTACHMENTS_TARGET)) {
+                    unsafeWindow.__voyageurFsAttachmentsRequested = true;
+                }
                 const resp = await origFsFetch.apply(this, args);
                 if (url.includes(FS_API_TARGET)) {
                     resp.clone().text().then((t) => storeFsApiResponse(url, t));
+                } else if (url.includes(FS_ATTACHMENTS_TARGET)) {
+                    resp.clone().text().then((t) => storeFsAttachmentsResponse(t));
                 }
                 return resp;
             };
+        }
+
+        // Lets buildFsItemData() await this endpoint's response before building rows - see
+        // the note on __voyageurFsAttachmentsArrived above for why this matters. Condition-
+        // based, not a fixed delay: gated on whether the request was actually observed at
+        // all (most historical personas were never attached, so most pages never call this
+        // endpoint), not on a blind timeout. requestGraceMs only covers the narrow window
+        // where the orchestration API response (which this function is awaited right after)
+        // and the attachments request can be dispatched within the same tick - real
+        // uncertainty about dispatch ORDER, not about whether the response has arrived yet
+        // (that part is resolved eagerly the instant it lands, via the waiters array, not
+        // polled). timeoutMs is a last-resort ceiling for a request that was genuinely
+        // observed but never got a response (network failure, backgrounded tab) - the same
+        // accepted pattern waitForFsApiResponse already uses for its own network wait.
+        async function waitForFsAttachments({timeoutMs = 3000, requestGraceMs = 300} = {}) {
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) {
+                console.log('[Voyageur FS ARK] waitForFsAttachments: already arrived, not waiting.');
+                return;
+            }
+
+            if (!unsafeWindow.__voyageurFsAttachmentsRequested) {
+                await new Promise((resolve) => setTimeout(resolve, requestGraceMs));
+                if (!unsafeWindow.__voyageurFsAttachmentsRequested) {
+                    console.log(`[Voyageur FS ARK] waitForFsAttachments: no request observed after `
+                        + `${requestGraceMs}ms grace - not waiting further.`);
+                    return;
+                }
+            }
+
+            if (unsafeWindow.__voyageurFsAttachmentsArrived) {
+                console.log('[Voyageur FS ARK] waitForFsAttachments: response arrived during grace window.');
+                return;
+            }
+
+            console.log('[Voyageur FS ARK] waitForFsAttachments: request observed, waiting for response...');
+            const startedAt = performance.now();
+            let timedOut = true;
+            await new Promise((resolve) => {
+                const timer = setTimeout(resolve, timeoutMs);
+                unsafeWindow.__voyageurFsAttachmentsWaiters.push(() => {
+                    clearTimeout(timer);
+                    timedOut = false;
+                    resolve();
+                });
+            });
+            const elapsedMs = Math.round(performance.now() - startedAt);
+            if (timedOut) {
+                console.log(`[Voyageur FS ARK] waitForFsAttachments: TIMED OUT after ${elapsedMs}ms - `
+                    + `proceeding without it.`);
+            } else {
+                console.log(`[Voyageur FS ARK] waitForFsAttachments: response arrived after ${elapsedMs}ms.`);
+            }
         }
 
         // Instant resolution if the response already arrived before this was called (the API
@@ -1659,28 +2024,6 @@
         // ==========================================
         // DOM HELPERS
         // ==========================================
-        function findByExactText(selector, text) {
-            // FamilySearch's own CSS class names aren't a stable target (same reasoning as
-            // Ancestry's findLeafByExactText) - match by visible text instead.
-            const candidates = document.querySelectorAll(selector);
-            for (const el of candidates) {
-                if (el.textContent.trim() === text) return el;
-            }
-            return null;
-        }
-
-        async function clickTab(tabText) {
-            // Event-driven (see waitForCondition) rather than polling every 100ms for up to
-            // 5s. No settle delay after the click either - every caller already waits on its
-            // own specific downstream condition (real citation text, an actually-populated
-            // table) rather than assuming a fixed delay is enough.
-            const tabWait = await waitForCondition(() => findByExactText('[role="tab"], button, a', tabText),
-                {timeoutMs: 5000});
-            if (!tabWait.result) return false;
-            tabWait.result.click();
-            return true;
-        }
-
         function getItemId() {
             const match = window.location.pathname.match(/ark:\/61903\/([^/?#]+)/);
             return match ? decodeURIComponent(match[1]) : "";
@@ -1689,60 +2032,82 @@
         // ==========================================
         // SCRAPING
         // ==========================================
-        async function scrapeCitationAndCatalog() {
-            const ok = await clickTab('Information');
-            if (!ok) return {citationText: "", catalogItems: []};
-
-            // FamilySearch renders the "Citation" heading immediately on tab switch but fills in
-            // the actual prose a beat later, showing a literal "No citation is available." placeholder
-            // in the meantime - waiting only for the heading to exist (rather than for real text to
-            // replace the placeholder) meant every image after the first got its citation scraped
-            // before it was ready. Event-driven (see waitForCondition) rather than polling every
-            // 200ms for up to 10s.
-            const citationWait = await waitForCondition(() => {
-                const citationHeading = findByExactText('h1, h2, h3, h4, h5, h6', 'Citation');
-                if (!citationHeading) return null;
-                // The citation prose sits alongside the heading inside the same panel; grab the
-                // panel's text and strip the heading/button lines around it rather than assuming
-                // a specific sibling structure, since that's the part most likely to shift.
-                const panelText = citationHeading.parentElement ? citationHeading.parentElement.innerText : "";
-                const match = panelText.match(/Citation\s*\n+([\s\S]*?)(?:\n+COPY CITATION|$)/i);
-                const candidateText = match ? match[1].trim() : "";
-                return (candidateText && candidateText.toLowerCase() !== 'no citation is available.') ? candidateText : null;
-            }, {timeoutMs: 10000});
-            const citationText = citationWait.result || "";
-
-            const catalogItems = [];
-            const table = document.querySelector('table');
-            if (table) {
-                const rows = [...table.querySelectorAll('tr')];
-                for (const row of rows.slice(1)) {
-                    const cells = [...row.querySelectorAll('th, td')];
-                    if (cells.length >= 3) {
-                        catalogItems.push({
-                            label: (cells[0].innerText || '').trim(),
-                            item_number: (cells[1].innerText || '').trim(),
-                            note: (cells[2].innerText || '').trim()
-                        });
-                    }
-                }
-            }
-
-            return {citationText, catalogItems};
-        }
-
         // Runs once per image, before either data source is awaited. Names/Image Index tab
         // presence is the ground truth of which page actually rendered - confirmed live this
         // is a navigation-method split (Search -> Names panel, Image Browser -> Image Index),
         // not something inferable from the URL. Event-driven via the existing
-        // waitForCondition convention, same as clickTab() above.
+        // waitForCondition convention.
         async function detectFsPageType({timeoutMs = 15000} = {}) {
             const wait = await waitForCondition(() => {
-                if (findByExactText('[role="tab"], button, a', 'Names')) return 'names';
-                if (findByExactText('[role="tab"], button, a', 'Image Index')) return 'image-index';
+                if (findByAriaLabel('[role="tab"], button, a', 'Names')
+                    || findByExactText('[role="tab"], button, a', 'Names')) return 'names';
+                if (findByAriaLabel('[role="tab"], button, a', 'Image Index')
+                    || findByExactText('[role="tab"], button, a', 'Image Index')) return 'image-index';
                 return null;
             }, {timeoutMs});
             return wait.result;
+        }
+
+        // FamilySearch's own "Information" tab (confirmed live 2026-08-21) is the only place
+        // that exposes the real numeric FamilySearch collection id - citation_text never
+        // carries a `cc=`-style query param under this architecture (Voyageur.js's own
+        // navigate URL, not FamilySearch's catalog browse URL, is what ends up in the
+        // citation), and the records/images/orchestration GraphQL API's `artifact`/
+        // `getArtifactParent`/`group` queries all require an internal id format that
+        // couldn't be reverse-engineered from the image ark. The Information panel's
+        // "Historical Record Collection" link (as opposed to the "Catalog Collection" link
+        // right above it) reliably points to /en/search/collection/<id> - unambiguous to
+        // select via the href pattern alone, no text-matching needed. Called once per run
+        // (gated by fsCollectionId being falsy) since every image in one gather belongs to
+        // the same collection - switches to Information, scrapes, then switches back to
+        // whichever tab (Names/Image Index) this page actually started on so the rest of
+        // buildFsItemData's existing per-image flow is unaffected.
+        async function scrapeFsCollectionInfo(pageType) {
+            const infoTab = findByAriaLabel('[role="tab"], button, a', 'Information')
+                || findByExactText('[role="tab"], button, a', 'Information');
+            if (!infoTab) {
+                debugLog('Information tab not found - collection_id will stay blank.');
+                return {collectionId: '', collectionName: ''};
+            }
+            infoTab.click();
+
+            const linkWait = await waitForCondition(
+                () => document.querySelector('a[href*="/search/collection/"]'),
+                {timeoutMs: 10000}
+            );
+            let collectionId = '', collectionName = '';
+            if (linkWait.result) {
+                const href = linkWait.result.getAttribute('href') || '';
+                const idMatch = href.match(/\/search\/collection\/(\d+)/);
+                if (idMatch) collectionId = idMatch[1];
+                collectionName = linkWait.result.textContent.trim();
+            } else {
+                debugLog(`Information panel collection link never appeared (${linkWait.elapsedMs}ms) - collection_id will stay blank.`);
+            }
+
+            const backLabel = pageType === 'image-index' ? 'Image Index' : 'Names';
+            const backTab = findByAriaLabel('[role="tab"], button, a', backLabel)
+                || findByExactText('[role="tab"], button, a', backLabel);
+            if (backTab) {
+                backTab.click();
+                await waitForCondition(() => !document.querySelector('a[href*="/search/collection/"]'), {timeoutMs: 5000});
+            }
+
+            return {collectionId, collectionName};
+        }
+
+        function parseFsLocationFromBrowsePath(browsePathArray) {
+            let state = "", county = "", city = "", ed = "";
+            let segments = browsePathArray.filter(s => !/^image\s+\d+\s+of\s+\d+$/i.test(s));
+            let edIndex = segments.findIndex(s => /\bED\b|enumeration district/i.test(s));
+            if (edIndex !== -1) {
+                ed = segments[edIndex];
+                segments.splice(edIndex, 1);
+            }
+            if (segments.length > 0) state = segments[0];
+            if (segments.length > 1) county = segments[1];
+            if (segments.length > 2) city = segments[2];
+            return { state, county, city, enumeration_district: ed };
         }
 
         async function buildFsItemData(itemId) {
@@ -1751,6 +2116,7 @@
             let citationText = '';
             let catalogItems = [];
             let incomplete = false;
+            let locationInfo = { state: "", county: "", city: "", enumeration_district: "" };
 
             if (pageType === 'image-index') {
                 const apiWait = await waitForFsImageIndexResponse(itemId);
@@ -1761,37 +2127,102 @@
                         imageNumber: imageMatch ? imageMatch[1] : undefined,
                         imageTotal: imageMatch ? imageMatch[2] : undefined,
                     });
+                    
+                    const record = ((apiWait.result && apiWait.result.records) || [])[0];
+                    const headPerson = record ? (record.persons || [])[0] : null;
+                    const censusFact = headPerson ? fsImageIndexFindByType(headPerson.facts || [], 'http://gedcomx.org/Census') : null;
+                    const browsePath = fsImageIndexBrowsePathSegments(censusFact);
+                    locationInfo = parseFsLocationFromBrowsePath(browsePath);
                 } else {
                     incomplete = true;
                     debugLog(`No Image-Index response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
                     if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
-                const catalog = await scrapeCitationAndCatalog();
-                catalogItems = catalog.catalogItems;
+                // No DOM scraping needed for image-index pages (fixes missing-panel errors).
             } else if (pageType === 'names') {
                 const apiWait = await waitForFsApiResponse(itemId);
                 if (apiWait.result) {
+                    // Confirmed live 2026-08-21: "Next Image" turned out to be a client-side
+                    // route change, NOT a full page reload as this file's own comments assumed
+                    // elsewhere (confirmed by injecting a probe script that survived the
+                    // navigation) - unsafeWindow, and everything on it, persists across every
+                    // image in one gather, not just within one. Without this reset,
+                    // __voyageurFsAttachmentsArrived - and __voyageurFsAttachmentsRequested -
+                    // go true on the FIRST image's attachments response and stay true forever,
+                    // so waitForFsAttachments() on every later image short-circuits on a STALE
+                    // flag instead of waiting for THIS image's own batch - confirmed live as
+                    // the real cause of Jess G Crowston's real KLBM-H9P mapping (present and
+                    // correctly keyed in the raw response, per a direct capture) never reaching
+                    // his row. __voyageurFsAttachments itself (the map of already-seen
+                    // mappings) is deliberately NOT cleared here - those entries stay correct
+                    // and harmless to keep across images, only the per-image "have we heard
+                    // back yet" flags need to start fresh.
+                    if (typeof unsafeWindow !== 'undefined') {
+                        unsafeWindow.__voyageurFsAttachmentsArrived = false;
+                        unsafeWindow.__voyageurFsAttachmentsRequested = false;
+                    }
+                    await waitForFsAttachments();
                     rows = fsBuildRowsFromApiResponse(apiWait.result);
+                    // The attachments endpoint can fire again after this point with a LATER
+                    // batch covering people the first response didn't - see
+                    // backfillFsPersonArks's own note.
+                    await backfillFsPersonArks(rows);
+                    const byId = buildFsElementIndex(apiWait.result);
+                    const primaryPerson = (apiWait.result.elements || []).find((e) => e.elementType === 'PERSON' && e.primary);
+                    const imageMatch = document.body.innerText.match(/Image\s+(\d+)\s+of\s+(\d+)/i);
+                    citationText = fsBuildCitationTextFromApiResponse(apiWait.result, byId, primaryPerson, {
+                        collectionName: document.title,
+                        url: window.location.href,
+                        imageNumber: imageMatch ? imageMatch[1] : undefined,
+                        imageTotal: imageMatch ? imageMatch[2] : undefined,
+                    });
+                    locationInfo = fsImageLevelLocation(apiWait.result);
                 } else {
                     incomplete = true;
                     debugLog(`No orchestration-API response arrived for item ${itemId} after ${apiWait.elapsedMs}ms.`);
                     if (window.fsShowToast) window.fsShowToast('No index data received for this image.', 'error', 4000);
                 }
-                const citation = await scrapeCitationAndCatalog();
-                citationText = citation.citationText;
-                catalogItems = citation.catalogItems;
+                // No DOM scraping needed for the Names panel either now, matching the
+                // Image-Index path above. catalogItems stays [] - roll_number still resolves
+                // downstream via nara_info['publication'] parsed from citationText's own NARA
+                // clause (FS.py's build_census_json), same fallback the Image-Index path
+                // already relies on.
             } else {
                 incomplete = true;
                 debugLog(`Neither Names nor Image Index tab found for item ${itemId} - unrecognized page shape.`);
                 if (window.fsShowToast) window.fsShowToast('Unrecognized page.', 'error', 4000);
             }
 
-            return {item_id: itemId, citation_text: citationText, catalog_items: catalogItems, rows, incomplete};
+            return {
+                item_id: itemId,
+                citation_text: citationText,
+                catalog_items: catalogItems,
+                rows,
+                incomplete,
+                country: getCountryFromState(locationInfo.state),
+                state: locationInfo.state,
+                county: locationInfo.county,
+                city: locationInfo.city,
+                enumeration_district: locationInfo.enumeration_district,
+                collection_id: fsCollectionId,
+                collection_name: fsCollectionName
+            };
         }
 
+        // Returns {progressed} rather than silently returning on an already-seen/missing
+        // itemId - a bounded browse set (e.g. one enumeration district's own image count)
+        // doesn't always give goToNextImage() a genuine dead end (a disabled/absent "Next"
+        // button): FamilySearch's own navigation can instead wrap back around to an image
+        // already gathered, or land somewhere with no parseable ark at all. Silently
+        // returning here (the prior behavior) gave runLoop() no way to distinguish that from
+        // real forward progress, so it kept calling goToNextImage() and cycling through the
+        // same already-seen images forever instead of ever reaching stopBatch() - confirmed
+        // live: a completed 14-image gather kept "flashing" between images indefinitely
+        // instead of downloading its final JSON.
         async function scrapeCurrentImage() {
             const itemId = getItemId();
-            if (!itemId || seenItemIds.has(itemId)) return;
+            if (!itemId) return {progressed: false, reason: 'no-item-id'};
+            if (seenItemIds.has(itemId)) return {progressed: false, reason: 'already-seen'};
 
             const itemData = await buildFsItemData(itemId);
             await downloadFsImage(itemId);
@@ -1803,6 +2234,7 @@
             }
 
             debugLog(`Scraped item ${itemId}: ${itemData.rows.length} index rows.`);
+            return {progressed: true};
         }
 
         // FamilySearch's account-level "explore" record view (reached, confirmed live, via
@@ -1902,7 +2334,7 @@
                 const prevUrl = window.location.href;
                 nextBtn.click();
                 // No post-nav settle delay needed - scrapeCurrentImage's own downstream
-                // waits (waitForFsApiResponse/scrapeCitationAndCatalog) already handle "has
+                // waits (waitForFsApiResponse/waitForFsImageIndexResponse) already handle "has
                 // the new page's content rendered yet" on their own terms.
                 const navWait = await waitForCondition(() => window.location.href !== prevUrl,
                     {timeoutMs: 10000});
@@ -1915,9 +2347,32 @@
         // BATCH LOOP
         // ==========================================
         async function runLoop() {
+            if (!fsCollectionId) {
+                const pageType = await detectFsPageType();
+                const info = await scrapeFsCollectionInfo(pageType);
+                fsCollectionId = info.collectionId;
+                fsCollectionName = info.collectionName;
+                saveFsReloadState(runId, {
+                    accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
+                    pagesNeedingRetry, retryPhase: inRetryPhase, currentRetryTarget,
+                    collectionId: fsCollectionId, collectionName: fsCollectionName,
+                });
+            }
             while (isRunning) {
                 if (window.fsShowToast) window.fsShowToast(`Gathering ${getItemId()}...`, 'success', 1200);
-                await scrapeCurrentImage();
+                const {progressed, reason} = await scrapeCurrentImage();
+                if (!progressed) {
+                    debugLog(`scrapeCurrentImage made no progress (${reason}) - treating as end of batch.`);
+                    if (window.fsShowToast) {
+                        window.fsShowToast(
+                            reason === 'already-seen'
+                                ? 'Reached an already-gathered image - stopping.'
+                                : 'Could not identify this page - stopping.',
+                            'success', 3000);
+                    }
+                    stopBatch();
+                    break;
+                }
 
                 if (accumulatedItems.length - itemsAtLastCheckpoint >= FS_CHECKPOINT_INTERVAL_ITEMS) {
                     downloadCheckpointJson();
@@ -1930,7 +2385,10 @@
                 // goToNextImage() itself ever called location.reload(). Without this,
                 // accumulatedItems reset to empty on the next injection and only the LAST
                 // scraped item ever reached the final JSON - confirmed live.
-                saveFsReloadState(runId, {accumulatedItems, seenItemIds, itemsAtLastCheckpoint});
+                saveFsReloadState(runId, {
+                    accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
+                    collectionId: fsCollectionId, collectionName: fsCollectionName,
+                });
 
                 const {advanced, timedOut} = await goToNextImage();
                 if (!advanced) {
@@ -1946,7 +2404,7 @@
                 await runFsRetryPass();
                 return;
             }
-            const incomplete = fsIncompleteItemsSummary(accumulatedItems);
+            const incomplete = incompleteItemsSummary(accumulatedItems);
             if (incomplete.length > 0) {
                 const idList = incomplete.map((i) => i.item_id).join(', ');
                 if (window.fsShowToast) {
@@ -1962,6 +2420,7 @@
             saveFsReloadState(runId, {
                 accumulatedItems, seenItemIds, itemsAtLastCheckpoint,
                 pagesNeedingRetry, retryPhase: true, currentRetryTarget: target,
+                collectionId: fsCollectionId, collectionName: fsCollectionName,
             });
             window.location.href = buildRetryNavigationUrl(target.url, runId);
         }
@@ -2068,15 +2527,34 @@
         }
 
         function downloadFinalJson() {
-            if (accumulatedItems.length === 0) {
+            // A reload wiping in-memory accumulatedItems (see FS_RELOAD_STATE_KEY's own
+            // note - "Next Image" is a real page navigation, re-running this whole script
+            // from scratch on every image) can land right before this runs, leaving
+            // accumulatedItems empty in memory even after a real, multi-image gather -
+            // confirmed live: "Stop & Download" appearing to do nothing was this exact
+            // case, not a download-mechanism failure. saveFsReloadState() is called before
+            // every single navigation attempt in runLoop(), so sessionStorage almost always
+            // holds a snapshot at least as complete as whatever survived in memory - fall
+            // back to it rather than declaring "no data gathered" and giving up.
+            let items = accumulatedItems;
+            if (items.length === 0) {
+                const persisted = loadFsReloadState(runId);
+                if (persisted && persisted.accumulatedItems && persisted.accumulatedItems.length > 0) {
+                    items = persisted.accumulatedItems;
+                    debugLog(`downloadFinalJson: in-memory accumulatedItems was empty, recovered `
+                        + `${items.length} item(s) from reload state.`);
+                }
+            }
+
+            if (items.length === 0) {
                 if (window.fsShowToast) window.fsShowToast('No data gathered to download.', 'error');
                 return;
             }
 
             const collectionTitle = document.title || 'FamilySearch Gather';
             const payload = {
-                source: 'FS', collection_title: collectionTitle, items: accumulatedItems,
-                incomplete_pages: fsIncompleteItemsSummary(accumulatedItems),
+                source: 'FS', collection_title: collectionTitle, items: items,
+                incomplete_pages: incompleteItemsSummary(items),
             };
             const safeName = collectionTitle.replace(/[/\\?%*:|"<>]/g, '-').slice(0, 120);
             triggerFsJsonDownload(JSON.stringify(payload, null, 2), `FS - ${safeName}.json`);
@@ -2103,6 +2581,7 @@
 
         function startBatch() {
             isRunning = true;
+            clearFsRunStopped(runId);
             if (!isResumingFsState) {
                 accumulatedItems = [];
                 seenItemIds.clear();
@@ -2137,6 +2616,26 @@
             if (window._fsStartBtn) window._fsStartBtn.style.display = 'block';
             if (window._fsStopBtn) window._fsStopBtn.style.display = 'none';
             if (window._fsStatusLight) window._fsStatusLight.classList.remove('running');
+            // Strip mgs_auto/mgs_run from the URL bar (no navigation - history.replaceState
+            // only, so this can't itself trigger a reload) the moment the batch stops.
+            // "Next Image" is a real page navigation on FamilySearch, so this whole script
+            // re-executes from scratch on every image (see FS_RELOAD_STATE_KEY's own note) -
+            // shouldAutoStart is re-read from the URL on every one of those re-executions.
+            // Without stripping it here, a goToNextImage() navigation already in flight when
+            // Stop was clicked (or any other later reload on this tab) lands after
+            // isRunning=false already took effect, re-injects the script, finds mgs_auto=1
+            // still present, and silently restarts the whole batch from empty state -
+            // confirmed live: this produced duplicate downloads of already-gathered images
+            // under the same run_id after a completed, downloaded run.
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('mgs_auto');
+            cleanUrl.searchParams.delete('mgs_run');
+            if (cleanUrl.href !== window.location.href) {
+                window.history.replaceState(null, '', cleanUrl.href);
+            }
+            // Belt-and-suspenders alongside the URL strip above - see FS_STOPPED_RUNS_KEY's
+            // own note for the narrower race this covers.
+            markFsRunStopped(runId);
             debugLog('Batch stopped.');
             finishBatch().catch((err) => console.error('[Voyageur FS] finishBatch crashed:', err));
         }
@@ -2155,29 +2654,6 @@
     // Test-only: exposes pure, DOM-free helpers for the Node test harness (see
     // tests/js/harness.js). `module` is undefined under Tampermonkey, so this never runs
     // there - the guard is load-bearing, not defensive boilerplate.
-// extractCurrentPageData() used to hardcode country = "USA" unconditionally - confirmed
-// live (2026-08-15 Canadian gather, dbId 1578, Ontario) this mislabeled every Canadian
-// Ancestry record as American, all the way through to the generated GEDCOM's citation
-// text. Matches Gazetteer.CA_PROVINCE_NAMES (Gazetteer/Gazetteer.py) plus the historical
-// fur-trade-era names already added to Archivist/Census.py's
-// CANADIAN_PROVINCES_AND_TERRITORIES this session - kept in sync by hand across the two
-// languages rather than sharing one file, same as this project's other small
-// cross-language constant duplications (e.g. get_census_era's US-history thresholds).
-const CANADIAN_PROVINCES_AND_TERRITORIES = new Set([
-    'alberta', 'british columbia', 'manitoba', 'new brunswick', 'newfoundland',
-    'nova scotia', 'northwest territories', 'north-west territories', 'ontario',
-    'prince edward island', 'quebec', 'saskatchewan', 'yukon', 'nunavut',
-]);
-
-// browsePath's own province/state text (e.g. "Ontario", "Dakota Territory") is the only
-// signal available at gather time - Ancestry's index-panel-data API has no dedicated
-// country field of its own. Defaults to "USA" (the collection this project has gathered
-// most, and every pre-Canada-support gather's own established behavior) when state is
-// empty or unrecognized, rather than leaving it blank.
-function ancestryCountryFromState(state) {
-    const normalized = (state || '').trim().toLowerCase();
-    return CANADIAN_PROVINCES_AND_TERRITORIES.has(normalized) ? 'Canada' : 'USA';
-}
 
 // Ancestry's imageviewer/api/record/index-panel-data endpoint uses a stable, self-
 // describing fieldName vocabulary that does NOT change across census years (only which
@@ -2341,30 +2817,32 @@ function buildRetryNavigationUrl(url, runIdValue) {
     return `${url}${separator}mgs_auto=1&mgs_run=${runIdValue}`;
 }
 
-function ancestryIncompletePagesSummary(pages) {
-    return (pages || [])
-        .filter((p) => p.incomplete)
-        .map((p) => ({page_number: p.page_number, image_id: p.image_id}));
-}
-
-function fsIncompleteItemsSummary(items) {
+function incompleteItemsSummary(items) {
     return (items || [])
         .filter((i) => i.incomplete)
-        .map((i) => ({item_id: i.item_id}));
+        .map((i) => ({
+            page_number: i.page_number,
+            image_id: i.image_id,
+            item_id: i.item_id
+        }));
 }
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = {
             placesMatch, saveReloadState, loadReloadState, clearReloadState,
+            markFsRunStopped, isFsRunStopped, clearFsRunStopped,
             buildFsElementIndex, fsFieldText, fsPersonFieldText, fsWrappedFieldText,
-            fsPersonName, fsPersonBirthPlace, fsHouseholds, fsBuildRowsFromApiResponse,
-            fsCanonicalFieldsFromApiPerson, fsColumnsFromCanonicalFields,
-            fsImageIndexFieldText, fsImageIndexFindByType,
-            fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
+            fsPersonName, fsPersonEventPlace, fsPersonBirthPlace, fsPersonResidencePlace,
+            fsResidencePlaceToBrowsePath, fsImageLevelFieldText, fsImageLevelLocation, fsHouseholds,
+            fsBuildRowsFromApiResponse, fsBuildCitationTextFromApiResponse, fsPersonArkFromAttachments,
+            backfillFsPersonArks,
+            fsRawFieldsFromApiPerson,
+            fsImageIndexFieldText, fsImageIndexFindByType, fsLastUriSegment,
+            fsRawFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
             fsImageIndexBrowsePathSegments, fsBuildCitationTextFromImageIndexResponse,
             ancestryColumnsFromIndexPanelRecord, ancestryRowsFromIndexPanelResponse,
-            ancestryCountryFromState, buildRetryNavigationUrl, ancestryIncompletePagesSummary,
-            fsIncompleteItemsSummary,
+            getCountryFromState, buildRetryNavigationUrl, incompleteItemsSummary,
+            findByAriaLabel,
         };
     }
 

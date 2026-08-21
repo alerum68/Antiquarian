@@ -21,6 +21,7 @@ deepzoomcloud storage service, keyed by the same item_id already scraped for cit
 no tile-stitching needed at all.
 """
 
+import hashlib
 import json
 import os
 import re
@@ -29,6 +30,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import urlparse, urlencode, urlunparse
 
 import pandas as pd
 import yaml
@@ -37,8 +39,8 @@ from thefuzz import fuzz
 
 import census_schema
 from _gather_helpers import (
-    census_collection_folder_name,
     cleanup_checkpoint_files,
+    extract_census_image_routing_fields,
     find_orphaned_gather_runs,
     launch_gather_browser,
     move_downloaded_images,
@@ -125,9 +127,9 @@ SEX_COLUMN_MAP = {
 # generalizes Antiquarian.py's existing _record_type_family() keyword-matching so Archivist's
 # single "Generate GEDCOM" button can dispatch without a manual per-type pick.
 RECORD_FAMILY_KEYWORDS = {
+    "census": ["census", "population schedule"],
     "church": ["church", "baptism", "baptême", "marriage", "mariage", "burial", "sépulture",
                "parish", "paroiss", "christening", "confirmation"],
-    "census": ["census", "population schedule"],
     "scrip": ["scrip"],
     "wills": ["will", "probate", "estate", "testament"],
 }
@@ -137,8 +139,17 @@ PARENT_MATCH_THRESHOLD = 80
 
 CITATION_RE = re.compile(
     r'^"(?P<collection_name>.+?),"\s+database with images,\s+(?P<repository>.+?)\s*\(.*?\),\s*'
-    r'(?P<browse_path>.+?);\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?)\.\s*$'
+    r'(?P<browse_path>.+?)'
+    r'(?:;\s*(?P<publisher>.+?),\s*(?P<pub_loc>[^,]+?))?\.\s*$'
 )
+# The trailing "; citing NARA microfilm publication ...
+# (repo_loc: repo_name, n.d.)." clause is OPTIONAL in Voyageur.js's own
+# fsBuildCitationTextFromApiResponse() - it only appends that clause when the image-level
+# EXT_FILM_NBR/EXT_REPOSITORY_NAME fields are both present, otherwise the citation text ends
+# with a bare period right after browse_path. The old pattern required that clause
+# unconditionally, so a real gather missing those two fields failed to match AT ALL -
+# collection_name/repository/browse_path/publisher/pub_loc all came back blank even though
+# citation_text itself was non-empty (only collection_url, extracted separately, survived).
 
 
 # ==========================================
@@ -397,8 +408,10 @@ def parse_citation(text: str) -> Dict[str, str]:
     if m:
         result["collection_name"] = m.group("collection_name").strip()
         result["repository"] = m.group("repository").strip()
-        result["publisher"] = m.group("publisher").strip()
-        result["pub_loc"] = m.group("pub_loc").strip()
+        # publisher/pub_loc are the optional trailing NARA clause - None (not "") when
+        # that clause is absent from this citation, per the pattern's own comment.
+        result["publisher"] = (m.group("publisher") or "").strip()
+        result["pub_loc"] = (m.group("pub_loc") or "").strip()
         result["browse_path"] = m.group("browse_path").strip()
     return result
 
@@ -406,7 +419,7 @@ def parse_citation(text: str) -> Dict[str, str]:
 def detect_record_family(text: str) -> str:
     lowered = text.lower()
     for family, keywords in RECORD_FAMILY_KEYWORDS.items():
-        if any(k in lowered for k in keywords):
+        if any(re.search(rf"\b{re.escape(k)}", lowered) for k in keywords):
             return family
     return "other"
 
@@ -584,6 +597,19 @@ def split_full_name(raw_name: str) -> Tuple[str, str]:
     return " ".join(parts[:-1]), parts[-1]
 
 
+def pid_from_identifier(identifier: str) -> str:
+    """Deterministic, numbers-only, 10-digit PID derived from an ark identifier - either
+    person_ark (preferred, when a true Family Tree attachment is on file) or record_ark.
+    GEDCOM software expects a clean numeric xref/REFN,
+    not an ark-shaped string with colons and hyphens, and it must stay stable across
+    repeated gathers of the same record/person - Python's own hash() is randomized
+    per-process (unless PYTHONHASHSEED is pinned) and so is unsuitable; hashlib is not.
+    Hashing person_ark when present means the SAME real person attached across multiple
+    records/census years collapses to the same pid, usable later to merge them."""
+    digest = hashlib.sha256(identifier.encode('utf-8')).hexdigest()
+    return f"{int(digest, 16) % 10 ** 10:010d}"
+
+
 def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str, dict]) -> dict:
     """Converts FamilySearch's raw census gather into the same {census_year, location,
     pages: [...]} shape Ancestry's own gather already produces (see Voyageur/A.py), instead
@@ -616,6 +642,24 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
     pages = []
     for page_number, it in enumerate(items_raw, start=1):
         item_id = it.get("item_id", "")
+        # Voyageur.js's buildFsItemData() computes this item's own state/county/city/
+        # country/enumeration_district directly (from the Image-Index API response or the
+        # scraped citation, depending on page type) - prefer that over the single
+        # first-citation-text-derived location_info/country below, which only covers the
+        # (common but not universal) case where every item in the gather shares one
+        # location; falling back to it only when this item's own fields came back empty.
+        item_state = it.get("state") or location_info["state"]
+        item_county = it.get("county") or location_info["county"]
+        item_city = it.get("city") or location_info["city"]
+        item_country = it.get("country") or country
+        item_ed = it.get("enumeration_district") or location_info["enumeration_district"]
+        # Voyageur.js's scrapeFsCollectionInfo() reads the real FamilySearch numeric
+        # collection id from the "Information" tab's "Historical Record Collection" link -
+        # citation_text's own cc= parse (below) never finds one under this architecture
+        # (see parse_citation's own note), so prefer this per-item value, same convention
+        # as the location fields above.
+        item_collection_id = it.get("collection_id") or citation.get("collection_id", "")
+        item_collection_name = it.get("collection_name") or citation.get("collection_name", "")
         people = []
         for row_index, row in enumerate(it.get("rows", [])):
             # FamilySearch's census index never exposes an actual Line Number on any year
@@ -641,52 +685,53 @@ def build_census_json(raw: dict, items_raw: List[dict], catalog_items: Dict[str,
                 columns["Surname"] = surname
 
             # Archivist's census-flavor loop uses 'pid' directly as this person's REFN/@I@ id
-            # - it needs to be one clean identifier, not a compound one. This used to be
-            # "{item_id}-{row_index}" (item_id is itself a full page-level ARK, e.g.
-            # "3:1:33S7-9YBJ-9PD7"), which read as two identifiers glued together once
-            # rendered ("3:1:33S7-9YBJ-9PD7-1"). person_ark is this row's own real,
-            # already-distinct per-person FamilySearch identifier (already carries its own
-            # "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D" - both JS extraction paths
-            # produce it in this same shape, confirmed live) - use that instead, falling
-            # back to the old compound form only on the rare row where person_ark itself is
-            # missing. It is NOT an Ancestry APID and must never feed Archivist's _APID
-            # GEDCOM tag (that's Ancestry-specific citation-linking syntax) - Census.py
-            # guards that tag on real Ancestry data now. It must ALSO never feed 'fsftid':
-            # that field drives a "familysearch.org/tree/person/details/<id>" weblink,
-            # which is specifically a Family Tree PROFILE id (a different, unrelated ID
-            # namespace with no "1:1:" prefix, only obtained via genuine tree-attachment) -
-            # person_ark is this historical record's own persona id, not a tree profile id,
-            # and belongs only in familysearch_url's ark-based citation link below.
+            # - it needs to be one clean identifier, not an ark-shaped string with colons and
+            # hyphens. 'pid' is a deterministic, numbers-
+            # only, 10-digit hash, preferring person_ark (the true Family Tree profile id)
+            # when a genuine attachment is on file - the same real person attached across
+            # multiple records/census years then collapses to the same pid, usable later to
+            # merge them - falling back to record_ark (this row's own real, already-distinct
+            # per-person FamilySearch record/persona identifier - always present, already
+            # carries its own "1:1:" GEDCOM X type prefix, e.g. "1:1:MF36-Z6D"), and finally
+            # to the old compound "{item_id}-{row_index}" form only on the rare row where
+            # record_ark itself is missing too, before hashing. It is NOT an Ancestry APID
+            # and must never feed Archivist's _APID GEDCOM tag (that's Ancestry-specific
+            # citation-linking syntax) - Census.py guards that tag on real Ancestry data now.
+            #
+            # person_ark is ALSO still preserved as its own separate field below - the raw
+            # value, not the hash - blank when no attachment was found, matching the "don't
+            # fabricate" convention everywhere else in this file.
+            record_ark = row.get("record_ark", "")
             person_ark = row.get("person_ark", "")
             people.append({
                 "columns": columns,
-                "pid": person_ark or f"{item_id}-{row_index + 1}",
-                "fsftid": row.get("attached_fsftid", ""),
+                "pid": pid_from_identifier(person_ark or record_ark or f"{item_id}-{row_index + 1}"),
+                "record_ark": record_ark,
                 "person_ark": person_ark,
                 # load_census_dataframe reads this directly (same construction
                 # MergedCensus.py uses for a merged person) - without it, an FS-only
                 # (non-merged) census run had no FamilySearch web link on its citation
-                # at all, even though person_ark was already right here to build one.
-                # person_ark already carries its own "1:1:" prefix (see above) - do not
+                # at all, even though record_ark was already right here to build one.
+                # record_ark already carries its own "1:1:" prefix (see above) - do not
                 # prepend a second one here (confirmed live: doing so produced a broken
                 # ".../ark:/61903/1:1:1:1:MF36-Z6D" URL).
-                "familysearch_url": f"https://www.familysearch.org/ark:/61903/{person_ark}" if person_ark else "",
+                "familysearch_url": f"https://www.familysearch.org/ark:/61903/{record_ark}" if record_ark else "",
             })
 
         pages.append({
             "page_number": page_number,
             "image_id": item_id,
-            "country": country,
-            "state": location_info["state"],
-            "county": location_info["county"],
-            "city": location_info["city"],
+            "country": item_country,
+            "state": item_state,
+            "county": item_county,
+            "city": item_city,
             "place_details": "",
-            "enumeration_district": location_info["enumeration_district"],
+            "enumeration_district": item_ed,
             "film_number": "",
             "roll_number": roll_number,
             "apid_db": "",
-            "collection_id": citation.get("collection_id", ""),
-            "collection_name": citation.get("collection_name", ""),
+            "collection_id": item_collection_id,
+            "collection_name": item_collection_name,
             "collection_url": citation.get("collection_url", ""),
             "repository": citation.get("repository", ""),
             "repository_loc": citation.get("repository_loc", ""),
@@ -723,25 +768,6 @@ def _unlink_with_retry(path: Path, attempts: int = 5, delay: float = 0.5) -> Non
             time.sleep(delay)
 
 
-def build_clean_census_filename(year: str, normalized_data: dict) -> Optional[str]:
-    """Builds a "{year} - {state} - {county} - {city} - FS.json" name (matching A.py/
-    Ancestry's own "{year} - {locationStr} - ANC" convention, so both sources' output files
-    are named the same way and the provider is obvious at a glance) from the first record
-    carrying any of those fields, instead of the raw browser-provided name (document.title,
-    which for a FamilySearch collection page often includes the page's own ark URL).
-    Returns None if no sheet/record has any of these fields at all, so the caller can fall
-    back rather than silently invent a location."""
-    for sheet in normalized_data.get("sheets", []):
-        for record in sheet.get("records", []):
-            fields = record.get("type_specific_fields", {}) or {}
-            parts = [year] + [fields[key] for key in ("state", "county", "city") if fields.get(key)]
-            if len(parts) > 1:
-                safe = " - ".join(parts)
-                safe = re.sub(r'[/\\?%*:|"<>]', "-", safe)
-                return f"{safe} - FS.json"
-    return None
-
-
 def normalize_familysearch_census_gather(raw_census: dict, collection_title: str) -> dict:
     """Translates a raw FamilySearch census gather (already grouped into Voyageur's own
     {census_year, pages: [...]} shape by build_census_json) into the shared record schema -
@@ -768,7 +794,8 @@ def convert_raw_gather_to_final(raw_data: dict) -> Tuple[dict, Optional[str]]:
     if record_family == "census":
         raw_census = build_census_json(raw_data, items_raw, catalog_items)
         final_data = normalize_familysearch_census_gather(raw_census, raw_data.get("collection_title", ""))
-        clean_name = build_clean_census_filename(raw_census.get("census_year", ""), final_data)
+        from _gather_helpers import build_detailed_census_filename
+        clean_name = build_detailed_census_filename(raw_census.get("census_year", ""), final_data, "FamilySearch")
     else:
         final_data = build_universal_json(raw_data, items_raw, catalog_items, record_family)
         validate_against_commissioner(final_data, record_family, raw_data.get("collection_title", ""))
@@ -794,8 +821,34 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
                   f"left in place for manual review: {names}")
             continue
 
-        raw_data = json.loads(_read_text_with_retry(group["final"]))
-        final_data, clean_name = convert_raw_gather_to_final(raw_data)
+        try:
+            raw_data = json.loads(_read_text_with_retry(group["final"]))
+            final_data, clean_name = convert_raw_gather_to_final(raw_data)
+        except Exception as exc:  # noqa: BLE001 - opportunistic recovery of a PAST run must
+            # never crash the CURRENT gather, and a corrupt/unparseable raw JSON (confirmed
+            # live 2026-08-21: a stray byte spliced into an otherwise-valid download,
+            # unrelated to any of this pipeline's own JSON.stringify-based serialization)
+            # could come from json.loads, or just as easily from convert_raw_gather_to_final/
+            # validate_against_commissioner further down - both are equally "this run's data
+            # is unusable", so both are handled the same way here. Left in Downloads
+            # unquarantined, this exact file would be picked up and crash again on every
+            # future run (find_orphaned_gather_runs re-scans by filename pattern every time,
+            # with no memory of a prior failed attempt) - user-directed design: move it into
+            # a "Failed" subfolder of the JSON output directory instead, so the raw data is
+            # preserved for manual inspection without blocking future runs or lingering in
+            # Downloads.
+            failed_dir = json_target_dir / "Failed"
+            failed_dir.mkdir(parents=True, exist_ok=True)
+            corrupt_path = failed_dir / group["final"].name
+            try:
+                group["final"].replace(corrupt_path)
+            except OSError:
+                corrupt_path = group["final"]
+            print(f"[WARN] Stale gather (run {run_id}) had unreadable raw JSON ({exc}) - "
+                  f"moved to {corrupt_path} for manual review; will not be retried "
+                  f"automatically.")
+            continue
+
         out_name = clean_name or group["final"].name[len(f"TMP_FS_{run_id}_"):]
         recovered_json = json_target_dir / out_name
 
@@ -806,21 +859,28 @@ def _recover_orphaned_runs(downloads_dir: Path, current_run_id: str, json_target
             recovered_json.write_text(json.dumps(final_data, indent=2, ensure_ascii=False), encoding="utf-8")
         _unlink_with_retry(group["final"])
 
-        stem = re.sub(r' - FS$', '', recovered_json.stem)
-        stem_parts = stem.split(' - ', 1)
-        census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
-        location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-        collection_name = final_data.get("citation", {}).get("collection_name", "")
-        country = next(
-            (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
-             for s in final_data.get("sheets", []) if s.get("records")), "")
-        census_folder = census_collection_folder_name(census_year, country, collection_name)
-        img_target_dir = resolve_census_image_dir("Census", genealogy_dir, census_folder, location_folder)
+        # Extract routing fields from the normalised data directly - no filename parsing.
+        census_year, country, location_folder, _ = \
+            extract_census_image_routing_fields(final_data)
+        img_target_dir = resolve_census_image_dir(
+            "Census", genealogy_dir, census_year, country, location_folder)
 
         img_moved, img_skipped, img_failed = move_downloaded_images(
             downloads_dir, f"TMP_FS_{run_id}_Images_", 0, img_target_dir, on_collision="skip")
         print(f"[System] Recovered stale run {run_id}: wrote {out_name} and moved {img_moved} image(s) "
               f"to Project folders.")
+
+
+def normalize_familysearch_gather_url(url: str) -> str:
+    """Normalizes to FamilySearch's canonical ark-image URL: <scheme>://<host>/ark:/61903/
+    <image-id>?view=index&lang=en - forcing the "index" view (Voyageur.js's extraction
+    relies on the index panel being open) instead of the "explore" view. URLs copied from
+    search results/tree links carry extra tracking/session query params (wc, cc, i,
+    groupId, grid, ...) that aren't part of the ark's own identity and can send the viewer
+    to the wrong page - discard the entire original query string rather than patching
+    around it, keeping only the ark path itself (collection id + image ark)."""
+    parsed_url = urlparse(url)
+    return urlunparse(parsed_url._replace(query=urlencode({"view": "index", "lang": "en"})))
 
 
 def main() -> None:
@@ -840,6 +900,8 @@ def main() -> None:
     if not url:
         print("[ERROR] Please enter a FamilySearch record URL in the Toolbox settings first.")
         sys.exit(1)
+
+    url = normalize_familysearch_gather_url(url)
 
     # Voyageur.js used GM_download to land these in their own Downloads subfolder, but
     # confirmed live this was unreliable - GM_download's own "downloads" permission grant
@@ -894,27 +956,17 @@ def main() -> None:
     _unlink_with_retry(raw_json_file)
     cleanup_checkpoint_files(downloads_dir, json_prefix, start_time)
 
-    # Mirrors A.py's own nested image-folder convention (see census_collection_folder_name()),
-    # derived from this same run's own clean filename (when one was built) so both
-    # sources' images land under a comparable structure.
-    stem = re.sub(r' - FS$', '', final_json.stem)
-    stem_parts = stem.split(' - ', 1)
-    census_year = stem_parts[0].strip() if stem_parts and stem_parts[0].strip() else "Unknown_Year"
-    location_folder = stem_parts[1].strip() if len(stem_parts) > 1 else "Unknown_Location"
-    # country only ever appears in type_specific_fields for census-flavor gathers
-    # (build_census_json/census_schema) - .get()'s own defaults make this a safe no-op
-    # for a church/scrip gather's differently-shaped participants, no record_family
-    # check needed.
-    collection_name = final_data.get("citation", {}).get("collection_name", "")
-    country = next(
-        (s.get("records", [{}])[0].get("type_specific_fields", {}).get("country", "")
-         for s in final_data.get("sheets", []) if s.get("records")), "")
-    census_folder = census_collection_folder_name(census_year, country, collection_name)
+    # Mirrors A.py's own nested image-folder convention - both sources' images land under
+    # the same Media\Census\Country\Year\State\County\City structure.
+    # Extract routing fields from the normalised data directly - no filename parsing.
+    census_year, country, location_folder, _ = \
+        extract_census_image_routing_fields(final_data)
 
     # Matches Antiquarian.py's own default ("Census", resolved against
     # MEDIA_DIR by the GUI before this ever runs).
     base_img_setting = "Census"
-    img_target_dir = resolve_census_image_dir(base_img_setting, genealogy_dir, census_folder, location_folder)
+    img_target_dir = resolve_census_image_dir(
+        base_img_setting, genealogy_dir, census_year, country, location_folder)
 
     img_moved, img_skipped, img_failed = move_downloaded_images(
         downloads_dir, image_prefix, start_time, img_target_dir, on_collision=on_collision)

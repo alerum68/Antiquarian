@@ -6,7 +6,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const {
     fsImageIndexFieldText, fsImageIndexFindByType,
-    fsCanonicalFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse,
+    fsRawFieldsFromImageIndexPerson, fsBuildRowsFromImageIndexResponse, fsLastUriSegment,
 } = require('./harness.js');
 
 // Trimmed, structurally faithful fixture built from a real live capture (1880, Dakota
@@ -164,62 +164,75 @@ test('fsImageIndexFieldText: returns empty string for null/missing field', () =>
     assert.equal(fsImageIndexFieldText({values: []}), '');
 });
 
-test('fsCanonicalFieldsFromImageIndexPerson: 1880-style person gets every rich field, head resolves to "Head"', () => {
+// 2026-08-20: explicit user direction - capture every field this API returns, keyed by
+// FamilySearch's own GedcomX type URI (trimmed to its trailing segment via
+// fsLastUriSegment), with zero renaming/curation at extraction time.
+test('fsRawFieldsFromImageIndexPerson: 1880-style person gets every rich field, keyed by its raw type', () => {
     const data = makeImageIndex1880Response();
-    const fields = fsCanonicalFieldsFromImageIndexPerson(data.records[0].persons[0]);
-    assert.deepEqual(fields, {
-        givenName: 'Prince A.', surname: 'Gatchill', sex: 'M', age: '38 years',
-        birthplace: 'Maine, United States',
-        householdIdSource: '8735134', householdIdFs: '',
-        relationshipToHead: 'Head', maritalStatus: 'Married', occupation: 'Editor',
-        race: 'White', fatherBirthplace: 'Maine, United States', motherBirthplace: 'Maine, United States',
-    });
+    const raw = fsRawFieldsFromImageIndexPerson(data.records[0].persons[0]);
+    assert.equal(raw.Given, 'Prince A.');
+    assert.equal(raw.Surname, 'Gatchill');
+    assert.equal(raw.Gender, fsLastUriSegment('http://gedcomx.org/Male'));
+    assert.equal(raw.Age, '38 years');
+    assert.equal(raw.RelationshipToHead, 'Head');
+    assert.equal(raw.SourceHouseholdId, '8735134');
+    assert.equal(raw.FatherBirthPlace, 'Maine, United States');
+    assert.equal(raw.MotherBirthPlace, 'Maine, United States');
+    assert.equal(raw.Race, 'White');
+    assert.equal(raw.Occupation, 'Editor');
+    assert.equal(raw.MaritalStatus, 'Married');
+    assert.equal(raw.Birth_Place, 'Maine, United States');
+    // Census fact's place has no single "Place" sub-field (unlike Birth) - State/County/
+    // Township/District are its own sub-fields and must all be captured, not just skipped.
+    assert.equal(raw.Census_State, 'Dakota Territory');
+    assert.equal(raw.Census_County, 'Pembina');
+    assert.equal(raw.Census_Township, 'Pembina');
+    assert.equal(raw.Census_District, 'ED 75');
 });
 
-test('fsCanonicalFieldsFromImageIndexPerson: spouse with a clean single relationshipToHead value', () => {
+test('fsRawFieldsFromImageIndexPerson: spouse with a clean single RelationshipToHead value', () => {
     const data = makeImageIndex1880Response();
-    const fields = fsCanonicalFieldsFromImageIndexPerson(data.records[0].persons[1]);
-    assert.equal(fields.relationshipToHead, 'Wife');
-    assert.equal(fields.givenName, 'Hattie O.');
-    assert.equal(fields.householdIdSource, '8735134');
+    const raw = fsRawFieldsFromImageIndexPerson(data.records[0].persons[1]);
+    assert.equal(raw.RelationshipToHead, 'Wife');
+    assert.equal(raw.Given, 'Hattie O.');
+    assert.equal(raw.SourceHouseholdId, '8735134');
 });
 
-test('fsCanonicalFieldsFromImageIndexPerson: 1860-style person omits era-absent fields as empty strings, uses HouseholdId type', () => {
+test('fsRawFieldsFromImageIndexPerson: 1860-style person omits era-absent fields entirely, uses HouseholdId type', () => {
     const data = makeImageIndex1860Response();
-    const fields = fsCanonicalFieldsFromImageIndexPerson(data.records[0].persons[0]);
-    assert.equal(fields.relationshipToHead, '');
-    assert.equal(fields.maritalStatus, '');
-    assert.equal(fields.occupation, '');
-    assert.equal(fields.fatherBirthplace, '');
-    assert.equal(fields.motherBirthplace, '');
-    assert.equal(fields.householdIdSource, '');
-    assert.equal(fields.householdIdFs, '1');
-    assert.equal(fields.givenName, 'Joseph');
-    assert.equal(fields.race, 'White');
+    const raw = fsRawFieldsFromImageIndexPerson(data.records[0].persons[0]);
+    assert.ok(!('RelationshipToHead' in raw));
+    assert.ok(!('MaritalStatus' in raw));
+    assert.ok(!('Occupation' in raw));
+    assert.ok(!('FatherBirthPlace' in raw));
+    assert.ok(!('MotherBirthPlace' in raw));
+    assert.ok(!('SourceHouseholdId' in raw));
+    assert.equal(raw.HouseholdId, '1');
+    assert.equal(raw.Given, 'Joseph');
+    assert.equal(raw.Race, 'White');
+    // 1860 sample uses MinorCivilDivision where 1880 used Township for the same concept -
+    // both must survive verbatim, not be normalized to one shared key.
+    assert.equal(raw.Census_MinorCivilDivision, 'On the Red River');
 });
 
-test('fsBuildRowsFromImageIndexResponse: builds one row per person, per-household sequencing, same columns shape as the orchestration-API path', () => {
+test('fsBuildRowsFromImageIndexResponse: builds one row per person with the full raw field set', () => {
     const rows = fsBuildRowsFromImageIndexResponse(makeImageIndex1880Response());
     assert.equal(rows.length, 2);
-    const prince = rows.find(r => r.person_ark === '1:1:MCVW-PYP');
-    assert.deepEqual(prince.columns, {
-        'Given Name': 'Prince A.', 'Surname': 'Gatchill', 'Gender': 'M', 'Age': '38 years',
-        'Family Number': '8735134', 'Relationship to Head': 'Head',
-    });
-    assert.equal(prince.attached_fsftid, '');
-    const hattie = rows.find(r => r.person_ark === '1:1:MCVW-PY2');
-    assert.equal(hattie.columns['Relationship to Head'], 'Wife');
-    assert.equal(hattie.columns['Family Number'], '8735134');
+    const prince = rows.find(r => r.record_ark === '1:1:MCVW-PYP');
+    assert.equal(prince.columns.Given, 'Prince A.');
+    assert.equal(prince.columns.RelationshipToHead, 'Head');
+    assert.equal(prince.person_ark, '');
+    const hattie = rows.find(r => r.record_ark === '1:1:MCVW-PY2');
+    assert.equal(hattie.columns.RelationshipToHead, 'Wife');
+    assert.equal(hattie.columns.SourceHouseholdId, '8735134');
 });
 
-test('fsBuildRowsFromImageIndexResponse: 1860-style row omits Relationship to Head entirely', () => {
+test('fsBuildRowsFromImageIndexResponse: 1860-style row omits RelationshipToHead entirely', () => {
     const rows = fsBuildRowsFromImageIndexResponse(makeImageIndex1860Response());
     assert.equal(rows.length, 1);
-    assert.deepEqual(rows[0].columns, {
-        'Given Name': 'Joseph', 'Surname': 'Kosses', 'Gender': 'M', 'Age': '32', 'Family Number': '1',
-    });
-    assert.ok(!('Relationship to Head' in rows[0].columns));
-    assert.equal(rows[0].person_ark, '1:1:MF36-Z6D');
+    assert.ok(!('RelationshipToHead' in rows[0].columns));
+    assert.equal(rows[0].columns.Given, 'Joseph');
+    assert.equal(rows[0].record_ark, '1:1:MF36-Z6D');
 });
 
 test('fsBuildRowsFromImageIndexResponse: empty records array produces no rows, no throw', () => {

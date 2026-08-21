@@ -138,6 +138,21 @@ def evaluate_task_priority(task_note: str) -> tuple:
     return 3, "3", "General Review"
 
 
+def _gedcom_text_lines(level: int, tag: str, text: str) -> List[str]:
+    """Splits a multi-line template text value into a leading 'LEVEL TAG line1' followed by
+    'LEVEL+1 CONT lineN' continuation lines for every subsequent line. Confirmed
+    live as the real cause of RootsMagic falling back every source
+    to Freeform instead of the imported template: GEDCOM 5.5.1 requires every physical line
+    to start with its own level+tag - this template source's own multi-paragraph
+    Description/Hint text contains raw embedded newlines, which previously got written
+    out as bare continuation lines with no tag prefix at all (invalid GEDCOM), not proper
+    CONT lines."""
+    parts = text.split("\n")
+    result = [f"{level} {tag} {parts[0]}"]
+    result.extend(f"{level + 1} CONT {cont}" for cont in parts[1:])
+    return result
+
+
 # noinspection DuplicatedCode
 def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
@@ -151,15 +166,15 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
 
     lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
     if desc:
-        lines.append(f"1 DESC {desc}")
+        lines.extend(_gedcom_text_lines(1, "DESC", desc))
     if cat:
         lines.append(f"1 CAT {cat}")
     if foot:
-        lines.append(f"1 FOOT {foot}")
+        lines.extend(_gedcom_text_lines(1, "FOOT", foot))
     if short:
-        lines.append(f"1 SHORT {short}")
+        lines.extend(_gedcom_text_lines(1, "SHORT", short))
     if bibl:
-        lines.append(f"1 BIBL {bibl}")
+        lines.extend(_gedcom_text_lines(1, "BIBL", bibl))
 
     for fld in elem.findall("Field"):
         f_type = (fld.findtext("Type") or "Text").strip()
@@ -175,10 +190,10 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
         if f_disp:
             lines.append(f"2 DISP {f_disp}")
         if f_hint:
-            lines.append(f"2 HINT {f_hint}")
+            lines.extend(_gedcom_text_lines(2, "HINT", f_hint))
         lines.append(f"2 DETL {f_detl}")
         if f_lhnt:
-            lines.append(f"2 LHNT {f_lhnt}")
+            lines.extend(_gedcom_text_lines(2, "LHNT", f_lhnt))
     return lines
 
 
@@ -316,6 +331,27 @@ def find_parent(units: List[HouseholdUnit], member: pd.Series) -> Optional[Tuple
                 if match_conf > best_conf:
                     best = (i, match_conf, match_rsn)
     return best
+
+
+def sort_group_by_line_number(group: pd.DataFrame) -> pd.DataFrame:
+    """Both parse_household() and parse_household_relational() assume rows arrive in the
+    census sheet's own physical line order (head first, then the rest of the household) -
+    confirmed live this isn't guaranteed by the raw gather's own participant ordering: a
+    real household had a daughter (Line Number 6) listed before the head (Line Number 4) in
+    the DataFrame, so parse_household_relational's "first person must be Head" check wrongly
+    flagged her as unrelated and detached her from her own family. Sorting by Line Number
+    here, right before parsing, fixes the input at the one place both functions actually
+    need it - regardless of what order upstream extraction produced - rather than requiring
+    every extraction path to itself guarantee ordering. A stable sort keeps rows with no
+    parseable Line Number (or when none exist at all) in their original relative order."""
+    line_col = next((c for c in ['Line Number', 'Line'] if c in group.columns), None)
+    if not line_col:
+        return group
+    line_nums = pd.to_numeric(group[line_col], errors='coerce')
+    if line_nums.isna().all():
+        return group
+    return group.assign(_line_sort_key=line_nums).sort_values(
+        '_line_sort_key', kind='stable', na_position='last').drop(columns='_line_sort_key')
 
 
 def parse_household(group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.Series], List[FlagRecord]]:
@@ -565,6 +601,14 @@ def append_unit_if_not_empty(units: List[HouseholdUnit], unit: Optional[Househol
 
 def parse_household_relational(
         group: pd.DataFrame) -> Tuple[List[HouseholdUnit], List[pd.Series], List[FlagRecord]]:
+    # Anyone enumerated at an institution (group
+    # quarters - hospital, prison, boarding house, etc.) gets no family/spouse/parent-child
+    # links at all, just their own individual record - if any member of this group is an
+    # institution resident, treat the whole group as unrelated individuals rather than
+    # attempting relational family-unit parsing on them.
+    if any(is_institution_resident(m) for _, m in group.iterrows()):
+        return [], [m for _, m in group.iterrows()], []
+
     rel_col = find_relationship_column(group.columns)
     if rel_col is None:
         return parse_household(group)
@@ -771,10 +815,7 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
     fam_num = get_row_val(row, ['Family Number', 'Family', 'Household Number', 'Household'], '')
     dwell_num = get_row_val(row, ['Dwelling Number', 'Dwelling', 'House Number'], '')
 
-    fsftid = get_row_val(row, ['FSFTID'], '')
     fs_url = get_row_val(row, ['FamilySearch_URL'], '')
-    # Prefer existing FSFTID; otherwise, use record ark for FS-sourced records
-    citation_fsftid = fsftid or (strip_ark_type_prefix(rec_id) if fs_url else '')
 
     ancestry_url = get_row_val(row, ['Extracted_URL'], '') or (
         f"https://www.ancestry.com/search/collections/{APID_DB}/records/{rec_id}"
@@ -812,11 +853,9 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
 
         cit.append("3 DATA")
         if APID_DB and rec_id:
-            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", "3 _WEBTAG",
+            cit.extend(["3 _WEBTAG",
                         f"4 NAME Anc- {collection_title}",
                         f"4 URL {ancestry_url}"])
-        if citation_fsftid:
-            cit.append(f"3 _FSFTID {citation_fsftid}")
         if fs_url:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME FS- {collection_title}",
@@ -830,19 +869,42 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             f"{row_county}; {row_state}; Roll {row_roll}; Film {row_film}")
         cit.append("3 QUAY 3")
         if APID_DB and rec_id:
-            cit.extend([f"3 _APID 1,{APID_DB}::{rec_id}", f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
-        if citation_fsftid:
-            cit.append(f"3 _FSFTID {citation_fsftid}")
+            cit.extend([f"3 _LINK {link_url}", f"3 NOTE {link_url}"])
         if fs_url:
             cit.extend([f"3 _LINK {fs_url}", f"3 NOTE {fs_url}"])
         cit.append(f"3 OBJE {m_id}")
     return cit
 
 
+def build_row_citation(idx: Any, row: pd.Series, target_software: str) -> Tuple[str, List[str]]:
+    """Computes (rec_id, citation_lines) for a row on its own. Every input build_census_citation()
+    needs is a pure function of the row/idx (no dependency on iteration order or media_dict
+    state), so - unlike the main per-row loop in build_gedcom_from_census() - this is safe to
+    call ahead of time, e.g. to cite a child's own census entry as the source for a fact placed
+    on a DIFFERENT person's (a parent's) record."""
+    row_pid = Utils.clean_val(row.get('PID', row.get('pid', '')))
+    rec_id = row_pid if row_pid else str(ANCESTRY_START_RECORD_ID + cast(int, idx))
+    row_state = get_row_val(row, ['State', 'State/Province'], '') or STATE
+    row_county = get_row_val(row, ['County', 'Parish'], '') or COUNTY
+    row_town = get_row_val(row, ['City', 'Township', 'Town', 'Civil Division', 'Ward'], '') or TOWNSHIP
+    row_roll = get_row_val(row, ['Roll', 'Roll Number', 'NARA Roll'], '') or ROLL_NUMBER
+    row_film = get_row_val(row, ['Film', 'FHL Film Number', 'Microfilm'], '') or FILM_NUMBER
+    row_ed = get_row_val(row, ['Enumeration District', 'Enumeration_District', 'ED'], '') or ENUMERATION_DISTRICT
+    page = get_row_val(row, ['Page', 'Page_Number', 'Page Number'], '')
+    real_page = get_row_val(row, ['Real Page', 'Real_Page', 'Page', 'Page_Number'], '')
+    image_id_val = Utils.clean_val(row.get('Image_ID', '')) or f"{BASE_ID}_{page.zfill(5)}"
+    m_id = f"@M{Path(image_id_val).stem}@"
+    cit = build_census_citation(row, rec_id, m_id, real_page, target_software, row_town, row_county, row_state,
+                                row_roll, row_film, row_ed)
+    return rec_id, cit
+
+
 def get_census_notes(row: pd.Series) -> List[str]:
     note_cols = ['Quality', 'Real Estate Value', 'Personal Estate Value', 'Cannot Read, Write', 'Disability Condition',
                  'Deaf Dumb Blind Insane', 'Idiotic Pauper Convict']
     notes = [f"{c}: {Utils.clean_val(row[c])}" for c in note_cols if c in row and Utils.clean_val(row[c])]
+    if institution_note := build_institution_note(row):
+        notes.append(institution_note)
     if CENSUS_YEAR == 1870:
         flags = {'Father Foreign Born': "Father of foreign birth.", 'Mother Foreign Born': "Mother of foreign birth.",
                  'Male Citizen Over 21': "Male citizen of the United States of 21 years of age and upwards.",
@@ -866,7 +928,48 @@ CORE_COLUMNS = {'given name', 'surname', 'gender', 'sex', 'age', 'birth year', '
                 'place_details', 'roll', 'film', 'enumeration_district', 'apid_db', 'extracted_url', 'pid', 'street',
                 'street address', 'address', 'house number', 'publisher', 'publisher location',
                 'repository', 'repository location', 'fsftid', 'familysearch_url', 'alternatenames',
-                'alternatebirthplaces', '_mergereviewreason'}
+                'alternatebirthplaces', '_mergereviewreason',
+                'institution 1', 'institution 1 type', 'institution 1 from line', 'institution 1 to line',
+                'institution 2', 'institution 2 type', 'institution 2 from line', 'institution 2 to line',
+                'father birth place', 'mother birth place', 'weeks out of work',
+                'residence place fallback', 'collection name', 'collection url',
+                'recordark', 'personark'}
+
+INSTITUTION_COLUMNS = ('Institution 1', 'Institution 1 Type', 'Institution 1 From Line', 'Institution 1 To Line',
+                       'Institution 2', 'Institution 2 Type', 'Institution 2 From Line', 'Institution 2 To Line')
+
+
+def is_institution_resident(row: pd.Series) -> bool:
+    """True when any institution/group-quarters field is present for this person - user-
+    directed design (2026-08-21): such a person should get no family/spouse/parent-child
+    links (they were enumerated at an institution, not with their own household), just a
+    note on their CENS fact stating where they were located."""
+    return any(Utils.clean_val(row.get(c)) for c in INSTITUTION_COLUMNS)
+
+
+def build_institution_note(row: pd.Series) -> str:
+    """One composed sentence for the CENS fact's note, built from whichever institution
+    fields are present - labeled by their own raw concept (not assuming exactly what
+    FamilySearch's bare "Institution N" field holds beyond "some institution-identifying
+    value") since that hasn't been confirmed against a real non-empty sample."""
+    parts = []
+    for num in ('1', '2'):
+        name = Utils.clean_val(row.get(f'Institution {num}'))
+        itype = Utils.clean_val(row.get(f'Institution {num} Type'))
+        from_line = Utils.clean_val(row.get(f'Institution {num} From Line'))
+        to_line = Utils.clean_val(row.get(f'Institution {num} To Line'))
+        if not (name or itype or from_line or to_line):
+            continue
+        piece = "Enumerated at institution"
+        if name:
+            piece += f" {name}"
+        if itype:
+            piece += f" (type: {itype})"
+        if from_line or to_line:
+            piece += f", lines {from_line or '?'}-{to_line or '?'}"
+        parts.append(piece)
+    return "; ".join(parts)
+
 
 DYNAMIC_EVENT_RULES = [(re.compile(r'immigrat', re.I), 'IMMI'),
                        (re.compile(r'year of naturali[sz]', re.I), 'NATU_DATE'),
@@ -957,7 +1060,8 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
-                     Utils.clean_val(row.get('Seeking Work')) == 'Yes')
+                     Utils.clean_val(row.get('Seeking Work')) == 'Yes' or
+                     bool(Utils.clean_val(row.get('Weeks Out of Work'))))
 
     # 3. Concatenation
     occ_str = ""
@@ -975,7 +1079,8 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
     # 4. Notes
     notes_parts = []
-    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Months Unemployed Past Year']:
+    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Weeks Out of Work',
+                  'Months Unemployed Past Year']:
         val = Utils.clean_val(row.get(field))
         if val:
             notes_parts.append(f"{field}: {val}")
@@ -1134,6 +1239,14 @@ def get_location_string(row: pd.Series) -> str:
     row_town = get_row_val(row, ['City', 'Township', 'Town', 'Civil Division', 'Ward'], '') or TOWNSHIP
     row_country = get_row_val(row, ['Country'], '') or 'USA'
 
+    # 'Residence Place Fallback' (FamilySearch's
+    # EVENT_RESIDENCE_PLACE) only fills in when the structured State/County/City breakdown
+    # is entirely blank - never its own fact, just a backup for this same place string.
+    if not (row_town or row_county or row_state):
+        fallback = Utils.clean_val(row.get('Residence Place Fallback'))
+        if fallback:
+            return fallback
+
     return ", ".join(filter(None, [row_town, row_county, row_state, row_country]))
 
 
@@ -1200,14 +1313,21 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             ged.append(f"2 CONC {Utils.GEDCOM_CONC}")
 
     fam_links: Dict[Any, List[str]] = {i: [] for i in df.index}
-    fam_blocks: List[str] = []
+    fam_block_lines: Dict[str, List[str]] = {}
     used_fam_ids = set()
     media_dict: Dict[str, Dict[str, Union[str, Path]]] = {}
     task_blocks: List[str] = []
     folder_tasks: Dict[str, List[str]] = {}
     review_flags: Dict[Any, List[Tuple[str, float]]] = {}
+    # Populated below as each household unit is built - lets the parent-birthplace pass
+    # (further down) tell whether a child's father/mother was already extracted as a real
+    # person (append a second BIRT fact to them) versus needing a synthesized stub parent,
+    # and which FAM block a synthesized parent should be attached to.
+    child_parent_idx: Dict[Any, Tuple[Optional[Any], Optional[Any]]] = {}
+    child_famc: Dict[Any, str] = {}
 
     for _, group in df.groupby('Household_ID'):
+        group = sort_group_by_line_number(group)
         units: List[HouseholdUnit]
         unrelated: List[pd.Series]
         flags: List[FlagRecord]
@@ -1254,27 +1374,110 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
             used_fam_ids.add(f_id)
 
-            fam_blocks.append(f"0 {f_id} FAM")
+            fam_block_lines[f_id] = [f"0 {f_id} FAM"]
 
             if isinstance(h, pd.Series):
                 h_idx = Utils.clean_val(h.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, h.name))
-                fam_blocks.append(f"1 HUSB @I{h_idx}@")
+                fam_block_lines[f_id].append(f"1 HUSB @I{h_idx}@")
                 fam_links[h.name].append(f"1 FAMS {f_id}")
             if isinstance(w, pd.Series):
                 w_idx = Utils.clean_val(w.get('PID')) or str(ANCESTRY_START_RECORD_ID + cast(int, w.name))
-                fam_blocks.append(f"1 WIFE @I{w_idx}@")
+                fam_block_lines[f_id].append(f"1 WIFE @I{w_idx}@")
                 fam_links[w.name].append(f"1 FAMS {f_id}")
             if isinstance(children_list, list):
                 for child in children_list:
                     if isinstance(child, pd.Series):
                         c_idx = Utils.clean_val(child.get('PID')) or str(
                             ANCESTRY_START_RECORD_ID + cast(int, child.name))
-                        fam_blocks.append(f"1 CHIL @I{c_idx}@")
+                        fam_block_lines[f_id].append(f"1 CHIL @I{c_idx}@")
                         fam_links[child.name].append(f"1 FAMC {f_id}")
+                        child_parent_idx[child.name] = (h.name if isinstance(h, pd.Series) else None,
+                                                        w.name if isinstance(w, pd.Series) else None)
+                        child_famc[child.name] = f_id
 
             if (isinstance(h, pd.Series) and pd.notna(h.get('Married within Year'))) or (
                     isinstance(w, pd.Series) and pd.notna(w.get('Married within Year'))):
-                fam_blocks.extend(["1 MARR", f"2 DATE EST {CENSUS_YEAR}", "2 _PROOF proven"])
+                fam_block_lines[f_id].extend(["1 MARR", f"2 DATE EST {CENSUS_YEAR}", "2 _PROOF proven"])
+
+    # FTHR_BIR_PLACE/MTHR_BIR_PLACE describe a relative,
+    # not the row's own facts. When that parent was already extracted as a real person in
+    # this household (child_parent_idx), append a second, proposed-proof BIRT fact to their
+    # existing INDI record rather than overriding the birthplace already extracted from
+    # their own gather. Otherwise synthesize a stub parent (surname only - given name isn't
+    # recorded) carrying just that BIRT fact, attached into the child's existing FAMC family
+    # if one exists (reusing it rather than creating a redundant second family), or a new
+    # one otherwise - but ONLY when that birthplace is foreign (reusing is_foreign_birthplace,
+    # which already excludes "USA"/"United States"/"US" and every US state/territory): the
+    # 1950 census overwhelmingly records "United States" for domestic-born parents, and
+    # creating a stub person for that ubiquitous, unremarkable answer would flood the tree
+    # with low-value records - a real, already-known parent still gets the fact appended
+    # regardless, since that costs nothing extra on an already-real person. If both parents
+    # need synthesizing for the same child, they share one new family instead of two.
+    extra_birth_facts: Dict[Any, List[str]] = {}
+    synth_parent_blocks: List[str] = []
+    # Guards against synthesizing a second father/mother into the same family when more
+    # than one sibling in a parentless unit separately reports the same absent parent's
+    # birthplace - only the first such child's data gets a synthetic person; a duplicate
+    # HUSB/WIFE line in one FAM block would otherwise be invalid GEDCOM.
+    family_synth_father: Dict[str, str] = {}
+    family_synth_mother: Dict[str, str] = {}
+    for idx, row in df.iterrows():
+        father_place = Utils.clean_val(row.get('Father Birth Place'))
+        mother_place = Utils.clean_val(row.get('Mother Birth Place'))
+        if not (father_place or mother_place):
+            continue
+
+        child_sur = Utils.clean_val(row.get('Surname'))
+        rec_id, cit = build_row_citation(idx, row, target_software)
+        existing_father_idx, existing_mother_idx = child_parent_idx.get(idx, (None, None))
+
+        father_place_for_synth: Optional[str] = None
+        if father_place:
+            if existing_father_idx is not None:
+                extra_birth_facts.setdefault(existing_father_idx, []).extend(
+                    ["1 BIRT", f"2 PLAC {father_place}", "2 _PROOF proposed"] + cit)
+            elif is_foreign_birthplace(father_place):
+                father_place_for_synth = father_place
+
+        mother_place_for_synth: Optional[str] = None
+        if mother_place:
+            if existing_mother_idx is not None:
+                extra_birth_facts.setdefault(existing_mother_idx, []).extend(
+                    ["1 BIRT", f"2 PLAC {mother_place}", "2 _PROOF proposed"] + cit)
+            elif is_foreign_birthplace(mother_place):
+                mother_place_for_synth = mother_place
+
+        if not (father_place_for_synth or mother_place_for_synth):
+            continue
+
+        target_fam_id = child_famc.get(idx)
+        if target_fam_id is None:
+            target_fam_id = f"@F{rec_id}_PARENTS@"
+            fam_block_lines[target_fam_id] = [f"0 {target_fam_id} FAM", f"1 CHIL @I{rec_id}@"]
+            fam_links.setdefault(idx, []).append(f"1 FAMC {target_fam_id}")
+            child_famc[idx] = target_fam_id
+
+        child_name = f"{Utils.clean_val(row.get('Given Name'))} {child_sur}".strip()
+        if father_place_for_synth and target_fam_id not in family_synth_father:
+            synth_id = f"@I{rec_id}_FTHR@"
+            synth_parent_blocks.extend(
+                [f"0 {synth_id} INDI", f"1 NAME /{child_sur}/", "1 SEX M", "1 BIRT",
+                 f"2 PLAC {father_place_for_synth}", "2 _PROOF proposed"] + cit +
+                [f"1 NOTE Synthesized father record (given name not recorded); birthplace inferred from "
+                 f"{child_name}'s census entry.", f"1 FAMS {target_fam_id}"])
+            fam_block_lines[target_fam_id].insert(1, f"1 HUSB {synth_id}")
+            family_synth_father[target_fam_id] = synth_id
+        if mother_place_for_synth and target_fam_id not in family_synth_mother:
+            synth_id = f"@I{rec_id}_MTHR@"
+            synth_parent_blocks.extend(
+                [f"0 {synth_id} INDI", f"1 NAME /{child_sur}/", "1 SEX F", "1 BIRT",
+                 f"2 PLAC {mother_place_for_synth}", "2 _PROOF proposed"] + cit +
+                [f"1 NOTE Synthesized mother record (given name not recorded); birthplace inferred from "
+                 f"{child_name}'s census entry.", f"1 FAMS {target_fam_id}"])
+            lines = fam_block_lines[target_fam_id]
+            insert_idx = next((i + 1 for i, ln in enumerate(lines) if ln.startswith("1 HUSB")), 1)
+            lines.insert(insert_idx, f"1 WIFE {synth_id}")
+            family_synth_mother[target_fam_id] = synth_id
 
     current_line_page_key = None
     synthesized_line_num = 0
@@ -1330,12 +1533,26 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         alt_names = parse_alternate_entries(row, 'AlternateNames')
         row_fsftid = get_row_val(row, ['FSFTID'], '')
+        row_person_ark = get_row_val(row, ['PersonArk'], '')
+        # PersonArk is now (2026-08-20) the TRUE enduring Family Tree identifier, not a
+        # record-scoped persona id - RecordArk carries that instead (see
+        # docs/plans/2026-08-20-familysearch-viewer-rebuild.md Task 4). Confirmed live the
+        # same day: FamilySearch's own UI shows a real Tree-attachment id ("Attached in Tree
+        # to Jesse Guy Crowston ... KLBM-H9P") that does not appear anywhere in the
+        # orchestration API's JSON response - only in the rendered page - so there is
+        # currently no reliable source to populate PersonArk from at gather time, and no
+        # record-scoped fallback is used here (a persona id is not a valid FamilySearch
+        # Tree person id, and falling back to one would produce a fabricated-looking
+        # _FSFTID). _FSFTID is simply omitted when PersonArk is empty, matching every other
+        # "don't fabricate data" convention in this file.
+        indi_fsftid = row_fsftid or row_person_ark
         fs_tree_link = (Utils.weblink_lines(f"https://www.familysearch.org/tree/person/details/{row_fsftid}",
                                             "FamilySearch Family Tree", target_software)
                         if row_fsftid else [])
         ged.extend(
             [f"0 @I{rec_id}@ INDI", f"1 REFN {strip_ark_type_prefix(rec_id)}"]
-            + ([f"1 _FSFTID {row_fsftid}"] if row_fsftid else [])
+            + ([f"1 _FSFTID {indi_fsftid}"] if indi_fsftid else [])
+            + ([f"1 _APID 1,{APID_DB}::{rec_id}"] if (APID_DB and rec_id) else [])
             + fs_tree_link
             + [f"1 NAME {giv} /{sur}/"] + cit +
             build_alternate_name_lines(alt_names, cit) +
@@ -1375,6 +1592,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
                 ged.append(f"2 DATE {get_birth_date(row, birth_year)}")
             if birth_place:
                 ged.append(f"2 PLAC {birth_place}")
+            ged.append("2 _PROOF proposed")
             ged.extend(cit)
 
         alt_birth_places = parse_alternate_entries(row, 'AlternateBirthPlaces')
@@ -1389,7 +1607,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             ged.extend(occ_evt)
 
         if race := Utils.capitalize_text_string(row.get('Race', row.get('Color', ''))):
-            ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
+            ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proposed"] + cit)
 
         nat_val = Utils.clean_val(row.get('Nationality'))
         if not nat_val and birth_place and is_foreign_birthplace(birth_place):
@@ -1414,9 +1632,12 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
 
         if notes := (get_census_notes(row) + dyn_notes):
             ged.append(f"2 NOTE {' | '.join(notes)}")
+        ged.extend(extra_birth_facts.get(idx, []))
         ged.extend(fam_links.get(idx, []))
 
-    ged.extend(fam_blocks)
+    ged.extend(synth_parent_blocks)
+    for lines in fam_block_lines.values():
+        ged.extend(lines)
     ged.extend(task_blocks)
 
     for folder, tasks in folder_tasks.items():
@@ -1481,6 +1702,8 @@ def load_census_dataframe(data: dict) -> pd.DataFrame:
             row = dict(person.get('columns', {}))
             row.update(page_meta)
             row['PID'] = person.get('pid', '')
+            row['RecordArk'] = person.get('record_ark', '')
+            row['PersonArk'] = person.get('person_ark', '')
             row['Extracted_URL'] = person.get('extracted_url', '')
             row['FSFTID'] = person.get('fsftid', '')
             row['FamilySearch_URL'] = person.get('familysearch_url', '')
@@ -1555,14 +1778,128 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Married within Year'] = pts['married_within_year']
                 if pts.get('street'):
                     row['Street'] = pts['street']
+                # FamilySearch occupation-detail fields (2026-08-20) - land in
+                # type_specific_fields (see field_maps/familysearch_census.yaml, not valid
+                # Commissioner FactDefinition names) but must reach these exact column
+                # names for get_occupation_value() to read them.
+                if pts.get('industry'):
+                    row['Industry'] = pts['industry']
+                if pts.get('occupation_category'):
+                    row['Occupation Category'] = pts['occupation_category']
+                if pts.get('class_of_worker'):
+                    row['Class of Worker'] = pts['class_of_worker']
+                if pts.get('hours_worked'):
+                    row['Hours Worked'] = pts['hours_worked']
+                if pts.get('weeks_worked'):
+                    row['Weeks Worked'] = pts['weeks_worked']
+                # FamilySearch remaining fields (2026-08-21) - no dedicated GEDCOM tag for
+                # most of these, so build_dynamic_events_and_notes() (these column names are
+                # not in CORE_COLUMNS) surfaces each as a plain, visible fact note; the three
+                # veteran columns are a deliberate exception - "veteran" in the column name
+                # matches the existing DYNAMIC_EVENT_RULES MILITARY pattern, so those three
+                # become a real "1 EVEN / 2 TYPE Military Service" event instead of a note.
+                if pts.get('veteran'):
+                    row['Veteran'] = pts['veteran']
+                if pts.get('wwi_veteran'):
+                    row['WWI Veteran'] = pts['wwi_veteran']
+                if pts.get('wwii_veteran'):
+                    row['WWII Veteran'] = pts['wwii_veteran']
+                if pts.get('citizen_status'):
+                    row['Citizen Status'] = pts['citizen_status']
+                if pts.get('children_born'):
+                    row['Children Born'] = pts['children_born']
+                if pts.get('three_plus_acres'):
+                    row['3+ Acres'] = pts['three_plus_acres']
+                if pts.get('lived_on_farm'):
+                    row['Lived on Farm'] = pts['lived_on_farm']
+                if pts.get('lived_on_farm_last_year'):
+                    row['Lived on Farm Last Year'] = pts['lived_on_farm_last_year']
+                if pts.get('same_house_last_year'):
+                    row['Same House as Last Year'] = pts['same_house_last_year']
+                if pts.get('same_county_last_year'):
+                    row['Same County as Last Year'] = pts['same_county_last_year']
+                if pts.get('household_continued'):
+                    row['Household Continued on Next Sheet'] = pts['household_continued']
+                if pts.get('multiple_marriages'):
+                    row['Multiple Marriages'] = pts['multiple_marriages']
+                if pts.get('years_since_marital_status_change'):
+                    row['Years Since Marital Status Change'] = pts['years_since_marital_status_change']
+                if pts.get('had_other_income'):
+                    row['Had Other Income'] = pts['had_other_income']
+                if pts.get('income'):
+                    row['Income'] = pts['income']
+                if pts.get('other_income'):
+                    row['Other Income'] = pts['other_income']
+                if pts.get('other_income_supplement'):
+                    row['Other Income Supplement'] = pts['other_income_supplement']
+                if pts.get('relatives_income'):
+                    row["Relatives' Income"] = pts['relatives_income']
+                if pts.get('relatives_other_income_supplement'):
+                    row["Relatives' Other Income Supplement"] = pts['relatives_other_income_supplement']
+                if pts.get('last_occupation'):
+                    row['Last Occupation'] = pts['last_occupation']
+                if pts.get('last_occupation_industry'):
+                    row['Last Occupation Industry'] = pts['last_occupation_industry']
+                if pts.get('last_worker_class'):
+                    row['Last Worker Class'] = pts['last_worker_class']
+                if pts.get('completed_grade_flag'):
+                    row['Completed Grade Flag'] = pts['completed_grade_flag']
+                if pts.get('worked_last_week'):
+                    row['Worked Last Week'] = pts['worked_last_week']
+                # Institution/group-quarters fields - composed into one note by
+                # get_census_notes() (see build_institution_note()) rather than surfacing as
+                # separate raw notes, so these column names are also added to CORE_COLUMNS.
+                if pts.get('institution_1'):
+                    row['Institution 1'] = pts['institution_1']
+                if pts.get('institution_1_type'):
+                    row['Institution 1 Type'] = pts['institution_1_type']
+                if pts.get('institution_1_from_line'):
+                    row['Institution 1 From Line'] = pts['institution_1_from_line']
+                if pts.get('institution_1_to_line'):
+                    row['Institution 1 To Line'] = pts['institution_1_to_line']
+                if pts.get('institution_2'):
+                    row['Institution 2'] = pts['institution_2']
+                if pts.get('institution_2_type'):
+                    row['Institution 2 Type'] = pts['institution_2_type']
+                if pts.get('institution_2_from_line'):
+                    row['Institution 2 From Line'] = pts['institution_2_from_line']
+                if pts.get('institution_2_to_line'):
+                    row['Institution 2 To Line'] = pts['institution_2_to_line']
+                if pts.get('seeking_work'):
+                    row['Seeking Work'] = pts['seeking_work']
+                if pts.get('attended_school'):
+                    row['Attended School'] = pts['attended_school']
+                # Describe a relative (the child's father/mother), not this participant's
+                # own facts - build_gedcom_from_census() reads these separately to append a
+                # second BIRT fact to an already-extracted parent or synthesize a stub one.
+                if pts.get('father_birth_place'):
+                    row['Father Birth Place'] = pts['father_birth_place']
+                if pts.get('mother_birth_place'):
+                    row['Mother Birth Place'] = pts['mother_birth_place']
+                # Folded into the Occupation fact's "Unemployed" note (get_occupation_value),
+                # not its own fact.
+                if pts.get('weeks_out_of_work'):
+                    row['Weeks Out of Work'] = pts['weeks_out_of_work']
+                # Only used by get_location_string() as a backup when the State/County/City
+                # breakdown is blank - never surfaced as its own fact.
+                if pts.get('residence_place_fallback'):
+                    row['Residence Place Fallback'] = pts['residence_place_fallback']
                 if p.get('birth_place'):
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
                     row['Race'] = p['race']
+                # Occupation belongs in the participant's
+                # own named 'occupation' field, not a duplicate facts-array entry (see
+                # field_maps/familysearch_census.yaml's own comment on this) - get_occupation_value()
+                # reads this same 'Occupation' column already.
+                if p.get('occupation'):
+                    row['Occupation'] = p['occupation']
                 for fact in p.get('facts', []) or []:
                     col = FACT_TYPE_TO_COLUMN.get(fact.get('fact_type', ''), fact.get('fact_type', ''))
                     row[col] = fact.get('value') or fact.get('date') or fact.get('place') or ''
                 row['PID'] = pts.get('pid', '')
+                row['RecordArk'] = pts.get('record_ark', '')
+                row['PersonArk'] = pts.get('person_ark', '')
                 row['Extracted_URL'] = pts.get('extracted_url', '')
                 row['FSFTID'] = pts.get('fsftid', '')
                 row['FamilySearch_URL'] = pts.get('familysearch_url', '')
@@ -1587,9 +1924,8 @@ def run_census_flavor(data: dict) -> None:
     if "pages" in data:
         census_df = load_census_dataframe(data)
         payload_year = Utils.clean_val(data.get('census_year'))
-        payload_location = Utils.clean_val(data.get('location'))
     else:
-        census_df, payload_year, payload_location = build_census_dataframe_from_unified(data)
+        census_df, payload_year, _ = build_census_dataframe_from_unified(data)
 
     STATE = get_json_fallback(census_df, ['State', 'State/Province'], STATE)
     COUNTY = get_json_fallback(census_df, ['County', 'Parish'], COUNTY)
@@ -1652,26 +1988,20 @@ def run_census_flavor(data: dict) -> None:
     CALL_NUMBER = CALL_NUMBER or (f"{FILM_NUMBER}, roll {ROLL_NUMBER}".strip(", ")
                                   if (FILM_NUMBER or ROLL_NUMBER) else CALL_NUMBER)
 
-    location_str = payload_location
-    if IMAGE_DIR and CENSUS_YEAR and location_str:
-        location_folder = re.sub(r'^USA\s*-\s*', '', location_str)
-        # Try the current folder-naming scheme first - the real collection name
-        # (sanitized the same way Voyageur's own census_collection_folder_name() does)
-        # when one was captured, else the generic "{year} {country} Census" template;
-        # fall back to the legacy unconditional "{year} US Federal Census" name every
-        # gather - any country - used before this fix, so already-gathered images stay
-        # linkable without requiring a re-gather.
-        current_folder_name = (
-            re.sub(r'[/\\?%*:|"<>]', "-", COLLECTION_NAME).strip() if COLLECTION_NAME
-            else f'{CENSUS_YEAR} {COUNTRY or "USA"} Census'
-        )
-        nested_dir = Path(IMAGE_DIR) / current_folder_name / location_folder
-        if not nested_dir.is_dir():
-            legacy_dir = Path(IMAGE_DIR) / f"{CENSUS_YEAR} US Federal Census" / location_folder
-            if legacy_dir.is_dir():
-                nested_dir = legacy_dir
-        if nested_dir.is_dir():
-            IMAGE_DIR = str(nested_dir)
+    # Matches Voyageur's own resolve_census_image_dir() convention: <base>/<country>/
+    # <year>/<state>/<county>/<city>/<ED>, no collection-name wrapper folder - see
+    # docs/plans/2026-08-17-media-directory-structure.md. Nests
+    # one level past city, down to the enumeration district - a single city/township
+    # can span several EDs, so ED is the level that actually disambiguates one image set
+    # from another within it. Always uses this computed path, never gated on nested_dir
+    # already existing on disk - that gate meant a GEDCOM FILE reference silently fell back
+    # to the flat, un-nested IMAGE_DIR whenever this run's STATE/COUNTY/TOWNSHIP/ED (all now
+    # mode-based, see get_json_fallback) didn't happen to match a folder some earlier/
+    # different run already created, instead of pointing at the same path Voyageur's own
+    # gather-time image routing (extract_census_image_routing_fields, also mode-based) uses.
+    if IMAGE_DIR and CENSUS_YEAR:
+        location_parts = [p for p in (STATE, COUNTY, TOWNSHIP, ENUMERATION_DISTRICT) if p]
+        IMAGE_DIR = str(Path(IMAGE_DIR).joinpath(COUNTRY or "USA", str(CENSUS_YEAR), *location_parts))
 
     for software in Utils.resolve_gedcom_output_targets():
         build_gedcom_from_census(census_df, software)
