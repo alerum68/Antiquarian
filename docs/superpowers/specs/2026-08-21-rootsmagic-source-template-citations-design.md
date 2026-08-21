@@ -13,8 +13,8 @@ RootsMagic-exported reference file the user produced from their live database
 (`C:\Users\Jason Cole\Documents\Genealogy\Antiquarian\GEDCOM\test.ged`, referred to
 below as `test.ged`).
 
-Two independent classes of bug, plus one content-drift issue and one selection-logic
-issue, all found by diffing our current output/code against `test.ged`:
+Two independent classes of bug, plus one naming-consistency issue and one
+selection-logic issue, all found by diffing our current output/code against `test.ged`:
 
 1. **Wrong GEDCOM tag vocabulary.** `_rmst_element_to_gedcom` (duplicated in
    `Census.py` and `General.py`) emits `_SRCTEMPLATE`/`FOOT`/`BIBL`/`DISP`/`DETL`/`LHNT`.
@@ -30,12 +30,18 @@ issue, all found by diffing our current output/code against `test.ged`:
    field data as belonging to a template when it's nested under a `_TMPLT` tag. Per
    `test.ged`, that citation-level `_TMPLT` carries **no `TID`** (the TID lives once, on
    the master `SOUR` record) and sits **after** `PAGE`/`_TITL`, not before.
-3. **Scrip template content has drifted from the user's live RootsMagic database.**
-   `Metis Scrip.rmst` and `Scrip.py`'s `_SIMPLIFIED_CITATION_TEMPLATES` dict describe an
-   older "Simplified Citations" design (6 master fields, `Accessed`/`RefNumber` detail
-   fields, `* Simple Citations: ...` naming) that no longer matches the templates
-   actually installed in the user's RootsMagic 11 database, which `test.ged` proves use
-   a simplified field set, `!`-prefixed names, and different footnote/bibliography text.
+3. **Every Source Template's display name needs a `!` prefix.** RootsMagic sorts the
+   Source Template picker alphabetically; a leading `!` sorts before letters/digits,
+   putting these custom templates at the top of the list. `test.ged`'s live-database
+   templates already use it (`!Métis Scrip: Manitoba (1870–1876)`, etc.), and the user
+   wants it applied to all of ours. `test.ged`'s templates *also* show a simplified
+   field set (3 master fields instead of 6, no `Accessed`/`RefNumber`) — but per the
+   user's judgment, `Metis Scrip.rmst`'s existing 6-field design (separating
+   `PrimaryCreator` from `Department`, tracking `Date`/`SourceDescription`, and keeping
+   `Accessed`/`RefNumber` for citation completeness) is the more advanced, correct
+   design and should be **kept as-is**, content-wise — only the naming prefix changes
+   (`*` → `!`, nothing else about the name text). `test.ged` is evidence for GEDCOM
+   *structure* (Sections 1–2 below), not for template *content*.
 4. **Scrip template *selection* is separately broken.** `resolve_scrip_template_id`
    reads `document_type` from `type_specific_fields`, but real Voyageur/Commissioner
    data puts it under `source_documents[].document_type` instead — so the
@@ -124,42 +130,35 @@ Master-source-level `_TMPLT`/`TID`/`FIELD` structure (`1 _TMPLT`/`2 TID`/`2 FIEL
 `@S1@ SOUR` example and by our existing `get_census_sources`/`get_scrip_template_sources`/
 `volume_source_detail_fields` code) — **no change** needed there.
 
-### 3. Scrip template content rebuild
+### 3. Naming: `*` → `!` prefix swap, all templates, content otherwise untouched
 
-`Metis Scrip.rmst` and `Scrip.py`'s `_SIMPLIFIED_CITATION_TEMPLATES` (TIDs `20001`–`20005`,
-unchanged numbering) are rebuilt field-for-field from `test.ged`'s `_STMPLT` blocks:
+Every template's `Name` (both in the `.rmst` `<Name>` element and the corresponding
+`'name'` value in `_SIMPLIFIED_CITATION_TEMPLATES`) gets its leading `*` replaced with
+`!` — nothing else about the name text changes (confirmed with the user: minimal swap,
+not test.ged's shorter "drop 'Simple Citations:'" phrasing). Category text
+(`Simplified Citations for Genealogical Sources`) is also kept as-is across every
+template, including the 5 Scrip ones — **not** switched to `test.ged`'s `Canadian
+Records`.
 
-| TID | Template | Master fields | Detail fields (dropped: `Accessed`, `RefNumber`) |
-|---|---|---|---|
-| 20001 | Métis Scrip: Manitoba (1870–1876) | Commission, Collection, Repository | ClaimantName, AffidavitNumber, Parish, ScripType, Volume, Microfilm, URL |
-| 20002 | Métis Scrip: North-West (1885 & 1900-1901) | Commission, Collection, Repository | ClaimantName, ClaimNumber, ScripNumber, IssueDate, Location, Volume, Microfilm, URL |
-| 20003 | Métis Scrip: Treaty 8 (1899-1908) | Commission, Collection, Repository | ClaimantName, ClaimNumber, ScripAmount, ScripNoteNumber, DeliveryDate, DeliveryPlace, Volume, URL |
-| 20004 | Métis Scrip: Certificate | Commission, Collection, Repository | ClaimantName, ScripType, CertificateNumber, Amount, IssueDate, Volume, Microfilm, URL |
-| 20005 | Land Records: Dominion Land Grant Patent | Collection, Repository (no Commission) | GranteeName, OriginalClaimant, LandDescription, IssueDate, Liber, Folio, Microfilm, URL |
-
-Names get the `!` prefix (dropping the "Simple Citations:" phrasing entirely, per
-`test.ged`'s exact wording — e.g. `!Métis Scrip: Manitoba (1870–1876)`, not
-`!Simple Citations: Métis Scrip...`). Category becomes `Canadian Records`. Footnote,
-ShortFootnote, and Bibliography text transcribed verbatim from `test.ged`.
-
-Every field name in the new design already has a working value source in
-`_scrip_template_field_value` or the template dict's own static values — no new field
-mappings need inventing.
-
-`get_scrip_template_sources` (master `SOUR` builder) simplifies from
-6 possible master `FIELD` entries down to 2–3 (`Commission` when present, `Collection`,
-`Repository`), dropping the `PrimaryCreator`/`Department`/`Date`/`SourceDescription`
-computation entirely.
+This applies uniformly to all 9 defined templates: `10001`(removed, see below),
+`10006`, `10008`, `10009`, `10010`, `20001`–`20005`. No field-list, master/detail-field,
+or footnote/bibliography content changes for the 5 Scrip templates — `Metis Scrip.rmst`
+and `_SIMPLIFIED_CITATION_TEMPLATES[20001..20005]` keep their current 6 master fields
+(`PrimaryCreator`, `Department`, `Date`, `SourceDescription`, `Collection`,
+`Repository`) and detail fields (including `Accessed`, `RefNumber`) unchanged.
+`get_scrip_template_sources` (master `SOUR` builder) is **not** simplified — it keeps
+building all 6 master `FIELD` entries exactly as it does today.
 
 FindAGrave's dict entry (`10001`) is deleted outright (dead code, unused elsewhere,
-now numerically colliding with the real North-West Scrip TID).
+now numerically colliding with the real North-West Scrip TID in the user's live
+database — not being built for currently, can be revisited later with its own TID).
 
-### 4. Census / Parish / Traditional / Master Template — mechanical fixes only, plus field-list reconciliation
+### 4. Census / Parish / Traditional / Master Template — mechanical fixes, plus field-list reconciliation
 
-These four keep their current TIDs (`10008`, `10009`, `10010`, `10006`), field content,
-and `"* Simple Citations: ..."` naming pattern — only the `*` → `!` prefix swap and the
-two universal mechanics (Sections 1–2) apply. Reading each `.rmst` file directly (per
-the user's direction — the `.rmst` files are themselves the authoritative field-usage
+These four (and Scrip, per Section 3) keep their current TIDs (`10008`, `10009`,
+`10010`, `10006`) and field content — only the `*` → `!` prefix swap and the two
+universal mechanics (Sections 1–2) apply. Reading each `.rmst` file directly (per the
+user's direction — the `.rmst` files are themselves the authoritative field-usage
 reference) surfaced real deltas between the `.rmst` definitions and the current Python
 dict that should be reconciled while this code is already being touched:
 
@@ -196,13 +195,14 @@ impact right now, but low-cost since this code is already being rewritten.
 
 ### 6. Verification
 
-- Trace `Footnote`/`ShortFootnote`/`Bibliography` for all 5 rebuilt Scrip templates
-  (plus Census and Parish, which already have real fixture data in the test suite)
-  against representative real field values, evaluating RM's template mini-language
-  (`[Field]` substitution, `<...>` optional clauses, `<?[Field]|A|B>` conditionals,
-  `:Caps`/`:Surname` modifiers) by hand to confirm each produces a grammatically
-  correct citation sentence with no dangling punctuation when optional fields are
-  empty.
+- Trace `Footnote`/`ShortFootnote`/`Bibliography` for all 5 Scrip templates (unchanged
+  content, but worth confirming against real data now that the citation-level `_TMPLT`
+  wiring will actually surface them in RM) and Census/Parish (which already have real
+  fixture data in the test suite) against representative real field values, evaluating
+  RM's template mini-language (`[Field]` substitution, `<...>` optional clauses,
+  `<?[Field]|A|B>` conditionals, `:Caps`/`:Surname` modifiers) by hand to confirm each
+  produces a grammatically correct citation sentence with no dangling punctuation when
+  optional fields are empty.
 - Golden-file regression tests (`Archivist/tests/golden/*.ged`) regenerated via
   `capture_golden_gedcom.py` only where the diff is exactly the intentional structural
   change (per `AGENTS.md`'s golden-file discipline — never to paper over an
@@ -220,12 +220,14 @@ impact right now, but low-cost since this code is already being rewritten.
   field-list reconciliation for 10006/10009/10010's dict entries lives in `Scrip.py`
   but their citation-detail-field builders live here — verify field lists used match
   the corrected dict.
-- `Archivist/Scrip.py` — `_SIMPLIFIED_CITATION_TEMPLATES` rebuild (20001–20005 content,
-  10006/10008/10009/10010 field-list reconciliation, 10001 FindAGrave removal),
-  `get_scrip_template_sources` simplification, `get_scrip_citation_fields` `_TMPLT` fix,
-  `select_scrip_template_id`/`resolve_scrip_template_id` selection-logic fixes.
+- `Archivist/Scrip.py` — `_SIMPLIFIED_CITATION_TEMPLATES` naming (`*`→`!` on all
+  entries), 10006/10008/10009/10010 field-list reconciliation, 10001 FindAGrave
+  removal, `get_scrip_citation_fields` `_TMPLT` fix, `select_scrip_template_id`/
+  `resolve_scrip_template_id` selection-logic fixes. No field-content changes to
+  20001–20005 or to `get_scrip_template_sources`.
 - `Archivist/HBCA.py` — citation `_TMPLT` fix.
-- `Archivist/Source Templates/Metis Scrip.rmst` — content rebuild per Section 3.
+- `Archivist/Source Templates/Metis Scrip.rmst` — `*`→`!` name-prefix swap only,
+  content otherwise unchanged.
 - `Archivist/tests/test_archivist.py`, `Archivist/tests/test_census_ingestion.py` —
   assertion updates for the new nesting level/structure.
 - `Archivist/tests/golden/*.ged` — regenerated where the diff is the intentional
