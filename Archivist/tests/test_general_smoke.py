@@ -21,3 +21,40 @@ def test_get_dynamic_source_id_keeps_prefix_by_default():
             General.GENERAL_CONFIG['register_source_id'] = orig
         else:
             General.GENERAL_CONFIG.pop('register_source_id', None)
+
+
+def test_general_rmst_element_to_gedcom_uses_stmplt_tag_vocabulary():
+    import lxml.etree as etree
+    xml = etree.fromstring("""
+    <Template Id="88888">
+      <Name>!Test Template</Name>
+      <Description>Paragraph one.
+
+Paragraph two.</Description>
+      <Category>Test Category</Category>
+      <Footnote>Footnote text.</Footnote>
+      <ShortFootnote>Short text.</ShortFootnote>
+      <Bibliography>Bibliography text.</Bibliography>
+      <Field>
+        <Type>Name</Type>
+        <Name>TestField</Name>
+        <Display>Test Field</Display>
+        <Hint>a hint</Hint>
+        <Detail>False</Detail>
+        <LongHint/>
+      </Field>
+    </Template>
+    """)
+    lines = General._rmst_element_to_gedcom(xml)
+    joined = "\n".join(lines)
+    assert "0 _STMPLT" in joined
+    assert "_SRCTEMPLATE" not in joined
+    assert "1 NAME !Test Template" in joined
+    assert "1 DESC Paragraph one." in joined
+    assert "2 CONT " in joined
+    assert "2 CONT Paragraph two." in joined
+    assert "1 FOOTNOTE Footnote text." in joined
+    assert "1 BIBLIO Bibliography text." in joined
+    assert "2 DISPLAY Test Field" in joined
+    assert "2 TYPE NAME" in joined
+    assert "2 ISDETAIL N" in joined

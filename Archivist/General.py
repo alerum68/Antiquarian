@@ -454,8 +454,29 @@ def generate_media_uid_for_lac_asset(asset_id: str) -> str:
 
 
 # noinspection DuplicatedCode
+def _gedcom_wrapped_lines(level: int, tag: str, text: str, max_len: int = 200) -> List[str]:
+    """CONT on each literal newline (paragraph break); CONC within a paragraph past
+    max_len - GEDCOM 5.5.1 caps a physical line at 255 bytes."""
+    lines: List[str] = []
+    first = True
+    for para in text.split("\n"):
+        chunks = [para[i:i + max_len] for i in range(0, len(para), max_len)] or [""]
+        for i, chunk in enumerate(chunks):
+            if first:
+                lines.append(f"{level} {tag} {chunk}")
+                first = False
+            elif i == 0:
+                lines.append(f"{level + 1} CONT {chunk}")
+            else:
+                lines.append(f"{level + 1} CONC {chunk}")
+    return lines
+
+
+# noinspection DuplicatedCode
 def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
-    """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
+    """Emits _STMPLT/FOOTNOTE/BIBLIO/DISPLAY/ISDETAIL/LONGHINT - RM's real tag
+    vocabulary, not the _SRCTEMPLATE/FOOT/BIBL/DISP/DETL/LHNT names RM doesn't
+    recognize."""
     tid = elem.get("Id", "")
     name = (elem.findtext("Name") or "").strip()
     desc = (elem.findtext("Description") or "").strip()
@@ -464,20 +485,22 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     short = (elem.findtext("ShortFootnote") or "").strip()
     bibl = (elem.findtext("Bibliography") or "").strip()
 
-    lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
+    lines = ["0 _STMPLT", f"1 TID {tid}"]
+    if name:
+        lines.append(f"1 NAME {name}")
     if desc:
-        lines.append(f"1 DESC {desc}")
+        lines.extend(_gedcom_wrapped_lines(1, "DESC", desc))
     if cat:
         lines.append(f"1 CAT {cat}")
     if foot:
-        lines.append(f"1 FOOT {foot}")
+        lines.extend(_gedcom_wrapped_lines(1, "FOOTNOTE", foot))
     if short:
-        lines.append(f"1 SHORT {short}")
+        lines.extend(_gedcom_wrapped_lines(1, "SHORT", short))
     if bibl:
-        lines.append(f"1 BIBL {bibl}")
+        lines.extend(_gedcom_wrapped_lines(1, "BIBLIO", bibl))
 
     for fld in elem.findall("Field"):
-        f_type = (fld.findtext("Type") or "Text").strip()
+        f_type = (fld.findtext("Type") or "Text").strip().upper()
         f_name = (fld.findtext("Name") or "").strip()
         f_disp = (fld.findtext("Display") or "").strip()
         f_hint = (fld.findtext("Hint") or "").strip()
@@ -485,15 +508,16 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
         f_lhnt = (fld.findtext("LongHint") or "").strip()
 
         lines.append("1 FIELD")
-        lines.append(f"2 TYPE {f_type}")
-        lines.append(f"2 NAME {f_name}")
+        if f_name:
+            lines.append(f"2 NAME {f_name}")
         if f_disp:
-            lines.append(f"2 DISP {f_disp}")
+            lines.extend(_gedcom_wrapped_lines(2, "DISPLAY", f_disp))
         if f_hint:
-            lines.append(f"2 HINT {f_hint}")
-        lines.append(f"2 DETL {f_detl}")
+            lines.extend(_gedcom_wrapped_lines(2, "HINT", f_hint))
         if f_lhnt:
-            lines.append(f"2 LHNT {f_lhnt}")
+            lines.extend(_gedcom_wrapped_lines(2, "LONGHINT", f_lhnt))
+        lines.append(f"2 TYPE {f_type}")
+        lines.append(f"2 ISDETAIL {f_detl}")
     return lines
 
 
