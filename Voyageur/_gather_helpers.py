@@ -15,6 +15,7 @@ import sys
 import threading
 import time
 import webbrowser
+from collections import Counter
 from pathlib import Path
 from typing import Optional
 
@@ -277,30 +278,51 @@ def move_downloaded_images(downloads_dir: Path, image_prefix: str, start_time: f
     return len(moved), skipped, final_failed_names
 
 
+def _mode_or_first(values: list) -> str:
+    """Most common non-blank value, falling back to the first non-blank one on a tie
+    (Counter.most_common's own tie-break: insertion order) - never the empty string as long
+    as at least one real value exists."""
+    counts = Counter(v for v in values if v)
+    return counts.most_common(1)[0][0] if counts else ""
+
+
 def extract_census_image_routing_fields(final_data: dict) -> tuple[str, str, str, str]:
     """Extracts (census_year, country, location_folder, collection_name) from a normalised
     gather dict (output of normalize_*_census_gather). Used by both FS.py and A.py to
     route images without re-parsing the filename.
 
+    User-directed design (2026-08-21): state/county/city are each the most common non-blank
+    value across ALL records, not just the first one - confirmed live this was a real bug,
+    not a hypothetical: a real 1950 Pembina, ND gather had its very first record's own
+    'state' field read "Advance" (a citation-parsing artifact for that one record) while the
+    true majority of records correctly said "North Dakota" - routing every image by the
+    first record alone sent them all into a one-off "Advance" folder that didn't match what
+    Archivist/Census.py's own get_json_fallback() (already mode-based) put in the GEDCOM,
+    producing a FILE reference to a folder the images were never actually saved in. Same
+    fix as that function's own reasoning, applied consistently here too.
+
     location_folder is built as 'state - county - city' (each segment omitted when blank)
     matching the ' - ' split resolve_census_image_dir uses internally."""
-    record: dict = {}
-    fields: dict = {}
+    census_year = ""
+    countries: list = []
+    states: list = []
+    counties: list = []
+    cities: list = []
     for sheet in final_data.get("sheets", []):
-        records = sheet.get("records", [])
-        if records:
-            record = records[0] or {}
+        for record in sheet.get("records", []) or []:
+            record = record or {}
+            if not census_year:
+                # normalize_census_pages() stores year on the record itself (a sibling of
+                # type_specific_fields), not inside type_specific_fields - see census_schema.py.
+                census_year = record.get("year", "") or ""
             fields = record.get("type_specific_fields", {}) or {}
-            break
-    # normalize_census_pages() stores year on the record itself (a sibling of
-    # type_specific_fields), not inside type_specific_fields - see census_schema.py.
-    census_year = record.get("year", "") or ""
-    country = fields.get("country", "") or ""
-    location_parts = [
-        fields.get("state", ""),
-        fields.get("county", ""),
-        fields.get("city", ""),
-    ]
+            countries.append(fields.get("country", ""))
+            states.append(fields.get("state", ""))
+            counties.append(fields.get("county", ""))
+            cities.append(fields.get("city", ""))
+
+    country = _mode_or_first(countries)
+    location_parts = [_mode_or_first(states), _mode_or_first(counties), _mode_or_first(cities)]
     location_folder = " - ".join(p for p in location_parts if p)
     collection_name = final_data.get("citation", {}).get("collection_name", "") or ""
     return census_year, country, location_folder, collection_name

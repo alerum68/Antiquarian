@@ -286,6 +286,24 @@ def test_fs_location_folder_skips_empty_fields():
     assert not loc_folder.endswith(" - ")
 
 
+def test_fs_image_routing_uses_majority_state_not_just_first_record():
+    """Real-world regression (2026-08-21): a real 1950 Pembina, ND gather had its very
+    first record's own 'state' field read "Advance" (a citation-parsing artifact for that
+    one record) while the true majority of records correctly said "North Dakota" - routing
+    every image by the first record alone sent them all into a one-off "Advance" folder
+    that didn't match Archivist/Census.py's own get_json_fallback() (already mode-based),
+    producing a GEDCOM FILE reference to a folder the images were never actually saved in."""
+    from _gather_helpers import extract_census_image_routing_fields
+    records = [{"year": "1950", "type_specific_fields": {"country": "USA", "state": "Advance",
+                                                         "county": "", "city": ""}}]
+    records += [{"year": "1950", "type_specific_fields": {"country": "USA", "state": "North Dakota",
+                                                          "county": "Pembina", "city": ""}}] * 3
+    data = {"citation": {"collection_name": "United States Census, 1950"},
+            "sheets": [{"records": records}]}
+    _, _, loc_folder, _ = extract_census_image_routing_fields(data)
+    assert loc_folder == "North Dakota - Pembina"
+
+
 def test_fs_normalize_then_extract_routing_fields_round_trips():
     """Integration regression: extract_census_image_routing_fields() must read whatever
     shape normalize_familysearch_census_gather() actually produces, not a hand-built

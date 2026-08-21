@@ -1952,12 +1952,16 @@ def run_census_flavor(data: dict) -> None:
 
     # Matches Voyageur's own resolve_census_image_dir() convention: <base>/<country>/
     # <year>/<state>/<county>/<city>, no collection-name wrapper folder - see
-    # docs/plans/2026-08-17-media-directory-structure.md.
+    # docs/plans/2026-08-17-media-directory-structure.md. User-directed design (2026-08-21):
+    # always use this computed path, never gated on nested_dir already existing on disk -
+    # that gate meant a GEDCOM FILE reference silently fell back to the flat, un-nested
+    # IMAGE_DIR whenever this run's STATE/COUNTY/TOWNSHIP (both now mode-based, see
+    # get_json_fallback) didn't happen to match a folder some earlier/different run already
+    # created, instead of pointing at the same path Voyageur's own gather-time image routing
+    # (extract_census_image_routing_fields, also mode-based) actually uses.
     if IMAGE_DIR and CENSUS_YEAR:
         location_parts = [p for p in (STATE, COUNTY, TOWNSHIP) if p]
-        nested_dir = Path(IMAGE_DIR).joinpath(COUNTRY or "USA", str(CENSUS_YEAR), *location_parts)
-        if nested_dir.is_dir():
-            IMAGE_DIR = str(nested_dir)
+        IMAGE_DIR = str(Path(IMAGE_DIR).joinpath(COUNTRY or "USA", str(CENSUS_YEAR), *location_parts))
 
     for software in Utils.resolve_gedcom_output_targets():
         build_gedcom_from_census(census_df, software)
