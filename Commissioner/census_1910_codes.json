@@ -587,5 +587,26 @@
     "999": "No occupation reported"
   },
   "Industry": {},
-  "Class_Of_Worker": {}
+  "Class_Of_Worker": {},
+  "Race": {
+    "W": "White",
+    "w": "White",
+    "B": "Black",
+    "b": "Black",
+    "Mu": "Mulatto",
+    "mu": "Mulatto",
+    "MU": "Mulatto",
+    "Ch": "Chinese",
+    "ch": "Chinese",
+    "CH": "Chinese",
+    "Jp": "Japanese",
+    "jp": "Japanese",
+    "JP": "Japanese",
+    "In": "Indian",
+    "in": "Indian",
+    "IN": "Indian",
+    "Ot": "Other",
+    "ot": "Other",
+    "OT": "Other"
+  }
 }

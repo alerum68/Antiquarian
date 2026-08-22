@@ -907,5 +907,20 @@
     "4": "Unpaid worker on family farm or business",
     "5": "Armed Forces",
     "9": "Inappropriate"
+  },
+  "Race": {
+    "W": "White",
+    "w": "White",
+    "B": "Black",
+    "b": "Black",
+    "Ch": "Chinese",
+    "ch": "Chinese",
+    "CH": "Chinese",
+    "Jp": "Japanese",
+    "jp": "Japanese",
+    "JP": "Japanese",
+    "In": "Indian",
+    "in": "Indian",
+    "IN": "Indian"
   }
 }

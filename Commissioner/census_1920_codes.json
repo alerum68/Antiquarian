@@ -587,5 +587,32 @@
     "999": "No occupation reported"
   },
   "Industry": {},
-  "Class_Of_Worker": {}
+  "Class_Of_Worker": {},
+  "Race": {
+    "W": "White",
+    "w": "White",
+    "B": "Black",
+    "b": "Black",
+    "Mu": "Mulatto",
+    "mu": "Mulatto",
+    "MU": "Mulatto",
+    "In": "Indian",
+    "in": "Indian",
+    "IN": "Indian",
+    "Ch": "Chinese",
+    "ch": "Chinese",
+    "CH": "Chinese",
+    "Jp": "Japanese",
+    "jp": "Japanese",
+    "JP": "Japanese",
+    "Fil": "Filipino",
+    "fil": "Filipino",
+    "FIL": "Filipino",
+    "Hin": "Hindu",
+    "hin": "Hindu",
+    "HIN": "Hindu",
+    "Kor": "Korean",
+    "kor": "Korean",
+    "KOR": "Korean"
+  }
 }
