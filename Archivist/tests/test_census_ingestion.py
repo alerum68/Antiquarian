@@ -973,7 +973,6 @@ def test_location_string_falls_back_to_residence_place_only_when_census_place_bl
     assert get_location_string(populated_row) == "Minnesota, USA"
 
 
-
 def test_build_census_dataframe_from_unified_surfaces_unmapped_codes():
     data = {
         "record_type_name": "Census_1950", "sheets": [{
@@ -1095,6 +1094,20 @@ def test_get_education_value_still_returns_empty_string_for_attended_only():
     row = pd.Series({'Attended School': 'Yes'})
     assert arc.get_education_value(row) == ''
 
+
+def test_get_education_value_falls_back_to_alt_column_in_heterogeneous_dataframe():
+    """On a real multi-row DataFrame built from rows with different keys, a
+    missing 'Highest Grade of School Completed' cell is NaN (not an absent key),
+    so the alt-column fallback must still fire via get_row_val rather than being
+    masked by row.get's default arg."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([
+        {'Highest Grade of School Completed': 'S8', 'Highest Grade Completed': None},
+        {'Highest Grade of School Completed': None, 'Highest Grade Completed': 'S4'},
+    ])
+    assert arc.get_education_value(df.iloc[1]) == "4th grade"
+
+
 def test_get_race_value_decodes_abbreviation():
     arc.CENSUS_YEAR = 1950
     assert arc.get_race_value(pd.Series({'Race': 'W'})) == "White"
@@ -1113,6 +1126,15 @@ def test_get_race_value_falls_back_to_color_column():
 def test_get_race_value_empty_when_nothing_present():
     arc.CENSUS_YEAR = 1950
     assert arc.get_race_value(pd.Series({})) == ""
+
+
+def test_get_race_value_falls_back_to_color_column_in_heterogeneous_dataframe():
+    """On a real multi-row DataFrame built from rows with different keys, a
+    missing 'Race' cell is NaN (not an absent key), so the Color fallback must
+    still fire via get_row_val rather than being masked by row.get's default arg."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([{'Race': 'W', 'Color': None}, {'Race': None, 'Color': 'N'}])
+    assert arc.get_race_value(df.iloc[1]) == "Negro"
 
 
 def test_get_nationality_value_uses_decoded_foreign_code():
