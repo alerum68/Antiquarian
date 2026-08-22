@@ -1110,6 +1110,14 @@ def get_education_value(row: pd.Series) -> Optional[str]:
         return ''
     return None
 
+def get_race_value(row: pd.Series) -> str:
+    from Commissioner import census_codes
+
+    raw = row.get('Race', row.get('Color', ''))
+    decoded = census_codes.decode(CENSUS_YEAR, "Race", raw)
+    return decoded or Utils.capitalize_text_string(raw)
+
+
 def get_birth_date(row: pd.Series, birth_year: float) -> str:
     month_str = get_row_val(row, ['Birth Month', 'Birth month', 'Month of Birth'], '')
     abbr = MONTH_ABBR.get(month_str.upper())
@@ -1617,7 +1625,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             occ_evt.extend(["2 _PROOF proven"] + cit)
             ged.extend(occ_evt)
 
-        if race := Utils.capitalize_text_string(row.get('Race', row.get('Color', ''))):
+        if race := get_race_value(row):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proposed"] + cit)
 
         nat_val = Utils.clean_val(row.get('Nationality'))

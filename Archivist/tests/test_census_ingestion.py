@@ -1094,3 +1094,22 @@ def test_get_education_value_still_returns_empty_string_for_attended_only():
     arc.CENSUS_YEAR = 1950
     row = pd.Series({'Attended School': 'Yes'})
     assert arc.get_education_value(row) == ''
+
+def test_get_race_value_decodes_abbreviation():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Race': 'W'})) == "White"
+
+
+def test_get_race_value_passes_through_already_spelled_out_value():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Race': 'White'})) == "White"
+
+
+def test_get_race_value_falls_back_to_color_column():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Color': 'W'})) == "White"
+
+
+def test_get_race_value_empty_when_nothing_present():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({})) == ""
