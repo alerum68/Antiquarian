@@ -1888,6 +1888,15 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
                     row['Race'] = p['race']
+                unmapped = pts.get('unmapped') or {}
+                if unmapped.get(f'MISC_CODE_C_{census_year_str}_CENSUS'):
+                    row['Occupation Code'] = unmapped[f'MISC_CODE_C_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_C1_{census_year_str}_CENSUS'):
+                    row['Industry Code'] = unmapped[f'MISC_CODE_C1_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_C2_{census_year_str}_CENSUS'):
+                    row['Class of Worker Code'] = unmapped[f'MISC_CODE_C2_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_B_{census_year_str}_CENSUS'):
+                    row['Birthplace Code'] = unmapped[f'MISC_CODE_B_{census_year_str}_CENSUS']
                 # Occupation belongs in the participant's
                 # own named 'occupation' field, not a duplicate facts-array entry (see
                 # field_maps/familysearch_census.yaml's own comment on this) - get_occupation_value()

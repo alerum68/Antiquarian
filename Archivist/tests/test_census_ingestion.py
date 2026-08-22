@@ -971,3 +971,50 @@ def test_location_string_falls_back_to_residence_place_only_when_census_place_bl
 
     populated_row = pd.Series({"State": "Minnesota", "Residence Place Fallback": "Should Not Win"})
     assert get_location_string(populated_row) == "Minnesota, USA"
+
+
+
+def test_build_census_dataframe_from_unified_surfaces_unmapped_codes():
+    data = {
+        "record_type_name": "Census_1950", "sheets": [{
+            "page_id": "1", "document_metadata": {},
+            "records": [{
+                "type_specific_fields": {},
+                "participants": [{
+                    "std_given": "William", "std_surname": "Vinctson",
+                    "type_specific_fields": {
+                        "unmapped": {
+                            "MISC_CODE_C_1950_CENSUS": "100",
+                            "MISC_CODE_C1_1950_CENSUS": "105",
+                            "MISC_CODE_C2_1950_CENSUS": "3",
+                            "MISC_CODE_B_1950_CENSUS": "161",
+                        },
+                    },
+                }],
+            }],
+        }],
+    }
+    df, year_str, _ = arc.build_census_dataframe_from_unified(data)
+    assert year_str == "1950"
+    row = df.iloc[0]
+    assert row['Occupation Code'] == "100"
+    assert row['Industry Code'] == "105"
+    assert row['Class of Worker Code'] == "3"
+    assert row['Birthplace Code'] == "161"
+
+
+def test_build_census_dataframe_from_unified_omits_code_columns_when_absent():
+    data = {
+        "record_type_name": "Census_1950", "sheets": [{
+            "page_id": "1", "document_metadata": {},
+            "records": [{
+                "type_specific_fields": {},
+                "participants": [{"std_given": "Jane", "std_surname": "Doe",
+                                  "type_specific_fields": {}}],
+            }],
+        }],
+    }
+    df, _, _ = arc.build_census_dataframe_from_unified(data)
+    row = df.iloc[0]
+    for col in ('Occupation Code', 'Industry Code', 'Class of Worker Code', 'Birthplace Code'):
+        assert col not in df.columns or not row.get(col)
