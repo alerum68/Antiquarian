@@ -907,5 +907,26 @@
     "4": "Unpaid worker on family farm or business",
     "5": "Armed Forces",
     "9": "Inappropriate"
+  },
+  "Education": {
+    "0": "No schooling",
+    "K": "Kindergarten",
+    "S1": "1st grade",
+    "S2": "2nd grade",
+    "S3": "3rd grade",
+    "S4": "4th grade",
+    "S5": "5th grade",
+    "S6": "6th grade",
+    "S7": "7th grade",
+    "S8": "8th grade",
+    "S9": "9th grade (1st year of High School)",
+    "S10": "10th grade (2nd year of High School)",
+    "S11": "11th grade (3rd year of High School)",
+    "S12": "12th grade (4th year of High School)",
+    "C1": "1st year of College",
+    "C2": "2nd year of College",
+    "C3": "3rd year of College",
+    "C4": "4th year of College",
+    "C5": "5 or more years of College"
   }
 }

@@ -477,5 +477,25 @@
     "4": "Working on own account (OA)",
     "5": "Unpaid family worker (NP)",
     "6": "New worker, that is, person without previous work experience"
+  },
+  "Education": {
+    "0": "No schooling",
+    "1": "1st grade",
+    "2": "2nd grade",
+    "3": "3rd grade",
+    "4": "4th grade",
+    "5": "5th grade",
+    "6": "6th grade",
+    "7": "7th grade",
+    "8": "8th grade",
+    "H1": "1st year of High School",
+    "H2": "2nd year of High School",
+    "H3": "3rd year of High School",
+    "H4": "4th year of High School",
+    "C1": "1st year of College",
+    "C2": "2nd year of College",
+    "C3": "3rd year of College",
+    "C4": "4th year of College",
+    "C5": "5 or more years of College"
   }
 }
