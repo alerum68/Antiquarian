@@ -191,14 +191,14 @@ def test_relational_era_household_parsing_works_on_adapted_dataframe():
     assert not unrelated
 
 
-def test_gedcom_text_lines_splits_multiline_text_into_cont_lines():
+def test_gedcom_wrapped_lines_splits_multiline_text_into_cont_lines():
     """Real-world regression (2026-08-21): RootsMagic imported every source as Freeform
     instead of the intended template - traced to _rmst_element_to_gedcom() emitting
     multi-paragraph Description/Hint text (from the .rmst source) as a single GEDCOM line
     with raw embedded newlines. GEDCOM 5.5.1 requires every physical line to start with its
     own level+tag; a bare continuation line with no tag prefix is invalid and can make a
-    strict parser silently drop or abort the whole _SRCTEMPLATE record."""
-    lines = arc._gedcom_text_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
+    strict parser silently drop or abort the whole _STMPLT record."""
+    lines = arc._gedcom_wrapped_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
     assert lines == ["1 DESC First paragraph.", "2 CONT ", "2 CONT Second paragraph."]
     assert not any("\n" in ln for ln in lines)
 
@@ -211,9 +211,11 @@ def test_load_source_template_lines_has_no_embedded_raw_newlines():
     lines = arc.load_source_template_lines(10008)
     assert lines, "expected the real Simplified Citations - Census.rmst template to be found"
     assert not any("\n" in ln for ln in lines)
+    joined = "\n".join(lines)
     assert "1 DESC (NOTE: changes made to the content of this template should also be made " \
            "to the master template. Alterations made for the sole purpose of allowing the " \
-           "content to print correctly do not need to be made.)" in lines
+           "content to print correctly do not need to be made." in joined
+    assert "2 CONC )" in joined
 
 
 def test_sort_group_by_line_number_fixes_out_of_order_household_and_reattaches_child():
@@ -669,19 +671,22 @@ def test_census_citation_household_id_field_is_bare_number_when_only_one_number_
     family_only = arc.build_census_citation(
         _citation_row(**{"Family Number": "1", "Dwelling Number": ""}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE 1" for ln in family_only), family_only
+    assert any(ln == "3 _TMPLT" for ln in family_only), family_only
+    assert any(ln == "5 VALUE 1" for ln in family_only), family_only
     assert not any("family" in ln.lower() for ln in family_only), family_only
 
     dwelling_only = arc.build_census_citation(
         _citation_row(**{"Family Number": "", "Dwelling Number": "5"}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE 5" for ln in dwelling_only), dwelling_only
+    assert any(ln == "3 _TMPLT" for ln in dwelling_only), dwelling_only
+    assert any(ln == "5 VALUE 5" for ln in dwelling_only), dwelling_only
     assert not any("dwelling" in ln.lower() for ln in dwelling_only), dwelling_only
 
     both = arc.build_census_citation(
         _citation_row(**{"Family Number": "1", "Dwelling Number": "5"}), "MF36-Z6D", "@Mimg1@", "3", "RM",
         "Pembina", "Dakota Territory", "Dakota Territory", "T624_1", "")
-    assert any(ln == "4 VALUE dwelling 5, family 1" for ln in both), both
+    assert any(ln == "3 _TMPLT" for ln in both), both
+    assert any(ln == "5 VALUE dwelling 5, family 1" for ln in both), both
 
 
 def test_census_citation_never_emits_apid_for_real_ancestry_data(monkeypatch):

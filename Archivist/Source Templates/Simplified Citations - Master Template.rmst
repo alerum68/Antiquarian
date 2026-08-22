@@ -2,7 +2,7 @@
 <SourceTemplates>
   <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
   <Template Id="10006">
-    <Name>* Simplified Citations Master Template   </Name>
+    <Name>!Simplified Citations Master Template   </Name>
     <Description>(NOTE: All other templates using simplified citations should start with this one. Items may be REMOVED from copies of this template to create other ones but NOTHING should be added to those templates unless it is also added here.)
 
 This template is designed to make citing sources consistent across many types of records (for example, books, gravestones, and wedding certificates, etc.). The fields are populated with information based upon the type of source they represent: traditional or non-traditional. Traditional sources are those usually found in bibliographies and reference lists (e.g., books, periodicals, newspapers, etc.). Non-traditional sources include most everything else: birth certificates. cemetery records, census records, gravestones, photographs, social security records, etc.

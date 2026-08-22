@@ -2,7 +2,7 @@
 <SourceTemplates>
   <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
   <Template Id="10008">
-    <Name>* Simple Citations: Census Records</Name>
+    <Name>!Simple Citations: Census Records</Name>
     <Description>(NOTE: changes made to the content of this template should also be made to the master template. Alterations made for the sole purpose of allowing the content to print correctly do not need to be made.)
 
 This template is designed for citing census records. 

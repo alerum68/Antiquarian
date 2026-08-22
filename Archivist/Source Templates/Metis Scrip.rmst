@@ -4,7 +4,7 @@
 
   <!-- TEMPLATE 1: MANITOBA SCRIP -->
   <Template Id="20001">
-    <Name>* Simple Citations: Métis Scrip (Manitoba, 1870–1876)</Name>
+    <Name>!Simple Citations: Métis Scrip (Manitoba, 1870–1876)</Name>
     <Description>Designed for citing Manitoba Act scrip grants (1870-1876), organized by Library and Archives Canada under RG 15, Series D-II-8-a. Uses the Simplified Citations architecture.</Description>
     <Category>Simplified Citations for Genealogical Sources</Category>
     <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, affidavit no. [AffidavitNumber]&gt;&lt;, [Parish]&gt;&lt;, [ScripType] scrip&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
@@ -135,7 +135,7 @@
 
   <!-- TEMPLATE 2: NORTH-WEST SCRIP -->
   <Template Id="20002">
-    <Name>* Simple Citations: Métis Scrip (North-West, 1885 &amp; 1900-1901)</Name>
+    <Name>!Simple Citations: Métis Scrip (North-West, 1885 &amp; 1900-1901)</Name>
     <Description>Designed for citing North-West Half-Breed scrip grants, organized by Library and Archives Canada under RG 15, Series D-II-8-c. Uses the Simplified Citations architecture.</Description>
     <Category>Simplified Citations for Genealogical Sources</Category>
     <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, claim no. [ClaimNumber]&gt;&lt;, scrip note [ScripNumber]&gt;&lt;, [Location]&gt;&lt;, issued [IssueDate]&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
@@ -274,7 +274,7 @@
 
   <!-- TEMPLATE 3: TREATY 8 SCRIP -->
   <Template Id="20003">
-    <Name>* Simple Citations: Métis Scrip (Treaty 8, 1899-1908)</Name>
+    <Name>!Simple Citations: Métis Scrip (Treaty 8, 1899-1908)</Name>
     <Description>Designed for citing Treaty 8 scrip and adhesions, organized by Library and Archives Canada under RG 15, Series D-II-8-i. Uses the Simplified Citations architecture.</Description>
     <Category>Simplified Citations for Genealogical Sources</Category>
     <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, claim no. [ClaimNumber]&gt;&lt;, [ScripAmount] scrip note [ScripNoteNumber]&gt;&lt; delivered [DeliveryDate]&gt;&lt; at [DeliveryPlace]&gt;&lt;; vol. [Volume]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
@@ -413,7 +413,7 @@
 
   <!-- TEMPLATE 4: SCRIP CERTIFICATE -->
   <Template Id="20004">
-    <Name>* Simple Citations: Métis Scrip (Certificates &amp; Payments)</Name>
+    <Name>!Simple Citations: Métis Scrip (Certificates &amp; Payments)</Name>
     <Description>Designed for citing the physical scrip certificates or receipts issued to the claimant, organized under LAC RG 15 Series D-II-8-e, D-II-8-f, or D-II-8-j. Uses the Simplified Citations architecture.</Description>
     <Category>Simplified Citations for Genealogical Sources</Category>
     <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [ClaimantName]&gt;&lt;, [ScripType] scrip certificate no. [CertificateNumber]&gt;&lt; for [Amount]&gt;&lt;, issued [IssueDate]&gt;&lt;; vol. [Volume]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
@@ -552,7 +552,7 @@
 
   <!-- TEMPLATE 5: DOMINION LAND GRANT / PATENT -->
   <Template Id="20005">
-    <Name>* Simple Citations: Dominion Land Grants &amp; Patents</Name>
+    <Name>!Simple Citations: Dominion Land Grants &amp; Patents</Name>
     <Description>Designed for citing final Letters Patent issued by the dominion government, utilizing the Dominion Lands System (Section, Township, Range, Meridian) and Liber/Folio identifiers. Uses the Simplified Citations architecture.</Description>
     <Category>Simplified Citations for Genealogical Sources</Category>
     <Footnote>&lt;[PrimaryCreator]&lt;,  [Department]&gt;&gt;&lt; ([Date])&gt;. &lt;?[SourceDescription]|[SourceDescription].|&gt;&lt;?[Collection]| [Collection].&gt; ||&lt; [GranteeName]&gt;&lt;?[OriginalClaimant]| (assignee of [OriginalClaimant])|&gt;&lt;, land grant, [LandDescription]&gt;&lt;, issued [IssueDate]&gt;&lt;; liber [Liber], folio [Folio]&gt;&lt;, microfilm [Microfilm]&gt;&lt;. [Repository:Caps]&gt;&lt;?[Repository]|&lt; ([URL]&gt;&lt;? [URL]|&lt;: accessed [Accessed]&gt;&gt;&lt;?[URL]|)&gt;.&gt;&gt;&lt; [RefNumber:Caps].&gt;</Footnote>
