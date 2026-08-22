@@ -183,13 +183,12 @@ class HBCAProfile:
             detail_fields.append(("ArchivalRecordURL", archival_urls[0]))
 
         # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
-        # that's on the master SOUR record only.
+        # that's on the master SOUR record only. RM's <...> omission logic only treats
+        # a field as blank when it's declared with an empty VALUE, not when it's
+        # missing from the list entirely - so every field is always declared.
         field_lines = []
         for f_name, f_val in detail_fields:
-            if f_val:
-                field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
-        if not field_lines:
-            return []
+            field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
         return ["3 _TMPLT"] + field_lines
 
     @staticmethod

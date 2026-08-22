@@ -188,16 +188,16 @@ class GeneralProfile:
             ("Location", parish_loc),
             ("Repository", Utils.clean_val(REPOSITORY)),
             ("URL", Utils.clean_val(COLLECTION_URL)),
+            ("Accessed", ""),
             ("RefNumber", ref_num_str),
         ]
         # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
-        # that's on the master SOUR record only.
+        # that's on the master SOUR record only. RM's <...> omission logic only treats
+        # a field as blank when it's declared with an empty VALUE, not when it's
+        # missing from the list entirely - so every field is always declared.
         field_lines = []
         for f_name, f_val in parish_detail_fields:
-            if f_val:
-                field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
-        if not field_lines:
-            return []
+            field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
         return ["3 _TMPLT"] + field_lines
 
     # noinspection DuplicatedCode
@@ -257,19 +257,17 @@ class GeneralProfile:
         dept = Utils.clean_val(GENERAL_CONFIG.get('diocese')) or Utils.clean_val(GENERAL_CONFIG.get('parish_location'))
         source_desc = f"{GENERAL_CONFIG.get('register_name', '')}{v_clause}".strip()
         date_str = Utils.clean_val(GENERAL_CONFIG.get('date_range_str'))
+        # RM's <...> omission logic only treats a field as blank when it's declared
+        # with an empty VALUE, not when it's missing from the list entirely - so
+        # every master field the template defines is always declared.
         lines = ["1 _TMPLT", f"2 TID {tid}"]
-        if primary_creator:
-            lines.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
-        if dept:
-            lines.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {dept}"])
-        if date_str:
-            lines.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
-        if source_desc:
-            lines.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
-        if REPOSITORY:
-            lines.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}"])
-        if REPOSITORY_LOC:
-            lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
+        lines.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
+        lines.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {dept}"])
+        lines.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+        lines.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
+        lines.extend(["2 FIELD", "3 NAME Person", "3 VALUE"])
+        lines.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}"])
+        lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
         return lines
 
     @staticmethod

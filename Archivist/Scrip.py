@@ -251,14 +251,13 @@ def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str
 def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str) -> List[str]:
     """Builds the citation detail FIELD/VALUE lines for a RootsMagic citation.
     Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
-    that's on the master SOUR record only."""
+    that's on the master SOUR record only. RM's <...> omission logic only treats a
+    field as blank when it's declared with an empty VALUE, not when it's missing
+    from the list entirely - so every field is always declared."""
     lines = []
     for field_name in _SCRIP_TEMPLATES[template_id]['detail_fields']:
         value = _scrip_template_field_value(field_name, rec, part, vol)
-        if value:
-            lines.extend(["4 FIELD", f"5 NAME {field_name}", f"5 VALUE {value}"])
-    if not lines:
-        return []
+        lines.extend(["4 FIELD", f"5 NAME {field_name}", f"5 VALUE {value}"])
     return ["3 _TMPLT"] + lines
 
 
@@ -292,16 +291,14 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
                 f"2 TID {tid}",
             ]
             # noinspection DuplicatedCode
-            if primary_creator:
-                block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
-            if commission:
-                block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {commission}"])
-            if date_str:
-                block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
-            if source_desc:
-                block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
-            if collection:
-                block.extend(["2 FIELD", "3 NAME Collection", f"3 VALUE {collection}"])
+            # RM's <...> omission logic only treats a field as blank when it's
+            # declared with an empty VALUE, not when it's missing from the list
+            # entirely - so every master field the template defines is always declared.
+            block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
+            block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {commission}"])
+            block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+            block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
+            block.extend(["2 FIELD", "3 NAME Collection", f"3 VALUE {collection}"])
             block.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"])
             block.extend(Utils.weblink_lines(General.COLLECTION_URL, General.COLLECTION_NAME, "RM"))
         else:

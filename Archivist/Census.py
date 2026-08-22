@@ -856,14 +856,12 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         ]
         cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
         # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
-        # that's on the master SOUR record only.
-        field_lines = []
+        # that's on the master SOUR record only. RM's <...> omission logic only treats
+        # a field as blank when it's declared with an empty VALUE, not when it's
+        # missing from the list entirely - so every field is always declared.
+        cit.append("3 _TMPLT")
         for f_name, f_val in detail_fields:
-            if f_val:
-                field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
-        if field_lines:
-            cit.append("3 _TMPLT")
-            cit.extend(field_lines)
+            cit.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
 
         cit.append("3 DATA")
 
@@ -1214,18 +1212,20 @@ def get_census_sources(target_software: str) -> List[str]:
     pub_loc = Utils.clean_val(PUB_LOC)
 
     if target_software == "RM":
+        # RM's <...> Footnote/Bibliography omission logic only recognizes a field as
+        # "blank, omit" when it's declared with an empty VALUE - a field missing from
+        # the _TMPLT list entirely renders as a literal [FieldName] placeholder instead.
+        # Every master field the template defines is declared here, even when unset.
         tmplt_fields = [
             "2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}",
             "2 FIELD", "3 NAME Department", f"3 VALUE {department}",
             "2 FIELD", "3 NAME Date", f"3 VALUE {date_str}",
             "2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_title}",
+            "2 FIELD", "3 NAME Person", "3 VALUE",
+            "2 FIELD", "3 NAME Publisher", f"3 VALUE {publisher}",
+            "2 FIELD", "3 NAME PublishLocation", f"3 VALUE {pub_loc}",
+            "2 FIELD", "3 NAME Repository", f"3 VALUE {repository}",
         ]
-        if publisher:
-            tmplt_fields += ["2 FIELD", "3 NAME Publisher", f"3 VALUE {publisher}"]
-        if pub_loc:
-            tmplt_fields += ["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {pub_loc}"]
-        if repository:
-            tmplt_fields += ["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"]
 
         bibl = (f"{primary_creator}, {department}. {date_str}. {source_title}. {pub_loc}: {publisher}."
                 if (pub_loc and publisher)

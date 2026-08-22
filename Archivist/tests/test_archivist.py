@@ -879,7 +879,7 @@ def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
         assert Scrip._scrip_template_field_value(field, rec, {}, "1") == ""
 
 
-def test_get_scrip_citation_fields_skips_empty_values():
+def test_get_scrip_citation_fields_declares_empty_values_blank_not_omitted():
     rec = {"type_specific_fields": {"affidavit_number": "5473"}, "lac_pid": ""}
     part = make_participant("primary", given="Roger", surname="Letendre")
     lines = Scrip.get_scrip_citation_fields(20001, rec, part, "1320")
@@ -887,9 +887,11 @@ def test_get_scrip_citation_fields_skips_empty_values():
     assert "3 _TMPLT" in joined
     assert "5 NAME AffidavitNumber" in joined and "5 VALUE 5473" in joined
     assert "5 NAME ClaimantName" in joined and "5 VALUE Roger Letendre" in joined
-    # Microfilm/Parish/URL were never set on this record - must not appear at all.
-    assert "Microfilm" not in joined
-    assert "URL" not in joined
+    # Microfilm/URL were never set on this record - RM only omits a <...> Footnote
+    # clause when its field is declared with an empty VALUE, not when the field is
+    # missing entirely, so both must still be declared here, just blank.
+    assert "5 NAME Microfilm\n5 VALUE " in joined
+    assert "5 NAME URL\n5 VALUE " in joined
 
 
 def test_build_general_citation_scrip_cites_the_matching_template_source_with_field_block():
