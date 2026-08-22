@@ -879,16 +879,19 @@ def test_scrip_template_field_value_land_grant_fields_are_a_known_gap():
         assert Scrip._scrip_template_field_value(field, rec, {}, "1") == ""
 
 
-def test_get_scrip_citation_fields_skips_empty_values():
+def test_get_scrip_citation_fields_declares_empty_values_blank_not_omitted():
     rec = {"type_specific_fields": {"affidavit_number": "5473"}, "lac_pid": ""}
     part = make_participant("primary", given="Roger", surname="Letendre")
     lines = Scrip.get_scrip_citation_fields(20001, rec, part, "1320")
     joined = "\n".join(lines)
-    assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
-    assert "4 NAME ClaimantName" in joined and "4 VALUE Roger Letendre" in joined
-    # Microfilm/Parish/URL were never set on this record - must not appear at all.
-    assert "Microfilm" not in joined
-    assert "URL" not in joined
+    assert "3 _TMPLT" in joined
+    assert "5 NAME AffidavitNumber" in joined and "5 VALUE 5473" in joined
+    assert "5 NAME ClaimantName" in joined and "5 VALUE Roger Letendre" in joined
+    # Microfilm/URL were never set on this record - RM only omits a <...> Footnote
+    # clause when its field is declared with an empty VALUE, not when the field is
+    # missing entirely, so both must still be declared here, just blank.
+    assert "5 NAME Microfilm\n5 VALUE " in joined
+    assert "5 NAME URL\n5 VALUE " in joined
 
 
 def test_build_general_citation_scrip_cites_the_matching_template_source_with_field_block():
@@ -901,7 +904,8 @@ def test_build_general_citation_scrip_cites_the_matching_template_source_with_fi
         blocks = General.build_general_citation(rec, part, "CENS", "1324", "M0000000001", target_software="RM")
         joined = blocks[0]
         assert "2 SOUR @S20001@" in joined
-        assert "4 NAME AffidavitNumber" in joined and "4 VALUE 5473" in joined
+        assert "3 _TMPLT" in joined
+        assert "5 NAME AffidavitNumber" in joined and "5 VALUE 5473" in joined
         assert "LAC Digital Record" in joined
         assert (
             "https://recherche-collection-search.bac-lac.gc.ca/eng/Home/Record?app=fonandcol&IdNumber=1506170"
@@ -1063,13 +1067,14 @@ def test_run_general_flavor_scrip_defaults_to_scrip_ged(monkeypatch):
 def test_load_source_template_lines_from_rmst():
     lines = General.load_source_template_lines(20001)
     joined = "\n".join(lines)
-    assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
+    assert "0 _STMPLT" in joined
     assert "1 TID 20001" in joined
+    assert "1 NAME !Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in joined
     assert "1 CAT Simplified Citations for Genealogical Sources" in joined
-    assert "1 FOOT" in joined
+    assert "1 FOOTNOTE" in joined
     assert "1 SHORT" in joined
-    assert "1 BIBL" in joined
-    assert "1 FIELD\n2 TYPE Name\n2 NAME ClaimantName" in joined
+    assert "1 BIBLIO" in joined
+    assert "1 FIELD\n2 NAME ClaimantName" in joined
 
 
 def test_get_scrip_template_sources_simplified_citations_fields():
@@ -1134,7 +1139,8 @@ def test_build_gedcom_from_general_emits_srctemplates_for_rm():
             ]
         }
         ged_text = General.build_gedcom_from_general(json_data, target_software="RM")
-        assert "0 _SRCTEMPLATE * Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
+        assert "0 _STMPLT" in ged_text
+        assert "1 NAME !Simple Citations: Métis Scrip (Manitoba, 1870–1876)" in ged_text
         assert "0 @S20001@ SOUR" in ged_text
         assert "0 @I1506170@ INDI" in ged_text
     finally:
@@ -1164,3 +1170,109 @@ def test_build_individual_skips_unknown_fact_type_gracefully():
     joined = "\n".join(lines)
 
     assert "irrelevant" not in joined
+
+
+def test_gedcom_wrapped_lines_cont_on_paragraph_break():
+    lines = Census._gedcom_wrapped_lines(1, "DESC", "First paragraph.\n\nSecond paragraph.")
+    assert lines[0] == "1 DESC First paragraph."
+    assert lines[1] == "2 CONT "
+    assert lines[2] == "2 CONT Second paragraph."
+
+
+def test_gedcom_wrapped_lines_conc_on_long_line():
+    long_text = "A" * 250
+    lines = Census._gedcom_wrapped_lines(1, "FOOTNOTE", long_text, max_len=200)
+    assert lines[0] == f"1 FOOTNOTE {'A' * 200}"
+    assert lines[1] == f"2 CONC {'A' * 50}"
+
+
+def test_rmst_element_to_gedcom_uses_stmplt_tag_vocabulary():
+    import lxml.etree as etree
+    xml = etree.fromstring("""
+    <Template Id="99999">
+      <Name>!Test Template</Name>
+      <Description>A description.</Description>
+      <Category>Test Category</Category>
+      <Footnote>Footnote text.</Footnote>
+      <ShortFootnote>Short text.</ShortFootnote>
+      <Bibliography>Bibliography text.</Bibliography>
+      <Field>
+        <Type>Text</Type>
+        <Name>TestField</Name>
+        <Display>Test Field</Display>
+        <Hint>a hint</Hint>
+        <Detail>True</Detail>
+        <LongHint>a long hint</LongHint>
+      </Field>
+    </Template>
+    """)
+    lines = Census._rmst_element_to_gedcom(xml)
+    joined = "\n".join(lines)
+    assert "0 _STMPLT" in joined
+    assert "_SRCTEMPLATE" not in joined
+    assert "1 TID 99999" in joined
+    assert "1 NAME !Test Template" in joined
+    assert "1 FOOTNOTE Footnote text." in joined
+    assert "1 BIBLIO Bibliography text." in joined
+    assert "2 DISPLAY Test Field" in joined
+    assert "2 LONGHINT a long hint" in joined
+    assert "2 TYPE TEXT" in joined
+    assert "2 ISDETAIL Y" in joined
+    assert "FOOT " not in joined
+    assert "BIBL " not in joined
+    assert "DISP " not in joined
+    assert "DETL " not in joined
+    assert "LHNT " not in joined
+
+
+def test_general_profile_citation_detail_fields_wraps_in_tmplt():
+    rec = {"record_id": "REC-1", "type_specific_fields": {}}
+    part = {"std_given": "Marie", "std_surname": "Gagnon"}
+    General.GENERAL_CONFIG["parish_location"] = "St. Boniface, Manitoba"
+    lines = General.GeneralProfile.citation_detail_fields(rec, part, "12", "3", "RM")
+    assert lines[0] == "3 _TMPLT"
+    assert "4 FIELD" in lines
+    assert any(ln == "5 NAME SourceDetailPerson" for ln in lines)
+    assert any(ln == "5 VALUE Marie Gagnon" for ln in lines)
+    assert not any(ln.startswith("4 TID") for ln in lines)
+
+
+def test_all_template_names_start_with_bang():
+    for tid, tpl in Scrip._SIMPLIFIED_CITATION_TEMPLATES.items():
+        assert tpl['name'].startswith('!'), f"TID {tid} name {tpl['name']!r} missing ! prefix"
+
+
+def test_findagrave_entry_removed():
+    assert 10001 not in Scrip._SIMPLIFIED_CITATION_TEMPLATES
+
+
+def test_non_traditional_master_fields_match_rmst():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10009]
+    assert 'Publisher' not in tpl['master_fields']
+    assert 'PublishLocation' not in tpl['master_fields']
+    assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_census_detail_fields_include_personal_id():
+    assert 'PersonalID' in Scrip._SIMPLIFIED_CITATION_TEMPLATES[10008]['detail_fields']
+
+
+def test_traditional_master_fields_include_title():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10010]
+    assert 'Title' in tpl['master_fields']
+    assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_master_template_fields_match_rmst():
+    tpl = Scrip._SIMPLIFIED_CITATION_TEMPLATES[10006]
+    for f in ('Author', 'Role', 'BookTitle', 'Subtitle', 'Title'):
+        assert f in tpl['master_fields'], f"missing {f}"
+    assert 'PersonalID' in tpl['detail_fields']
+
+
+def test_resolve_scrip_template_id_checks_source_documents_document_type():
+    rec = {
+        "type_specific_fields": {},
+        "source_documents": [{"document_type": "Scrip Certificate"}],
+    }
+    assert Scrip.resolve_scrip_template_id(rec) == 20004

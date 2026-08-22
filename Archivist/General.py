@@ -188,13 +188,17 @@ class GeneralProfile:
             ("Location", parish_loc),
             ("Repository", Utils.clean_val(REPOSITORY)),
             ("URL", Utils.clean_val(COLLECTION_URL)),
+            ("Accessed", ""),
             ("RefNumber", ref_num_str),
         ]
-        lines = []
+        # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+        # that's on the master SOUR record only. RM's <...> omission logic only treats
+        # a field as blank when it's declared with an empty VALUE, not when it's
+        # missing from the list entirely - so every field is always declared.
+        field_lines = []
         for f_name, f_val in parish_detail_fields:
-            if f_val:
-                lines.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
-        return lines
+            field_lines.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
+        return ["3 _TMPLT"] + field_lines
 
     # noinspection DuplicatedCode
     @staticmethod
@@ -253,19 +257,17 @@ class GeneralProfile:
         dept = Utils.clean_val(GENERAL_CONFIG.get('diocese')) or Utils.clean_val(GENERAL_CONFIG.get('parish_location'))
         source_desc = f"{GENERAL_CONFIG.get('register_name', '')}{v_clause}".strip()
         date_str = Utils.clean_val(GENERAL_CONFIG.get('date_range_str'))
+        # RM's <...> omission logic only treats a field as blank when it's declared
+        # with an empty VALUE, not when it's missing from the list entirely - so
+        # every master field the template defines is always declared.
         lines = ["1 _TMPLT", f"2 TID {tid}"]
-        if primary_creator:
-            lines.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
-        if dept:
-            lines.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {dept}"])
-        if date_str:
-            lines.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
-        if source_desc:
-            lines.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
-        if REPOSITORY:
-            lines.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}"])
-        if REPOSITORY_LOC:
-            lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
+        lines.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
+        lines.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {dept}"])
+        lines.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+        lines.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
+        lines.extend(["2 FIELD", "3 NAME Person", "3 VALUE"])
+        lines.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {REPOSITORY}"])
+        lines.extend(["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {REPOSITORY_LOC}"])
         return lines
 
     @staticmethod
@@ -454,8 +456,29 @@ def generate_media_uid_for_lac_asset(asset_id: str) -> str:
 
 
 # noinspection DuplicatedCode
+def _gedcom_wrapped_lines(level: int, tag: str, text: str, max_len: int = 200) -> List[str]:
+    """CONT on each literal newline (paragraph break); CONC within a paragraph past
+    max_len - GEDCOM 5.5.1 caps a physical line at 255 bytes."""
+    lines: List[str] = []
+    first = True
+    for para in text.split("\n"):
+        chunks = [para[i:i + max_len] for i in range(0, len(para), max_len)] or [""]
+        for i, chunk in enumerate(chunks):
+            if first:
+                lines.append(f"{level} {tag} {chunk}")
+                first = False
+            elif i == 0:
+                lines.append(f"{level + 1} CONT {chunk}")
+            else:
+                lines.append(f"{level + 1} CONC {chunk}")
+    return lines
+
+
+# noinspection DuplicatedCode
 def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
-    """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
+    """Emits _STMPLT/FOOTNOTE/BIBLIO/DISPLAY/ISDETAIL/LONGHINT - RM's real tag
+    vocabulary, not the _SRCTEMPLATE/FOOT/BIBL/DISP/DETL/LHNT names RM doesn't
+    recognize."""
     tid = elem.get("Id", "")
     name = (elem.findtext("Name") or "").strip()
     desc = (elem.findtext("Description") or "").strip()
@@ -464,20 +487,22 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     short = (elem.findtext("ShortFootnote") or "").strip()
     bibl = (elem.findtext("Bibliography") or "").strip()
 
-    lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
+    lines = ["0 _STMPLT", f"1 TID {tid}"]
+    if name:
+        lines.append(f"1 NAME {name}")
     if desc:
-        lines.append(f"1 DESC {desc}")
+        lines.extend(_gedcom_wrapped_lines(1, "DESC", desc))
     if cat:
         lines.append(f"1 CAT {cat}")
     if foot:
-        lines.append(f"1 FOOT {foot}")
+        lines.extend(_gedcom_wrapped_lines(1, "FOOTNOTE", foot))
     if short:
-        lines.append(f"1 SHORT {short}")
+        lines.extend(_gedcom_wrapped_lines(1, "SHORT", short))
     if bibl:
-        lines.append(f"1 BIBL {bibl}")
+        lines.extend(_gedcom_wrapped_lines(1, "BIBLIO", bibl))
 
     for fld in elem.findall("Field"):
-        f_type = (fld.findtext("Type") or "Text").strip()
+        f_type = (fld.findtext("Type") or "Text").strip().upper()
         f_name = (fld.findtext("Name") or "").strip()
         f_disp = (fld.findtext("Display") or "").strip()
         f_hint = (fld.findtext("Hint") or "").strip()
@@ -485,15 +510,16 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
         f_lhnt = (fld.findtext("LongHint") or "").strip()
 
         lines.append("1 FIELD")
-        lines.append(f"2 TYPE {f_type}")
-        lines.append(f"2 NAME {f_name}")
+        if f_name:
+            lines.append(f"2 NAME {f_name}")
         if f_disp:
-            lines.append(f"2 DISP {f_disp}")
+            lines.extend(_gedcom_wrapped_lines(2, "DISPLAY", f_disp))
         if f_hint:
-            lines.append(f"2 HINT {f_hint}")
-        lines.append(f"2 DETL {f_detl}")
+            lines.extend(_gedcom_wrapped_lines(2, "HINT", f_hint))
         if f_lhnt:
-            lines.append(f"2 LHNT {f_lhnt}")
+            lines.extend(_gedcom_wrapped_lines(2, "LONGHINT", f_lhnt))
+        lines.append(f"2 TYPE {f_type}")
+        lines.append(f"2 ISDETAIL {f_detl}")
     return lines
 
 
@@ -527,7 +553,7 @@ def load_source_template_lines(template_id: int) -> List[str]:
 
 
 def get_source_templates(template_ids_used: set) -> List[str]:
-    """Generates 0 _SRCTEMPLATE GEDCOM blocks for all referenced template IDs."""
+    """Generates 0 _STMPLT GEDCOM blocks for all referenced template IDs."""
     lines = []
     for tid in sorted(template_ids_used):
         t_lines = load_source_template_lines(tid)

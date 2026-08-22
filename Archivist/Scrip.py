@@ -7,54 +7,50 @@ import Utils
 # RootsMagic custom Source Templates (Simplified Citations and Metis Scrip .rmst files).
 # Detail=False fields populate the master SOUR record; Detail=True fields populate citations.
 _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
-    10001: {
-        'name': "_Find A Grave",
-        'category': "FAG - Find A Grave",
-        'label': "Find A Grave Memorial",
-        'source_description': "Find A Grave Memorials",
-        'master_fields': ['Web', 'Cem'],
-        'detail_fields': ['Name', 'Dates', 'Notes', 'Mem'],
-    },
     10006: {
-        'name': "* Simplified Citations Master Template",
+        'name': "!Simplified Citations Master Template",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Master Template",
         'source_description': "Master Citation Template",
-        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
+        'master_fields': ['PrimaryCreator', 'Department', 'Author', 'Role', 'Date',
+                          'BookTitle', 'Subtitle', 'Title', 'SourceDescription',
                           'Person', 'Publisher', 'PublishLocation'],
         'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'CensusED',
-                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber',
+                          'PersonalID'],
     },
     10008: {
-        'name': "* Simple Citations: Census Records",
+        'name': "!Simple Citations: Census Records",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Census Records",
         'source_description': "Census Records and Population Schedules",
         'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
                           'Person', 'Publisher', 'PublishLocation'],
         'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'CensusED',
-                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+                          'HouseholdID', 'Repository', 'URL', 'Accessed', 'RefNumber',
+                          'PersonalID'],
     },
     10009: {
-        'name': "* Simple Citations: Non-traditional",
+        'name': "!Simple Citations: Non-traditional",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Non-traditional (Church / Parish / Vital / Cemetery)",
         'source_description': "Church Registers, Vital Records, and Archives",
-        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription',
-                          'Person', 'Publisher', 'PublishLocation'],
+        'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Person'],
         'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'Repository',
-                          'URL', 'Accessed', 'RefNumber'],
+                          'URL', 'Accessed', 'RefNumber', 'PersonalID'],
     },
     10010: {
-        'name': "* Simple Citations: Traditional",
+        'name': "!Simple Citations: Traditional",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Traditional (Books / Newspapers / Periodicals)",
         'source_description': "Published Books, Articles, and Periodicals",
-        'master_fields': ['Author', 'Role', 'Date', 'BookTitle', 'Subtitle', 'Publisher', 'PublishLocation'],
-        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'Repository', 'URL', 'Accessed', 'RefNumber'],
+        'master_fields': ['Author', 'Role', 'Date', 'BookTitle', 'Subtitle', 'Title',
+                          'Publisher', 'PublishLocation'],
+        'detail_fields': ['Page', 'SourceDetailPerson', 'Location', 'Repository',
+                          'URL', 'Accessed', 'RefNumber', 'PersonalID'],
     },
     20001: {
-        'name': "* Simple Citations: Métis Scrip (Manitoba, 1870–1876)",
+        'name': "!Simple Citations: Métis Scrip (Manitoba, 1870–1876)",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Manitoba (1870–1876)",
         'source_description': "Manitoba Métis Scrip Applications",
@@ -70,7 +66,7 @@ _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
                           'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20002: {
-        'name': "* Simple Citations: Métis Scrip (North-West, 1885 & 1900-1901)",
+        'name': "!Simple Citations: Métis Scrip (North-West, 1885 & 1900-1901)",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: North-West (1885 & 1900-1901)",
         'source_description': "North-West Territories Métis Scrip Applications",
@@ -86,7 +82,7 @@ _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
                           'Location', 'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20003: {
-        'name': "* Simple Citations: Métis Scrip (Treaty 8, 1899-1908)",
+        'name': "!Simple Citations: Métis Scrip (Treaty 8, 1899-1908)",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Treaty 8 (1899-1908)",
         'source_description': "Treaty No. 8 Métis Scrip Applications",
@@ -102,7 +98,7 @@ _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
                           'DeliveryDate', 'DeliveryPlace', 'Volume', 'URL', 'Accessed', 'RefNumber'],
     },
     20004: {
-        'name': "* Simple Citations: Métis Scrip (Certificates & Payments)",
+        'name': "!Simple Citations: Métis Scrip (Certificates & Payments)",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Métis Scrip: Certificate",
         'source_description': "Métis Scrip Certificates and Payments",
@@ -111,14 +107,14 @@ _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
         'department': "Scrip Commission",
         'commission': "Scrip Commission",
         'collection': "Department of the Interior fonds, RG 15, Series D-II-8-e/f/j",
-        'date_range': [],
+        'date_range': [(1870, 1906)],
         'date_range_str': "1870–1906",
         'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
         'detail_fields': ['ClaimantName', 'ScripType', 'CertificateNumber', 'Amount',
                           'IssueDate', 'Volume', 'Microfilm', 'URL', 'Accessed', 'RefNumber'],
     },
     20005: {
-        'name': "* Simple Citations: Dominion Land Grants & Patents",
+        'name': "!Simple Citations: Dominion Land Grants & Patents",
         'category': "Simplified Citations for Genealogical Sources",
         'label': "Land Records: Dominion Land Grant Patent",
         'source_description': "Dominion Lands Patents",
@@ -127,7 +123,7 @@ _SIMPLIFIED_CITATION_TEMPLATES: Dict[int, Dict[str, object]] = {
         'department': "Dominion Lands Branch",
         'commission': "",
         'collection': "Dominion Land Grants, RG 15",
-        'date_range': [],
+        'date_range': [(1870, 1930)],
         'date_range_str': "1870–1930",
         'master_fields': ['PrimaryCreator', 'Department', 'Date', 'SourceDescription', 'Collection', 'Repository'],
         'detail_fields': ['GranteeName', 'OriginalClaimant', 'LandDescription', 'IssueDate',
@@ -190,8 +186,14 @@ def select_scrip_template_id(commission_reference: str, document_type: str,
 def resolve_scrip_template_id(rec: dict) -> Optional[int]:
     """Resolves the template ID for a single Scrip record."""
     tf = rec.get('type_specific_fields') or {}
+    doc_type = tf.get('document_type')
+    if not doc_type:
+        for doc in rec.get('source_documents') or []:
+            doc_type = doc.get('document_type')
+            if doc_type:
+                break
     return select_scrip_template_id(
-        tf.get('commission_reference'), tf.get('document_type'), tf.get('rg_series_code'), _scrip_record_year(rec)
+        tf.get('commission_reference'), doc_type, tf.get('rg_series_code'), _scrip_record_year(rec)
     )
 
 
@@ -247,13 +249,16 @@ def _scrip_template_field_value(field_name: str, rec: dict, part: dict, vol: str
 
 
 def get_scrip_citation_fields(template_id: int, rec: dict, part: dict, vol: str) -> List[str]:
-    """Builds the citation detail FIELD/VALUE lines for a RootsMagic citation."""
+    """Builds the citation detail FIELD/VALUE lines for a RootsMagic citation.
+    Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+    that's on the master SOUR record only. RM's <...> omission logic only treats a
+    field as blank when it's declared with an empty VALUE, not when it's missing
+    from the list entirely - so every field is always declared."""
     lines = []
     for field_name in _SCRIP_TEMPLATES[template_id]['detail_fields']:
         value = _scrip_template_field_value(field_name, rec, part, vol)
-        if value:
-            lines.extend(["3 FIELD", f"4 NAME {field_name}", f"4 VALUE {value}"])
-    return lines
+        lines.extend(["4 FIELD", f"5 NAME {field_name}", f"5 VALUE {value}"])
+    return ["3 _TMPLT"] + lines
 
 
 def get_scrip_template_sources(template_ids_used: set, target_software: str) -> list:
@@ -286,16 +291,14 @@ def get_scrip_template_sources(template_ids_used: set, target_software: str) -> 
                 f"2 TID {tid}",
             ]
             # noinspection DuplicatedCode
-            if primary_creator:
-                block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
-            if commission:
-                block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {commission}"])
-            if date_str:
-                block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
-            if source_desc:
-                block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
-            if collection:
-                block.extend(["2 FIELD", "3 NAME Collection", f"3 VALUE {collection}"])
+            # RM's <...> omission logic only treats a field as blank when it's
+            # declared with an empty VALUE, not when it's missing from the list
+            # entirely - so every master field the template defines is always declared.
+            block.extend(["2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}"])
+            block.extend(["2 FIELD", "3 NAME Department", f"3 VALUE {commission}"])
+            block.extend(["2 FIELD", "3 NAME Date", f"3 VALUE {date_str}"])
+            block.extend(["2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_desc}"])
+            block.extend(["2 FIELD", "3 NAME Collection", f"3 VALUE {collection}"])
             block.extend(["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"])
             block.extend(Utils.weblink_lines(General.COLLECTION_URL, General.COLLECTION_NAME, "RM"))
         else:
