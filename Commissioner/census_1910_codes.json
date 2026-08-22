@@ -607,6 +607,8 @@
     "IN": "Indian",
     "Ot": "Other",
     "ot": "Other",
-    "OT": "Other"
+    "OT": "Other",
+    "M": "Mulatto",
+    "m": "Mulatto"
   }
 }
