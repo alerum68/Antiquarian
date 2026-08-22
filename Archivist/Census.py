@@ -1041,22 +1041,25 @@ def is_foreign_birthplace(birth_place: str) -> bool:
 
 
 def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
-    # 1. Primary Selection
-    # capitalize_text_string (not clean_val alone) on every raw-sourced piece here - a real census
-    # source can hand back ALL-CAPS or lowercase text, and every other proper-noun-like
-    # census field in this module (race, birth_place, occupation itself pre-refactor)
-    # already normalizes to Title Case. The connector words this function assembles
-    # itself ("at"/"working in") are left alone - they're ours, not sourced data.
-    base_occ = Utils.capitalize_text_string(row.get('Usual Occupation'))
+    from Commissioner import census_codes
+
+    # 1. Primary Selection - code-first: a decoded Item_C_Occupation code wins even
+    # when real occupation text is also present, per the code-first constraint.
+    # capitalize_text_string (not clean_val alone) on every text-sourced fallback -
+    # a real census source can hand back ALL-CAPS or lowercase text, and every other
+    # proper-noun-like census field in this module already normalizes to Title Case.
+    base_occ = census_codes.decode(CENSUS_YEAR, "Item_C_Occupation", row.get('Occupation Code'))
+    if not base_occ:
+        base_occ = Utils.capitalize_text_string(row.get('Usual Occupation'))
     if not base_occ:
         base_occ = Utils.capitalize_text_string(row.get('Occupation'))
-    if not base_occ:
-        base_occ = Utils.capitalize_text_string(row.get('Occupation Category'))
     if not base_occ:
         base_occ = Utils.capitalize_text_string(row.get('Trade or Profession'))
 
     employer = Utils.capitalize_text_string(row.get('Employer'))
-    industry = Utils.capitalize_text_string(row.get('Industry'))
+    industry = census_codes.decode(CENSUS_YEAR, "Item_C_Industry", row.get('Industry Code'))
+    if not industry:
+        industry = Utils.capitalize_text_string(row.get('Industry'))
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
@@ -1078,9 +1081,14 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
         occ_str += f", working in {industry}"
 
     # 4. Notes
+    class_of_worker = census_codes.decode(CENSUS_YEAR, "Item_C_Class_Of_Worker", row.get('Class of Worker Code'))
+    if not class_of_worker:
+        class_of_worker = Utils.clean_val(row.get('Class of Worker'))
+
     notes_parts = []
-    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Weeks Out of Work',
-                  'Months Unemployed Past Year']:
+    if class_of_worker:
+        notes_parts.append(f"Class of Worker: {class_of_worker}")
+    for field in ['Hours Worked', 'Weeks Worked', 'Weeks Out of Work', 'Months Unemployed Past Year']:
         val = Utils.clean_val(row.get(field))
         if val:
             notes_parts.append(f"{field}: {val}")
@@ -1088,6 +1096,7 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
     notes_str = "; ".join(notes_parts)
 
     return occ_str, notes_str
+
 
 
 def get_education_value(row: pd.Series) -> Optional[str]:

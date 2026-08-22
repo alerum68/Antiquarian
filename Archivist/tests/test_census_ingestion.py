@@ -1018,3 +1018,49 @@ def test_build_census_dataframe_from_unified_omits_code_columns_when_absent():
     row = df.iloc[0]
     for col in ('Occupation Code', 'Industry Code', 'Class of Worker Code', 'Birthplace Code'):
         assert col not in df.columns or not row.get(col)
+
+
+def test_get_occupation_value_prefers_decoded_code_over_existing_text():
+    """Code-first, not code-fallback: even when real occupation text is ALSO
+    present, the decoded code wins."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Occupation': 'Some Other Job'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Farmers (owners and tenants)"
+
+
+def test_get_occupation_value_falls_back_to_text_when_code_unknown():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '999999', 'Occupation': 'Blacksmith'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Blacksmith"
+
+
+def test_get_occupation_value_falls_back_to_text_when_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation': 'Blacksmith'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Blacksmith"
+
+
+def test_get_occupation_value_drops_occupation_category_entirely():
+    """Occupation Category (h/wk/ot/u) is a different, undecodable scheme - it must
+    never appear as the occupation value, even as a last resort."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Category': 'wk'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == ""
+
+
+def test_get_occupation_value_decodes_industry_code_first():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Industry Code': '105'})
+    occ, _ = arc.get_occupation_value(row)
+    assert "working in Agriculture" in occ
+
+
+def test_get_occupation_value_decodes_class_of_worker_code_in_notes():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Class of Worker Code': '3'})
+    _, notes = arc.get_occupation_value(row)
+    assert "Class of Worker: In own business" in notes
