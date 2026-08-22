@@ -19,6 +19,13 @@ def get_version() -> str:
 
 def build():
     version = get_version()
+    # customtkinter's hook is known to silently drop assets (themes, fonts) depending on the
+    # runner state - pin the assets dir explicitly so blue.json is always present. Resolved via
+    # the installed package's own __file__ rather than a hardcoded "venv/..." path, since CI
+    # installs straight into the hosted Python with no venv/ directory at all.
+    import customtkinter
+    customtkinter_dir = os.path.dirname(customtkinter.__file__)
+
     # Package the Antiquarian binary natively. --onedir prevents extraction penalties
     # for background subprocesses during runtime.
     print("Running PyInstaller...")
@@ -30,9 +37,7 @@ def build():
         "--noconfirm",
         "--clean",
         "--icon", "Antiquarian.ico",
-        # customtkinter's hook is known to silently drop assets (themes, fonts) depending
-        # on the runner state - pin the assets dir explicitly so blue.json is always present.
-        "--add-data", "venv/Lib/site-packages/customtkinter;customtkinter",
+        "--add-data", f"{customtkinter_dir};customtkinter",
         "--add-data", "Commissioner/assets/theme.json;Commissioner/assets",
         "--add-data", "Archivist/settings_schema.yaml;Archivist",
         "--add-data", "Voyageur/settings_schema.yaml;Voyageur",
