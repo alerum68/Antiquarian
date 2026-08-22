@@ -1098,11 +1098,10 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
     return occ_str, notes_str
 
 
-
 def get_education_value(row: pd.Series) -> Optional[str]:
     from Commissioner import census_codes
 
-    grade = Utils.clean_val(row.get('Highest Grade of School Completed', row.get('Highest Grade Completed', '')))
+    grade = get_row_val(row, ['Highest Grade of School Completed', 'Highest Grade Completed'], '')
     if grade:
         code = "0" if grade.upper() == "O" else grade
         return census_codes.decode(CENSUS_YEAR, "Education", code) or grade
@@ -1110,10 +1109,11 @@ def get_education_value(row: pd.Series) -> Optional[str]:
         return ''
     return None
 
+
 def get_race_value(row: pd.Series) -> str:
     from Commissioner import census_codes
 
-    raw = row.get('Race', row.get('Color', ''))
+    raw = get_row_val(row, ['Race', 'Color'], '')
     decoded = census_codes.decode(CENSUS_YEAR, "Race", raw)
     return decoded or Utils.capitalize_text_string(raw)
 
