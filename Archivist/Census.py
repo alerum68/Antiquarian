@@ -1100,13 +1100,15 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
 
 def get_education_value(row: pd.Series) -> Optional[str]:
+    from Commissioner import census_codes
+
     grade = Utils.clean_val(row.get('Highest Grade of School Completed', row.get('Highest Grade Completed', '')))
     if grade:
-        return grade
+        code = "0" if grade.upper() == "O" else grade
+        return census_codes.decode(CENSUS_YEAR, "Education", code) or grade
     if Utils.clean_val(row.get('Attended School')):
         return ''
     return None
-
 
 def get_birth_date(row: pd.Series, birth_year: float) -> str:
     month_str = get_row_val(row, ['Birth Month', 'Birth month', 'Month of Birth'], '')

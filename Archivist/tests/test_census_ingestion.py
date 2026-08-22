@@ -1064,3 +1064,33 @@ def test_get_occupation_value_decodes_class_of_worker_code_in_notes():
     row = pd.Series({'Occupation Code': '100', 'Class of Worker Code': '3'})
     _, notes = arc.get_occupation_value(row)
     assert "Class of Worker: In own business" in notes
+
+
+def test_get_education_value_decodes_grade_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'S8'})
+    assert arc.get_education_value(row) == "8th grade"
+
+
+def test_get_education_value_normalizes_letter_o_to_zero_before_decode():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'O'})
+    assert arc.get_education_value(row) == "No schooling"
+
+
+def test_get_education_value_falls_back_to_raw_code_when_undecodable():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'ZZ'})
+    assert arc.get_education_value(row) == "ZZ"
+
+
+def test_get_education_value_still_returns_none_when_nothing_present():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_education_value(row) is None
+
+
+def test_get_education_value_still_returns_empty_string_for_attended_only():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Attended School': 'Yes'})
+    assert arc.get_education_value(row) == ''
