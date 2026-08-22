@@ -66,3 +66,12 @@ def test_decode_birthplace_falsy_code():
     place, is_foreign = census_codes.decode_birthplace(1950, "")
     assert place is None
     assert is_foreign is False
+
+
+def test_decode_birthplace_tolerates_nan_and_numeric_codes():
+    place, is_foreign = census_codes.decode_birthplace(1950, float('nan'))
+    assert place is None
+    assert is_foreign is False
+
+    assert census_codes.decode_birthplace(1950, 161) == census_codes.decode_birthplace(1950, "161")
+    assert census_codes.decode_birthplace(1950, 161) == ("Canada -- English", True)
