@@ -548,7 +548,15 @@
     "999": "Inappropriate (under 14)"
   },
   "Item_H_Veteran": {
-    "": ""
+    "00": "N/A",
+    "10": "Not a veteran",
+    "11": "No military service",
+    "12": "Military service, but currently on active duty",
+    "13": "Training for Reserves or National Guard only",
+    "20": "Veteran (on active duty in past but not now)",
+    "0": "N/A",
+    "1": "Not a veteran",
+    "2": "Veteran"
   },
   "Item_C_Occupation": {
     "004": "Artists and art teachers",
