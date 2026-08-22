@@ -1121,7 +1121,7 @@ def get_race_value(row: pd.Series) -> str:
 def get_nationality_value(row: pd.Series, birth_place: str) -> str:
     from Commissioner import census_codes
 
-    code = row.get('Birthplace Code')
+    code = Utils.clean_val(row.get('Birthplace Code'))
     if code:
         place, is_foreign = census_codes.decode_birthplace(CENSUS_YEAR, code)
         if place is not None:

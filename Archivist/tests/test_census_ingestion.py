@@ -1146,3 +1146,19 @@ def test_get_nationality_value_empty_for_us_birthplace_text_no_code():
     arc.CENSUS_YEAR = 1950
     row = pd.Series({})
     assert arc.get_nationality_value(row, birth_place='Ohio') == ""
+
+
+def test_get_nationality_value_handles_nan_code_from_heterogeneous_dataframe():
+    """When a DataFrame has mixed Birthplace Code presence across rows,
+    pandas fills the missing cells with NaN rather than omitting the key.
+    NaN is truthy, so get_nationality_value must clean_val it before the
+    truthiness check or it will crash trying to len() a float."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([
+        {'Birthplace Code': 'V39', 'Nationality': None},
+        {'Birthplace Code': None, 'Nationality': 'Norway'},
+    ])
+    row_with_code = df.iloc[0]
+    row_without_code = df.iloc[1]
+    assert arc.get_nationality_value(row_with_code, birth_place='Ireland') == "Iceland"
+    assert arc.get_nationality_value(row_without_code, birth_place='Ohio') == "Norway"
