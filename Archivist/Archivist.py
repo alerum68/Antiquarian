@@ -21,6 +21,13 @@ _MODULE_DIR = str(Path(__file__).resolve().parent)
 if _MODULE_DIR not in sys.path:
     sys.path.insert(0, _MODULE_DIR)
 
+# Commissioner lives in a sibling tool folder, not an installed package - add the repo
+# root to sys.path so it can be imported by absolute path, matching Voyageur/FS.py's
+# and Paleographer/Extract.py's own precedent for cross-package imports.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 import Census  # noqa: E402
 import General  # noqa: E402
 import HBCA  # noqa: E402

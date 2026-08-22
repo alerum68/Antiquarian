@@ -1054,22 +1054,25 @@ def is_foreign_birthplace(birth_place: str) -> bool:
 
 
 def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
-    # 1. Primary Selection
-    # capitalize_text_string (not clean_val alone) on every raw-sourced piece here - a real census
-    # source can hand back ALL-CAPS or lowercase text, and every other proper-noun-like
-    # census field in this module (race, birth_place, occupation itself pre-refactor)
-    # already normalizes to Title Case. The connector words this function assembles
-    # itself ("at"/"working in") are left alone - they're ours, not sourced data.
-    base_occ = Utils.capitalize_text_string(row.get('Usual Occupation'))
+    from Commissioner import census_codes
+
+    # 1. Primary Selection - code-first: a decoded Item_C_Occupation code wins even
+    # when real occupation text is also present, per the code-first constraint.
+    # capitalize_text_string (not clean_val alone) on every text-sourced fallback -
+    # a real census source can hand back ALL-CAPS or lowercase text, and every other
+    # proper-noun-like census field in this module already normalizes to Title Case.
+    base_occ = census_codes.decode(CENSUS_YEAR, "Item_C_Occupation", row.get('Occupation Code'))
+    if not base_occ:
+        base_occ = Utils.capitalize_text_string(row.get('Usual Occupation'))
     if not base_occ:
         base_occ = Utils.capitalize_text_string(row.get('Occupation'))
-    if not base_occ:
-        base_occ = Utils.capitalize_text_string(row.get('Occupation Category'))
     if not base_occ:
         base_occ = Utils.capitalize_text_string(row.get('Trade or Profession'))
 
     employer = Utils.capitalize_text_string(row.get('Employer'))
-    industry = Utils.capitalize_text_string(row.get('Industry'))
+    industry = census_codes.decode(CENSUS_YEAR, "Item_C_Industry", row.get('Industry Code'))
+    if not industry:
+        industry = Utils.capitalize_text_string(row.get('Industry'))
 
     # 2. Unemployment Override
     is_unemployed = (Utils.clean_val(row.get('Out Of Work')) == 'Yes' or
@@ -1091,9 +1094,14 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
         occ_str += f", working in {industry}"
 
     # 4. Notes
+    class_of_worker = census_codes.decode(CENSUS_YEAR, "Item_C_Class_Of_Worker", row.get('Class of Worker Code'))
+    if not class_of_worker:
+        class_of_worker = Utils.clean_val(row.get('Class of Worker'))
+
     notes_parts = []
-    for field in ['Class of Worker', 'Hours Worked', 'Weeks Worked', 'Weeks Out of Work',
-                  'Months Unemployed Past Year']:
+    if class_of_worker:
+        notes_parts.append(f"Class of Worker: {class_of_worker}")
+    for field in ['Hours Worked', 'Weeks Worked', 'Weeks Out of Work', 'Months Unemployed Past Year']:
         val = Utils.clean_val(row.get(field))
         if val:
             notes_parts.append(f"{field}: {val}")
@@ -1104,12 +1112,38 @@ def get_occupation_value(row: pd.Series) -> Tuple[str, str]:
 
 
 def get_education_value(row: pd.Series) -> Optional[str]:
-    grade = Utils.clean_val(row.get('Highest Grade of School Completed', row.get('Highest Grade Completed', '')))
+    from Commissioner import census_codes
+
+    grade = get_row_val(row, ['Highest Grade of School Completed', 'Highest Grade Completed'], '')
     if grade:
-        return grade
+        code = "0" if grade.upper() == "O" else grade
+        return census_codes.decode(CENSUS_YEAR, "Education", code) or grade
     if Utils.clean_val(row.get('Attended School')):
         return ''
     return None
+
+
+def get_race_value(row: pd.Series) -> str:
+    from Commissioner import census_codes
+
+    raw = get_row_val(row, ['Race', 'Color'], '')
+    decoded = census_codes.decode(CENSUS_YEAR, "Race", raw)
+    return decoded or Utils.capitalize_text_string(raw)
+
+
+def get_nationality_value(row: pd.Series, birth_place: str) -> str:
+    from Commissioner import census_codes
+
+    code = Utils.clean_val(row.get('Birthplace Code'))
+    if code:
+        place, is_foreign = census_codes.decode_birthplace(CENSUS_YEAR, code)
+        if place is not None:
+            return place if is_foreign else ""
+
+    nat_val = Utils.clean_val(row.get('Nationality'))
+    if not nat_val and birth_place and is_foreign_birthplace(birth_place):
+        nat_val = birth_place
+    return nat_val
 
 
 def get_birth_date(row: pd.Series, birth_year: float) -> str:
@@ -1621,12 +1655,10 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
             occ_evt.extend(["2 _PROOF proven"] + cit)
             ged.extend(occ_evt)
 
-        if race := Utils.capitalize_text_string(row.get('Race', row.get('Color', ''))):
+        if race := get_race_value(row):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proposed"] + cit)
 
-        nat_val = Utils.clean_val(row.get('Nationality'))
-        if not nat_val and birth_place and is_foreign_birthplace(birth_place):
-            nat_val = birth_place
+        nat_val = get_nationality_value(row, birth_place)
         if nat_val:
             ged.extend([f"1 NATI {nat_val}", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
 
@@ -1903,6 +1935,15 @@ def build_census_dataframe_from_unified(data: dict) -> Tuple[pd.DataFrame, str, 
                     row['Birth Place'] = p['birth_place']
                 if p.get('race'):
                     row['Race'] = p['race']
+                unmapped = pts.get('unmapped') or {}
+                if unmapped.get(f'MISC_CODE_C_{census_year_str}_CENSUS'):
+                    row['Occupation Code'] = unmapped[f'MISC_CODE_C_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_C1_{census_year_str}_CENSUS'):
+                    row['Industry Code'] = unmapped[f'MISC_CODE_C1_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_C2_{census_year_str}_CENSUS'):
+                    row['Class of Worker Code'] = unmapped[f'MISC_CODE_C2_{census_year_str}_CENSUS']
+                if unmapped.get(f'MISC_CODE_B_{census_year_str}_CENSUS'):
+                    row['Birthplace Code'] = unmapped[f'MISC_CODE_B_{census_year_str}_CENSUS']
                 # Occupation belongs in the participant's
                 # own named 'occupation' field, not a duplicate facts-array entry (see
                 # field_maps/familysearch_census.yaml's own comment on this) - get_occupation_value()

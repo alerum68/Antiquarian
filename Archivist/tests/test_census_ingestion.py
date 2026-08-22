@@ -976,3 +976,216 @@ def test_location_string_falls_back_to_residence_place_only_when_census_place_bl
 
     populated_row = pd.Series({"State": "Minnesota", "Residence Place Fallback": "Should Not Win"})
     assert get_location_string(populated_row) == "Minnesota, USA"
+
+
+def test_build_census_dataframe_from_unified_surfaces_unmapped_codes():
+    data = {
+        "record_type_name": "Census_1950", "sheets": [{
+            "page_id": "1", "document_metadata": {},
+            "records": [{
+                "type_specific_fields": {},
+                "participants": [{
+                    "std_given": "William", "std_surname": "Vinctson",
+                    "type_specific_fields": {
+                        "unmapped": {
+                            "MISC_CODE_C_1950_CENSUS": "100",
+                            "MISC_CODE_C1_1950_CENSUS": "105",
+                            "MISC_CODE_C2_1950_CENSUS": "3",
+                            "MISC_CODE_B_1950_CENSUS": "161",
+                        },
+                    },
+                }],
+            }],
+        }],
+    }
+    df, year_str, _ = arc.build_census_dataframe_from_unified(data)
+    assert year_str == "1950"
+    row = df.iloc[0]
+    assert row['Occupation Code'] == "100"
+    assert row['Industry Code'] == "105"
+    assert row['Class of Worker Code'] == "3"
+    assert row['Birthplace Code'] == "161"
+
+
+def test_build_census_dataframe_from_unified_omits_code_columns_when_absent():
+    data = {
+        "record_type_name": "Census_1950", "sheets": [{
+            "page_id": "1", "document_metadata": {},
+            "records": [{
+                "type_specific_fields": {},
+                "participants": [{"std_given": "Jane", "std_surname": "Doe",
+                                  "type_specific_fields": {}}],
+            }],
+        }],
+    }
+    df, _, _ = arc.build_census_dataframe_from_unified(data)
+    row = df.iloc[0]
+    for col in ('Occupation Code', 'Industry Code', 'Class of Worker Code', 'Birthplace Code'):
+        assert col not in df.columns or not row.get(col)
+
+
+def test_get_occupation_value_prefers_decoded_code_over_existing_text():
+    """Code-first, not code-fallback: even when real occupation text is ALSO
+    present, the decoded code wins."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Occupation': 'Some Other Job'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Farmers (owners and tenants)"
+
+
+def test_get_occupation_value_falls_back_to_text_when_code_unknown():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '999999', 'Occupation': 'Blacksmith'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Blacksmith"
+
+
+def test_get_occupation_value_falls_back_to_text_when_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation': 'Blacksmith'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == "Blacksmith"
+
+
+def test_get_occupation_value_drops_occupation_category_entirely():
+    """Occupation Category (h/wk/ot/u) is a different, undecodable scheme - it must
+    never appear as the occupation value, even as a last resort."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Category': 'wk'})
+    occ, _ = arc.get_occupation_value(row)
+    assert occ == ""
+
+
+def test_get_occupation_value_decodes_industry_code_first():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Industry Code': '105'})
+    occ, _ = arc.get_occupation_value(row)
+    assert "working in Agriculture" in occ
+
+
+def test_get_occupation_value_decodes_class_of_worker_code_in_notes():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Occupation Code': '100', 'Class of Worker Code': '3'})
+    _, notes = arc.get_occupation_value(row)
+    assert "Class of Worker: In own business" in notes
+
+
+def test_get_education_value_decodes_grade_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'S8'})
+    assert arc.get_education_value(row) == "8th grade"
+
+
+def test_get_education_value_normalizes_letter_o_to_zero_before_decode():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'O'})
+    assert arc.get_education_value(row) == "No schooling"
+
+
+def test_get_education_value_falls_back_to_raw_code_when_undecodable():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Highest Grade Completed': 'ZZ'})
+    assert arc.get_education_value(row) == "ZZ"
+
+
+def test_get_education_value_still_returns_none_when_nothing_present():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_education_value(row) is None
+
+
+def test_get_education_value_still_returns_empty_string_for_attended_only():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Attended School': 'Yes'})
+    assert arc.get_education_value(row) == ''
+
+
+def test_get_education_value_falls_back_to_alt_column_in_heterogeneous_dataframe():
+    """On a real multi-row DataFrame built from rows with different keys, a
+    missing 'Highest Grade of School Completed' cell is NaN (not an absent key),
+    so the alt-column fallback must still fire via get_row_val rather than being
+    masked by row.get's default arg."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([
+        {'Highest Grade of School Completed': 'S8', 'Highest Grade Completed': None},
+        {'Highest Grade of School Completed': None, 'Highest Grade Completed': 'S4'},
+    ])
+    assert arc.get_education_value(df.iloc[1]) == "4th grade"
+
+
+def test_get_race_value_decodes_abbreviation():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Race': 'W'})) == "White"
+
+
+def test_get_race_value_passes_through_already_spelled_out_value():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Race': 'White'})) == "White"
+
+
+def test_get_race_value_falls_back_to_color_column():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({'Color': 'W'})) == "White"
+
+
+def test_get_race_value_empty_when_nothing_present():
+    arc.CENSUS_YEAR = 1950
+    assert arc.get_race_value(pd.Series({})) == ""
+
+
+def test_get_race_value_falls_back_to_color_column_in_heterogeneous_dataframe():
+    """On a real multi-row DataFrame built from rows with different keys, a
+    missing 'Race' cell is NaN (not an absent key), so the Color fallback must
+    still fire via get_row_val rather than being masked by row.get's default arg."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([{'Race': 'W', 'Color': None}, {'Race': None, 'Color': 'N'}])
+    assert arc.get_race_value(df.iloc[1]) == "Negro"
+
+
+def test_get_nationality_value_uses_decoded_foreign_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': 'V39', 'Birth Place': 'Ireland'})
+    assert arc.get_nationality_value(row, birth_place='Ireland') == "Iceland"
+
+
+def test_get_nationality_value_suppresses_for_resolved_us_code():
+    """A resolved US code must win over stale Nationality text or a
+    foreign-looking birth_place string - the code can rule a value out, not just
+    supply one."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': '091', 'Nationality': 'Norwegian'})
+    assert arc.get_nationality_value(row, birth_place='Norway') == ""
+
+
+def test_get_nationality_value_falls_back_to_text_when_code_unresolved():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': '999999'})
+    assert arc.get_nationality_value(row, birth_place='Norway') == "Norway"
+
+
+def test_get_nationality_value_falls_back_to_text_when_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_nationality_value(row, birth_place='Norway') == "Norway"
+
+
+def test_get_nationality_value_empty_for_us_birthplace_text_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_nationality_value(row, birth_place='Ohio') == ""
+
+
+def test_get_nationality_value_handles_nan_code_from_heterogeneous_dataframe():
+    """When a DataFrame has mixed Birthplace Code presence across rows,
+    pandas fills the missing cells with NaN rather than omitting the key.
+    NaN is truthy, so get_nationality_value must clean_val it before the
+    truthiness check or it will crash trying to len() a float."""
+    arc.CENSUS_YEAR = 1950
+    df = pd.DataFrame([
+        {'Birthplace Code': 'V39', 'Nationality': None},
+        {'Birthplace Code': None, 'Nationality': 'Norway'},
+    ])
+    row_with_code = df.iloc[0]
+    row_without_code = df.iloc[1]
+    assert arc.get_nationality_value(row_with_code, birth_place='Ireland') == "Iceland"
+    assert arc.get_nationality_value(row_without_code, birth_place='Ohio') == "Norway"

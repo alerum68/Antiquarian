@@ -28,3 +28,4 @@ os.environ["ANCESTRY_GROUP_URL"] = "https://www.ancestry.com/groups/85343"
 os.environ["ROOT_SOURCE_ID"] = "@S1@"
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
