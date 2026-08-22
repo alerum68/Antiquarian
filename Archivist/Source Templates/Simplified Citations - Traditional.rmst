@@ -2,7 +2,7 @@
 <SourceTemplates>
   <Copyright>RootsMagic source templates, template language, and template file format are copyright 2009-10 RootsMagic, Inc.  All rights reserved.</Copyright>
   <Template Id="10010">
-    <Name>* Simple Citations: Traditional</Name>
+    <Name>!Simple Citations: Traditional</Name>
     <Description>(NOTE: All other templates using simplified citations should start with this one. Items may be REMOVED from copies of this template to create other ones but NOTHING should be added to those templates unless it is also added here.)
 
 This template is designed for citing traditional sources: books, newspapers, periodicals, etc. that were created by an individual or individuals.

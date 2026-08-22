@@ -138,24 +138,29 @@ def evaluate_task_priority(task_note: str) -> tuple:
     return 3, "3", "General Review"
 
 
-def _gedcom_text_lines(level: int, tag: str, text: str) -> List[str]:
-    """Splits a multi-line template text value into a leading 'LEVEL TAG line1' followed by
-    'LEVEL+1 CONT lineN' continuation lines for every subsequent line. Confirmed
-    live as the real cause of RootsMagic falling back every source
-    to Freeform instead of the imported template: GEDCOM 5.5.1 requires every physical line
-    to start with its own level+tag - this template source's own multi-paragraph
-    Description/Hint text contains raw embedded newlines, which previously got written
-    out as bare continuation lines with no tag prefix at all (invalid GEDCOM), not proper
-    CONT lines."""
-    parts = text.split("\n")
-    result = [f"{level} {tag} {parts[0]}"]
-    result.extend(f"{level + 1} CONT {cont}" for cont in parts[1:])
-    return result
+def _gedcom_wrapped_lines(level: int, tag: str, text: str, max_len: int = 200) -> List[str]:
+    """CONT on each literal newline (paragraph break); CONC within a paragraph past
+    max_len - GEDCOM 5.5.1 caps a physical line at 255 bytes."""
+    lines: List[str] = []
+    first = True
+    for para in text.split("\n"):
+        chunks = [para[i:i + max_len] for i in range(0, len(para), max_len)] or [""]
+        for i, chunk in enumerate(chunks):
+            if first:
+                lines.append(f"{level} {tag} {chunk}")
+                first = False
+            elif i == 0:
+                lines.append(f"{level + 1} CONT {chunk}")
+            else:
+                lines.append(f"{level + 1} CONC {chunk}")
+    return lines
 
 
 # noinspection DuplicatedCode
 def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
-    """Converts a <Template> XML element into RootsMagic GEDCOM 0 _SRCTEMPLATE lines."""
+    """Emits _STMPLT/FOOTNOTE/BIBLIO/DISPLAY/ISDETAIL/LONGHINT - RM's real tag
+    vocabulary, not the _SRCTEMPLATE/FOOT/BIBL/DISP/DETL/LHNT names RM doesn't
+    recognize."""
     tid = elem.get("Id", "")
     name = (elem.findtext("Name") or "").strip()
     desc = (elem.findtext("Description") or "").strip()
@@ -164,20 +169,22 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
     short = (elem.findtext("ShortFootnote") or "").strip()
     bibl = (elem.findtext("Bibliography") or "").strip()
 
-    lines = [f"0 _SRCTEMPLATE {name}", f"1 TID {tid}"]
+    lines = ["0 _STMPLT", f"1 TID {tid}"]
+    if name:
+        lines.append(f"1 NAME {name}")
     if desc:
-        lines.extend(_gedcom_text_lines(1, "DESC", desc))
+        lines.extend(_gedcom_wrapped_lines(1, "DESC", desc))
     if cat:
         lines.append(f"1 CAT {cat}")
     if foot:
-        lines.extend(_gedcom_text_lines(1, "FOOT", foot))
+        lines.extend(_gedcom_wrapped_lines(1, "FOOTNOTE", foot))
     if short:
-        lines.extend(_gedcom_text_lines(1, "SHORT", short))
+        lines.extend(_gedcom_wrapped_lines(1, "SHORT", short))
     if bibl:
-        lines.extend(_gedcom_text_lines(1, "BIBL", bibl))
+        lines.extend(_gedcom_wrapped_lines(1, "BIBLIO", bibl))
 
     for fld in elem.findall("Field"):
-        f_type = (fld.findtext("Type") or "Text").strip()
+        f_type = (fld.findtext("Type") or "Text").strip().upper()
         f_name = (fld.findtext("Name") or "").strip()
         f_disp = (fld.findtext("Display") or "").strip()
         f_hint = (fld.findtext("Hint") or "").strip()
@@ -185,15 +192,16 @@ def _rmst_element_to_gedcom(elem: etree.Element) -> List[str]:
         f_lhnt = (fld.findtext("LongHint") or "").strip()
 
         lines.append("1 FIELD")
-        lines.append(f"2 TYPE {f_type}")
-        lines.append(f"2 NAME {f_name}")
+        if f_name:
+            lines.append(f"2 NAME {f_name}")
         if f_disp:
-            lines.append(f"2 DISP {f_disp}")
+            lines.extend(_gedcom_wrapped_lines(2, "DISPLAY", f_disp))
         if f_hint:
-            lines.extend(_gedcom_text_lines(2, "HINT", f_hint))
-        lines.append(f"2 DETL {f_detl}")
+            lines.extend(_gedcom_wrapped_lines(2, "HINT", f_hint))
         if f_lhnt:
-            lines.extend(_gedcom_text_lines(2, "LHNT", f_lhnt))
+            lines.extend(_gedcom_wrapped_lines(2, "LONGHINT", f_lhnt))
+        lines.append(f"2 TYPE {f_type}")
+        lines.append(f"2 ISDETAIL {f_detl}")
     return lines
 
 
@@ -227,7 +235,7 @@ def load_source_template_lines(template_id: int) -> List[str]:
 
 
 def get_source_templates(template_ids_used: set) -> List[str]:
-    """Generates 0 _SRCTEMPLATE GEDCOM blocks for all referenced template IDs."""
+    """Generates 0 _STMPLT GEDCOM blocks for all referenced template IDs."""
     lines = []
     for tid in sorted(template_ids_used):
         t_lines = load_source_template_lines(tid)
@@ -834,7 +842,6 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
         page_parts.append(person_str)
 
         collection_title = COLLECTION_NAME or DEFAULT_COLLECTION_NAME
-        cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
 
         detail_fields = [
             ("Page", f"p. {real_page}" if real_page else ""),
@@ -847,11 +854,17 @@ def build_census_citation(row: pd.Series, rec_id: str, m_id: str, real_page: str
             ("URL", ancestry_url),
             ("RefNumber", f"APID 1,{APID_DB}::{rec_id}" if (APID_DB and rec_id) else ""),
         ]
+        cit.append(f"3 PAGE {'; '.join(filter(None, page_parts))}")
+        # Bare FIELD tags render Free Form; RM needs them under _TMPLT. No TID here -
+        # that's on the master SOUR record only. RM's <...> omission logic only treats
+        # a field as blank when it's declared with an empty VALUE, not when it's
+        # missing from the list entirely - so every field is always declared.
+        cit.append("3 _TMPLT")
         for f_name, f_val in detail_fields:
-            if f_val:
-                cit.extend(["3 FIELD", f"4 NAME {f_name}", f"4 VALUE {f_val}"])
+            cit.extend(["4 FIELD", f"5 NAME {f_name}", f"5 VALUE {f_val}"])
 
         cit.append("3 DATA")
+
         if APID_DB and rec_id:
             cit.extend(["3 _WEBTAG",
                         f"4 NAME Anc- {collection_title}",
@@ -1199,18 +1212,20 @@ def get_census_sources(target_software: str) -> List[str]:
     pub_loc = Utils.clean_val(PUB_LOC)
 
     if target_software == "RM":
+        # RM's <...> Footnote/Bibliography omission logic only recognizes a field as
+        # "blank, omit" when it's declared with an empty VALUE - a field missing from
+        # the _TMPLT list entirely renders as a literal [FieldName] placeholder instead.
+        # Every master field the template defines is declared here, even when unset.
         tmplt_fields = [
             "2 FIELD", "3 NAME PrimaryCreator", f"3 VALUE {primary_creator}",
             "2 FIELD", "3 NAME Department", f"3 VALUE {department}",
             "2 FIELD", "3 NAME Date", f"3 VALUE {date_str}",
             "2 FIELD", "3 NAME SourceDescription", f"3 VALUE {source_title}",
+            "2 FIELD", "3 NAME Person", "3 VALUE",
+            "2 FIELD", "3 NAME Publisher", f"3 VALUE {publisher}",
+            "2 FIELD", "3 NAME PublishLocation", f"3 VALUE {pub_loc}",
+            "2 FIELD", "3 NAME Repository", f"3 VALUE {repository}",
         ]
-        if publisher:
-            tmplt_fields += ["2 FIELD", "3 NAME Publisher", f"3 VALUE {publisher}"]
-        if pub_loc:
-            tmplt_fields += ["2 FIELD", "3 NAME PublishLocation", f"3 VALUE {pub_loc}"]
-        if repository:
-            tmplt_fields += ["2 FIELD", "3 NAME Repository", f"3 VALUE {repository}"]
 
         bibl = (f"{primary_creator}, {department}. {date_str}. {source_title}. {pub_loc}: {publisher}."
                 if (pub_loc and publisher)
