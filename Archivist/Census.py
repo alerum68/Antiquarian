@@ -1118,6 +1118,21 @@ def get_race_value(row: pd.Series) -> str:
     return decoded or Utils.capitalize_text_string(raw)
 
 
+def get_nationality_value(row: pd.Series, birth_place: str) -> str:
+    from Commissioner import census_codes
+
+    code = row.get('Birthplace Code')
+    if code:
+        place, is_foreign = census_codes.decode_birthplace(CENSUS_YEAR, code)
+        if place is not None:
+            return place if is_foreign else ""
+
+    nat_val = Utils.clean_val(row.get('Nationality'))
+    if not nat_val and birth_place and is_foreign_birthplace(birth_place):
+        nat_val = birth_place
+    return nat_val
+
+
 def get_birth_date(row: pd.Series, birth_year: float) -> str:
     month_str = get_row_val(row, ['Birth Month', 'Birth month', 'Month of Birth'], '')
     abbr = MONTH_ABBR.get(month_str.upper())
@@ -1628,9 +1643,7 @@ def build_gedcom_from_census(df_in: pd.DataFrame, target_software: str) -> None:
         if race := get_race_value(row):
             ged.extend([f"1 FACT {race}", "2 TYPE Race", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proposed"] + cit)
 
-        nat_val = Utils.clean_val(row.get('Nationality'))
-        if not nat_val and birth_place and is_foreign_birthplace(birth_place):
-            nat_val = birth_place
+        nat_val = get_nationality_value(row, birth_place)
         if nat_val:
             ged.extend([f"1 NATI {nat_val}", f"2 DATE {CENSUS_YEAR}", "2 _PROOF proven"] + cit)
 

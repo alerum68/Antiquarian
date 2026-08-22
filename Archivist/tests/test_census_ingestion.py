@@ -1113,3 +1113,36 @@ def test_get_race_value_falls_back_to_color_column():
 def test_get_race_value_empty_when_nothing_present():
     arc.CENSUS_YEAR = 1950
     assert arc.get_race_value(pd.Series({})) == ""
+
+
+def test_get_nationality_value_uses_decoded_foreign_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': 'V39', 'Birth Place': 'Ireland'})
+    assert arc.get_nationality_value(row, birth_place='Ireland') == "Iceland"
+
+
+def test_get_nationality_value_suppresses_for_resolved_us_code():
+    """A resolved US code must win over stale Nationality text or a
+    foreign-looking birth_place string - the code can rule a value out, not just
+    supply one."""
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': '091', 'Nationality': 'Norwegian'})
+    assert arc.get_nationality_value(row, birth_place='Norway') == ""
+
+
+def test_get_nationality_value_falls_back_to_text_when_code_unresolved():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({'Birthplace Code': '999999'})
+    assert arc.get_nationality_value(row, birth_place='Norway') == "Norway"
+
+
+def test_get_nationality_value_falls_back_to_text_when_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_nationality_value(row, birth_place='Norway') == "Norway"
+
+
+def test_get_nationality_value_empty_for_us_birthplace_text_no_code():
+    arc.CENSUS_YEAR = 1950
+    row = pd.Series({})
+    assert arc.get_nationality_value(row, birth_place='Ohio') == ""
