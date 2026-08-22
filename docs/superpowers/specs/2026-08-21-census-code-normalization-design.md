@@ -47,12 +47,21 @@ during this same working session, verified against the real gather.
   from the occupation fallback chain entirely rather than used as raw, undecoded text.
 - No hard restriction to the 1950 census year in the code itself — the decode
   function is year-parameterized and gracefully returns nothing for any
-  year/item/code that isn't in the dictionary, so other years (1900-1940, which
-  already have populated Occupation/Industry/Class-of-Worker tables) benefit
-  automatically wherever their raw JSON happens to use the same
-  `MISC_CODE_*_<year>_CENSUS` unmapped-key convention 1950 uses. That convention is
-  unverified for other years - no code changes are gated on it, but accuracy for
-  years other than 1950 is unverified until checked against a real gather.
+  year/item/code that isn't in the dictionary. In practice, only the `Race` and
+  `Education` tables currently generalize across years without further work: their
+  item keys (`Race`, `Education`) are consistent in every year's JSON dictionary.
+  `Occupation`/`Industry`/`Class of Worker` decoding, however, will not fire for
+  1910-1940 as-is, because `Census.py` hardcodes the 1900/1950-style
+  `Item_C_Occupation`/`Item_C_Industry`/`Item_C_Class_Of_Worker` item keys, while
+  `census_1910_codes.json` through `census_1930_codes.json` use plain
+  `Occupation`/`Industry`/`Class_Of_Worker` keys instead (1940 does too, alongside
+  1900/1950-style keys for other items). Likewise `decode_birthplace` hardcodes
+  `Item_B1_Birthplace_US`/`Item_B2_Birthplace_Foreign`, but 1940's dictionary uses
+  `Item_F_Birthplace` instead. This is safe either way at runtime — a decode miss
+  falls back to the existing text-based logic unchanged — but making
+  Occupation/Industry/Class-of-Worker/Birthplace decoding actually work for
+  1910-1940 would require a per-year item-key alias map as follow-up work, which is
+  out of scope for this branch.
 
 ## Design
 
