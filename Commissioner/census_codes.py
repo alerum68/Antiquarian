@@ -8,6 +8,7 @@ dictionary fix never requires re-gathering.
 """
 
 import json
+import math
 import os
 from typing import Dict, Optional, Tuple
 
@@ -41,8 +42,9 @@ def decode_birthplace(year: int, code: Optional[str]) -> Tuple[Optional[str], bo
     code against Item_B1 first; if that misses, strips the first character and
     tries the remainder against Item_B2. Returns (place, is_foreign) - (None, False)
     if neither resolves."""
-    if not code:
+    if not code or (isinstance(code, float) and math.isnan(code)):
         return None, False
+    code = str(code)
     us_place = decode(year, "Item_B1_Birthplace_US", code)
     if us_place:
         return us_place, False
